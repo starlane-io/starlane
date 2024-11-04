@@ -36,7 +36,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
-use starlane_primitive_macros::logx;
+use starlane_primitive_macros::{logger, push_loc};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
@@ -293,7 +293,7 @@ impl Starlane {
         let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookups.clone())).await?);
         let handle = PostgresRegistryContextHandle::new(&db.database, ctx, db.handle);
 
-        let logger = logx!(&Point::global_registry());
+        let logger = logger!(&Point::global_registry());
         let registry = Arc::new(RegistryWrapper::new(Arc::new(
             PostgresRegistry::new(handle, Box::new(lookups), logger).await?,
         )));
@@ -430,9 +430,7 @@ where
                 .unwrap();
         };
 
-        let logger = self
-            .logger()
-            .push_loc(Point::from_str("control-blah").unwrap());
+        let logger = push_loc!((self.logger(),Point::from_str("control-blah").unwrap()));
 
         if !is_local_ipv4_port_free(STARLANE_CONTROL_PORT.clone()) {
             panic_shutdown(format!(

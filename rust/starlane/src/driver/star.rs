@@ -43,6 +43,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use starlane::space::parse::util::{result, parse_errs};
 use starlane::space::wave::core::MethodKind::Hyp;
+use starlane_primitive_macros::push_mark;
 
 #[derive(Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct StarPair {
@@ -188,7 +189,7 @@ impl Driver for StarDriver
     }
 
     async fn init(&mut self, skel: DriverSkel, _: DriverCtx) -> Result<(), DriverErr> {
-        let logger = skel.logger.push_mark("init")?;
+        let logger = push_mark!(skel.logger);
         logger
             .result(self.driver_skel.status_tx.send(DriverStatus::Init).await)
             .unwrap_or_default();

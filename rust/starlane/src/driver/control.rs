@@ -41,7 +41,7 @@ use std::time::Duration;
 use anyhow::anyhow;
 use thiserror::Error;
 use starlane::space::log::Tracker;
-use starlane_primitive_macros::logx;
+use starlane_primitive_macros::logger;
 
 pub struct ControlDriverFactory {}
 
@@ -161,7 +161,8 @@ impl Driver for ControlDriver {
             remote_point_factory,
             self.skel.driver.logger.clone(),
         );
-        let mut interchange = HyperwayInterchange::new(self.skel.driver.logger.clone());
+        let point = skel.point.clone();
+        let mut interchange = HyperwayInterchange::new(point,self.skel.driver.logger.clone());
         let hyperway = Hyperway::new(
             Point::remote_endpoint().to_surface(),
             Agent::HyperUser,
@@ -418,7 +419,7 @@ impl ControlClient {
             Timeouts::default(),
             Default::default(),
         );
-        let logger = logx!(Point::from_str("control-client")?);
+        let logger = logger!(Point::from_str("control-client")?);
         let client = HyperClient::new_with_exchanger(factory, Some(exchanger), logger)?;
         Ok(Self { client })
     }

@@ -109,8 +109,8 @@ pub struct GlobalExecutionChamber {
 
 impl GlobalExecutionChamber {
     pub fn new(skel: HyperStarSkel) -> Self {
-        let logger = skel.logger.clone();
-        Self { skel, logger: push_mark!()}
+        let logger = push_mark!(skel.logger);
+        Self { skel, logger}
     }
 
     #[track_caller]

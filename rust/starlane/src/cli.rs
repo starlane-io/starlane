@@ -21,7 +21,7 @@ use tokio::io::AsyncWriteExt;
 use walkdir::{DirEntry, WalkDir};
 use zip::write::FileOptions;
 use starlane::space::parse::util::result;
-use starlane_primitive_macros::logx;
+use starlane_primitive_macros::logger;
 use crate::env::STARLANE_HOME;
 
 #[derive(Debug, Parser)]
@@ -152,7 +152,7 @@ pub struct Session {
 
 impl Session {
     pub async fn new(host: String, certs: String) -> Result<Self, SpaceErr> {
-        let logger = logx!(Point::from_str("starlane-cli")?);
+        let logger = logger!(Point::from_str("starlane-cli")?);
         let tcp_client: Box<dyn HyperwayEndpointFactory> = Box::new(HyperlaneTcpClient::new(
             format!("{}:{}", host, 4343),
             certs,

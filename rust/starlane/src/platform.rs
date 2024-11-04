@@ -16,7 +16,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use anyhow::anyhow;
 use starlane::space::log::SpanLogger;
-use starlane_primitive_macros::logx;
+use starlane_primitive_macros::logger;
 use crate::env::config_path;
 use crate::foundation::Foundation;
 use crate::PgRegistryConfig;
@@ -91,7 +91,7 @@ where
     fn artifact_hub(&self) -> Artifacts;
     async fn start_services(&self, gate: &Arc<HyperGateSelector>) {}
     fn logger(&self) -> SpanLogger{
-        logx!()
+        logger!()
     }
 
     fn web_port(&self) -> Result<u16, Self::Err> {

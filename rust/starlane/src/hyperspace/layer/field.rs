@@ -22,7 +22,7 @@ use starlane::space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
 use starlane::space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, PongCore, Reflection, Wave, WaveVariantDef,
 };
-
+use starlane_primitive_macros::push_loc;
 use crate::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, TraverseToNextRouter};
 
@@ -40,7 +40,7 @@ impl Field
 {
     pub fn new(point: Point, skel: HyperStarSkel) -> Self {
         let port = point.to_surface().with_layer(Layer::Field);
-        let logger = skel.logger.loc(port.point.clone());
+        let logger = push_loc!((skel.logger,&port));
         let shell_router = Arc::new(TraverseToNextRouter::new(skel.traverse_to_next_tx.clone()));
         let shell_transmitter = TraversalTransmitter::new(shell_router, skel.exchanger.clone());
 
@@ -109,7 +109,7 @@ impl TraversalLayer for Field
 
     async fn traverse_next(&self, traversal: Traversal<Wave>) {
         self.logger
-            .eat(self.skel.traverse_to_next_tx.send(traversal).await);
+            .result(self.skel.traverse_to_next_tx.send(traversal).await);
     }
 
     async fn inject(&self, wave: Wave) {

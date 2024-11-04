@@ -42,6 +42,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use starlane_primitive_macros::push_loc;
 use crate::Database;
 use crate::env::STARLANE_CONFIG;
 use crate::hyperspace::reg::{Registration, RegistryApi};
@@ -66,7 +67,7 @@ impl PostgresRegistry {
         platform: Box<dyn PostgresPlatform>,
         logger: PointLogger
     ) -> Result<Self, RegErr> {
-        let logger = logger.loc(Point::global_registry());
+        let logger = push_loc!((logger,Point::global_registry()));
         /*
         let pool = PgPoolOptions::new()
             .max_connections(5)

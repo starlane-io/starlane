@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use crate::space::loc::{ToPoint, ToSurface};
-use crate::space::log::{logger,  PointLogger, Trackable, Tracker};
+use crate::space::log::{ PointLogger, Trackable, Tracker};
 use crate::space::particle::traversal::Traversal;
 use crate::space::point::Point;
 use crate::space::settings::Timeouts;
@@ -22,7 +22,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use nom_supreme::error::StackContext;
 use tokio::sync::{mpsc, oneshot};
-use starlane_primitive_macros::log_span;
+use starlane_primitive_macros::{log_span, logger};
 
 #[async_trait]
 impl Router for TxRouter {
@@ -484,7 +484,7 @@ impl Default for Exchanger {
         Self::new(
             Point::root().to_surface(),
             Default::default(),
-            logger()
+            logger!()
         )
     }
 }

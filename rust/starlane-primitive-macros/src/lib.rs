@@ -445,14 +445,14 @@ pub fn log_span(tokens: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn logx(item: TokenStream) -> TokenStream {
+pub fn logger(item: TokenStream) -> TokenStream {
     let log_pack= quote!(starlane::space::log);
 
     let loc = if !item.is_empty()  {
         let expr = parse_macro_input!(item as Expr);
-        quote!( #log_pack::logger().push_loc(#expr); )
+        quote!( #log_pack::_logger().push(#expr); )
     } else {
-        quote!( #log_pack::logger(); )
+        quote!( #log_pack::_logger(); )
     };
 println!("LOC {}",loc.is_empty());
 
@@ -474,15 +474,15 @@ println!("LOC {}",loc.is_empty());
 
 #[proc_macro]
 pub fn push_mark(_item: TokenStream) -> TokenStream {
+    let logger= parse_macro_input!(_item as Expr);
     let rtn = quote! {
         {
-
     let mut builder = starlane::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
     let mark  = builder.build().unwrap();
-    logger.push_mark(mark)
+    #logger.push_mark(mark)
             }
 
         };

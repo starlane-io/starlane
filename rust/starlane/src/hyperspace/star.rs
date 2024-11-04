@@ -54,7 +54,7 @@ use starlane::space::wave::exchange::SetStrategy;
 use starlane::space::wave::{Agent, DirectedProto, Handling, HandlingKind, PongCore, Priority, Recipients, Reflectable, Retries, Ripple, Scope, SignalCore, SingularRipple, WaitTime, WaveVariantDef, WaveKind, ToReflected, ReflectedWave, WaveId};
 use starlane::space::wave::core::ReflectedCore;
 use starlane::space::wave::Wave;
-use starlane_primitive_macros::{push_loc, push_mark};
+use starlane_primitive_macros::{log_span, push_loc, push_mark};
 use crate::registry::err::RegErr;
 use crate::service::ServiceTemplate;
 use crate::template::Templates;
@@ -298,7 +298,7 @@ impl HyperStarSkel
             Err(StarErr::point_not_in_star(&self.point, &create.template.point.parent))?;
         }
 
-        let logger = self.logger.push_mark("create-in-star").unwrap();
+        let logger = push_mark!(self.logger);
         let global = GlobalExecutionChamber::new(self.clone());
         let details = global.create(&create, &Agent::HyperUser).await?;
 
@@ -330,7 +330,7 @@ impl HyperStarSkel
         self.registry
             .assign_star(&details.stub.point, &self.point)
             .await?;
-        let logger = logger.push_mark("result").unwrap();
+        let logger = push_mark!(logger);
         logger.result(assign_result.ok_or())?;
         Ok(details)
     }
@@ -343,8 +343,8 @@ impl HyperStarSkel
 
      */
 
-    pub fn location(&self) -> &Point {
-        &self.logger.point
+    pub fn point(&self) -> &Point {
+        &self.point
     }
 
     pub fn stub(&self) -> StarStub {
@@ -670,7 +670,7 @@ impl HyperStar
             GlobalCommandExecutionHandler::new(skel.clone()),
             transmitter,
             global_executor,
-            push_loc!((skel.logger,skel.point))
+            push_loc!((skel.logger,&skel.point))
         );
 
         let mut forwarders = vec![];
@@ -688,7 +688,7 @@ impl HyperStar
         let hyperway_transmitter = hyperway_transmitter.build();
 
         let mut injector = skel
-            .location()
+            .point()
             .clone()
             .push("injector")
             .unwrap()
@@ -808,7 +808,7 @@ impl HyperStar
                                         match Bridge::new(
                                             local_endpoint,
                                             remote_factory,
-                                            push_mark!(),
+                                            push_mark!(logger),
                                         ) {
                                             Ok(_) => {}
                                             Err(err) => {
@@ -1020,7 +1020,7 @@ impl HyperStar
             .to_gravity
             .send(wave.clone())
             .unwrap_or_default();
-        let logger = self.skel.logger.push_mark("hyperstar:to-gravity").unwrap();
+        let logger = push_mark!(self.skel.logger);
         logger.track(&wave, || Tracker::new("to_gravity", "Receive"));
         if wave.is_directed()
             && wave.to().is_single()
@@ -1045,6 +1045,7 @@ impl HyperStar
         let skel = self.skel.clone();
         let locator = SmartLocator::new(self.skel.clone());
         let gravity = self.gravity.clone();
+        let logger = push_mark!(self.skel.logger);
         tokio::spawn(async move {
             async fn shard(
                 mut wave: Wave,
@@ -1135,7 +1136,6 @@ impl HyperStar
                 }
                 Ok(())
             }
-            let logger = skel.logger.push_mark("shard").unwrap();
             logger
                 .result(shard(wave, skel, locator, gravity).await)
                 .unwrap_or_default();
@@ -1147,7 +1147,7 @@ impl HyperStar
 
     #[track_caller]
     async fn to_hyperway(&self, transport: WaveVariantDef<SignalCore>) -> Result<(), StarErr> {
-        let logger = self.skel.logger.push_mark("hyperstar:to-hyperway")?;
+        let logger = push_mark!(self.skel.logger);
         if self.skel.point == transport.to.point {
             // it's a bit of a strange case, but even if this star is sending a transport message
             // to itself, it still makes use of the Hyperway Interchange, which will bounce it back
@@ -1365,10 +1365,7 @@ impl LayerTraversalEngine
             .send(wave.clone())
             .unwrap_or_default();
 
-        let logger = self
-            .skel
-            .logger
-            .push_mark("hyperstar:start-layer-traversal")?;
+            let logger = push_mark!(self.skel.logger);
 
         let tos = match wave.kind() {
             WaveKind::Ripple => {
@@ -1494,8 +1491,9 @@ impl LayerTraversalEngine
                 }
             }
 
-            let traversal_logger = self.skel.logger.loc(to.to_point());
-            let traversal_logger = traversal_logger.span();
+
+            let traversal_logger= push_loc!((self.skel.logger,&to));
+            let traversal_logger = log_span!(traversal_logger);
 
             let point = if dir == TraversalDirection::Core {
                 to.clone().to_point()
@@ -1564,7 +1562,7 @@ impl LayerTraversalEngine
     }
 
     async fn visit_layer(&self, traversal: Traversal<Wave>) -> Result<(), SpaceErr> {
-        let logger = self.skel.logger.push_mark("stack-traversal:visit")?;
+        let logger = push_mark!(self.skel.logger);
         logger.track(&traversal, || {
             Tracker::new(
                 format!("visit:layer@{}", traversal.layer.to_string()),
@@ -1575,8 +1573,8 @@ impl LayerTraversalEngine
         match traversal.layer {
             Layer::Field => {
                 let field = Field::new(traversal.point.clone(), self.skel.clone());
+                let logger = push_loc!((self.skel.logger,self.skel.point.clone().into_surface(Layer::Field)));
                 tokio::spawn(async move {
-                    let logger = logger.push_action("Field").unwrap();
                     logger
                         .result(field.visit(traversal).await)
                         .unwrap_or_default();
@@ -1590,9 +1588,8 @@ impl LayerTraversalEngine
                         .find_shell(&traversal.point.to_surface().with_layer(Layer::Shell))?,
                 );
 
-                let logger = logger.clone();
+                let logger = push_loc!((self.skel.logger,self.skel.point.clone().into_surface(Layer::Shell)));
                 tokio::spawn(async move {
-                    let logger = logger.push_action("Shell").unwrap();
                     logger
                         .result(shell.visit(traversal).await)
                         .unwrap_or_default();
@@ -1608,11 +1605,8 @@ impl LayerTraversalEngine
     }
 
     async fn traverse_to_next_layer(&self, mut traversal: Traversal<Wave>) {
-        let logger = self
-            .skel
-            .logger
-            .push_mark("stack-traversal:traverse-to-next-layer")
-            .unwrap();
+
+        let logger = push_mark!(self.skel.logger);
 
         self.skel
             .logger

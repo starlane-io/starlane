@@ -12,9 +12,7 @@ use crate::space::wasm::Timestamp;
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::exchange::synch::{ProtoTransmitter, ProtoTransmitterBuilder};
 use crate::space::wave::exchange::SetStrategy;
-use crate::space::wave::{
-    DirectedProto, Handling, HandlingKind, Priority, Retries, ToRecipients, WaitTime, Wave,
-};
+use crate::space::wave::{DirectedProto, Handling, HandlingKind, Priority, Retries, SignalCore, ToRecipients, WaitTime, Wave, WaveVariantDef};
 use crate::Agent;
 use core::str::FromStr;
 use derive_builder::Builder;
@@ -69,7 +67,7 @@ impl LoggerStack {
     }
 }
 
-pub fn logger() -> SpanLogger {
+pub fn _logger() -> SpanLogger {
     STACK.get()
 }
 
@@ -704,6 +702,12 @@ impl SpanLogBuilder {
 pub struct SpanLogger {
     pub span: LogSpan,
     pub commit_on_drop: bool,
+}
+
+impl SpanLogger {
+    pub fn track_msg<A,B>(&self, p0: &WaveVariantDef<SignalCore>, p1: A, p2: B) where A: FnOnce()-> Tracker+'static, B: FnOnce()-> &'static str+'static{
+        todo!("not really sure what this was supposed to do at one point but will wan tto bring it back sometday")
+    }
 }
 
 impl Default for SpanLogger {

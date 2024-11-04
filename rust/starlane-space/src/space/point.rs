@@ -1,5 +1,5 @@
 use crate::space::err::{ParseErrs};
-use crate::space::loc::{PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, VarVal, Variable, Version, CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT};
+use crate::space::loc::{Layer, PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Topic, VarVal, Variable, Version, CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT};
 use crate::space::parse::util::{new_span, Trace};
 use crate::space::parse::util::result;
 use crate::space::parse::{
@@ -615,7 +615,7 @@ impl Into<Surface> for Point {
     fn into(self) -> Surface {
         Surface {
             point: self,
-            topic: Default::default(),
+            topic: Topic::None,
             layer: Default::default(),
         }
     }
@@ -978,8 +978,9 @@ impl Point {
         }
     }
 
-
-
+    pub fn into_surface(self, layer: Layer) -> Surface {
+        Surface::new(self,layer,Topic::None)
+    }
 
     pub fn to_path(&self) -> PathBuf {
         let mut path = String::new();

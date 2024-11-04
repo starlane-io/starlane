@@ -251,7 +251,7 @@ where
 
         let skel = MachineSkel {
             name: machine_name.clone(),
-            machine_star,
+            machine_star: machine_star.clone(),
             registry: platform.global_registry().await?,
             artifacts: platform.artifact_hub(),
             logger: platform.logger(),
@@ -281,7 +281,7 @@ where
             let mut drivers = platform.drivers_builder(&star_template.kind);
 
             let mut interchange =
-                HyperwayInterchange::new(push_mark!());
+                HyperwayInterchange::new(machine_star.point.clone(), push_mark!(logger));
 
             let star_hop = star_point.clone().to_surface().with_layer(Layer::Gravity);
 
