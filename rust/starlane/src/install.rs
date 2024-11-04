@@ -48,15 +48,13 @@ impl Installer {
     }
 
     pub async fn start(self) -> Result<(), anyhow::Error> {
-        self.console.intro("INSTALL STARLANE")?;
 
         let context = context();
         {
             self.console.splash();
             println!("{}", self.console.center("* I N S T A L L E R *"));
-            println!();
 
-
+            self.console.intro("INSTALL STARLANE")?;
             let version = VERSION.to_string();
             let home = STARLANE_HOME.to_string();
             self.console.remark(self.console.key_value(format!(
