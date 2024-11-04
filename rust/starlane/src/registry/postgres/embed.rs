@@ -46,7 +46,7 @@ impl Postgres {
                     .into();
                 settings.port = pg_config.port;
                 settings.temporary = !pg_config.persistent;
-                settings.username = pg_config.user.clone();
+                settings.username = pg_config.username.clone();
                 settings.password = pg_config.password.clone();
                 Ok(settings)
             }
@@ -148,7 +148,7 @@ impl Drop for Postgres {
 #[derive(Builder, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct PgEmbedSettings {
     pub port: u16,
-    pub user: String,
+    pub username: String,
     pub password: String,
     pub auth_method: PgEmbedAuthMethod,
     pub persistent: bool,
@@ -187,7 +187,7 @@ impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
             schema: self.schema.clone(),
             settings: PostgresConnectInfo {
             url: self.to_uri(),
-            user: self.user.clone(),
+            user: self.username.clone(),
             password: self.password.clone(),
         }
     }
@@ -201,7 +201,7 @@ impl Default for PgEmbedSettings {
         Self {
             database_dir: None,
             port: 5432,
-            user: "postgres".to_string(),
+            username: "postgres".to_string(),
             password: "password".to_string(),
             auth_method: Default::default(),
             persistent: true,

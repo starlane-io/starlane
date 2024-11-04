@@ -1,27 +1,30 @@
-use crate::env::{config_save, context, context_dir, GlobalMode, STARLANE_GLOBAL_SETTINGS};
+use crate::env::{config, config_path, config_save, context, context_dir, GlobalMode, STARLANE_GLOBAL_SETTINGS, STARLANE_HOME};
 use crate::foundation::{Foundation, StandAloneFoundation};
+use crate::registry::postgres::embed::PgEmbedSettings;
 use crate::shutdown::shutdown;
 use crate::{env, Database, PgRegistryConfig, StarlaneConfig, COLORS, VERSION};
-use cliclack::{clear_screen, confirm, input, intro, outro, outro_cancel, select, set_theme, spinner, Confirm, Input, ProgressBar, Select, Theme, ThemeState, Validate};
+use cliclack::{
+    clear_screen, confirm, input, intro, outro, outro_cancel, select, set_theme, spinner, Confirm,
+    Input, ProgressBar, Select, Theme, ThemeState, Validate,
+};
 use colored::Colorize;
+use console::style;
 use lerp::Lerp;
+use nom::combinator::all_consuming;
 use starlane::env::{Enviro, StdEnviro};
+use starlane_space::space::parse::util::{new_span, result};
+use starlane_space::space::parse::{path, var_case, VarCase};
 use std::fmt::Display;
+use std::io::Write;
 use std::ops::Deref;
+use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{io, thread};
-use std::io::Write;
-use std::path::PathBuf;
-use std::str::FromStr;
-use console::style;
-use nom::combinator::all_consuming;
 use text_to_ascii_art::to_art;
 use textwrap::Options;
 use tokio::fs;
-use starlane_space::space::parse::{path, var_case, VarCase};
-use starlane_space::space::parse::util::{new_span, result};
-use crate::registry::postgres::embed::PgEmbedSettings;
 
 #[tokio::main]
 pub async fn install() -> Result<(), anyhow::Error> {
@@ -44,9 +47,16 @@ impl Installer {
         let context = context();
         {
             self.console.splash();
-            println!("{}",self.console.center( "* I N S T A L L E R *"));
+            println!("{}", self.console.center("* I N S T A L L E R *"));
             println!();
-            println!("{}",self.console.center(format!("context: '{}'   version: {}", context, VERSION.to_string())));
+            println!(
+                "{}",
+                self.console.center(format!(
+                    "context: '{}'   version: {}",
+                    context,
+                    VERSION.to_string()
+                ))
+            );
         }
 
         self.console.intro("INSTALL STARLANE")?;
@@ -67,7 +77,7 @@ impl Installer {
                     shutdown(0);
                 } else {
                     fs::remove_file(env::config_path()).await?;
-                    self.console.success("config reset.\n")?;
+                    self.console.success("configuration reset.\n")?;
                 }
             }
 
@@ -76,14 +86,15 @@ impl Installer {
                 self.console.newlines(1usize);
                 let should_continue = confirm("Proceed with installation?").interact()?;
                 if !should_continue {
-                    self.console.outro("Starlane installation aborted by user.")?;
+                    self.console
+                        .outro("Starlane installation aborted by user.")?;
                     println!();
                     println!();
                     println!();
                     shutdown(0);
                 } else {
                     fs::remove_file(env::config_path()).await?;
-                    self.console.success("config deleted.")?;
+                    self.console.success("configuration reset.\n")?;
                 }
             }
             Ok(None) => {
@@ -91,16 +102,14 @@ impl Installer {
             }
         }
 
-
         self.console.long_delay();
 
         self.console.note("Foundation", "Starlane requires a Foundation in order to provision and manage various resources. If you aren't sure what to select just choose the first option: Local Standalone" );
 
         self.console.long_delay();
-        let mut selector= self
+        let mut selector = self
             .console
             .select(r#"Select a Foundation:"#)
-
             .item(
                 InstallType::Standalone,
                 "Local Standalone",
@@ -115,7 +124,6 @@ impl Installer {
 
         let selected = selector.interact()?;
 
-
         match selected {
             InstallType::Standalone => StandaloneInstaller::new(self.console.clone()).start().await,
             InstallType::ExistingPostgres => panic!(),
@@ -125,12 +133,10 @@ impl Installer {
     fn foundation_more_info(&self) -> Result<(), anyhow::Error> {
         self.console.clear()?;
         self.console.intro("Foundation")?;
-        self.console.note("topic","A foundation...")?;
+        self.console.note("topic", "A foundation...")?;
         Ok(())
     }
 }
-
-
 
 struct StandaloneInstaller {
     pub console: Console,
@@ -145,7 +151,7 @@ impl StandaloneInstaller {
         spinner.start("starting install");
         self.console.long_delay();
         spinner.set_message("generating config");
-        let config = StarlaneConfig::default();
+        let config = config().unwrap_or_default().unwrap_or_default();
         spinner.next("config generated", "saving config");
         env::config_save(config.clone())?;
         spinner.stop("config saved");
@@ -153,10 +159,10 @@ impl StandaloneInstaller {
 
         match &config.registry {
             PgRegistryConfig::Embedded(db) => {
-                let configurator = DbConfigurator::new(self.console.clone(),db.clone());
+                let configurator = DbConfigurator::new(self.console.clone(), db.clone());
                 let db = configurator.start().await?;
                 let spinner = self.console.spinner();
-                spinner.start("saving registry config...");
+                spinner.start(format!("saving registry config -> ({})", config_path()));
                 let mut config = config.clone();
                 config.registry = db;
                 config_save(config)?;
@@ -173,70 +179,144 @@ impl StandaloneInstaller {
 
 pub struct DbConfigurator {
     pub console: Console,
-    pub config: Database<PgEmbedSettings>
+    pub config: Database<PgEmbedSettings>,
 }
 
 impl DbConfigurator {
-  pub fn new(console:Console, config: Database<PgEmbedSettings>) ->  Self {
-      Self { config, console }
-  }
+    pub fn new(console: Console, config: Database<PgEmbedSettings>) -> Self {
+        Self { config, console }
+    }
 
-  pub async fn start(self) -> Result<PgRegistryConfig, anyhow::Error> {
-      self.console.section("POSTGRES REGISTRY CONFIGURATION", "choose postgres registry settings for this context [hit ENTER for defaults]");
+    pub async fn start(self) -> Result<PgRegistryConfig, anyhow::Error> {
+        self.console.section_intro(
+            "POSTGRES REGISTRY CONFIGURATION",
+            "customize standalone postgres registry",
+        )?;
 
-      let mut config = self.config.clone();;
+        let mut cfg = self.config.clone();
 
-      let database: VarCase  = self.console.input("Database name:").default_input(self.config.database.as_str()).validate(|s:&String|{
-          let span = new_span(s.as_str());
-          match result(all_consuming(var_case)(span)) {
-              Ok(_) => Ok(()),
-              Err(err) => Err(err)
-          }
-      }).interact()?;
+        loop {
+            let database = &cfg.database;
+            let database_dir = cfg.database_dir(context()).display().to_string();
+            let schema = &cfg.schema;
+            let username = &cfg.settings.username;
+            let password = &cfg.settings.password;
+            let info = format!(
+                r#"data_dir: {database_dir}
+database: {database}
+schema:   {schema}
+username: {username}
+password: {password}
+"#
+            );
 
-      config.database = database.to_string();
+            let info = self.console.key_value(info.as_str());
+            self.console.note("DATABASE CONFIG", format!("{info}"))?;
+            let customize = self
+                .console
+                .confirm("Would you like to make changes to the Database config?")
+                .initial_value(false)
+                .interact()?;
 
-      let user: VarCase  = self.console.input("username:").default_input(self.config.user.as_str()).validate_interactively(|s:&String|{
-          let span = new_span(s.as_str());
-          match result(all_consuming(var_case)(span)) {
-              Ok(_) => Ok(()),
-              Err(err) => Err(err)
-          }
-      }).interact()?;
+            if !customize {
+                return Ok(PgRegistryConfig::Embedded(cfg));
+            }
 
-      config.settings.user = user.to_string();
-
-
-      let password: VarCase  = self.console.input("password:").default_input(self.config.password.as_str()).validate_interactively(|s:&String|{
-          let span = new_span(s.as_str());
-          match result(all_consuming(var_case)(span)) {
-              Ok(_) => Ok(()),
-              Err(err) => Err(err)
-          }
-      }).interact()?;
-
-
-      config.settings.password = password.to_string();
-
-      let database_dir: PathBuf= self.console.input("Database directory:").default_input(self.config.database_dir(&context_dir()).display().to_string().as_str()).validate(|s:&String|{
-          let span = new_span(s.as_str());
-          match result(all_consuming(path)(span)) {
-              Ok(_) => Ok(()),
-              Err(err) => Err(err)
-          }
-      }).interact()?;
+            let database_dir: PathBuf = self
+                .console
+                .input("Database directory:")
+                .default_input(
+                   cfg
+                        .database_dir(&context_dir())
+                        .display()
+                        .to_string()
+                        .as_str(),
+                )
+                .validate(|s: &String| {
+                    let span = new_span(s.as_str());
+                    match result(all_consuming(path)(span)) {
+                        Ok(_) => Ok(()),
+                        Err(err) => Err(err),
+                    }
+                })
+                .interact()?;
+            cfg.settings.database_dir = Some(database_dir);
 
 
-      config.settings.database_dir = Some(database_dir);
 
-      Ok(PgRegistryConfig::Embedded(config))
-  }
+            let database: VarCase = self
+                .console
+                .input("Database name:")
+                .default_input(cfg.database.as_str())
+                .validate(|s: &String| {
+                    let span = new_span(s.as_str());
+                    match result(all_consuming(var_case)(span)) {
+                        Ok(_) => Ok(()),
+                        Err(err) => Err(err),
+                    }
+                })
+                .interact()?;
+            cfg.database = database.to_string();
+
+            let schema: VarCase = self
+                .console
+                .input("Schema name:")
+                .default_input(cfg.schema.as_str())
+                .validate(|s: &String| {
+                    let span = new_span(s.as_str());
+                    match result(all_consuming(var_case)(span)) {
+                        Ok(_) => Ok(()),
+                        Err(err) => Err(err),
+                    }
+                })
+                .interact()?;
+
+            cfg.schema= schema.to_string();
+
+            let user: VarCase = self
+                .console
+                .input("username:")
+                .default_input(cfg.username.as_str())
+                .validate_interactively(|s: &String| {
+                    let span = new_span(s.as_str());
+                    match result(all_consuming(var_case)(span)) {
+                        Ok(_) => Ok(()),
+                        Err(err) => Err(err),
+                    }
+                })
+                .interact()?;
+
+            cfg.settings.username = user.to_string();
+
+            let password: VarCase = self
+                .console
+                .input("password:")
+                .default_input(cfg.password.as_str())
+                .validate_interactively(|s: &String| {
+                    let span = new_span(s.as_str());
+                    match result(all_consuming(var_case)(span)) {
+                        Ok(_) => Ok(()),
+                        Err(err) => Err(err),
+                    }
+                })
+                .interact()?;
+
+            cfg.settings.password = password.to_string();
+
+
+            self.console.section_success(
+                "POSTGRES REGISTRY CONFIGURATION",
+                "choose postgres registry settings for this context [hit ENTER for defaults]",
+            )?;
+
+        }
+    }
 }
 
 #[derive(Clone)]
 pub struct Console {
     pub enviro: Arc<dyn Enviro>,
-    pub theme: Arc<dyn Theme>
+    pub theme: Arc<dyn Theme>,
 }
 
 impl Console {
@@ -244,7 +324,7 @@ impl Console {
         set_theme(StarlaneTheme());
         Self {
             enviro: Arc::new(StdEnviro::default()),
-            theme: Arc::new(StarlaneTheme())
+            theme: Arc::new(StarlaneTheme()),
         }
     }
 
@@ -256,7 +336,6 @@ impl Console {
     }
 
      */
-
 
     pub fn clear(&self) -> Result<(), anyhow::Error> {
         /*
@@ -275,7 +354,7 @@ impl Console {
         self.splash_with_params(1, 1, 50);
     }
 
-    pub fn section(&self, prompt: impl Display, message: impl Display) -> io::Result<()> {
+    pub fn section_intro(&self, prompt: impl Display, message: impl Display) -> io::Result<()> {
         self.info(style(format!(" {} ", prompt)).on_blue().black())?;
 
         let bar = console::Emoji("│", "|");
@@ -283,13 +362,40 @@ impl Console {
         let bar = color.apply_to(bar);
 
         let message = color.apply_to(self.wrap_indent(message, 1usize));
-        println!( "{bar} {message}");
+        println!("{bar} {message}");
         self.newlines(1);
         Ok(())
     }
 
+    pub fn section_success(&self, prompt: impl Display, message: impl Display) -> io::Result<()> {
+        //self.success(style(format!(" {} ", prompt)).on_green().black())?;
+        self.success(format!(" {} ", prompt))?;
 
+        /*
+        let bar = console::Emoji("│", "|");
+        let color = self.theme.bar_color(&ThemeState::Submit);
+        let bar = color.apply_to(bar);
 
+        let message = color.apply_to(self.wrap_indent(message, 1usize));
+        println!("{bar} {message}");
+
+         */
+        self.newlines(1);
+        Ok(())
+    }
+
+    pub fn section_fail(&self, prompt: impl Display, message: impl Display) -> io::Result<()> {
+        self.info(style(format!(" {} ", prompt)).on_red().black())?;
+
+        let bar = console::Emoji("│", "|");
+        let color = self.theme.bar_color(&ThemeState::Submit);
+        let bar = color.apply_to(bar);
+
+        let message = color.apply_to(self.wrap_indent(message, 1usize));
+        println!("{bar} {message}");
+        self.newlines(1);
+        Ok(())
+    }
 
     pub fn info(&self, text: impl Display) -> io::Result<()> {
         let padding = 10usize;
@@ -313,7 +419,12 @@ impl Console {
 
     pub fn success(&self, message: impl Display) -> io::Result<()> {
         let padding = 10usize;
-        let newlines = message.to_string().chars().rev().filter(|c|*c == '\n').count();
+        let newlines = message
+            .to_string()
+            .chars()
+            .rev()
+            .filter(|c| *c == '\n')
+            .count();
         let size = self.enviro.term_width();
         let len = size - padding;
         let text = textwrap::wrap(message.to_string().as_str(), len).join("\n");
@@ -322,16 +433,41 @@ impl Console {
         Ok(())
     }
 
+    pub fn key_value(&self, string: &str) -> String {
+        let key = self.theme.bar_color(&ThemeState::Submit);
+        let value = self.theme.bar_color(&ThemeState::Active);
+        let mut rtn = String::new();
+        for line in string.lines() {
+            if line.contains(":") {
+                if let Some((k, v)) = line.split_once(":") {
+                    let k = key.apply_to(k.to_string());
+                    let v = value.apply_to(v.to_string());
+                    let sep = key.apply_to(":");
+                    rtn.push_str(k.to_string().as_str());
+                    rtn.push_str(sep.to_string().as_str());
+                    rtn.push_str(v.to_string().as_str());
+                    rtn.push_str("\n");
+                }
+            } else {
+                let k = key.apply_to(line.to_string());
+                rtn.push_str(k.to_string().as_str());
+                rtn.push_str("\n");
+            }
+        }
 
-
-
+        rtn
+    }
 
     pub fn note(&self, prompt: impl Display, message: impl Display) -> io::Result<()> {
         let padding = 10usize;
 
         let size = self.enviro.term_width();
         let len = size - padding;
-        let text = textwrap::wrap(message.to_string().as_str(), len).join("\n").to_string().trim().to_string();
+        let text = textwrap::wrap(message.to_string().as_str(), len)
+            .join("\n")
+            .to_string()
+            .trim()
+            .to_string();
         cliclack::note(prompt, text)
     }
 
@@ -342,16 +478,14 @@ impl Console {
         textwrap::wrap(text.to_string().as_str(), len).join("\n")
     }
 
-
     pub fn wrap_indent(&self, text: impl Display, indent: usize) -> impl Display {
         let padding = 10usize;
-        let width = self.enviro.term_width()- padding;
+        let width = self.enviro.term_width() - padding;
         let mut options = Options::new(width);
         let indent = " ".repeat(indent).to_string();
         options.initial_indent = indent.as_str();
         textwrap::wrap(text.to_string().as_str(), options).join("\n")
     }
-
 
     pub fn spinner(&self) -> Spinner {
         Spinner::new(&self)
@@ -534,7 +668,6 @@ impl Console {
         Ok(())
     }
 
-
     pub fn delay(&self) {
         match &STARLANE_GLOBAL_SETTINGS.mode {
             GlobalMode::Newbie => {
@@ -559,7 +692,7 @@ impl Console {
             self.theme.bar_color(&ThemeState::Active);
             let color = self.theme.bar_color(&ThemeState::Submit);
             let bar = color.apply_to(bar);
-            println!( "{bar}" );
+            println!("{bar}");
             self.delay();
         }
     }
@@ -579,13 +712,11 @@ impl Console {
 #[derive(Clone)]
 pub struct StarlaneTheme();
 
-impl Theme for StarlaneTheme{
+impl Theme for StarlaneTheme {
     fn format_log(&self, text: &str, symbol: &str) -> String {
         self.format_log_with_spacing(text, symbol, false)
     }
-
 }
-
 
 pub struct Spinner<'a> {
     pub bar: ProgressBar,
@@ -630,6 +761,5 @@ pub enum InstallType {
 pub mod test {
 
     #[test]
-    pub fn test() {
-    }
+    pub fn test() {}
 }

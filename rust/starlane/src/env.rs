@@ -137,7 +137,10 @@ pub fn config() -> Result<Option<StarlaneConfig>, HypErr> {
 
     match fs::exists(file.clone())? {
         true => {
+println!("file exists... loading: {}", file);
             let config = std::fs::read_to_string(file.clone())?;
+println!("config as strng... : {}", config);
+
             let mut config: StarlaneConfig  = serde_yaml::from_str(config.as_str()).map_err(|err| anyhow!("starlane config found: '{}' yet Starlane encountered an error when attempting to process the config: '{}'", config_path(), err))?;
             config.context = context();
 

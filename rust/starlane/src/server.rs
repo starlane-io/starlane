@@ -241,7 +241,7 @@ impl Database<PgEmbedSettings> {
     pub fn to_key(&self) -> PostgresDbKey {
         PostgresDbKey {
             url: "localhost".to_string(),
-            user: self.settings.user.clone(),
+            user: self.settings.username.clone(),
             database: self.database.clone(),
         }
     }
@@ -249,7 +249,7 @@ impl Database<PgEmbedSettings> {
     pub fn to_uri(&self) -> String {
         format!(
             "postgres://{}:{}@localhost/{}",
-            self.user, self.password, self.database
+            self.username, self.password, self.database
         )
     }
 }
