@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::string::ToString;
 use std::{fs, process};
+use tempdir::TempDir;
 use uuid::Uuid;
 
 pub fn context() -> String {
@@ -58,6 +59,7 @@ pub static STARLANE_CONTROL_PORT: Lazy<u16> = Lazy::new(|| {
         .unwrap_or(4343)
 });
 
+#[cfg(not(test))]
 pub static STARLANE_HOME: Lazy<String> = Lazy::new(|| {
     std::env::var("STARLANE_HOME").unwrap_or_else(|e| {
         let home_dir: String = match dirs::home_dir() {
@@ -66,6 +68,13 @@ pub static STARLANE_HOME: Lazy<String> = Lazy::new(|| {
         };
         format!("{}/.starlane", home_dir).to_string()
     })
+});
+
+#[cfg(test)]
+pub static STARLANE_HOME: Lazy<String> = Lazy::new(|| {
+    let dir = ".starlane_test";
+    fs::create_dir_all(dir).unwrap();
+    dir.to_string()
 });
 
 pub static STARLANE_GLOBAL_SETTINGS: Lazy<GlobalSettings> = Lazy::new(|| ensure_global_settings());

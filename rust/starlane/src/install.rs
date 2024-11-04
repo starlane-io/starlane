@@ -1,8 +1,7 @@
-use crate::env::{config_save, config_save_new, context, context_dir, GlobalMode, STARLANE_GLOBAL_SETTINGS};
+use crate::env::{config_save, context, context_dir, GlobalMode, STARLANE_GLOBAL_SETTINGS};
 use crate::foundation::{Foundation, StandAloneFoundation};
-use crate::shutdown::{panic_shutdown, shutdown};
+use crate::shutdown::shutdown;
 use crate::{env, Database, PgRegistryConfig, StarlaneConfig, COLORS, VERSION};
-use cliclack::log::{error, success, warning};
 use cliclack::{clear_screen, confirm, input, intro, outro, outro_cancel, select, set_theme, spinner, Confirm, Input, ProgressBar, Select, Theme, ThemeState, Validate};
 use colored::Colorize;
 use lerp::Lerp;
@@ -20,8 +19,7 @@ use nom::combinator::all_consuming;
 use text_to_ascii_art::to_art;
 use textwrap::Options;
 use tokio::fs;
-use starlane_space::space::err::ParseErrs;
-use starlane_space::space::parse::{filename, path, to_string, var_case, VarCase};
+use starlane_space::space::parse::{path, var_case, VarCase};
 use starlane_space::space::parse::util::{new_span, result};
 use crate::registry::postgres::embed::PgEmbedSettings;
 
@@ -626,4 +624,12 @@ impl<'a> Deref for Spinner<'a> {
 pub enum InstallType {
     Standalone,
     ExistingPostgres,
+}
+
+#[cfg(test)]
+pub mod test {
+
+    #[test]
+    pub fn test() {
+    }
 }

@@ -1,14 +1,12 @@
 
 use crate::registry::err::RegErr;
-use crate::shutdown::{add_shutdown_hook, panic_shutdown, shutdown};
+use crate::shutdown::{add_shutdown_hook, panic_shutdown};
 use crate::{Database, PgRegistryConfig, StarlaneConfig};
 use derive_builder::Builder;
 use port_check::is_local_ipv4_port_free;
 use postgresql_embedded::{PostgreSQL, Settings};
 use rustyline::completion::Candidate;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
-use starlane::space::parse::set;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::fs;
@@ -224,3 +222,5 @@ impl Default for PgEmbedAuthMethod {
         PgEmbedAuthMethod::Plain
     }
 }
+
+
