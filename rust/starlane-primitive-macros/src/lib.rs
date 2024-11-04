@@ -11,10 +11,7 @@ use quote::quote;
 use quote::ToTokens;
 use syn::__private::TokenStream2;
 use syn::token::Mut;
-use syn::{
-    parse_file, parse_macro_input, AttrStyle, Attribute, AttributeArgs, Data, DeriveInput, File,
-    FnArg, ImplItem, ItemImpl, LitStr, PatType, PathArguments, Token, Type, Visibility,
-};
+use syn::{parse_file, parse_macro_input, AttrStyle, Attribute, AttributeArgs, Data, DeriveInput, Expr, ExprTuple, File, FnArg, ImplItem, ItemImpl, LitStr, PatType, PathArguments, Token, Type, Visibility};
 
 /// Takes a given enum (which in turn accepts child enums) and auto generates a `Parent::From` so the child
 /// can turn into the parent and a `TryInto<Child> for Parent` so the Parent can attempt to turn into the child.
@@ -404,47 +401,47 @@ pub fn loggerhead(_attr: TokenStream, item: TokenStream) -> TokenStream {
     rtn.into()
 }
 
+
+
 #[proc_macro]
-pub fn push_loc(item: TokenStream) -> TokenStream {
-    let loc = quote!{ item };
+pub fn push_loc(tokens: TokenStream) -> TokenStream {
+    let tuple = parse_macro_input!(tokens as ExprTuple);
+    let mut iter = tuple.elems.into_iter();
+    let logger = iter.next().unwrap();
+    let loc = iter.next().unwrap();
+
     let rtn = quote! {
-      let logger ={
-     match Loc::try_from(loc) {
-                Ok(loc) => {
-                      let mut builder = LogMarkBuilder::default();
-                     builder.package(env!("CARGO_PKG_NAME").to_string());
-                     builder.file(file!().to_string());
-                     builder.line(line!().to_string());
-                     let mark : LogMark = builder.build().unwrap();
-                     logger.push_loc(loc, mark)
-                }
-                Err(err) => {
-                    loggger.error(err.to_string());
-                }
-      }
+        {
+    let mut builder = crate::space::log::LogMarkBuilder::default();
+    builder.package(env!("CARGO_PKG_NAME").to_string());
+    builder.file(file!().to_string());
+    builder.line(line!().to_string());
+    let mark = builder.build().unwrap();
+    #logger.push(#loc)
+            }
+        };
 
-          };
-
-    };
-
+    println!("PUsH LOC {} ", rtn.to_string());
     rtn.into()
 }
 
 
+
 #[proc_macro]
-pub fn log_span(_item: TokenStream) -> TokenStream {
+pub fn log_span(tokens: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(tokens as Expr);
     let rtn = quote! {
         {
-    let mut builder = LogMarkBuilder::default();
+    let mut builder = crate::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
-    let mark : LogMark = builder.build().unwrap();
-    logger.push_mark(mark)
+    let mark = builder.build().unwrap();
+    #input.push_mark(mark)
             }
-
         };
 
+    println!("PROC {} ", rtn.to_string());
     rtn.into()
 }
 
@@ -452,7 +449,8 @@ pub fn log_span(_item: TokenStream) -> TokenStream {
 pub fn push_mark(_item: TokenStream) -> TokenStream {
     let rtn = quote! {
         {
-    let mut builder = LogMarkBuilder::default();
+            stringify!(env!("CARGO_PKG_NAME"));
+    let mut builder = LogMark::builder();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -461,6 +459,7 @@ pub fn push_mark(_item: TokenStream) -> TokenStream {
             }
 
         };
+
 
     rtn.into()
 }

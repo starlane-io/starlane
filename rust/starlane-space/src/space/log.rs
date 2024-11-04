@@ -1333,6 +1333,19 @@ impl From<Surface> for Loc {
     }
 }
 
+impl From<&Point> for Loc {
+    fn from(point: &Point) -> Self {
+        Loc::Point(point.clone())
+    }
+}
+
+
+impl From<&Surface> for Loc {
+    fn from(surface: &Surface) -> Self {
+        Loc::Surface(surface.clone())
+    }
+}
+
 impl From<Option<Surface>> for Loc {
     fn from(f: Option<Surface>) -> Self {
         match f {

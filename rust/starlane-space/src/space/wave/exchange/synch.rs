@@ -241,8 +241,7 @@ impl DirectedHandlerShell {
 
         let mut transmitter = self.builder.clone().build();
         let reflection = wave.reflection();
-        let logger = self.logger.clone();
-        let logger = log_span!();
+        let logger = log_span!(self.logger);
         let ctx = RootInCtx::new(wave, self.surface.clone(), logger, transmitter.clone());
         match self.handler.handle(ctx) {
             CoreBounce::Absorbed => Bounce::Absorbed,

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use crate::space::loc::{ToPoint, ToSurface};
-use crate::space::log::{logger, root_logger, PointLogger, Trackable, Tracker};
+use crate::space::log::{logger,  PointLogger, Trackable, Tracker};
 use crate::space::particle::traversal::Traversal;
 use crate::space::point::Point;
 use crate::space::settings::Timeouts;
@@ -499,8 +499,7 @@ where
 
         let mut transmitter = self.builder.clone().build();
         let reflection = wave.reflection();
-        let logger = self.logger.clone();
-        let logger = log_span!();
+        let logger = log_span!(self.logger);
         let ctx = RootInCtx::new(wave, self.surface.clone(), logger, transmitter);
         match self.handler.handle(ctx).await {
             CoreBounce::Absorbed => {}

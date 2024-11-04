@@ -56,6 +56,8 @@ mod server;
 #[cfg(feature = "server")]
 pub use server::*;
 
+
+
 use crate::cli::{Cli, Commands, ContextCmd};
 use crate::env::{
     config_exists, context, context_dir, ensure_global_settings, save_global_settings, set_context,

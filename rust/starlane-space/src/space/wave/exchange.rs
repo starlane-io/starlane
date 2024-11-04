@@ -8,7 +8,7 @@ use asynch::{
     DirectedHandler, Router,
 };
 use tokio::sync::broadcast;
-use starlane_primitive_macros::log_span;
+use starlane_primitive_macros::{log_span, push_loc};
 use crate::space::config::bind::RouteSelector;
 use crate::space::loc::{ToPoint, ToSurface, Topic};
 use crate::space::log::{PointLogger, SpanLogger};
@@ -32,13 +32,12 @@ impl<D, T> DirectedHandlerShellDef<D, T>
 where
     D: Sized,
 {
-    pub fn new(handler: D, builder: T, surface: Surface, logger: RootLogger) -> Self {
-        let logger = logger.push_loc(surface.point.clone());
+    pub fn new(handler: D, builder: T, surface: Surface, logger: SpanLogger) -> Self {
         Self {
             handler,
             builder,
+            logger: push_loc!((logger,&surface)),
             surface,
-            logger,
         }
     }
 }
@@ -225,7 +224,7 @@ where
         InCtxDef {
             root: self.root,
             input: self.input,
-            logger: log_span!(),
+            logger: log_span!(self.logger),
             transmitter: self.transmitter.clone(),
         }
     }
