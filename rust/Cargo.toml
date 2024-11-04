@@ -91,7 +91,8 @@ webpki-roots = "0.26.5"
 anyhow = "1.0.92"
 virtual-fs = "0.19.0"
 bytes = "1.7.1"
-
+crossterm = "0.28.1"
+console = "0.15.8"
 
 syn = { version = "1.0", features = ["full"] }
 quote = "1.0"
