@@ -1393,7 +1393,6 @@ impl PostgresRegistryContext {
         let mut pools = HashMap::new();
 
         for db in dbs {
-println!("DATABASE CONNECTION: {}",db.url);
             let pool = PgPoolOptions::new()
                 .max_connections(5)
                 .connect(db.to_uri().as_str())

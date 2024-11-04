@@ -41,7 +41,10 @@ pub struct Cli {
 #[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
 #[command(version, about, long_about = None)]
 pub enum Commands {
-    Install,
+    Install {
+        #[arg(long)]
+        defaults: bool
+    },
     Run,
     Term(TermArgs),
     Version,

@@ -220,11 +220,8 @@ pub enum GlobalMode {
 
 
 pub trait Enviro {
-
     fn is_terminal(&self) -> bool;
     fn term_width(&self) -> usize;
-
-
 }
 
 

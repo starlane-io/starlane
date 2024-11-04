@@ -93,8 +93,6 @@ impl Postgres {
             }
         };
 
-        println!("DATABASE: {}", database.database);
-
 
         Ok(())
     }

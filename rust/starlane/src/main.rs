@@ -231,7 +231,7 @@ fn run() -> Result<(), anyhow::Error> {
                     console.note("install", "please run `starlane install` to configure a new Starlane runner")?;
 
                     outro("Good Luck!")?;
-                    console.newlines(3, 100);
+                    console.newlines(3);
                     shutdown(1);
                     panic!();
                 }
@@ -241,7 +241,7 @@ fn run() -> Result<(), anyhow::Error> {
                     console.note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", env::config_path()))?;
                     console.note("fresh install", "To create a fresh configuration please run: `starlane install`")?;
                     outro("Good Luck!")?;
-                    console.newlines(3, 100);
+                    console.newlines(3);
                     shutdown(1);
                     panic!();
                 }
@@ -269,7 +269,7 @@ fn run() -> Result<(), anyhow::Error> {
 
 
             spinner().clear();
-            console.newlines(3, 100);
+            console.newlines(3);
 
 
             console.splash_with_params(1, 2, 25);
@@ -277,7 +277,7 @@ fn run() -> Result<(), anyhow::Error> {
             console.note("what's next?", "You can connect to this starlane runner with a control terminal: `starlane term`" )?;
 
             console.outro("Starlane is running.")?;
-            console.newlines(3, 100);
+            console.newlines(3);
 
             // this is a dirty hack which is good enough for a 0.3.0 release...
             loop {
@@ -291,11 +291,10 @@ fn run() -> Result<(), anyhow::Error> {
             Ok(_) => {}
             Err(err) =>
                 {
-
                     error(format!("starlane halted due to an error: {}", err.to_string())).unwrap_or_default();
 
                     console.outro("runner failed").unwrap();
-                    console.newlines(3, 100);
+                    console.newlines(3);
                 }
         }
     });
