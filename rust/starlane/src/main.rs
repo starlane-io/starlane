@@ -81,7 +81,7 @@ use once_cell::sync::Lazy;
 use starlane::space::loc::ToBaseKind;
 use starlane_primitive_macros::{create_mark, ToBase};
 use starlane_space::space::err::PrintErr;
-use starlane_space::space::log::log_entry_point;
+use starlane_space::space::log::push_scope;
 use starlane_space::space::parse::SkewerCase;
 use starlane_space::space::particle::Status;
 use std::any::Any;
@@ -137,7 +137,7 @@ pub fn main() -> Result<(), anyhow::Error> {
         }
         Commands::Run => {
             let runtime = Builder::new_multi_thread().enable_all().build()?;
-            runtime.block_on(async move { log_entry_point(run,create_mark!()).await });
+            runtime.block_on(async move { push_scope(run, create_mark!()).await });
             Ok(())
         },
         Commands::Term(args) => {

@@ -12,7 +12,10 @@ use crate::space::wasm::Timestamp;
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::exchange::synch::{ProtoTransmitter, ProtoTransmitterBuilder};
 use crate::space::wave::exchange::SetStrategy;
-use crate::space::wave::{DirectedProto, Handling, HandlingKind, Priority, Retries, SignalCore, ToRecipients, WaitTime, Wave, WaveVariantDef};
+use crate::space::wave::{
+    DirectedProto, Handling, HandlingKind, Priority, Retries, SignalCore, ToRecipients, WaitTime,
+    Wave, WaveVariantDef,
+};
 use crate::Agent;
 use core::str::FromStr;
 use derive_builder::Builder;
@@ -32,20 +35,21 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::{Arc, LazyLock};
+use anyhow::anyhow;
 use tokio::task_local;
 
-pub type PointLogger = SpanLogger;
+pub type PointLogger = Logger;
 
 task_local! {
-    static STACK: SpanLogger;
+    static STACK: Logger;
 }
 
 struct LoggerStack {
-    loggers: Vec<SpanLogger>,
+    loggers: Vec<Logger>,
 }
 
 impl Deref for LoggerStack {
-    type Target = Vec<SpanLogger>;
+    type Target = Vec<Logger>;
 
     fn deref(&self) -> &Self::Target {
         &self.loggers
@@ -53,33 +57,70 @@ impl Deref for LoggerStack {
 }
 
 impl LoggerStack {
-    fn push(&mut self, logger: SpanLogger) {
+    fn push(&mut self, logger: Logger) {
         self.loggers.push(logger);
     }
 
     /// should only be called by SpanLogger when it gets dropped
-    fn pop(&mut self, last: &SpanLogger) {
+    fn pop(&mut self, last: &Logger) {
         self.loggers.pop();
     }
 
-    fn get(&self) -> &SpanLogger {
+    fn get(&self) -> &Logger {
         self.loggers.last().unwrap()
     }
 }
 
-pub fn _logger() -> SpanLogger {
+pub fn _logger() -> Logger {
     STACK.get()
 }
 
-pub async fn log_entry_point<F>(f: F, mark: LogMark)
+macro_rules! enter{
+    ($args: expr) => {
+    }
+}
+
+macro_rules! async_closure {
+    ($name:ident, [$($fields:ty),+] ; [$($init:expr),+] ; $self:ident, $args:ident, $e:expr) => {{
+        struct $name($($fields,)+);
+        impl<'a> FnMut() for $name {
+            type Output = impl 'a + Future<Output = usize>;
+            extern "rust-call" fn call_once($self, $args: (&'a str,)) -> Self::Output {
+                async move { $e }
+            }
+        }
+        $name($($init),+)
+    }};
+}
+
+
+/*
+#[tokio::main]
+pub async fn enter<F, R, O>(mut f: F, mark: LogMark) -> Result<O, anyhow::Error> {
+    push_scope(f,mark)
+}
+
+ */
+
+pub async fn push_scope<F, R, O>(mut f: F, mark: LogMark) -> Result<O, anyhow::Error>
 where
-    F: FnMut() + Future,
+    F: FnMut() -> R,
+    F: Copy + Send + Sync + 'static,
+    R: Future<Output = Result<O, anyhow::Error>>,
+    O: Sized + Send + Sync,
 {
     if STACK.try_with(|v| {}).is_ok() {}
 
     let root = root_logger();
-    let span = root.push_mark(mark);
-    STACK.scope(span, f).await;
+    let logger = root.push_mark(mark);
+    STACK
+        .scope(logger, async move {
+            _logger().result(match f().await {
+                Ok(rtn) => Ok(rtn),
+                Err(err) => Err(anyhow!(err)),
+            })
+        })
+        .await
 }
 
 static ROOT_LOGGER: LazyLock<RootLogger> = LazyLock::new(|| unsafe {
@@ -518,17 +559,17 @@ impl RootLogger {
         P: Into<Loc>,
     {
         let span = LogSpan::root(loc, mark);
-        let logger = SpanLogger {
+        let logger = Logger {
             span: span.clone(),
             commit_on_drop: true,
         };
         logger
     }
 
-    pub fn push_mark(&self, mark: LogMark) -> SpanLogger {
+    pub fn push_mark(&self, mark: LogMark) -> Logger {
         let span = LogSpan::root(Loc::None, mark);
 
-        let logger = SpanLogger {
+        let logger = Logger {
             span: span.clone(),
             commit_on_drop: true,
         };
@@ -568,7 +609,6 @@ impl LogAppender for StdOutAppender {
             None => "None".to_string(),
             Some(action) => action.to_string(),
         };
-
 
         println!("{} | {}", log.loc.to_string(), log.payload.to_string())
     }
@@ -699,18 +739,22 @@ impl SpanLogBuilder {
 }
 
 #[derive(Clone)]
-pub struct SpanLogger {
+pub struct Logger {
     pub span: LogSpan,
     pub commit_on_drop: bool,
 }
 
-impl SpanLogger {
-    pub fn track_msg<A,B>(&self, p0: &WaveVariantDef<SignalCore>, p1: A, p2: B) where A: FnOnce()-> Tracker+'static, B: FnOnce()-> &'static str+'static{
+impl Logger {
+    pub fn track_msg<A, B>(&self, p0: &WaveVariantDef<SignalCore>, p1: A, p2: B)
+    where
+        A: FnOnce() -> Tracker + 'static,
+        B: FnOnce() -> &'static str + 'static,
+    {
         todo!("not really sure what this was supposed to do at one point but will wan tto bring it back sometday")
     }
 }
 
-impl Default for SpanLogger {
+impl Default for Logger {
     fn default() -> Self {
         Self {
             span: Default::default(),
@@ -725,8 +769,7 @@ impl Default for LogSpan {
     }
 }
 
-
-impl SpanLogger {
+impl Logger {
     pub fn track<T, F>(&self, track: &T, tracker: F)
     where
         T: Trackable,
@@ -737,10 +780,9 @@ impl SpanLogger {
             track.track_id()
         ));
     }
-
 }
 
-impl SpanLogger {
+impl Logger {
     pub fn span_uuid(&self) -> Uuid {
         self.span.id.clone()
     }
@@ -749,36 +791,35 @@ impl SpanLogger {
         &self.span.loc
     }
 
-    pub fn push<L>(&self, loc: L) -> SpanLogger
+    pub fn push<L>(&self, loc: L) -> Logger
     where
         L: Into<Loc>,
     {
         let loc = loc.into();
         let mut span = self.span.clone();
         span.loc = loc;
-        SpanLogger {
+        Logger {
             span,
             commit_on_drop: true,
         }
     }
 
-    pub fn push_mark(&self, mark: LogMark) -> SpanLogger {
+    pub fn push_mark(&self, mark: LogMark) -> Logger {
         let span = LogSpan::root(self.loc().clone(), mark);
-        SpanLogger {
+        Logger {
             span,
             commit_on_drop: true,
         }
     }
 
-    pub fn span_attr(&self, attr: HashMap<String, String>, mark: LogMark) -> SpanLogger {
+    pub fn span_attr(&self, attr: HashMap<String, String>, mark: LogMark) -> Logger {
         let mut span = LogSpan::pointless(mark);
         span.attributes = attr;
-        SpanLogger {
+        Logger {
             span,
             commit_on_drop: true,
         }
     }
-
 
     pub fn current_span(&self) -> &LogSpan {
         &self.span
@@ -883,10 +924,9 @@ impl SpanLogger {
         }
         result
     }
-
 }
 
-impl Drop for SpanLogger {
+impl Drop for Logger {
     fn drop(&mut self) {
         if self.commit_on_drop {
             let log = SpanEvent::create(&self.span);
@@ -1277,14 +1317,12 @@ impl TryInto<Surface> for Loc {
     }
 }
 
-
-
 impl Into<Agent> for Loc {
     fn into(self) -> Agent {
         match self {
             Loc::None => Agent::Anonymous,
             Loc::Point(point) => Agent::Point(point),
-            Loc::Surface(surface) => Agent::Point(surface.to_point())
+            Loc::Surface(surface) => Agent::Point(surface.to_point()),
         }
     }
 }
@@ -1294,7 +1332,7 @@ impl Into<Option<Agent>> for Loc {
         match self {
             Loc::None => None,
             Loc::Point(point) => Some(Agent::Point(point)),
-            Loc::Surface(surface) => Some(Agent::Point(surface.to_point()))
+            Loc::Surface(surface) => Some(Agent::Point(surface.to_point())),
         }
     }
 }
@@ -1342,7 +1380,6 @@ impl From<&Point> for Loc {
         Loc::Point(point.clone())
     }
 }
-
 
 impl From<&Surface> for Loc {
     fn from(surface: &Surface) -> Self {
@@ -1395,3 +1432,5 @@ impl ToString for Loc {
         }
     }
 }
+
+pub use starlane_primitive_macros::logger;

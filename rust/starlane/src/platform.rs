@@ -15,7 +15,7 @@ use starlane::space::settings::Timeouts;
 use std::str::FromStr;
 use std::sync::Arc;
 use anyhow::anyhow;
-use starlane::space::log::SpanLogger;
+use starlane::space::log::Logger;
 use starlane_primitive_macros::logger;
 use crate::env::config_path;
 use crate::foundation::Foundation;
@@ -90,7 +90,7 @@ where
     async fn star_registry(&self, star: &StarKey) -> Result<Registry, Self::Err>;
     fn artifact_hub(&self) -> Artifacts;
     async fn start_services(&self, gate: &Arc<HyperGateSelector>) {}
-    fn logger(&self) -> SpanLogger{
+    fn logger(&self) -> Logger {
         logger!()
     }
 

@@ -11,7 +11,7 @@ use tokio::sync::broadcast;
 use starlane_primitive_macros::{log_span, push_loc};
 use crate::space::config::bind::RouteSelector;
 use crate::space::loc::{ToPoint, ToSurface, Topic};
-use crate::space::log::{PointLogger, SpanLogger};
+use crate::space::log::{PointLogger, Logger};
 use crate::space::wave::core::Method;
 use crate::space::wave::{
     Bounce, DirectedProto, DirectedWave, EchoCore, FromReflectedAggregate,
@@ -32,7 +32,7 @@ impl<D, T> DirectedHandlerShellDef<D, T>
 where
     D: Sized,
 {
-    pub fn new(handler: D, builder: T, surface: Surface, logger: SpanLogger) -> Self {
+    pub fn new(handler: D, builder: T, surface: Surface, logger: Logger) -> Self {
         Self {
             handler,
             builder,
@@ -57,12 +57,12 @@ pub struct RootInCtxDef<T> {
     pub to: Surface,
     pub wave: DirectedWave,
     pub session: Option<Session>,
-    pub logger: SpanLogger,
+    pub logger: Logger,
     pub transmitter: T,
 }
 
 impl<T> RootInCtxDef<T> {
-    pub fn new(wave: DirectedWave, to: Surface, logger: SpanLogger, transmitter: T) -> Self {
+    pub fn new(wave: DirectedWave, to: Surface, logger: Logger, transmitter: T) -> Self {
         Self {
             wave,
             to,
@@ -180,7 +180,7 @@ where
     root: &'a RootInCtxDef<T>,
     pub transmitter: Cow<'a, T>,
     pub input: &'a I,
-    pub logger: SpanLogger,
+    pub logger: Logger,
 }
 
 impl<'a, I, T> Deref for InCtxDef<'a, I, T>
@@ -202,7 +202,7 @@ where
         root: &'a RootInCtxDef<T>,
         input: &'a I,
         tx: Cow<'a, T>,
-        logger: SpanLogger,
+        logger: Logger,
     ) -> Self {
         Self {
             root,

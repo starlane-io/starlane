@@ -421,7 +421,6 @@ pub fn push_loc(tokens: TokenStream) -> TokenStream {
             }
         };
 
-    println!("PUsH LOC {} ", rtn.to_string());
     rtn.into()
 }
 
@@ -454,7 +453,6 @@ pub fn logger(item: TokenStream) -> TokenStream {
     } else {
         quote!( #log_pack::_logger(); )
     };
-println!("LOC {}",loc.is_empty());
 
     let rtn = quote! {
         {

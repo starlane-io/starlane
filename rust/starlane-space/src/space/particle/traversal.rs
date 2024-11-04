@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::space::loc::Layer;
-use crate::space::log::{SpanLogger, Trackable};
+use crate::space::log::{Logger, Trackable};
 use crate::space::point::Point;
 use crate::space::wave::exchange::asynch::Exchanger;
 use crate::space::wave::{DirectedWave, PingCore, PongCore, ReflectedWave, SingularDirectedWave, Wave, WaveVariantDef};
@@ -167,7 +167,7 @@ pub struct Traversal<W> {
     pub record: ParticleRecord,
     pub layer: Layer,
     pub dest: Option<Layer>,
-    pub logger: SpanLogger,
+    pub logger: Logger,
     pub dir: TraversalDirection,
     pub to: Surface,
 }
@@ -248,7 +248,7 @@ impl<W> Traversal<W> {
         payload: W,
         record: ParticleRecord,
         layer: Layer,
-        logger: SpanLogger,
+        logger: Logger,
         dir: TraversalDirection,
         dest: Option<Layer>,
         to: Surface,
