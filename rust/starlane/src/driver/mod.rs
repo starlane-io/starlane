@@ -11,6 +11,7 @@ pub mod artifact;
 
 pub mod filestore;
 
+use crate::driver::control::ControlErr;
 use crate::driver::star::StarDriverFactory;
 use crate::executor::dialect::filestore::FileStoreErr;
 use crate::hyperspace::machine::MachineErr;
@@ -19,8 +20,10 @@ use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
 use crate::platform::Platform;
 use crate::registry::err::RegErr;
 use crate::service::{
-    Service,  ServiceErr, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate,
+    Service, ServiceErr, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate,
 };
+use anyhow::__private::kind::TraitKind;
+use anyhow::{anyhow, Error};
 use dashmap::DashMap;
 use futures::future::select_all;
 use futures::task::Spawn;
@@ -28,6 +31,7 @@ use futures::{FutureExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use starlane::space::artifact::asynch::{ArtErr, Artifacts};
 use starlane::space::artifact::ArtRef;
+use starlane::space::command::common::StateSrc::Subst;
 use starlane::space::command::common::{SetProperties, StateSrc};
 use starlane::space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
@@ -37,16 +41,19 @@ use starlane::space::err::{any_result, CoreReflector, SpaceErr, SpatialError};
 use starlane::space::hyper::{Assign, HyperSubstance, ParticleRecord};
 use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, Surface, ToBaseKind, ToPoint, ToSurface};
-use starlane::space::log::{PointLogger, Tracker};
+use starlane::space::log::{Logger, Tracker};
 use starlane::space::parse::bind_config;
+use starlane::space::parse::util::{parse_errs, result};
 use starlane::space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
 use starlane::space::particle::{Details, Status, Stub};
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
+use starlane::space::substance::{Substance, SubstanceErr};
 use starlane::space::util::{log, IdSelector, ValueMatcher};
 use starlane::space::wave::core::cmd::CmdMethod;
+use starlane::space::wave::core::http2::StatusCode;
 use starlane::space::wave::core::{CoreBounce, Method, ReflectedCore};
 use starlane::space::wave::exchange::asynch::{
     DirectedHandler, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
@@ -56,21 +63,15 @@ use starlane::space::wave::exchange::SetStrategy;
 use starlane::space::wave::{Agent, DirectedWave, ReflectedWave, Wave};
 use starlane::space::HYPERUSER;
 use starlane_macros::DirectedHandler;
+use starlane_primitive_macros::push_loc;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::ops::{Deref};
+use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
-use anyhow::{anyhow, Error};
-use anyhow::__private::kind::TraitKind;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
-use starlane::space::command::common::StateSrc::Subst;
-use starlane::space::parse::util::{parse_errs, result};
-use starlane::space::substance::{Substance, SubstanceErr};
-use starlane::space::wave::core::http2::StatusCode;
-use crate::driver::control::ControlErr;
 
 pub struct DriversBuilder {
     factories: Vec<Arc<dyn HyperDriverFactory>>,
@@ -617,7 +618,7 @@ impl Drivers {
             async fn register(
                 skel: &HyperStarSkel,
                 point: &Point,
-                logger: &PointLogger,
+                logger: &Logger,
             ) -> Result<(), DriverErr> {
                 let registration = Registration {
                     point: point.clone(),
@@ -637,11 +638,10 @@ impl Drivers {
             let point = drivers_point
                 .push(selector.as_point_segments().unwrap())
                 .unwrap();
-            let logger = self.skel.logger.point(point.clone());
             let status_rx = status_tx.subscribe();
 
             {
-                let logger = logger.point(point.clone());
+                let logger = push_loc!((self.skel.logger, &point));
                 let kind = selector.clone();
                 let mut status_rx = status_rx.clone();
                 tokio::spawn(async move {
@@ -687,13 +687,20 @@ impl Drivers {
                 });
             }
 
-            match logger.result(register(&star, &point, &logger).await) {
-                Ok(_) => {}
-                Err(err) => {
-                    status_tx.send(DriverStatus::Fatal(
-                        "Driver registration failed".to_string(),
-                    ));
-                    return;
+            {
+                let logger = push_loc!((self.skel.logger, &point));
+                match self
+                    .skel
+                    .logger
+                    .result(register(&star, &point, &logger).await)
+                {
+                    Ok(_) => {}
+                    Err(err) => {
+                        status_tx.send(DriverStatus::Fatal(
+                            "Driver registration failed".to_string(),
+                        ));
+                        return;
+                    }
                 }
             }
 
@@ -712,7 +719,18 @@ impl Drivers {
 
             let (runner_tx, runner_rx) = mpsc::channel(1024);
             let (request_tx, mut request_rx) = mpsc::channel(1024);
-            let driver_skel = DriverSkel::new(star, kind, point.clone(), selector.clone(), transmitter.clone(), logger.clone(), status_tx, request_tx);
+
+            let logger = push_loc!((self.skel.logger, &point));
+            let driver_skel = DriverSkel::new(
+                star,
+                kind,
+                point.clone(),
+                selector.clone(),
+                transmitter.clone(),
+                logger.clone(),
+                status_tx,
+                request_tx,
+            );
 
             {
                 let runner_tx = runner_tx.clone();
@@ -810,8 +828,7 @@ impl Drivers {
 
     pub fn find_internal(&self, kind: &Kind) -> Option<&DriverApi> {
         for selector in &self.kinds {
-            if selector.is_match(kind).is_ok()
-            {
+            if selector.is_match(kind).is_ok() {
                 return self.kind_to_driver.get(selector);
             }
         }
@@ -1001,8 +1018,7 @@ pub enum DriverRunnerCall {
     OnAdded,
     InitParticle {
         point: Point,
-        rtn: oneshot::Sender<Result<Status, DriverErr >>,
-
+        rtn: oneshot::Sender<Result<Status, DriverErr>>,
     },
     DriverRunnerRequest(DriverRunnerRequest),
     DriverBind(oneshot::Sender<ArtRef<BindConfig>>),
@@ -1027,9 +1043,7 @@ pub struct ParticleOuter {
     pub router: Arc<dyn Router>,
 }
 
-impl ParticleOuter {
-
-}
+impl ParticleOuter {}
 
 #[async_trait]
 impl TraversalLayer for ParticleOuter {
@@ -1041,11 +1055,7 @@ impl TraversalLayer for ParticleOuter {
         self.skel
             .logger
             .track(&direct, || Tracker::new("core:outer", "DeliverDirected"));
-        let logger = self
-            .skel
-            .logger
-            .point(self.surface().clone().to_point())
-            .span();
+        let logger = push_loc!((self.skel.logger, &self.surface));
 
         match &self.particle.inner {
             ParticleSphereInner::Handler(handler) => {
@@ -1121,7 +1131,7 @@ pub struct DriverRunner {
     call_rx: mpsc::Receiver<DriverRunnerCall>,
     driver: Box<dyn Driver>,
     router: LayerInjectionRouter,
-    logger: PointLogger,
+    logger: Logger,
     status_rx: watch::Receiver<DriverStatus>,
     layer: Layer,
 }
@@ -1136,7 +1146,7 @@ impl DriverRunner {
         status_rx: watch::Receiver<DriverStatus>,
         layer: Layer,
     ) -> mpsc::Sender<DriverRunnerCall> {
-        let logger = star_skel.logger.point(skel.point.clone());
+        let logger = push_loc!((star_skel.logger, &skel.point));
         let router = LayerInjectionRouter::new(
             star_skel.clone(),
             skel.point.clone().to_surface().with_layer(Layer::Guest),
@@ -1164,103 +1174,110 @@ impl DriverRunner {
     fn start(mut self) {
         tokio::spawn(async move {
             while let Some(call) = self.call_rx.recv().await {
-                    match call {
-                        DriverRunnerCall::OnAdded => {
-                            let mut router = LayerInjectionRouter::new(
-                                self.star_skel.clone(),
-                                self.skel.point.clone().to_surface().with_layer(Layer::Core),
-                            );
-                            router.direction = Some(TraversalDirection::Fabric);
+                match call {
+                    DriverRunnerCall::OnAdded => {
+                        let mut router = LayerInjectionRouter::new(
+                            self.star_skel.clone(),
+                            self.skel.point.clone().to_surface().with_layer(Layer::Core),
+                        );
+                        router.direction = Some(TraversalDirection::Fabric);
 
-                            let mut transmitter = ProtoTransmitter::new(
-                                Arc::new(router),
-                                self.star_skel.exchanger.clone(),
-                            );
-                            let ctx = DriverCtx::new(transmitter);
-                            match self
-                                .skel
-                                .logger
-                                .result(self.driver.init(self.skel.clone(), ctx).await)
-                            {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    self.skel
-                                        .status_tx
-                                        .send(DriverStatus::Fatal(err.to_string()))
-                                        .await;
-                                }
+                        let mut transmitter = ProtoTransmitter::new(
+                            Arc::new(router),
+                            self.star_skel.exchanger.clone(),
+                        );
+                        let ctx = DriverCtx::new(transmitter);
+                        match self
+                            .skel
+                            .logger
+                            .result(self.driver.init(self.skel.clone(), ctx).await)
+                        {
+                            Ok(_) => {}
+                            Err(err) => {
+                                self.skel
+                                    .status_tx
+                                    .send(DriverStatus::Fatal(err.to_string()))
+                                    .await;
                             }
-                        }
-                        DriverRunnerCall::Traverse(traversal) => {
-                            self.traverse(traversal).await.unwrap();
-                        }
-                        DriverRunnerCall::Handle(traversal) => {
-                            if traversal.is_directed() {
-                                let wave = traversal.payload.to_directed().unwrap();
-                                self.logger
-                                    .track(&wave, || Tracker::new("driver:shell", "Route"));
-                                let reflection = wave.reflection();
-                                let port = wave.to().clone().unwrap_single();
-                                let logger =
-                                    self.star_skel.logger.point(port.clone().to_point()).span();
-                                let router = Arc::new(self.router.clone());
-                                let transmitter =
-                                    ProtoTransmitter::new(router, self.star_skel.exchanger.clone());
-                                let ctx =
-                                    RootInCtx::new(wave, port.clone(), logger, transmitter.clone());
-                                let handler = self.handler().await;
-                                let skel = self.skel.clone();
-                                tokio::spawn(async move {
-                                    match handler.handle(ctx).await {
-                                        CoreBounce::Absorbed => {
-                                            // do nothing
-                                        }
-                                        CoreBounce::Reflected(core) => {
-                                            let reflection = reflection.unwrap();
-                                            let reflect = reflection.make(
-                                                core,
-                                                skel.point.to_surface().with_layer(Layer::Core),
-                                            );
-                                            transmitter.route(reflect.to_wave()).await;
-                                        }
-                                    }
-                                });
-                            } else {
-                                let wave = traversal.payload.to_reflected().unwrap();
-                                self.star_skel.exchanger.reflected(wave).await.unwrap();
-                            }
-                        }
-                        DriverRunnerCall::Particle { point, tx } => {
-                            let result = self.logger.result(self.driver.particle(&point).await);
-                            tx.send(result);
-                        }
-                        DriverRunnerCall::DriverRunnerRequest(request) => {
-                            match request {
-                            DriverRunnerRequest::Create { .. } => {
-                                todo!()
-                            }
-                        }
-                        },
-                        DriverRunnerCall::ParticleBind { point, rtn } => {
-                            let bind = self.skel.artifacts().get_bind(&self.driver.kind().to_base().bind()).await.map_err(|e|e.into());
-                            rtn.send(bind);
-                        }
-                        DriverRunnerCall::InitParticle { point, rtn } => {
-                            let particle = self.driver.particle(&point).await.unwrap();
-                            rtn.send(particle.init().await);
-                        }
-                        DriverRunnerCall::GetPoint(rtn) => {
-                            rtn.send(self.skel.point.clone());
-                        }
-                        DriverRunnerCall::DriverBind(rtn) => {
-                            let bind = self.skel.artifacts().get_bind(&BaseKind::Driver.bind()).await.unwrap();
-                            rtn.send(bind);
-                        }
-                        DriverRunnerCall::AddDriver(api) => {
-                            self.driver.add_driver(api.clone()).await;
-                            api.on_added();
                         }
                     }
+                    DriverRunnerCall::Traverse(traversal) => {
+                        self.traverse(traversal).await.unwrap();
+                    }
+                    DriverRunnerCall::Handle(traversal) => {
+                        if traversal.is_directed() {
+                            let wave = traversal.payload.to_directed().unwrap();
+                            self.logger
+                                .track(&wave, || Tracker::new("driver:shell", "Route"));
+                            let reflection = wave.reflection();
+                            let port = wave.to().clone().unwrap_single();
+                            let logger = push_loc!((self.star_skel.logger, &port));
+                            let router = Arc::new(self.router.clone());
+                            let transmitter =
+                                ProtoTransmitter::new(router, self.star_skel.exchanger.clone());
+                            let ctx =
+                                RootInCtx::new(wave, port.clone(), logger, transmitter.clone());
+                            let handler = self.handler().await;
+                            let skel = self.skel.clone();
+                            tokio::spawn(async move {
+                                match handler.handle(ctx).await {
+                                    CoreBounce::Absorbed => {
+                                        // do nothing
+                                    }
+                                    CoreBounce::Reflected(core) => {
+                                        let reflection = reflection.unwrap();
+                                        let reflect = reflection.make(
+                                            core,
+                                            skel.point.to_surface().with_layer(Layer::Core),
+                                        );
+                                        transmitter.route(reflect.to_wave()).await;
+                                    }
+                                }
+                            });
+                        } else {
+                            let wave = traversal.payload.to_reflected().unwrap();
+                            self.star_skel.exchanger.reflected(wave).await.unwrap();
+                        }
+                    }
+                    DriverRunnerCall::Particle { point, tx } => {
+                        let result = self.logger.result(self.driver.particle(&point).await);
+                        tx.send(result);
+                    }
+                    DriverRunnerCall::DriverRunnerRequest(request) => match request {
+                        DriverRunnerRequest::Create { .. } => {
+                            todo!()
+                        }
+                    },
+                    DriverRunnerCall::ParticleBind { point, rtn } => {
+                        let bind = self
+                            .skel
+                            .artifacts()
+                            .get_bind(&self.driver.kind().to_base().bind())
+                            .await
+                            .map_err(|e| e.into());
+                        rtn.send(bind);
+                    }
+                    DriverRunnerCall::InitParticle { point, rtn } => {
+                        let particle = self.driver.particle(&point).await.unwrap();
+                        rtn.send(particle.init().await);
+                    }
+                    DriverRunnerCall::GetPoint(rtn) => {
+                        rtn.send(self.skel.point.clone());
+                    }
+                    DriverRunnerCall::DriverBind(rtn) => {
+                        let bind = self
+                            .skel
+                            .artifacts()
+                            .get_bind(&BaseKind::Driver.bind())
+                            .await
+                            .unwrap();
+                        rtn.send(bind);
+                    }
+                    DriverRunnerCall::AddDriver(api) => {
+                        self.driver.add_driver(api.clone()).await;
+                        api.on_added();
+                    }
+                }
             }
         });
     }
@@ -1333,7 +1350,7 @@ pub struct DriverSkel {
     pub selector: KindSelector,
     pub kind: Kind,
     pub point: Point,
-    pub logger: PointLogger,
+    pub logger: Logger,
     pub status_rx: watch::Receiver<DriverStatus>,
     pub status_tx: mpsc::Sender<DriverStatus>,
     pub request_tx: mpsc::Sender<DriverRunnerRequest>,
@@ -1349,11 +1366,7 @@ impl DriverSkel {
             kind,
             driver: Some(self.kind.clone()),
         };
-        let service = self
-            .star
-            .machine_api
-            .select_service(selector)
-            .await?;
+        let service = self.star.machine_api.select_service(selector).await?;
         let service = service.into();
         Ok(service)
     }
@@ -1384,7 +1397,7 @@ impl DriverSkel {
         point: Point,
         selector: KindSelector,
         transmitter: ProtoTransmitter,
-        logger: PointLogger,
+        logger: Logger,
         status_tx: watch::Sender<DriverStatus>,
         request_tx: mpsc::Sender<DriverRunnerRequest>,
     ) -> Self {
@@ -1432,10 +1445,12 @@ impl DriverSkel {
             strategy: Strategy::Ensure,
             state: StateSrc::None,
         };
-        Ok(self
-            .star
-            .logger
-            .result(self.star.create_in_star(create).await.map_err(|e|SpaceErr::to_space_err(e)))?)
+        Ok(self.star.logger.result(
+            self.star
+                .create_in_star(create)
+                .await
+                .map_err(|e| SpaceErr::to_space_err(e)),
+        )?)
     }
 
     pub async fn locate(&self, point: &Point) -> Result<ParticleRecord, RegErr> {
@@ -1553,7 +1568,6 @@ pub trait Driver: Send + Sync {
         DriverAvail::External
     }
 
-
     async fn init(&mut self, skel: DriverSkel, _: DriverCtx) -> Result<(), DriverErr> {
         skel.logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
@@ -1644,13 +1658,19 @@ impl ParticleSphere {
         Ok(Status::Ready)
     }
 
-    pub fn new_handler<H>(handler: H) -> Self where H: DirectedHandler + 'static {
+    pub fn new_handler<H>(handler: H) -> Self
+    where
+        H: DirectedHandler + 'static,
+    {
         Self {
             inner: ParticleSphereInner::Handler(Box::new(handler)),
         }
     }
 
-    pub fn new_router<R>(router: R) -> Self where R: TraversalRouter + 'static {
+    pub fn new_router<R>(router: R) -> Self
+    where
+        R: TraversalRouter + 'static,
+    {
         Self {
             inner: ParticleSphereInner::Router(Box::new(router)),
         }
@@ -1721,12 +1741,17 @@ pub struct ParticleSkel {
     skel: DriverSkel,
     pub point: Point,
     pub kind: Kind,
-    pub bind: ArtRef<BindConfig>
+    pub bind: ArtRef<BindConfig>,
 }
 
 impl ParticleSkel {
     pub fn new(point: Point, kind: Kind, bind: ArtRef<BindConfig>, skel: DriverSkel) -> Self {
-        Self { point, kind, skel, bind }
+        Self {
+            point,
+            kind,
+            skel,
+            bind,
+        }
     }
 
     pub fn data_dir(&self) -> String {
@@ -1832,7 +1857,6 @@ impl Driver for DriverDriver {
 
         Ok(any_result(particle.sphere())?)
     }
-
 }
 
 #[derive(DirectedHandler)]
@@ -1851,7 +1875,7 @@ impl Particle for DriverParticle {
     }
 
     fn sphere(self) -> Result<ParticleSphere, Self::Err> {
-//        let router: dyn TraversalRouter = Box::new(self);
+        //        let router: dyn TraversalRouter = Box::new(self);
         Ok(ParticleSphere::new_router(self))
     }
 }
@@ -1866,22 +1890,21 @@ impl TraversalRouter for DriverParticle {
 
 impl ParticleRouter for DriverParticle {}
 
-
-#[derive(Error,Debug,ToSpaceErr)]
+#[derive(Error, Debug, ToSpaceErr)]
 pub enum ParticleDriverErr {
     #[error(transparent)]
     DriverErr(#[from] DriverErr),
 }
 
 impl ParticleDriverErr {
-    pub fn unwrap(self) -> DriverErr{
+    pub fn unwrap(self) -> DriverErr {
         match self {
-            ParticleDriverErr::DriverErr(err) => err
+            ParticleDriverErr::DriverErr(err) => err,
         }
     }
 }
 
-#[derive(Error,Debug,ToSpaceErr)]
+#[derive(Error, Debug, ToSpaceErr)]
 pub enum ParticleStarErr {
     #[error(transparent)]
     SpaceErr(#[from] SpaceErr),
@@ -1890,10 +1913,8 @@ pub enum ParticleStarErr {
     #[error(transparent)]
     RegErr(#[from] RegErr),
     #[error("{0}")]
-    Anyhow(#[source]Arc<anyhow::Error>)
+    Anyhow(#[source] Arc<anyhow::Error>),
 }
-
-
 
 impl From<anyhow::Error> for ParticleStarErr {
     fn from(err: anyhow::Error) -> Self {
@@ -1901,14 +1922,11 @@ impl From<anyhow::Error> for ParticleStarErr {
     }
 }
 
-impl From<DriverErr> for ParticleStarErr{
+impl From<DriverErr> for ParticleStarErr {
     fn from(err: DriverErr) -> Self {
-        StarErr::Anyhow(Arc::new(anyhow!("{}",err))).into()
+        StarErr::Anyhow(Arc::new(anyhow!("{}", err))).into()
     }
 }
-
-
-
 
 impl ParticleStarErr {
     pub fn unwrap(self) -> StarErr {
@@ -1917,49 +1935,38 @@ impl ParticleStarErr {
             ParticleStarErr::RegErr(err) => err.into(),
             ParticleStarErr::SpaceErr(err) => StarErr::SpaceErr(err),
             ParticleStarErr::Anyhow(any) => StarErr::Anyhow(any),
-            e => StarErr::Anyhow(Arc::new(anyhow!("{}",e))),
-            _ => StarErr::Anyhow(Arc::new(anyhow!("exhausted error")))
+            e => StarErr::Anyhow(Arc::new(anyhow!("{}", e))),
+            _ => StarErr::Anyhow(Arc::new(anyhow!("exhausted error"))),
         }
     }
 }
 
 impl CoreReflector for ParticleStarErr {
     fn as_reflected_core(self) -> ReflectedCore {
-        ReflectedCore{
+        ReflectedCore {
             headers: Default::default(),
             status: StatusCode::fail(),
-            body: Substance::Err(SubstanceErr(self.to_string()))
+            body: Substance::Err(SubstanceErr(self.to_string())),
         }
     }
 }
 
-
-impl CoreReflector for ParticleDriverErr{
+impl CoreReflector for ParticleDriverErr {
     fn as_reflected_core(self) -> ReflectedCore {
-        ReflectedCore{
+        ReflectedCore {
             headers: Default::default(),
             status: StatusCode::fail(),
-            body: Substance::Err(SubstanceErr(self.to_string()))
+            body: Substance::Err(SubstanceErr(self.to_string())),
         }
     }
 }
 
+impl ParticleErr for ParticleStarErr {}
 
-
-
-impl ParticleErr for ParticleStarErr {
-
-}
-
-
-impl ParticleErr for ParticleDriverErr {
-
-}
-
+impl ParticleErr for ParticleDriverErr {}
 
 #[derive(Error, Debug, ToSpaceErr)]
 pub enum DriverErr {
-
     #[error(transparent)]
     SpaceErr(#[from] SpaceErr),
     #[error(transparent)]
@@ -1991,13 +1998,14 @@ pub enum DriverErr {
     #[error("'{0}'")]
     String(String),
     #[error("{0}")]
-    Anyhow(#[from] Arc<anyhow::Error>)
+    Anyhow(#[from] Arc<anyhow::Error>),
 }
 
 impl DriverErr {
-
-
-    pub fn driver_not_found<S>(name: S) -> Self where S: ToString {
+    pub fn driver_not_found<S>(name: S) -> Self
+    where
+        S: ToString,
+    {
         Self::String(name.to_string())
     }
     pub fn particle_router_not_set(point: &Point, kind: &Kind) -> Self {
@@ -2014,30 +2022,22 @@ impl DriverErr {
     }
 }
 
-
-
-pub trait ParticleErr: std::error::Error + Send + Sync + 'static + CoreReflector+Sized {}
-
-
-
+pub trait ParticleErr: std::error::Error + Send + Sync + 'static + CoreReflector + Sized {}
 
 pub type StdParticleErr = Box<StdParticleErrInner>;
 
-
-
-#[derive(Error, Debug, Clone,ToSpaceErr)]
+#[derive(Error, Debug, Clone, ToSpaceErr)]
 pub enum StdParticleErrInner {
     #[error(transparent)]
-   SpaceErr(#[from] SpaceErr),
+    SpaceErr(#[from] SpaceErr),
 }
-
 
 impl CoreReflector for StdParticleErr {
     fn as_reflected_core(self) -> ReflectedCore {
         ReflectedCore {
             headers: Default::default(),
             status: StatusCode::fail(),
-            body: Substance::Err(SubstanceErr(self.to_string()))
+            body: Substance::Err(SubstanceErr(self.to_string())),
         }
     }
 }
@@ -2049,4 +2049,3 @@ impl<T> From<tokio::sync::mpsc::error::SendError<T>> for DriverErr {
         DriverErr::TokioMpscSendErr
     }
 }
-

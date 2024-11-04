@@ -1,7 +1,7 @@
 use crate::registry::err::RegErr;
 use crate::registry::postgres::embed::{PgEmbedSettings, Postgres};
 use crate::registry::postgres::PostgresConnectInfo;
-use crate::{Database, LiveDatabase};
+use crate::{Database, LiveDatabase, StarlaneConfig};
 use std::sync::Arc;
 use tokio::fs;
 use tracing::instrument::WithSubscriber;
@@ -15,10 +15,10 @@ where
 {
     type Err;
 
-    async fn install(&self, config: &Database<PgEmbedSettings>) -> Result<(), Self::Err>;
+    async fn install(&self, config: &StarlaneConfig) -> Result<(), Self::Err>;
     async fn provision_registry(
         &self,
-        config: Database<PgEmbedSettings>,
+        config: &StarlaneConfig,
     ) -> Result<LiveDatabase, Self::Err>;
 }
 
@@ -35,19 +35,19 @@ impl StandAloneFoundation {
 impl Foundation for StandAloneFoundation {
     type Err = RegErr;
 
-    async fn install(&self, config: &Database<PgEmbedSettings>) -> Result<(), Self::Err> {
+    async fn install(&self, config: &StarlaneConfig) -> Result<(), Self::Err> {
         Postgres::install(config).await?;
         Ok(())
     }
 
     async fn provision_registry(
         &self,
-        config: Database<PgEmbedSettings>,
+        config: &StarlaneConfig,
     ) -> Result<LiveDatabase, Self::Err> {
-        let db = Postgres::new(&config).await?;
+        let db = Postgres::new(config).await?;
         let url = db.url();
         let handle = db.start().await?;
-        let mut database :Database<PostgresConnectInfo>= config.into();
+        let mut database :Database<PostgresConnectInfo>= config.clone().registry.into();
         database.settings.url= url;
         Ok(LiveDatabase { database, handle })
     }

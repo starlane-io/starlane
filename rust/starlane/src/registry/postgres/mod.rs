@@ -18,7 +18,7 @@ use starlane::space::err::SpaceErr;
 use starlane::space::hyper::{ParticleLocation, ParticleRecord};
 use starlane::space::kind::{BaseKind, Kind, KindParts, Specific};
 use starlane::space::loc::{StarKey, ToBaseKind, Version};
-use starlane::space::log::PointLogger;
+use starlane::space::log::Logger;
 use starlane::space::parse::util::{result, parse_errs};
 use starlane::space::parse::{CamelCase, Domain, SkewerCase};
 use starlane::space::particle::{Details, Properties, Property, Status, Stub};
@@ -42,8 +42,9 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use starlane_primitive_macros::push_loc;
 use crate::Database;
-use crate::env::{STARLANE_REGISTRY_DATABASE, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_SCHEMA, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER};
+use crate::env::STARLANE_CONFIG;
 use crate::hyperspace::reg::{Registration, RegistryApi};
 
 pub trait PostgresPlatform: Send + Sync {
@@ -52,7 +53,7 @@ pub trait PostgresPlatform: Send + Sync {
 }
 
 pub struct PostgresRegistry {
-    logger: PointLogger,
+    logger: Logger,
     ctx: PostgresRegistryContextHandle,
     platform: Box<dyn PostgresPlatform>,
 
@@ -64,9 +65,9 @@ impl PostgresRegistry {
     pub async fn new(
         ctx: PostgresRegistryContextHandle,
         platform: Box<dyn PostgresPlatform>,
-        logger: PointLogger
+        logger: Logger
     ) -> Result<Self, RegErr> {
-        let logger = logger.point(Point::global_registry());
+        let logger = push_loc!((logger,Point::global_registry()));
         /*
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -95,6 +96,12 @@ impl PostgresRegistry {
 
     async fn setup(&self) -> Result<(), RegErr> {
         //        let database= format!("CREATE DATABASE IF NOT EXISTS {}", REGISTRY_DATABASE );
+
+        /// reset mode of 'none' will not let the db be deleted
+        let mode = r#"CREATE TYPE reset_mode_enum AS ENUM ('None', 'Scorch');
+                            CREATE TABLE reset_mode (mode reset_mode_enum DEFAULT 'none' NOT NULL UNIQUE);
+w                           INSERT INTO reset_mode VALUES ('None');"#;
+
 
         let particles = r#"CREATE TABLE IF NOT EXISTS particles (
          id SERIAL PRIMARY KEY,
@@ -174,6 +181,7 @@ impl PostgresRegistry {
         transaction.execute(labels).await?;
         transaction.execute(tags).await?;
          */
+        transaction.execute(mode).await?;
         transaction.execute(properties).await?;
         transaction.execute(point_index).await?;
         transaction.execute(point_segment_parent_index).await?;
@@ -186,10 +194,43 @@ impl PostgresRegistry {
 
 #[async_trait]
 impl RegistryApi for PostgresRegistry {
-    async fn nuke<'a>(&'a self) -> Result<(), RegErr> {
-        self.logger.info("nuking database!");
+    async fn scorch<'a>(&'a self) -> Result<(), RegErr> {
+        self.logger.info("scorching database!");
         let mut conn = self.ctx.acquire().await?;
+
+
+
         let mut trans = conn.begin().await?;
+
+        struct CanScorch(bool);
+
+        impl CanScorch {
+            fn can(&self) -> bool {
+                self.0
+            }
+        }
+
+
+        impl sqlx::FromRow<'_, PgRow> for CanScorch{
+            fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
+                let v:i64 = row.get(0);
+                let v = v != 0;
+                Ok(Self(v))
+            }
+        }
+
+        let scorch= sqlx::query_as::<Postgres,CanScorch>(
+            "SELECT count(*) FROM reset_mode WHERE mode=('Scorch')",
+        )
+            .fetch_one(&mut *trans)
+            .await?;
+
+        if !scorch.can() {
+            let err = "database has scorch guard enabled.  To change this: 'INSERT INTO reset_mode VALUES ('Scorch')'";
+            self.logger.error(err);
+            Result::Err(RegErr::NoScorch)?;
+        }
+
         trans.execute("DROP TABLE particles CASCADE").await?;
         trans.execute("DROP TABLE access_grants CASCADE").await?;
         trans.execute("DROP TABLE properties CASCADE").await?;
@@ -1353,7 +1394,6 @@ impl PostgresRegistryContext {
         let mut pools = HashMap::new();
 
         for db in dbs {
-println!("DATABASE CONNECTION: {}",db.url);
             let pool = PgPoolOptions::new()
                 .max_connections(5)
                 .connect(db.to_uri().as_str())
@@ -1414,16 +1454,6 @@ pub struct PostgresConnectInfo {
     pub password: String,
 }
 
-impl Default for PostgresConnectInfo {
-    fn default() -> Self {
-        PostgresConnectInfo {
-            url: STARLANE_REGISTRY_URL.to_string(),
-            user: STARLANE_REGISTRY_USER.to_string(),
-            password: STARLANE_REGISTRY_PASSWORD.to_string(),
-
-        }
-    }
-}
 
 impl PostgresConnectInfo {
     pub fn new<Url, User, Pass>(url: Url, user: User, password: Pass) -> Self
@@ -1570,14 +1600,14 @@ pub mod test {
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), OldStarErr> {
         let registry = registry().await?;
-        registry.nuke().await?;
+        registry.scorch().await?;
         Ok(())
     }
 
     #[tokio::test]
     pub async fn test_create() -> Result<(), OldStarErr> {
         let registry = registry().await?;
-        registry.nuke().await?;
+        registry.scorch().await?;
 
         let point = Point::from_str("localhost")?;
         let hyperuser = (*HYPERUSER).clone();
@@ -1637,7 +1667,7 @@ pub mod test {
     #[tokio::test]
     pub async fn test_access() -> Result<(), HypErr> {
         let registry = registry().await?;
-        registry.nuke().await?;
+        registry.scorch().await?;
 
         let hyperuser = (*HYPERUSER).clone();
         let superuser = Point::from_str("localhost:users:superuser").unwrap();

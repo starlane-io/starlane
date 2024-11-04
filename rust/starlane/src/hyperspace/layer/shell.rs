@@ -7,7 +7,7 @@ use starlane::space::command::common::StateSrc;
 use starlane::space::command::{Command, RawCommand};
 use starlane::space::err::SpaceErr;
 use starlane::space::loc::{Layer, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
-use starlane::space::log::PointLogger;
+use starlane::space::log::Logger;
 use starlane::space::parse::{command_line, Env};
 use starlane::space::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
 use starlane::space::point::Point;
@@ -24,7 +24,7 @@ use starlane::space::wave::{
 };
 
 use starlane::space::parse::util::result;
-
+use starlane_primitive_macros::push_loc;
 use crate::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 
@@ -34,14 +34,14 @@ pub struct Shell
 {
     skel: HyperStarSkel,
     state: ShellState,
-    logger: PointLogger,
+    logger: Logger,
 }
 
 impl Shell
 
 {
     pub fn new(skel: HyperStarSkel, state: ShellState) -> Self {
-        let logger = skel.logger.point(state.point.clone());
+        let logger = push_loc!((skel.logger,&state.point));
         Self {
             skel,
             state,
@@ -84,7 +84,7 @@ impl TraversalLayer for Shell
                 .insert(directed.id().clone(), AtomicU16::new(1));
         }
 
-        let logger = self.skel.logger.point(directed.to.point.clone()).span();
+        let logger = push_loc!((self.skel.logger,&directed.to));
         let injector = directed
             .from()
             .clone()

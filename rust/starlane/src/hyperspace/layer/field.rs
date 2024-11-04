@@ -8,7 +8,7 @@ use starlane::space::artifact::asynch::ArtErr;
 use starlane::space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
 use starlane::space::err::{CoreReflector, SpaceErr, StatusErr};
 use starlane::space::loc::{Layer, Surface, ToSurface};
-use starlane::space::log::{PointLogger, Trackable};
+use starlane::space::log::{Logger, Trackable};
 use starlane::space::parse::model::{PipelineSegmentVar, PipelineVar};
 use starlane::space::parse::{Env, RegexCapturesResolver};
 use starlane::space::particle::traversal::{Traversal, TraversalLayer};
@@ -22,7 +22,7 @@ use starlane::space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
 use starlane::space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, PongCore, Reflection, Wave, WaveVariantDef,
 };
-
+use starlane_primitive_macros::push_loc;
 use crate::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, TraverseToNextRouter};
 
@@ -31,7 +31,7 @@ pub struct Field
 {
     pub port: Surface,
     pub skel: HyperStarSkel,
-    pub logger: PointLogger,
+    pub logger: Logger,
     pub shell_transmitter: TraversalTransmitter,
 }
 
@@ -40,7 +40,7 @@ impl Field
 {
     pub fn new(point: Point, skel: HyperStarSkel) -> Self {
         let port = point.to_surface().with_layer(Layer::Field);
-        let logger = skel.logger.point(port.point.clone());
+        let logger = push_loc!((skel.logger,&port));
         let shell_router = Arc::new(TraverseToNextRouter::new(skel.traverse_to_next_tx.clone()));
         let shell_transmitter = TraversalTransmitter::new(shell_router, skel.exchanger.clone());
 
@@ -109,7 +109,7 @@ impl TraversalLayer for Field
 
     async fn traverse_next(&self, traversal: Traversal<Wave>) {
         self.logger
-            .eat(self.skel.traverse_to_next_tx.send(traversal).await);
+            .result(self.skel.traverse_to_next_tx.send(traversal).await);
     }
 
     async fn inject(&self, wave: Wave) {
@@ -184,7 +184,7 @@ pub struct PipeEx
 {
     pub skel: HyperStarSkel,
     pub surface: Surface,
-    pub logger: PointLogger,
+    pub logger: Logger,
     pub env: Env,
     pub reflection: Result<Reflection, SpaceErr>,
     pub pipeline: PipelineVar,
@@ -210,7 +210,7 @@ impl PipeEx
         env: Env,
         shell_transmitter: TraversalTransmitter,
         gravity_transmitter: ProtoTransmitter,
-        logger: PointLogger,
+        logger: Logger,
     ) {
         tokio::spawn(async move {
             let pipex = Self {

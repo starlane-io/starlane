@@ -7,8 +7,7 @@ use starlane_space::space::parse::util::new_span;
 use starlane::space::command::{CmdTransfer, RawCommand};
 use starlane::space::err::SpaceErr;
 use starlane::space::hyper::Knock;
-use starlane::space::log::{root_logger, RootLogger};
-use starlane::space::parse::upload_blocks;
+use starlane::space::parse::{upload_blocks, SkewerCase};
 use starlane::space::point::Point;
 use starlane::space::substance::Substance;
 use starlane::space::wave::core::ReflectedCore;
@@ -22,6 +21,7 @@ use tokio::io::AsyncWriteExt;
 use walkdir::{DirEntry, WalkDir};
 use zip::write::FileOptions;
 use starlane::space::parse::util::result;
+use starlane_primitive_macros::logger;
 use crate::env::STARLANE_HOME;
 
 #[derive(Debug, Parser)]
@@ -39,17 +39,48 @@ pub struct Cli {
 }
 
 #[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
+#[command(version, about, long_about = None)]
 pub enum Commands {
-    Install,
+    Install{
+        #[arg(long,short)]
+        edit: bool,
+        #[arg(long,short)]
+        nuke: bool
+    },
     Run,
     Term(TermArgs),
     Version,
     Splash,
-    Nuke
+    Scorch,
+    Nuke{
+        #[arg(long)]
+        all: bool
+    },
+    Context(ContextArgs)
+}
+
+#[derive(Debug,Args)]
+pub struct ContextArgs{
+    #[clap(subcommand)]
+    pub command: ContextCmd,
+}
+
+impl Default for ContextArgs {
+    fn default() -> Self {
+        todo!()
+    }
+}
+
+#[derive(Debug,Subcommand,EnumString, strum_macros::Display)]
+pub enum ContextCmd {
+    Create{ context_name: String},
+    Switch{ context_name: String},
+    Default,
+    List,
+    Which
 }
 
 #[derive(Debug, Args)]
-#[command(version, about, long_about = None)]
 pub struct TermArgs {
     #[arg(long)]
     host: Option<String>,
@@ -121,8 +152,7 @@ pub struct Session {
 
 impl Session {
     pub async fn new(host: String, certs: String) -> Result<Self, SpaceErr> {
-        let logger = root_logger();
-        let logger = logger.point(Point::from_str("starlane-cli")?);
+        let logger = logger!(Point::from_str("starlane-cli")?);
         let tcp_client: Box<dyn HyperwayEndpointFactory> = Box::new(HyperlaneTcpClient::new(
             format!("{}:{}", host, 4343),
             certs,

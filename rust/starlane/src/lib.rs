@@ -14,7 +14,6 @@ extern crate core;
 #[cfg(test)]
 pub mod test;
 
-
 pub mod foundation;
 
 pub mod shutdown;

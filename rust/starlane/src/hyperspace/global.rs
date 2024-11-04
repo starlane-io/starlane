@@ -1,6 +1,6 @@
+use crate::platform::Platform;
 use crate::hyperspace::reg::Registration;
 use crate::hyperspace::star::{HyperStarSkel, SmartLocator, StarErr};
-use crate::platform::Platform;
 use crate::registry::err::RegErr;
 use once_cell::sync::Lazy;
 use starlane::space::artifact::ArtRef;
@@ -10,7 +10,7 @@ use starlane::space::command::RawCommand;
 use starlane::space::config::bind::BindConfig;
 use starlane::space::err::{CoreReflector, SpaceErr};
 use starlane::space::loc::{ToPoint, ToSurface};
-use starlane::space::log::PointLogger;
+use starlane::space::log::Logger;
 use starlane::space::parse::util::result;
 use starlane::space::parse::{bind_config, command_line};
 use starlane::space::particle::{Details, Status};
@@ -27,6 +27,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
 use thiserror_context::impl_context;
+use starlane_primitive_macros::push_mark;
 /*
 #[derive(DirectedHandler,Clone)]
 pub struct Global where P: Platform {
@@ -103,13 +104,13 @@ impl GlobalCommandExecutionHandler {
 
 pub struct GlobalExecutionChamber {
     pub skel: HyperStarSkel,
-    pub logger: PointLogger,
+    pub logger: Logger,
 }
 
 impl GlobalExecutionChamber {
     pub fn new(skel: HyperStarSkel) -> Self {
-        let logger = skel.logger.push_point("global").unwrap();
-        Self { skel, logger }
+        let logger = push_mark!(skel.logger);
+        Self { skel, logger}
     }
 
     #[track_caller]
@@ -189,3 +190,7 @@ impl GlobalExecutionChamber {
         Ok(record.details)
     }
 }
+
+
+
+

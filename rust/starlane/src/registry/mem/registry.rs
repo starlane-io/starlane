@@ -54,7 +54,7 @@ impl MemoryRegistry
 #[async_trait]
 impl RegistryApi for MemoryRegistry
 {
-    async fn nuke<'a>(&'a self) -> Result<(), RegErr> {
+    async fn scorch<'a>(&'a self) -> Result<(), RegErr> {
         Ok(())
     }
 

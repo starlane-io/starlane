@@ -8,10 +8,10 @@ use asynch::{
     DirectedHandler, Router,
 };
 use tokio::sync::broadcast;
-
+use starlane_primitive_macros::{log_span, push_loc};
 use crate::space::config::bind::RouteSelector;
 use crate::space::loc::{ToPoint, ToSurface, Topic};
-use crate::space::log::{PointLogger, RootLogger, SpanLogger};
+use crate::space::log::{Logger};
 use crate::space::wave::core::Method;
 use crate::space::wave::{
     Bounce, DirectedProto, DirectedWave, EchoCore, FromReflectedAggregate,
@@ -22,7 +22,7 @@ use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 
 #[derive(Clone)]
 pub struct DirectedHandlerShellDef<D, T> {
-    logger: PointLogger,
+    logger: Logger,
     handler: D,
     surface: Surface,
     builder: T,
@@ -32,13 +32,12 @@ impl<D, T> DirectedHandlerShellDef<D, T>
 where
     D: Sized,
 {
-    pub fn new(handler: D, builder: T, surface: Surface, logger: RootLogger) -> Self {
-        let logger = logger.point(surface.point.clone());
+    pub fn new(handler: D, builder: T, surface: Surface, logger: Logger) -> Self {
         Self {
             handler,
             builder,
+            logger: push_loc!((logger,&surface)),
             surface,
-            logger,
         }
     }
 }
@@ -58,12 +57,12 @@ pub struct RootInCtxDef<T> {
     pub to: Surface,
     pub wave: DirectedWave,
     pub session: Option<Session>,
-    pub logger: SpanLogger,
+    pub logger: Logger,
     pub transmitter: T,
 }
 
 impl<T> RootInCtxDef<T> {
-    pub fn new(wave: DirectedWave, to: Surface, logger: SpanLogger, transmitter: T) -> Self {
+    pub fn new(wave: DirectedWave, to: Surface, logger: Logger, transmitter: T) -> Self {
         Self {
             wave,
             to,
@@ -181,7 +180,7 @@ where
     root: &'a RootInCtxDef<T>,
     pub transmitter: Cow<'a, T>,
     pub input: &'a I,
-    pub logger: SpanLogger,
+    pub logger: Logger,
 }
 
 impl<'a, I, T> Deref for InCtxDef<'a, I, T>
@@ -203,7 +202,7 @@ where
         root: &'a RootInCtxDef<T>,
         input: &'a I,
         tx: Cow<'a, T>,
-        logger: SpanLogger,
+        logger: Logger,
     ) -> Self {
         Self {
             root,
@@ -225,7 +224,7 @@ where
         InCtxDef {
             root: self.root,
             input: self.input,
-            logger: self.logger.span(),
+            logger: log_span!(self.logger),
             transmitter: self.transmitter.clone(),
         }
     }

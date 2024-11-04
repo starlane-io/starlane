@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use crate::space::loc::{ToPoint, ToSurface};
-use crate::space::log::{root_logger, PointLogger, RootLogger, Trackable, Tracker};
+use crate::space::log::{Logger, Trackable, Tracker};
 use crate::space::particle::traversal::Traversal;
 use crate::space::point::Point;
 use crate::space::settings::Timeouts;
@@ -20,7 +20,9 @@ use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 use dashmap::{DashMap, DashSet};
 use std::sync::Arc;
 use std::time::Duration;
+use nom_supreme::error::StackContext;
 use tokio::sync::{mpsc, oneshot};
+use starlane_primitive_macros::{log_span, logger};
 
 #[async_trait]
 impl Router for TxRouter {
@@ -293,14 +295,14 @@ pub struct Exchanger {
     pub multis: Arc<DashMap<WaveId, mpsc::Sender<ReflectedWave>>>,
     pub singles: Arc<DashMap<WaveId, oneshot::Sender<ReflectedAggregate>>>,
     pub timeouts: Timeouts,
-    pub logger: PointLogger,
+    pub logger: Logger,
     #[cfg(test)]
     pub claimed: Arc<DashSet<String>>,
 }
 
 impl Exchanger {
-    pub fn new(surface: Surface, timeouts: Timeouts, logger: PointLogger) -> Self {
-        let logger = logger.point(surface.point.clone());
+    pub fn new(surface: Surface, timeouts: Timeouts, logger: Logger) -> Self {
+        let logger = logger.push(surface.clone());
         Self {
             surface,
             singles: Arc::new(DashMap::new()),
@@ -313,7 +315,7 @@ impl Exchanger {
     }
 
     pub fn with_surface(&self, surface: Surface) -> Self {
-        let logger = self.logger.point(surface.point.clone());
+        let logger = self.logger.push(surface.clone());
         Self {
             surface,
             singles: self.singles.clone(),
@@ -326,8 +328,6 @@ impl Exchanger {
     }
 
     pub async fn reflected(&self, reflect: ReflectedWave) -> Result<(), SpaceErr> {
-        self.logger
-            .track(&reflect, || Tracker::new("exchange", "Reflected"));
 
         if let Some(multi) = self.multis.get(reflect.reflection_of()) {
             multi.value().send(reflect).await;
@@ -484,7 +484,7 @@ impl Default for Exchanger {
         Self::new(
             Point::root().to_surface(),
             Default::default(),
-            root_logger().point(Point::root()),
+            logger!()
         )
     }
 }
@@ -496,12 +496,10 @@ where
     D: DirectedHandler,
 {
     pub async fn handle(&self, wave: DirectedWave) {
-        let logger = self
-            .logger
-            .point(self.surface.clone().to_point())
-            .spanner(&wave);
+
         let mut transmitter = self.builder.clone().build();
         let reflection = wave.reflection();
+        let logger = log_span!(self.logger);
         let ctx = RootInCtx::new(wave, self.surface.clone(), logger, transmitter);
         match self.handler.handle(ctx).await {
             CoreBounce::Absorbed => {}

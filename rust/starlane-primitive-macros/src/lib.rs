@@ -1,7 +1,7 @@
 /*#![feature(proc_macro_quote)]*/
 #![crate_type = "lib"]
 #![allow(warnings)]
-
+#[feature("proc_macro_lib2")]
 #[macro_use]
 extern crate quote;
 
@@ -9,8 +9,9 @@ use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::quote;
 use quote::ToTokens;
-use syn::{parse_macro_input, Data, DeriveInput, PathArguments, Type};
-
+use syn::__private::TokenStream2;
+use syn::token::Mut;
+use syn::{parse_file, parse_macro_input, AttrStyle, Attribute, AttributeArgs, Data, DeriveInput, Expr, ExprTuple, File, FnArg, ImplItem, ItemImpl, LitStr, PatType, PathArguments, Token, Type, Visibility};
 
 /// Takes a given enum (which in turn accepts child enums) and auto generates a `Parent::From` so the child
 /// can turn into the parent and a `TryInto<Child> for Parent` so the Parent can attempt to turn into the child.
@@ -318,6 +319,37 @@ pub fn base(item: TokenStream) -> TokenStream {
         }
     }
 
+    let rtn = quote! {
+        pub enum #base {
+        #(#variants),*
+        }
+
+
+        #[allow(bindings_with_variant_name)]
+        impl ToString for #base {
+            fn to_string(&self) -> String {
+                match self {
+            #( #variants => "#variants".to_string() ),*
+                }
+            }
+        }
+    };
+
+    rtn.into()
+}
+
+#[proc_macro_derive(ToLogMark)]
+pub fn to_log_mark(item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as DeriveInput);
+    let ident = &input.ident;
+    let base = format_ident!("{}Base", ident);
+    let mut variants: Vec<Ident> = vec![];
+
+    if let Data::Enum(data) = &input.data {
+        for variant in data.variants.clone() {
+            variants.push(variant.ident.clone());
+        }
+    }
 
     let rtn = quote! {
         pub enum #base {
@@ -347,8 +379,275 @@ mod tests {
     }
 }
 
-
 #[proc_macro_derive(EnumAsStr)]
 pub fn directed_handler(item: TokenStream) -> TokenStream {
     TokenStream::from(quote! {})
+}
+
+#[proc_macro_attribute]
+pub fn loggerhead(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut out = vec![];
+    let input = parse_macro_input!(item as File);
+    for item in input.items.into_iter() {
+        let item = quote!(#item);
+        println!("running parser over {}", item);
+        out.push(item);
+    }
+
+    let rtn = quote! {
+        #(#out)*
+    };
+
+    rtn.into()
+}
+
+
+
+#[proc_macro]
+pub fn push_loc(tokens: TokenStream) -> TokenStream {
+    let tuple = parse_macro_input!(tokens as ExprTuple);
+    let mut iter = tuple.elems.into_iter();
+    let logger = iter.next().unwrap();
+    let loc = iter.next().unwrap();
+
+    let rtn = quote! {
+        {
+    let mut builder = starlane::space::log::LogMarkBuilder::default();
+    builder.package(env!("CARGO_PKG_NAME").to_string());
+    builder.file(file!().to_string());
+    builder.line(line!().to_string());
+    let mark = builder.build().unwrap();
+    #logger.push(#loc)
+            }
+        };
+
+    rtn.into()
+}
+
+
+
+#[proc_macro]
+pub fn log_span(tokens: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(tokens as Expr);
+    let rtn = quote! {
+        {
+    let mut builder = starlane::space::log::LogMarkBuilder::default();
+    builder.package(env!("CARGO_PKG_NAME").to_string());
+    builder.file(file!().to_string());
+    builder.line(line!().to_string());
+    let mark = builder.build().unwrap();
+    #input.push_mark(mark)
+            }
+        };
+
+    rtn.into()
+}
+
+#[proc_macro]
+pub fn logger(item: TokenStream) -> TokenStream {
+    let log_pack= quote!(starlane::space::log);
+
+    let loc = if !item.is_empty()  {
+        let expr = parse_macro_input!(item as Expr);
+        quote!( #log_pack::_logger().push(#expr); )
+    } else {
+        quote!( #log_pack::_logger(); )
+    };
+
+    let rtn = quote! {
+        {
+            let logger = #loc;
+    let mut builder = #log_pack::LogMarkBuilder::default();
+    builder.package(env!("CARGO_PKG_NAME").to_string());
+    builder.file(file!().to_string());
+    builder.line(line!().to_string());
+    let mark = builder.build().unwrap();
+            logger.push_mark(mark)
+            }
+        };
+
+
+    rtn.into()
+}
+
+#[proc_macro]
+pub fn push_mark(_item: TokenStream) -> TokenStream {
+    let logger= parse_macro_input!(_item as Expr);
+    let rtn = quote! {
+        {
+    let mut builder = starlane::space::log::LogMarkBuilder::default();
+    builder.package(env!("CARGO_PKG_NAME").to_string());
+    builder.file(file!().to_string());
+    builder.line(line!().to_string());
+    let mark  = builder.build().unwrap();
+    #logger.push_mark(mark)
+            }
+
+        };
+
+    rtn.into()
+}
+
+#[proc_macro]
+pub fn create_mark(_item: TokenStream) -> TokenStream {
+    let rtn = quote! {
+        {
+    let mut builder = starlane::space::log::LogMarkBuilder::default();
+    builder.package(env!("CARGO_PKG_NAME").to_string());
+    builder.file(file!().to_string());
+    builder.line(line!().to_string());
+    builder.build().unwrap()
+            }
+        };
+
+    rtn.into()
+}
+
+#[proc_macro]
+pub fn warn(_item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(_item as LitStr);
+    let rtn = quote! {
+
+    // pushing scope so we don't collide with
+    // any other imports or local things...
+    {
+        use starlane_primitive_macros::mark;
+        use starlane_primitive_macros::create_mark;
+        use starlane_space::space::log::Log;
+        use starlane_space::space::log::Log;
+        use starlane_space::space::log::LOGGER;
+        use starlane_space::space::log::root_logger;
+
+        // need to push_mark somewhere around here...
+        LOGGER.try_with(|logger| {
+             logger.warn(stringify!(#input));
+        } ).map_err(|e| {
+        root_logger().warn(stringify!(#input));
+    })
+        }
+     };
+    rtn.into()
+}
+
+/*
+#[proc_macro_attribute]
+pub fn point_log(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut out = vec![];
+    let input = parse_macro_input!(item as File);
+    for item in input.items.into_iter() {
+        let item = quote!(#item);
+        println!("running parser over {}", item);
+        out.push(item);
+    }
+
+    let rtn = quote! {
+        #(#out)*
+    };
+
+    panic!("~~~ POINT LOG MACRO: {}",rtn.to_string());
+
+    rtn.into()
+}
+
+ */
+
+#[proc_macro_attribute]
+pub fn log(attr: TokenStream, item: TokenStream) -> TokenStream {
+    item.into()
+}
+
+#[proc_macro_attribute]
+pub fn logger_att(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let surface = if attr.is_empty() {
+        format_ident!("logger")
+    } else {
+        format_ident!("{}", attr.to_string())
+    };
+
+    let item_cp = item.clone();
+    let mut impl_item = parse_macro_input!(item_cp as syn::ItemImpl);
+    //    let mut wrappers = vec![];
+    //    let mut methods = vec![];
+
+    for item_impl in &impl_item.items {
+        if let ImplItem::Method(call) = item_impl {
+            {
+                let (__async, __await) = match call.sig.asyncness {
+                    None => (quote! {}, quote! {}),
+                    Some(_) => (quote! {async}, quote! {.await}),
+                };
+
+                let mut inner_call = call.clone();
+                inner_call.vis = Visibility::Inherited;
+                inner_call.sig.ident = format_ident!("__{}", call.sig.ident);
+                inner_call.attrs = vec![];
+                /*
+                let args: Vec<TokenStream>  = inner_call.sig.inputs.clone().into_iter().map( |arg| match arg.clone() {
+
+                   FnArg::Receiver(r) => {
+                      let arg = quote!{#r};
+                       arg.to_token_stream()
+
+                   },
+                    arg => arg.to_token_stream()
+                }
+
+                ).collect_into();
+
+
+                let args = quote!{#( #args )*};
+                panic!("ARGS: {}",args.to_string());
+                 */
+                todo!();
+
+                let attributes = call.attrs.clone();
+                let vis = call.vis.clone();
+                let sig = call.sig.clone();
+                let block = call.block.clone();
+
+                call.clone();
+                let blah = quote! {
+                   #(#attributes)*
+                   #vis
+                   #__async
+                   #sig
+                    {
+                        #inner_call
+                    }
+                };
+                panic!("{}", blah);
+            }
+        }
+    }
+
+    //    TokenStream2::from_iter(vec![rtn, TokenStream2::from(item)]).into()
+    todo!()
+}
+
+fn find_impl_type(item_impl: &ItemImpl) -> Ident {
+    if let Type::Path(path) = &*item_impl.self_ty {
+        path.path.segments.last().as_ref().unwrap().ident.clone()
+    } else {
+        panic!("could not get impl name")
+    }
+}
+
+fn find_log_attr(attrs: &Vec<Attribute>) -> TokenStream {
+    for attr in attrs {
+        if attr
+            .path
+            .segments
+            .last()
+            .expect("segment")
+            .to_token_stream()
+            .to_string()
+            .as_str()
+            == "logger"
+        {
+            let rtn = quote!(#attr);
+            return rtn.into();
+        }
+    }
+    let rtn = quote!(logger);
+    rtn.into()
 }

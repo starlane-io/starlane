@@ -40,6 +40,10 @@ pub enum RegErr {
     PgErr(#[from] postgresql_embedded::Error),
     #[error(transparent)]
     IoErr(Arc<std::io::Error>),
+    #[error("database has scorch guard enabled.  To change this: 'INSERT INTO reset_mode VALUES ('Scorch')'")]
+    NoScorch,
+    #[error("expected an embedded postgres registry but received configuration for a remote postgres registry")]
+    ExpectedEmbeddedRegistry
 }
 
 impl  From<std::io::Error> for RegErr {

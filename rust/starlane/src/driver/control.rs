@@ -21,7 +21,6 @@ use starlane::space::err::{CoreReflector, SpaceErr};
 use starlane::space::hyper::{ControlPattern, Greet, InterchangeKind};
 use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, PointFactory, Surface, ToSurface};
-use starlane::space::log::{root_logger, RootLogger, Tracker};
 use starlane::space::particle::traversal::Traversal;
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
@@ -41,6 +40,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use anyhow::anyhow;
 use thiserror::Error;
+use starlane::space::log::Tracker;
+use starlane_primitive_macros::logger;
 
 pub struct ControlDriverFactory {}
 
@@ -160,7 +161,8 @@ impl Driver for ControlDriver {
             remote_point_factory,
             self.skel.driver.logger.clone(),
         );
-        let mut interchange = HyperwayInterchange::new(self.skel.driver.logger.clone());
+        let point = skel.point.clone();
+        let mut interchange = HyperwayInterchange::new(point,self.skel.driver.logger.clone());
         let hyperway = Hyperway::new(
             Point::remote_endpoint().to_surface(),
             Agent::HyperUser,
@@ -417,8 +419,7 @@ impl ControlClient {
             Timeouts::default(),
             Default::default(),
         );
-        let logger = root_logger();
-        let logger = logger.point(Point::from_str("control-client")?);
+        let logger = logger!(Point::from_str("control-client")?);
         let client = HyperClient::new_with_exchanger(factory, Some(exchanger), logger)?;
         Ok(Self { client })
     }

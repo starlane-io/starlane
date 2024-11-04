@@ -29,7 +29,7 @@ use starlane::space::err::{HyperSpatialError, SpaceErr, SpatialError};
 use starlane::space::hyper::{InterchangeKind, Knock};
 use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface};
-use starlane::space::log::{PointLogger, RootLogger};
+use starlane::space::log::{Logger};
 use starlane::space::particle::property::PropertiesConfig;
 use starlane::space::particle::{Property, Status, Stub};
 use starlane::space::point::Point;
@@ -43,6 +43,7 @@ use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
 use thiserror::Error;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
+use starlane_primitive_macros::{push_loc, push_mark};
 
 #[derive(Clone)]
 pub struct MachineApi {
@@ -179,7 +180,7 @@ where
     pub platform: P,
     pub registry: Registry,
     pub artifacts: Artifacts,
-    pub logger: RootLogger,
+    pub logger: Logger,
     pub timeouts: Timeouts,
     pub api: MachineApi,
     pub status_rx: watch::Receiver<MachineStatus>,
@@ -199,7 +200,7 @@ where
     pub call_tx: mpsc::Sender<MachineCall>,
     pub call_rx: mpsc::Receiver<MachineCall>,
     pub termination_broadcast_tx: broadcast::Sender<Result<(), String>>,
-    pub logger: PointLogger,
+    pub logger: Logger,
 }
 
 impl<P> Machine<P>
@@ -239,7 +240,7 @@ where
             .to_point()
             .to_surface()
             .with_layer(Layer::Gravity);
-        let logger = platform.logger().point(machine_star.point.clone());
+        let logger = push_loc!((platform.logger(),machine_star.point.clone()));
         let global = machine_star
             .point
             .push("global")
@@ -250,7 +251,7 @@ where
 
         let skel = MachineSkel {
             name: machine_name.clone(),
-            machine_star,
+            machine_star: machine_star.clone(),
             registry: platform.global_registry().await?,
             artifacts: platform.artifact_hub(),
             logger: platform.logger(),
@@ -271,7 +272,7 @@ where
             let star_port = star_point.clone().to_surface().with_layer(Layer::Core);
 
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
-            let logger = skel.logger.point(drivers_point.clone());
+            let logger = push_loc!((skel.logger,&drivers_point));
 
             let mut star_tx: HyperStarTx = HyperStarTx::new(star_point.clone());
             let star_skel =
@@ -280,7 +281,7 @@ where
             let mut drivers = platform.drivers_builder(&star_template.kind);
 
             let mut interchange =
-                HyperwayInterchange::new(logger.push_point("interchange").unwrap());
+                HyperwayInterchange::new(machine_star.point.clone(), push_mark!(logger));
 
             let star_hop = star_point.clone().to_surface().with_layer(Layer::Gravity);
 
@@ -355,7 +356,7 @@ where
             });
         }
 
-        let logger = skel.logger.point(machine_point);
+        let logger = push_loc!((skel.logger,&machine_point));
 
         let (term_tx, _) = broadcast::channel(1);
         let stars = Arc::new(stars);
@@ -500,7 +501,7 @@ where
                 }
                 MachineCall::Knock { knock, rtn } => {
                     let gate_selector = self.gate_selector.clone();
-                    let logger = self.skel.logger.point(self.skel.machine_star.point.clone());
+                    let logger = push_loc!((self.skel.logger,self.skel.machine_star.point.clone()));
                     tokio::spawn(async move {
                         rtn.send(
                             gate_selector.knock(knock).await
@@ -737,7 +738,7 @@ impl HyperwayEndpointFactory for MachineHyperwayEndpointFactory {
 
 pub struct MachineApiExtFactory {
     pub machine_api: MachineApi,
-    pub logger: PointLogger,
+    pub logger: Logger,
 }
 
 #[async_trait]

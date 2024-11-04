@@ -10,6 +10,7 @@ static SHUTDOWN_HOOK_TX: Lazy<tokio::sync::mpsc::Sender<ShutdownCall>> = Lazy::n
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
     tokio::spawn(async move {
         let mut hooks = vec![];
+        let mut drops= vec![];
         while let Some(call) = rx.recv().await {
             match call {
                 ShutdownCall::AddHook(tx) => {
@@ -22,6 +23,7 @@ static SHUTDOWN_HOOK_TX: Lazy<tokio::sync::mpsc::Sender<ShutdownCall>> = Lazy::n
                     }).await.unwrap_or_default();
                     process::exit(code);
                 }
+                ShutdownCall::KeepAlive(drop) => drops.push(drop),
             }
         }
 
@@ -37,6 +39,10 @@ pub fn shutdown(code: i32) {
     SHUTDOWN_HOOK_TX.try_send(ShutdownCall::Shutdown(code)).unwrap_or_default();
 }
 
+pub fn add_keep_alive( keep: Box<dyn Drop+ Send+Sync+'static>) {
+    SHUTDOWN_HOOK_TX.try_send(ShutdownCall::KeepAlive(keep)).unwrap_or_default();
+}
+
 
 pub fn panic_shutdown<M>(msg: M) where M: AsRef<str> {
     eprintln!("{}", msg.as_ref());
@@ -47,5 +53,6 @@ pub fn panic_shutdown<M>(msg: M) where M: AsRef<str> {
 pub enum ShutdownCall  {
     AddHook(Pin<Box<dyn Future<Output=()>+Sync+Send+'static>>),
     Shutdown(i32),
+    KeepAlive(Box<dyn Drop+Send+Sync+'static>)
 }
 

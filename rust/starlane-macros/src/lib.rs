@@ -22,12 +22,12 @@ use starlane::space::util::log;
 use starlane::space::wasm::Timestamp;
 
 #[no_mangle]
-extern "C" fn cosmic_uuid() -> loc::Uuid {
+extern "C" fn starlane_uuid() -> loc::Uuid {
     loc::Uuid::from(uuid::Uuid::new_v4().to_string()).unwrap()
 }
 
 #[no_mangle]
-extern "C" fn cosmic_timestamp() -> Timestamp {
+extern "C" fn starlane_timestamp() -> Timestamp {
     Timestamp::new(Utc::now().timestamp_millis())
 }
 
@@ -83,6 +83,7 @@ pub fn handler(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn handler_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
     _handler(attr, item, false)
 }
+
 
 fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
     let item_cp = item.clone();

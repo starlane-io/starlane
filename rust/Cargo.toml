@@ -88,10 +88,11 @@ threadpool = "1.8.1"
 oneshot = "0.1.5"
 
 webpki-roots = "0.26.5"
-anyhow = "1.0.86"
-virtual-fs = "0.16.0"
+anyhow = "1.0.92"
+virtual-fs = "0.19.0"
 bytes = "1.7.1"
-
+crossterm = "0.28.1"
+console = "0.15.8"
 
 syn = { version = "1.0", features = ["full"] }
 quote = "1.0"
@@ -120,3 +121,7 @@ termsize = "0.1.9"
 textwrap = "0.16.1"
 postgresql_embedded = "0.17.2"
 port_check = "0.2.1"
+function_name = "0.3.0"
+derive-name = "1.1.0"
+tokio-scoped = "0.2.0"
+prettyplease = "0.2.25"

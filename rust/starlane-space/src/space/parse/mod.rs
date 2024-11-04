@@ -1632,6 +1632,13 @@ pub struct SkewerCase {
     string: String,
 }
 
+pub struct SnakeCase {
+    string: String
+}
+
+
+
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct VarCase {
     string: String,
