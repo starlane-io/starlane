@@ -202,13 +202,6 @@ impl StandaloneInstaller {
 
         let bar = self.console.progress_bar(100);
         bar.start("downloading postgres...");
-        let bar2 = bar.clone();
-        tokio::spawn( async move {
-            for _ in 0..100 {
-                tokio::time::sleep(Duration::from_millis(100)).await;
-                bar2.inc(1)
-            }
-        });
 
         foundation.install(&config).await?;
         bar.stop("postgres download complete");
