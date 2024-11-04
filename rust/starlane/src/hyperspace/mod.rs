@@ -11,7 +11,7 @@ use colored::Colorize;
 use once_cell::sync::Lazy;
 use uuid::Uuid;
 use starlane::space::err::SpaceErr;
-use starlane::space::log::{FileAppender, LogAppender, RootLogger, StdOutAppender};
+use starlane::space::log::{FileAppender, LogAppender, StdOutAppender};
 use crate::env::{StarlaneWriteLogs, STARLANE_LOG_DIR, STARLANE_WRITE_LOGS};
 
 pub mod err;

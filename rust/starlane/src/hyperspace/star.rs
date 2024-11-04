@@ -54,7 +54,7 @@ use starlane::space::wave::exchange::SetStrategy;
 use starlane::space::wave::{Agent, DirectedProto, Handling, HandlingKind, PongCore, Priority, Recipients, Reflectable, Retries, Ripple, Scope, SignalCore, SingularRipple, WaitTime, WaveVariantDef, WaveKind, ToReflected, ReflectedWave, WaveId};
 use starlane::space::wave::core::ReflectedCore;
 use starlane::space::wave::Wave;
-use starlane_primitive_macros::push_mark;
+use starlane_primitive_macros::{push_loc, push_mark};
 use crate::registry::err::RegErr;
 use crate::service::ServiceTemplate;
 use crate::template::Templates;
@@ -157,7 +157,7 @@ impl HyperStarSkel
         star_tx: &mut HyperStarTx,
     ) -> Self where P: Platform{
         let point = template.key.clone().to_point();
-        let logger = machine.logger.push_loc(point.clone());
+        let logger = push_loc!((machine.logger,&point));
         let exchanger = Exchanger::new(
             point.clone().to_surface(),
             machine.timeouts.clone(),
@@ -670,7 +670,7 @@ impl HyperStar
             GlobalCommandExecutionHandler::new(skel.clone()),
             transmitter,
             global_executor,
-            skel.logger.logger.clone(),
+            push_loc!((skel.logger,skel.point))
         );
 
         let mut forwarders = vec![];
@@ -785,7 +785,7 @@ impl HyperStar
         {
             let skel = skel.clone();
             tokio::spawn(async move {
-                let logger = skel.logger.push_mark("client-connect").unwrap();
+                let logger = push_mark!(skel.logger);
                 for con in &skel.template.connections {
                     if let StarCon::Connector(stub) = con {
                         match interchange

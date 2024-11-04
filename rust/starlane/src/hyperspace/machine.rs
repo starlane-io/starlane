@@ -29,7 +29,7 @@ use starlane::space::err::{HyperSpatialError, SpaceErr, SpatialError};
 use starlane::space::hyper::{InterchangeKind, Knock};
 use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface};
-use starlane::space::log::{PointLogger, RootLogger};
+use starlane::space::log::{PointLogger };
 use starlane::space::particle::property::PropertiesConfig;
 use starlane::space::particle::{Property, Status, Stub};
 use starlane::space::point::Point;
@@ -43,7 +43,7 @@ use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
 use thiserror::Error;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
-use starlane_primitive_macros::push_mark;
+use starlane_primitive_macros::{push_loc, push_mark};
 
 #[derive(Clone)]
 pub struct MachineApi {
@@ -180,7 +180,7 @@ where
     pub platform: P,
     pub registry: Registry,
     pub artifacts: Artifacts,
-    pub logger: RootLogger,
+    pub logger: PointLogger,
     pub timeouts: Timeouts,
     pub api: MachineApi,
     pub status_rx: watch::Receiver<MachineStatus>,
@@ -240,7 +240,7 @@ where
             .to_point()
             .to_surface()
             .with_layer(Layer::Gravity);
-        let logger = platform.logger().push_loc(machine_star.point.clone());
+        let logger = push_loc!((platform.logger(),machine_star.point.clone()));
         let global = machine_star
             .point
             .push("global")
@@ -272,7 +272,7 @@ where
             let star_port = star_point.clone().to_surface().with_layer(Layer::Core);
 
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
-            let logger = skel.logger.push_loc(drivers_point.clone());
+            let logger = push_loc!((skel.logger,&drivers_point));
 
             let mut star_tx: HyperStarTx = HyperStarTx::new(star_point.clone());
             let star_skel =
@@ -356,7 +356,7 @@ where
             });
         }
 
-        let logger = skel.logger.push_loc(machine_point);
+        let logger = push_loc!((skel.logger,&machine_point));
 
         let (term_tx, _) = broadcast::channel(1);
         let stars = Arc::new(stars);
@@ -501,7 +501,7 @@ where
                 }
                 MachineCall::Knock { knock, rtn } => {
                     let gate_selector = self.gate_selector.clone();
-                    let logger = self.skel.logger.push_loc(self.skel.machine_star.point.clone());
+                    let logger = push_loc!((self.skel.logger,self.skel.machine_star.point.clone()));
                     tokio::spawn(async move {
                         rtn.send(
                             gate_selector.knock(knock).await

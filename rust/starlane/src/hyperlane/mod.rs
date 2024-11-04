@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 use starlane::space::err::SpaceErr;
 use starlane::space::hyper::{Greet, InterchangeKind, Knock};
 use starlane::space::loc::{Layer, PointFactory, Surface, ToSurface};
-use starlane::space::log::{PointLogger, RootLogger, Tracker};
+use starlane::space::log::{PointLogger, Tracker};
 use starlane::space::point::Point;
 use starlane::space::substance::{Substance, Token};
 use starlane::space::wave::core::ext::ExtMethod;
@@ -55,8 +55,7 @@ pub struct Hyperway {
 
 impl Hyperway {
     pub fn new(remote: Surface, agent: Agent, logger: PointLogger) -> Self {
-        //let logger = logger.loc(remote.point.clone());
-        let logger = push_loc!(remote.point.clone());
+        let logger = push_loc!((logger,&remote.point));
 
         let mut inbound = Hyperlane::new(format!("{}<Inbound>", remote.to_string()));
         inbound
@@ -866,12 +865,12 @@ impl HyperAuthenticator for AnonHyperAuthenticatorAssignEndPoint {
 
 #[derive(Clone)]
 pub struct TokensFromHeavenHyperAuthenticatorAssignEndPoint {
-    pub logger: RootLogger,
+    pub logger: PointLogger,
     pub tokens: Arc<DashMap<Token, HyperwayStub>>,
 }
 
 impl TokensFromHeavenHyperAuthenticatorAssignEndPoint {
-    pub fn new(tokens: Arc<DashMap<Token, HyperwayStub>>, logger: RootLogger) -> Self {
+    pub fn new(tokens: Arc<DashMap<Token, HyperwayStub>>, logger: PointLogger) -> Self {
         Self { logger, tokens }
     }
 }
@@ -933,8 +932,7 @@ impl TokenDispensingHyperwayInterchange {
     pub async fn dispense(&self) -> Result<(Token, HyperwayStub), SpaceErr> {
         let token = Token::new_uuid();
         let remote_point = self.remote_point_factory.create().await?.to_surface();
-        let lane_point = self.lane_point_factory.create().await?;
-        let logger = self.logger.loc(lane_point);
+        //let lane_point = self.lane_point_factory.create().await?;
         let stub = HyperwayStub {
             agent: self.agent.clone(),
             remote: remote_point,
@@ -2011,7 +2009,7 @@ pub mod test_util {
     use starlane::space::err::SpaceErr;
     use starlane::space::hyper::{Greet, InterchangeKind, Knock};
     use starlane::space::loc::{Layer, Surface, ToSurface};
-    use starlane::space::log::{root_logger, PointLogger, RootLogger};
+    use starlane::space::log::{logger,  PointLogger };
     use starlane::space::point::Point;
     use starlane::space::settings::Timeouts;
     use starlane::space::substance::Substance;
@@ -2038,10 +2036,10 @@ pub mod test_util {
 
     impl SingleInterchangePlatform {
         pub async fn new() -> Self {
-            let root_logger = root_logger();
-            let logger = root_logger.push_mark(create_mark!());
+            let loggger = logger();
+            let logger = loggger.push_mark(create_mark!());
             let point = Point::from_str("point").unwrap();
-            let logger = push_loc!(point);
+            let logger = push_loc!((logger,point));
             let interchange = Arc::new(HyperwayInterchange::new(
                 push_mark!()
             ));
@@ -2115,15 +2113,16 @@ pub mod test_util {
                 PointLogger::default(),
             );
 
-            let root_logger = root_logger();
-            let logger = root_logger.push_loc(Point::from_str("less-client").unwrap());
+            let logger = logger();
+
+            let logger = logger.push_loc(Point::from_str("less-client").unwrap());
             let less_client = HyperClient::new_with_exchanger(
                 self.less_factory,
                 Some(less_exchanger.clone()),
                 logger,
             )
             .unwrap();
-            let logger = root_logger.push_loc(Point::from_str("fae-client").unwrap());
+            let logger = logger.push_loc(Point::from_str("fae-client").unwrap());
             let fae_client = HyperClient::new_with_exchanger(
                 self.fae_factory,
                 Some(fae_exchanger.clone()),

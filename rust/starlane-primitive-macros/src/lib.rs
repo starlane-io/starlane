@@ -412,7 +412,7 @@ pub fn push_loc(tokens: TokenStream) -> TokenStream {
 
     let rtn = quote! {
         {
-    let mut builder = crate::space::log::LogMarkBuilder::default();
+    let mut builder = starlane::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -432,7 +432,7 @@ pub fn log_span(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as Expr);
     let rtn = quote! {
         {
-    let mut builder = crate::space::log::LogMarkBuilder::default();
+    let mut builder = starlane::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -441,7 +441,34 @@ pub fn log_span(tokens: TokenStream) -> TokenStream {
             }
         };
 
-    println!("PROC {} ", rtn.to_string());
+    rtn.into()
+}
+
+#[proc_macro]
+pub fn logx(item: TokenStream) -> TokenStream {
+    let log_pack= quote!(starlane::space::log);
+
+    let loc = if !item.is_empty()  {
+        let expr = parse_macro_input!(item as Expr);
+        quote!( #log_pack::logger().push_loc(#expr); )
+    } else {
+        quote!( #log_pack::logger(); )
+    };
+println!("LOC {}",loc.is_empty());
+
+    let rtn = quote! {
+        {
+            let logger = #loc;
+    let mut builder = #log_pack::LogMarkBuilder::default();
+    builder.package(env!("CARGO_PKG_NAME").to_string());
+    builder.file(file!().to_string());
+    builder.line(line!().to_string());
+    let mark = builder.build().unwrap();
+            logger.push_mark(mark)
+            }
+        };
+
+
     rtn.into()
 }
 
@@ -449,12 +476,12 @@ pub fn log_span(tokens: TokenStream) -> TokenStream {
 pub fn push_mark(_item: TokenStream) -> TokenStream {
     let rtn = quote! {
         {
-            stringify!(env!("CARGO_PKG_NAME"));
-    let mut builder = LogMark::builder();
+
+    let mut builder = starlane::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
-    let mark : LogMark = builder.build().unwrap();
+    let mark  = builder.build().unwrap();
     logger.push_mark(mark)
             }
 
@@ -467,7 +494,7 @@ pub fn push_mark(_item: TokenStream) -> TokenStream {
 pub fn create_mark(_item: TokenStream) -> TokenStream {
     let rtn = quote! {
         {
-    let mut builder = LogMarkBuilder::default();
+    let mut builder = starlane::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -532,7 +559,7 @@ pub fn log(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn logger(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn logger_att(attr: TokenStream, item: TokenStream) -> TokenStream {
     let surface = if attr.is_empty() {
         format_ident!("logger")
     } else {

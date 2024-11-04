@@ -12,7 +12,6 @@ use crate::driver::{DriverAvail, DriversBuilder};
 use starlane::space::artifact::asynch::Artifacts;
 use starlane::space::kind::StarSub;
 use starlane::space::loc::{MachineName, StarKey};
-use starlane::space::log::root_logger;
 use starlane::space::point::Point;
 use std::fs;
 use std::path::Path;
@@ -37,6 +36,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
+use starlane_primitive_macros::logx;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
@@ -293,8 +293,7 @@ impl Starlane {
         let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookups.clone())).await?);
         let handle = PostgresRegistryContextHandle::new(&db.database, ctx, db.handle);
 
-        let logger = root_logger();
-        let logger = logger.push_loc(Point::global_registry());
+        let logger = logx!(&Point::global_registry());
         let registry = Arc::new(RegistryWrapper::new(Arc::new(
             PostgresRegistry::new(handle, Box::new(lookups), logger).await?,
         )));

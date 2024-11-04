@@ -39,12 +39,10 @@ use space::hyper::ParticleRecord;
 use space::wave::Agent;
 
 
+pub extern crate self as starlane;
 
-pub mod starlane {
-    pub mod space {
-        pub use crate::space::*;
-    }
-}
+
+
 
 
 pub mod space;
