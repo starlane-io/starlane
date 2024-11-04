@@ -8,10 +8,10 @@ use asynch::{
     DirectedHandler, Router,
 };
 use tokio::sync::broadcast;
-
+use starlane_primitive_macros::log_span;
 use crate::space::config::bind::RouteSelector;
 use crate::space::loc::{ToPoint, ToSurface, Topic};
-use crate::space::log::{PointLogger, RootLogger, SpanLogger};
+use crate::space::log::{PointLogger, SpanLogger};
 use crate::space::wave::core::Method;
 use crate::space::wave::{
     Bounce, DirectedProto, DirectedWave, EchoCore, FromReflectedAggregate,
@@ -225,7 +225,7 @@ where
         InCtxDef {
             root: self.root,
             input: self.input,
-            logger: self.logger.span(),
+            logger: log_span!(),
             transmitter: self.transmitter.clone(),
         }
     }

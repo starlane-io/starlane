@@ -27,6 +27,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
 use thiserror_context::impl_context;
+use starlane_primitive_macros::push_mark;
 /*
 #[derive(DirectedHandler,Clone)]
 pub struct Global where P: Platform {
@@ -108,8 +109,8 @@ pub struct GlobalExecutionChamber {
 
 impl GlobalExecutionChamber {
     pub fn new(skel: HyperStarSkel) -> Self {
-        let logger = skel.logger.push_point("global").unwrap();
-        Self { skel, logger }
+        let logger = skel.logger.clone();
+        Self { skel, logger: push_mark!()}
     }
 
     #[track_caller]

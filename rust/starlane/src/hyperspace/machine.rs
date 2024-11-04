@@ -43,6 +43,7 @@ use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
 use thiserror::Error;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
+use starlane_primitive_macros::push_mark;
 
 #[derive(Clone)]
 pub struct MachineApi {
@@ -280,7 +281,7 @@ where
             let mut drivers = platform.drivers_builder(&star_template.kind);
 
             let mut interchange =
-                HyperwayInterchange::new(logger.push_point("interchange").unwrap());
+                HyperwayInterchange::new(push_mark!());
 
             let star_hop = star_point.clone().to_surface().with_layer(Layer::Gravity);
 

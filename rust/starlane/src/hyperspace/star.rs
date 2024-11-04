@@ -54,6 +54,7 @@ use starlane::space::wave::exchange::SetStrategy;
 use starlane::space::wave::{Agent, DirectedProto, Handling, HandlingKind, PongCore, Priority, Recipients, Reflectable, Retries, Ripple, Scope, SignalCore, SingularRipple, WaitTime, WaveVariantDef, WaveKind, ToReflected, ReflectedWave, WaveId};
 use starlane::space::wave::core::ReflectedCore;
 use starlane::space::wave::Wave;
+use starlane_primitive_macros::push_mark;
 use crate::registry::err::RegErr;
 use crate::service::ServiceTemplate;
 use crate::template::Templates;
@@ -807,7 +808,7 @@ impl HyperStar
                                         match Bridge::new(
                                             local_endpoint,
                                             remote_factory,
-                                            logger.push_point("endpoint").unwrap(),
+                                            push_mark!(),
                                         ) {
                                             Ok(_) => {}
                                             Err(err) => {

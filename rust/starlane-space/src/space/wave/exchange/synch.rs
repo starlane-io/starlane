@@ -13,6 +13,7 @@ use crate::space::wave::{
 };
 use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 use std::sync::Arc;
+use starlane_primitive_macros::log_span;
 
 pub trait ExchangeRouter: Send + Sync {
     fn route(&self, wave: Wave);
@@ -240,7 +241,9 @@ impl DirectedHandlerShell {
 
         let mut transmitter = self.builder.clone().build();
         let reflection = wave.reflection();
-        let ctx = RootInCtx::new(wave, self.surface.clone(), self.logger.span(), transmitter.clone());
+        let logger = self.logger.clone();
+        let logger = log_span!();
+        let ctx = RootInCtx::new(wave, self.surface.clone(), logger, transmitter.clone());
         match self.handler.handle(ctx) {
             CoreBounce::Absorbed => Bounce::Absorbed,
             CoreBounce::Reflected(reflected) => {

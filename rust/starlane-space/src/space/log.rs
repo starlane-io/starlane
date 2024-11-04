@@ -2,7 +2,7 @@ use crate::space::err::SpaceErr;
 use crate::space::loc;
 use crate::space::loc::{Layer, Surface, ToPoint, ToSurface, Uuid};
 use crate::space::parse::util::Span;
-use crate::space::parse::CamelCase;
+use crate::space::parse::{create, CamelCase};
 use crate::space::particle::traversal::Traversal;
 use crate::space::point::Point;
 use crate::space::selector::Selector;
@@ -24,7 +24,7 @@ use regex::Regex;
 use serde;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use starlane_primitive_macros::{create_mark, mark};
+use starlane_primitive_macros::{create_mark, push_mark};
 use std::cell::LazyCell;
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -94,7 +94,7 @@ static ROOT_LOGGER: LazyLock<RootLogger> = LazyLock::new(|| unsafe {
         }
     }
 });
-pub fn root_logger() -> RootLogger {
+fn root_logger() -> RootLogger {
     ROOT_LOGGER.clone()
 }
 
@@ -415,6 +415,7 @@ impl RootLoggerBuilder {
             panic!("LogBuilder: must set Logger before LogBuilder.send() can be called")
         };
 
+        let mark = create_mark!();
         let log = Log {
             loc: self.loc,
             mark,
@@ -439,7 +440,7 @@ pub trait LogAppender: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct RootLogger {
+struct RootLogger {
     appender: Arc<dyn LogAppender>,
 }
 
@@ -677,11 +678,6 @@ impl PointLogger {
         }
     }
 
-    pub fn push_point<S: ToString>(&self, segs: S) -> Result<PointLogger, SpaceErr> {
-        Ok(PointLogger {
-            point: self.point.push(segs)?,
-        })
-    }
 
 
 
@@ -737,6 +733,7 @@ impl SpanLogger {
             track.track_id()
         ));
     }
+
 }
 
 impl SpanLogger {
@@ -777,6 +774,7 @@ impl SpanLogger {
             commit_on_drop: true,
         }
     }
+
 
     pub fn current_span(&self) -> &LogSpan {
         &self.span
@@ -882,20 +880,6 @@ impl SpanLogger {
         result
     }
 
-    pub fn push_point<S: ToString>(&self, segs: S, mark: LogMark) -> Result<PointLogger, SpaceErr> {
-
-        let point = match &self.span.loc {
-            None => Point::from_str(segs.to_string().as_str())?,
-            Some(point) => point.clone().push(segs)?,
-        };
-
-        let span = LogSpan::root(point,mark);
-
-        Ok(PointLogger {
-            span,
-            ..Default::default()
-        })
-    }
 }
 
 impl Drop for SpanLogger {
@@ -1180,10 +1164,7 @@ where
     fn start(mut self) {
         tokio::spawn(async move {
             while let Some(log) = self.rx.recv().await {
-                let point = match &log.loc {
-                    Some(point) => point.to_string(),
-                    None => "None".to_string(),
-                };
+                let point = log.loc.to_string();
                 let log = format!("{} | {}", point, log.payload.to_string());
                 self.writer.write_all(log.as_bytes()).unwrap_or_default();
                 self.writer.flush().unwrap_or_default();

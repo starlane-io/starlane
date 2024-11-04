@@ -405,13 +405,61 @@ pub fn loggerhead(_attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn mark(_item: TokenStream) -> TokenStream {
+pub fn push_loc(item: TokenStream) -> TokenStream {
+    let loc = quote!{ item };
     let rtn = quote! {
+      let logger ={
+     match Loc::try_from(loc) {
+                Ok(loc) => {
+                      let mut builder = LogMarkBuilder::default();
+                     builder.package(env!("CARGO_PKG_NAME").to_string());
+                     builder.file(file!().to_string());
+                     builder.line(line!().to_string());
+                     let mark : LogMark = builder.build().unwrap();
+                     logger.push_loc(loc, mark)
+                }
+                Err(err) => {
+                    loggger.error(err.to_string());
+                }
+      }
+
+          };
+
+    };
+
+    rtn.into()
+}
+
+
+#[proc_macro]
+pub fn log_span(_item: TokenStream) -> TokenStream {
+    let rtn = quote! {
+        {
     let mut builder = LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
-    builder.build().unwrap()
+    let mark : LogMark = builder.build().unwrap();
+    logger.push_mark(mark)
+            }
+
+        };
+
+    rtn.into()
+}
+
+#[proc_macro]
+pub fn push_mark(_item: TokenStream) -> TokenStream {
+    let rtn = quote! {
+        {
+    let mut builder = LogMarkBuilder::default();
+    builder.package(env!("CARGO_PKG_NAME").to_string());
+    builder.file(file!().to_string());
+    builder.line(line!().to_string());
+    let mark : LogMark = builder.build().unwrap();
+    logger.push_mark(mark)
+            }
+
         };
 
     rtn.into()

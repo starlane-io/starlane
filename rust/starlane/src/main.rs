@@ -11,13 +11,12 @@ extern crate starlane_macros;
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
 
+pub mod env;
 pub mod err;
 pub mod properties;
 pub mod template;
-pub mod env;
 
 pub mod platform;
-
 
 pub mod foundation;
 
@@ -58,43 +57,45 @@ mod server;
 pub use server::*;
 
 use crate::cli::{Cli, Commands, ContextCmd};
-use crate::env::{config_exists, context, context_dir, ensure_global_settings, save_global_settings, set_context, STARLANE_HOME};
+use crate::env::{
+    config_exists, context, context_dir, ensure_global_settings, save_global_settings, set_context,
+    STARLANE_HOME,
+};
+use crate::foundation::Foundation;
+use crate::foundation::StandAloneFoundation;
+use crate::install::{Console, StarlaneTheme};
 use crate::platform::Platform;
+use crate::shutdown::shutdown;
+use anyhow::{anyhow, ensure};
 use clap::Parser;
 use cliclack::log::{error, success};
-use cliclack::{
-    intro, outro, spinner
-};
+use cliclack::{intro, outro, spinner};
 use colored::Colorize;
+use crossterm::execute;
+use crossterm::style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor, Stylize};
 use lerp::Lerp;
 use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
 use starlane::space::loc::ToBaseKind;
-use starlane_primitive_macros::ToBase;
+use starlane_primitive_macros::{create_mark, ToBase};
+use starlane_space::space::err::PrintErr;
+use starlane_space::space::log::log_entry_point;
+use starlane_space::space::parse::SkewerCase;
+use starlane_space::space::particle::Status;
+use std::any::Any;
+use std::fmt::Display;
 use std::fs::File;
+use std::io;
 use std::io::{Read, Seek, Write};
 use std::ops::{Add, Index, Mul};
 use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
-use std::any::Any;
-use std::fmt::Display;
-use std::io;
-use anyhow::{anyhow, ensure};
-use crossterm::execute;
-use crossterm::style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor, Stylize};
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::FileOptions;
-use starlane_space::space::err::PrintErr;
-use starlane_space::space::parse::SkewerCase;
-use starlane_space::space::particle::Status;
-use crate::foundation::Foundation;
-use crate::foundation::StandAloneFoundation;
-use crate::install::{Console, StarlaneTheme};
-use crate::shutdown::shutdown;
 
 /*
 let config = Default::default();
@@ -126,13 +127,17 @@ pub fn main() -> Result<(), anyhow::Error> {
             console.splash2();
             Ok(())
         }
-        Commands::Install{ edit, nuke } => {
+        Commands::Install { edit, nuke } => {
             if nuke {
                 crate::nuke(false);
             }
             install::install(edit)
+        }
+        Commands::Run => {
+            let runtime = Builder::new_multi_thread().enable_all().build()?;
+            runtime.block_on(async move { log_entry_point(run,create_mark!()).await });
+            Ok(())
         },
-        Commands::Run => run(),
         Commands::Term(args) => {
             let runtime = Builder::new_multi_thread().enable_all().build()?;
 
@@ -148,35 +153,48 @@ pub fn main() -> Result<(), anyhow::Error> {
             println!("{}", VERSION.to_string());
             Ok(())
         }
-        Commands::Scorch=> {
+        Commands::Scorch => {
             scorch();
             Ok(())
         }
-        Commands::Nuke{ all } => {
+        Commands::Nuke { all } => {
             nuke(all);
             Ok(())
         }
         Commands::Context(args) => {
             match args.command {
                 ContextCmd::Create { context_name } => {
-                    let context_name = SkewerCase::from_str(context_name.as_str()).map_err(|e|{ e.print(); anyhow!("illegal context name") })?;
+                    let context_name =
+                        SkewerCase::from_str(context_name.as_str()).map_err(|e| {
+                            e.print();
+                            anyhow!("illegal context name")
+                        })?;
                     set_context(context_name.as_str())?;
-                    if config_exists(context_name.to_string())
-                    {
+                    if config_exists(context_name.to_string()) {
                         Err(anyhow!("context '{}' already exists", context_name))?;
                     }
 
-                    println!("Context '{}' created.  Next you may want to run '{}'", context_name.truecolor(COOL.0, COOL.1, COOL.2), "starlane install".to_string().truecolor(COOL.0, COOL.1, COOL.2));
+                    println!(
+                        "Context '{}' created.  Next you may want to run '{}'",
+                        context_name.truecolor(COOL.0, COOL.1, COOL.2),
+                        "starlane install"
+                            .to_string()
+                            .truecolor(COOL.0, COOL.1, COOL.2)
+                    );
                 }
                 ContextCmd::Switch { context_name } => {
-                    let context_name = SkewerCase::from_str(context_name.as_str()).map_err(|e|{ e.print(); anyhow!("illegal context name") })?;
+                    let context_name =
+                        SkewerCase::from_str(context_name.as_str()).map_err(|e| {
+                            e.print();
+                            anyhow!("illegal context name")
+                        })?;
                     set_context(context_name.as_str());
                 }
                 ContextCmd::Default => {
                     set_context("default").unwrap_or_default();
                 }
                 ContextCmd::Which => {
-                    println!("{}",context());
+                    println!("{}", context());
                 }
                 ContextCmd::List => {
                     let context = context();
@@ -184,10 +202,17 @@ pub fn main() -> Result<(), anyhow::Error> {
                     for dir in dir.into_iter() {
                         let dir = dir?;
                         if dir.metadata()?.is_dir() {
-                            let dir= dir.path().iter().last().expect("expected a last directory").to_str().unwrap_or_default().to_string();
+                            let dir = dir
+                                .path()
+                                .iter()
+                                .last()
+                                .expect("expected a last directory")
+                                .to_str()
+                                .unwrap_or_default()
+                                .to_string();
                             if context == dir {
                                 println!("{}{}", "*", dir.truecolor(0xff, 0xff, 0xff));
-                            }else {
+                            } else {
                                 println!(" {}", dir.truecolor(COOL.0, COOL.1, COOL.2));
                             }
                         }
@@ -199,8 +224,6 @@ pub fn main() -> Result<(), anyhow::Error> {
     }
 }
 
-
-
 #[cfg(not(feature = "server"))]
 fn run() -> Result<(), anyhow::Error> {
     println!("'' feature is not enabled in this starlane installation");
@@ -208,7 +231,127 @@ fn run() -> Result<(), anyhow::Error> {
         "'machine' feature is not enabled in this starlane installation"
     ))
 }
+#[cfg(feature = "server")]
+async fn run() -> Result<(), anyhow::Error> {
+    let console = Console::new();
+    console.info("starlane started.")?;
 
+    console.intro("RUN STARLANE").unwrap_or_default();
+
+    async fn runner(console: &Console) -> Result<(), anyhow::Error> {
+        console.spinner().start("initializing");
+        console.info("initialization complete.")?;
+
+        console.long_delay();
+        let mut spinner = console.spinner();
+        spinner.start("loading configuration");
+
+        let config = match env::config() {
+            Ok(Some(config)) => config,
+            Ok(None) => {
+                console.long_delay();
+                spinner.error("Starlane configuration not found.");
+
+                error(format!(
+                    "Starlane looked for a configuration here: '{}' But none was found.",
+                    env::config_path()
+                ))?;
+
+                console.remark(format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", env::config_path()))?;
+
+                console.note(
+                    "install",
+                    "please run `starlane install` to configure a new Starlane runner",
+                )?;
+
+                outro("Good Luck!")?;
+                console.newlines(3);
+                shutdown(1);
+                panic!();
+            }
+            Err(err) => {
+                spinner.error("invalid configuration");
+                console.error(format!("{}", err.to_string()))?;
+                console.note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", env::config_path()))?;
+                console.note(
+                    "fresh install",
+                    "To create a fresh configuration please run: `starlane install`",
+                )?;
+                outro("Good Luck!")?;
+                console.newlines(3);
+                shutdown(1);
+                panic!();
+            }
+        };
+
+        console.long_delay();
+        console.success("starlane configured.")?;
+        spinner.next(
+            "configuration loaded.",
+            "launching registry [this may take a while]",
+        );
+
+        console.long_delay();
+        let starlane = Starlane::new(config, StandAloneFoundation())
+            .await
+            .map_err(|e| {
+                println!("{}", e.to_string());
+                e
+            })
+            .unwrap();
+
+        spinner.next("registry status: [Ready]", "acquiring machine API");
+
+        let machine_api = starlane.machine();
+
+        spinner.next(
+            "machine API acquired",
+            "waiting for Starlane [Ready] status",
+        );
+
+        let api = tokio::time::timeout(Duration::from_secs(30), machine_api).await??;
+
+        spinner.clear();
+
+        console.status("Starlane status:", Status::Ready)?;
+
+        console.newlines(3);
+
+        console.splash_with_params(1, 2, 25);
+
+        console.note(
+            "what's next?",
+            "You can connect to this starlane runner with a control terminal: `starlane term`",
+        )?;
+
+        console.outro("Starlane is running.")?;
+        console.newlines(3);
+
+        // this is a dirty hack which is good enough for a 0.3.0 release...
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }
+
+        Ok(())
+    };
+
+    match runner(&console).await {
+        Ok(_) => {}
+        Err(err) => {
+            error(format!(
+                "starlane halted due to an error: {}",
+                err.to_string()
+            ))
+            .unwrap_or_default();
+
+            console.outro("runner failed").unwrap();
+            console.newlines(3);
+        }
+    }
+
+    Ok(())
+}
+/*
 #[cfg(feature = "server")]
 fn run() -> Result<(), anyhow::Error> {
     let console = Console::new();
@@ -219,6 +362,7 @@ fn run() -> Result<(), anyhow::Error> {
 
     runtime.block_on(async move {
 
+        log_entry_point()
         console.intro("RUN STARLANE").unwrap_or_default();
 
         async fn runner(console: &Console) -> Result<(),anyhow::Error> {
@@ -309,6 +453,8 @@ fn run() -> Result<(), anyhow::Error> {
 
     Ok(())
 }
+
+ */
 
 /*
 #[no_mangle]
@@ -469,15 +615,14 @@ impl Color {
 static COOL: (u8, u8, u8) = (0x6D, 0xD7, 0xFD);
 static UNDERSTATED: (u8, u8, u8) = (0x66, 0x66, 0xFD);
 
-static IMPORTANT : (u8, u8, u8) = (0xFF, 0xFF, 0xFF);
-static ERR : (u8, u8, u8) = (0xcc, 0x00, 0x00);
+static IMPORTANT: (u8, u8, u8) = (0xFF, 0xFF, 0xFF);
+static ERR: (u8, u8, u8) = (0xcc, 0x00, 0x00);
 
-static OK : (u8, u8, u8) = (0x00, 0xcc, 0x00);
+static OK: (u8, u8, u8) = (0x00, 0xcc, 0x00);
 #[derive(ToBase)]
 pub enum StartSequence {
     Starting(String),
 }
-
 
 /*
 splash().await;
@@ -495,17 +640,19 @@ println!();
 
  */
 
-
 #[tokio::main]
-async fn scorch()  {
+async fn scorch() {
     if let Ok(Some(config)) = env::config() {
-        if !config.can_scorch{
-            panic!("in config: '{}' can_scorch flag is set to false.", env::config_path());
+        if !config.can_scorch {
+            panic!(
+                "in config: '{}' can_scorch flag is set to false.",
+                env::config_path()
+            );
         }
     }
 }
 
-fn nuke(all: bool)  {
+fn nuke(all: bool) {
     if all {
         let global = ensure_global_settings();
         if global.nuke {
@@ -517,15 +664,16 @@ fn nuke(all: bool)  {
     }
 
     if let Ok(Some(config)) = env::config() {
-        if !config.can_nuke  {
-            panic!("in config: '{}' can_nuke flag is set to false.", env::config_path());
+        if !config.can_nuke {
+            panic!(
+                "in config: '{}' can_nuke flag is set to false.",
+                env::config_path()
+            );
         } else {
             std::fs::remove_dir_all(context_dir()).unwrap();
         }
     }
-
 }
-
 
 /*
 fn list_contexts() -> Result<Vec<String>,anyhow::Error> {
@@ -542,4 +690,3 @@ fn list_contexts() -> Result<Vec<String>,anyhow::Error> {
 }
 
  */
-

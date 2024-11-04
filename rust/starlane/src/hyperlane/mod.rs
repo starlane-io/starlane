@@ -28,6 +28,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use derive_name::Name;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
+use starlane_primitive_macros::{push_loc, push_mark};
 
 pub static LOCAL_CLIENT: Lazy<Point> =
     Lazy::new(|| Point::from_str("LOCAL::client").expect("point"));
@@ -54,7 +55,9 @@ pub struct Hyperway {
 
 impl Hyperway {
     pub fn new(remote: Surface, agent: Agent, logger: PointLogger) -> Self {
-        let logger = logger.loc(remote.point.clone());
+        //let logger = logger.loc(remote.point.clone());
+        let logger = push_loc!(remote.point.clone());
+
         let mut inbound = Hyperlane::new(format!("{}<Inbound>", remote.to_string()));
         inbound
             .tx
@@ -160,7 +163,7 @@ pub struct HyperwayEndpoint {
 
 impl ToString for HyperwayEndpoint {
     fn to_string(&self) -> String {
-        format!("{}<~{}>", self.logger.point.to_string(), Self::name())
+        format!("{}<~{}>", self.logger.loc().to_string(), Self::name())
     }
 }
 
@@ -201,7 +204,8 @@ impl HyperwayEndpoint {
             {
                 let my_tx = self.tx.clone();
                 tokio::spawn(async move {
-                    let logger = endpoint.logger.push_mark("mux:tx").unwrap();
+                    let logger = endpoint.logger;
+                    let logger = push_mark!();
                     while let Some(wave) = endpoint.rx.recv().await {
                         logger.track(&wave, || Tracker::new("hyperway-endpoint", "Rx"));
                         match logger.result(my_tx.send(wave).await) {
@@ -212,7 +216,7 @@ impl HyperwayEndpoint {
                 });
             }
 
-            let logger = logger.push_mark("mux:rx").unwrap();
+            let logger = push_mark!();
             while let Some(wave) = self.rx.recv().await {
                 logger.track(&wave, || Tracker::new("hyperway-endpoint", "Tx"));
                 match logger.result(end_tx.send(wave).await) {
@@ -626,7 +630,7 @@ impl HyperwayInterchange {
     }
 
     pub fn point(&self) -> &Point {
-        &self.logger.point
+        &self.logger.loc().try_into().unwrap()
     }
 
     pub async fn mount(
@@ -908,10 +912,13 @@ impl TokenDispensingHyperwayInterchange {
         logger: PointLogger,
     ) -> Self {
         let tokens = Arc::new(DashMap::new());
+        /*
         let authenticator = Box::new(TokensFromHeavenHyperAuthenticatorAssignEndPoint::new(
             tokens.clone(),
-            logger.logger.clone(),
+            logger.clone(),
         ));
+
+         */
         let interchange = HyperwayInterchange::new(logger.clone());
         Self {
             agent,
@@ -1659,7 +1666,7 @@ impl HyperClientRunner {
         logger: PointLogger,
     ) -> mpsc::Receiver<Wave> {
         let (to_client_tx, from_runner_rx) = mpsc::channel(1024);
-        let logger = logger.push_point("runner").unwrap();
+        push_mark!();
         let runner = Self {
             ext: None,
             factory,
@@ -2016,6 +2023,7 @@ pub mod test_util {
         DirectedProto, PongCore, ReflectedKind, ReflectedProto
         , WaveVariantDef,
     };
+    use starlane_primitive_macros::{create_mark, push_loc, push_mark};
 
     pub static LESS: Lazy<Point> =
         Lazy::new(|| Point::from_str("space:users:less").expect("point"));
@@ -2031,9 +2039,11 @@ pub mod test_util {
     impl SingleInterchangePlatform {
         pub async fn new() -> Self {
             let root_logger = root_logger();
-            let logger = root_logger.push_loc(Point::from_str("point").unwrap());
+            let logger = root_logger.push_mark(create_mark!());
+            let point = Point::from_str("point").unwrap();
+            let logger = push_loc!(point);
             let interchange = Arc::new(HyperwayInterchange::new(
-                logger.push_point("interchange").unwrap(),
+                push_mark!()
             ));
 
             interchange
@@ -2051,11 +2061,12 @@ pub mod test_util {
                 ))
                 .await;
             let auth = AnonHyperAuthenticator::new();
+            push_mark!();
             let gate = Arc::new(MountInterchangeGate::new(
                 auth,
                 TestGreeter::new(),
                 interchange.clone(),
-                logger.push_point("gate").unwrap(),
+                logger
             ));
             let mut gates: Arc<DashMap<InterchangeKind, Arc<dyn HyperGate>>> =
                 Arc::new(DashMap::new());
@@ -2321,7 +2332,7 @@ pub mod test {
         Agent, DirectedProto, HyperWave, PongCore, ReflectedKind, ReflectedProto
         , Wave, WaveVariantDef,
     };
-
+    use starlane_primitive_macros::{create_mark, push_mark};
     use crate::hyperlane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest};
     use crate::hyperlane::{
         AnonHyperAuthenticator, Bridge, HyperClient, HyperConnectionDetails, HyperGate,
@@ -2528,7 +2539,7 @@ pub mod test {
     pub async fn test_dual_interchange() {
         let logger = root_logger().push_loc(Point::from_str("point").unwrap());
         let interchange = Arc::new(HyperwayInterchange::new(
-            logger.push_point("interchange").unwrap(),
+            push_mark!()
         ));
 
         interchange
@@ -2551,7 +2562,7 @@ pub mod test {
             auth,
             TestGreeter::new(),
             interchange.clone(),
-            logger.push_point("gate").unwrap(),
+            push_mark!()
         ));
         let mut gates: Arc<DashMap<InterchangeKind, Arc<dyn HyperGate>>> = Arc::new(DashMap::new());
         gates.insert(InterchangeKind::Singleton, gate);
@@ -2636,18 +2647,22 @@ pub mod test {
     pub async fn test_bridge() {
         pub fn create(name: &str) -> (Arc<HyperwayInterchange>, Arc<dyn HyperGate>) {
             let root_logger = root_logger();
-            let logger = root_logger.push_loc(Point::from_str(name).unwrap());
-            let interchange = Arc::new(HyperwayInterchange::new(
-                logger.push_point("interchange").unwrap(),
-            ));
+            let logger = root_logger.push_loc(Point::from_str(name).unwrap(),create_mark!());
 
-            let auth = AnonHyperAuthenticator::new();
-            let gate = Arc::new(MountInterchangeGate::new(
-                auth,
-                TestGreeter::new(),
-                interchange.clone(),
-                logger.push_point("gate").unwrap(),
-            ));
+            let interchange =
+                Arc::new(HyperwayInterchange::new(
+                    push_mark!()
+                ));
+
+            let gate = {
+                let auth = AnonHyperAuthenticator::new();
+                 Arc::new(MountInterchangeGate::new(
+                    auth,
+                    TestGreeter::new(),
+                    interchange.clone(),
+                    push_mark!()
+                ))
+            };
             let mut gates: Arc<DashMap<InterchangeKind, Arc<dyn HyperGate>>> =
                 Arc::new(DashMap::new());
             gates.insert(InterchangeKind::Singleton, gate);

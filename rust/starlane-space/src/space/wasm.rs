@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use crate::space::loc;
 use serde::{Deserialize, Serialize};
-use crate::space::log::{LogAppender, RootLogger, RootLoggerBuilder};
+use crate::space::log::{LogAppender, RootLoggerBuilder};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Timestamp {

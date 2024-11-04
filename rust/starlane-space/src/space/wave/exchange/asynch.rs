@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use crate::space::loc::{ToPoint, ToSurface};
-use crate::space::log::{root_logger, PointLogger, RootLogger, Trackable, Tracker};
+use crate::space::log::{logger, root_logger, PointLogger, Trackable, Tracker};
 use crate::space::particle::traversal::Traversal;
 use crate::space::point::Point;
 use crate::space::settings::Timeouts;
@@ -20,7 +20,9 @@ use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 use dashmap::{DashMap, DashSet};
 use std::sync::Arc;
 use std::time::Duration;
+use nom_supreme::error::StackContext;
 use tokio::sync::{mpsc, oneshot};
+use starlane_primitive_macros::log_span;
 
 #[async_trait]
 impl Router for TxRouter {
@@ -482,7 +484,7 @@ impl Default for Exchanger {
         Self::new(
             Point::root().to_surface(),
             Default::default(),
-            root_logger().push_loc(Point::root()),
+            logger()
         )
     }
 }
@@ -497,7 +499,9 @@ where
 
         let mut transmitter = self.builder.clone().build();
         let reflection = wave.reflection();
-        let ctx = RootInCtx::new(wave, self.surface.clone(), self.logger.span(), transmitter);
+        let logger = self.logger.clone();
+        let logger = log_span!();
+        let ctx = RootInCtx::new(wave, self.surface.clone(), logger, transmitter);
         match self.handler.handle(ctx).await {
             CoreBounce::Absorbed => {}
             CoreBounce::Reflected(reflected) => {
