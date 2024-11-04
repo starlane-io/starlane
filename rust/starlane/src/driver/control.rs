@@ -418,7 +418,7 @@ impl ControlClient {
             Default::default(),
         );
         let logger = root_logger();
-        let logger = logger.point(Point::from_str("control-client")?);
+        let logger = logger.push_loc(Point::from_str("control-client")?);
         let client = HyperClient::new_with_exchanger(factory, Some(exchanger), logger)?;
         Ok(Self { client })
     }

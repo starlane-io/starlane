@@ -316,8 +316,8 @@ impl<W> Traversal<W> {
     }
 
     pub fn is_inter_layer(&self) -> bool {
-        if let Some(point) = self.logger.point() {
-            self.to.point == *point
+        if let Ok(point) = self.logger.loc().clone().try_into() {
+            self.to.point == point
         } else {
             false
         }

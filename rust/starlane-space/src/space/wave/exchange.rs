@@ -33,7 +33,7 @@ where
     D: Sized,
 {
     pub fn new(handler: D, builder: T, surface: Surface, logger: RootLogger) -> Self {
-        let logger = logger.point(surface.point.clone());
+        let logger = logger.push_loc(surface.point.clone());
         Self {
             handler,
             builder,

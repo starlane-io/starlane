@@ -605,14 +605,14 @@ mod tests {
             .write_to_dir(".".to_string())
             .await?;
         let logger = root_logger();
-        let logger = logger.point(Point::from_str("tcp-blah").unwrap());
+        let logger = logger.push_loc(Point::from_str("tcp-blah").unwrap());
         let port = 4344u16;
         let server =
             HyperlaneTcpServer::new(port, ".".to_string(), platform.gate.clone(), logger.clone())
                 .await?;
         let api = server.start()?;
 
-        let less_logger = logger.point(LESS.clone());
+        let less_logger = logger.loc(LESS.clone());
         let less_client = Box::new(HyperlaneTcpClient::new(
             format!("localhost:{}", port),
             ".",
@@ -621,7 +621,7 @@ mod tests {
             less_logger,
         ));
 
-        let fae_logger = logger.point(FAE.clone());
+        let fae_logger = logger.loc(FAE.clone());
         let fae_client = Box::new(HyperlaneTcpClient::new(
             format!("localhost:{}", port),
             ".",
@@ -645,14 +645,14 @@ mod tests {
             .write_to_dir(".".to_string())
             .await?;
         let logger = root_logger();
-        let logger = logger.point(Point::from_str("tcp-blah").unwrap());
+        let logger = logger.push_loc(Point::from_str("tcp-blah").unwrap());
         let port = 4345u16;
         let server =
             HyperlaneTcpServer::new(port, ".".to_string(), platform.gate.clone(), logger.clone())
                 .await?;
         let api = server.start()?;
 
-        let less_logger = logger.point(LESS.clone());
+        let less_logger = logger.loc(LESS.clone());
         let less_client = Box::new(HyperlaneTcpClient::new(
             format!("localhost:{}", port),
             ".",
@@ -661,7 +661,7 @@ mod tests {
             less_logger,
         ));
 
-        let fae_logger = logger.point(FAE.clone());
+        let fae_logger = logger.loc(FAE.clone());
         let fae_client = Box::new(HyperlaneTcpClient::new(
             format!("localhost:{}", port),
             ".",

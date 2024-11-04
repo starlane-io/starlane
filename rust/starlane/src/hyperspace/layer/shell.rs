@@ -41,7 +41,7 @@ impl Shell
 
 {
     pub fn new(skel: HyperStarSkel, state: ShellState) -> Self {
-        let logger = skel.logger.point(state.point.clone());
+        let logger = skel.logger.loc(state.point.clone());
         Self {
             skel,
             state,
@@ -84,7 +84,7 @@ impl TraversalLayer for Shell
                 .insert(directed.id().clone(), AtomicU16::new(1));
         }
 
-        let logger = self.skel.logger.point(directed.to.point.clone()).span();
+        let logger = self.skel.logger.loc(directed.to.point.clone()).span();
         let injector = directed
             .from()
             .clone()

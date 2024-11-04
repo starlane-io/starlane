@@ -40,7 +40,7 @@ impl Field
 {
     pub fn new(point: Point, skel: HyperStarSkel) -> Self {
         let port = point.to_surface().with_layer(Layer::Field);
-        let logger = skel.logger.point(port.point.clone());
+        let logger = skel.logger.loc(port.point.clone());
         let shell_router = Arc::new(TraverseToNextRouter::new(skel.traverse_to_next_tx.clone()));
         let shell_transmitter = TraversalTransmitter::new(shell_router, skel.exchanger.clone());
 

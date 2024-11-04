@@ -300,7 +300,7 @@ pub struct Exchanger {
 
 impl Exchanger {
     pub fn new(surface: Surface, timeouts: Timeouts, logger: PointLogger) -> Self {
-        let logger = logger.point(surface.point.clone());
+        let logger = logger.push(surface.clone());
         Self {
             surface,
             singles: Arc::new(DashMap::new()),
@@ -313,7 +313,7 @@ impl Exchanger {
     }
 
     pub fn with_surface(&self, surface: Surface) -> Self {
-        let logger = self.logger.point(surface.point.clone());
+        let logger = self.logger.push(surface.clone());
         Self {
             surface,
             singles: self.singles.clone(),
@@ -482,7 +482,7 @@ impl Default for Exchanger {
         Self::new(
             Point::root().to_surface(),
             Default::default(),
-            root_logger().point(Point::root()),
+            root_logger().push_loc(Point::root()),
         )
     }
 }

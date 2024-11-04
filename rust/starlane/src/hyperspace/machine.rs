@@ -239,7 +239,7 @@ where
             .to_point()
             .to_surface()
             .with_layer(Layer::Gravity);
-        let logger = platform.logger().point(machine_star.point.clone());
+        let logger = platform.logger().push_loc(machine_star.point.clone());
         let global = machine_star
             .point
             .push("global")
@@ -271,7 +271,7 @@ where
             let star_port = star_point.clone().to_surface().with_layer(Layer::Core);
 
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
-            let logger = skel.logger.point(drivers_point.clone());
+            let logger = skel.logger.push_loc(drivers_point.clone());
 
             let mut star_tx: HyperStarTx = HyperStarTx::new(star_point.clone());
             let star_skel =
@@ -355,7 +355,7 @@ where
             });
         }
 
-        let logger = skel.logger.point(machine_point);
+        let logger = skel.logger.push_loc(machine_point);
 
         let (term_tx, _) = broadcast::channel(1);
         let stars = Arc::new(stars);
@@ -500,7 +500,7 @@ where
                 }
                 MachineCall::Knock { knock, rtn } => {
                     let gate_selector = self.gate_selector.clone();
-                    let logger = self.skel.logger.point(self.skel.machine_star.point.clone());
+                    let logger = self.skel.logger.push_loc(self.skel.machine_star.point.clone());
                     tokio::spawn(async move {
                         rtn.send(
                             gate_selector.knock(knock).await

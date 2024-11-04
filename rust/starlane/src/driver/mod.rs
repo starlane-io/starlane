@@ -637,7 +637,7 @@ impl Drivers {
             let point = drivers_point
                 .push(selector.as_point_segments().unwrap())
                 .unwrap();
-            let logger = self.skel.logger.point(point.clone());
+            let logger = self.skel.logger.loc(point.clone());
             let status_rx = status_tx.subscribe();
 
             {
@@ -1044,7 +1044,7 @@ impl TraversalLayer for ParticleOuter {
         let logger = self
             .skel
             .logger
-            .point(self.surface().clone().to_point())
+            .loc(self.surface().clone().to_point())
             .span();
 
         match &self.particle.inner {
@@ -1136,7 +1136,7 @@ impl DriverRunner {
         status_rx: watch::Receiver<DriverStatus>,
         layer: Layer,
     ) -> mpsc::Sender<DriverRunnerCall> {
-        let logger = star_skel.logger.point(skel.point.clone());
+        let logger = star_skel.logger.loc(skel.point.clone());
         let router = LayerInjectionRouter::new(
             star_skel.clone(),
             skel.point.clone().to_surface().with_layer(Layer::Guest),
@@ -1202,7 +1202,7 @@ impl DriverRunner {
                                 let reflection = wave.reflection();
                                 let port = wave.to().clone().unwrap_single();
                                 let logger =
-                                    self.star_skel.logger.point(port.clone().to_point()).span();
+                                    self.star_skel.logger.loc(port.clone().to_point()).span();
                                 let router = Arc::new(self.router.clone());
                                 let transmitter =
                                     ProtoTransmitter::new(router, self.star_skel.exchanger.clone());

@@ -10,8 +10,11 @@ use proc_macro2::Ident;
 use quote::quote;
 use quote::ToTokens;
 use syn::__private::TokenStream2;
-use syn::{parse_file, parse_macro_input, AttrStyle, Attribute, AttributeArgs, Data, DeriveInput, File, FnArg, ImplItem, ItemImpl, LitStr, PatType, PathArguments, Token, Type, Visibility};
 use syn::token::Mut;
+use syn::{
+    parse_file, parse_macro_input, AttrStyle, Attribute, AttributeArgs, Data, DeriveInput, File,
+    FnArg, ImplItem, ItemImpl, LitStr, PatType, PathArguments, Token, Type, Visibility,
+};
 
 /// Takes a given enum (which in turn accepts child enums) and auto generates a `Parent::From` so the child
 /// can turn into the parent and a `TryInto<Child> for Parent` so the Parent can attempt to turn into the child.
@@ -479,37 +482,35 @@ pub fn point_log(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn log(attr: TokenStream, item: TokenStream) -> TokenStream {
-
-
     item.into()
 }
 
 #[proc_macro_attribute]
 pub fn logger(attr: TokenStream, item: TokenStream) -> TokenStream {
-
     let surface = if attr.is_empty() {
         format_ident!("logger")
     } else {
-        format_ident!("{}",attr.to_string())
+        format_ident!("{}", attr.to_string())
     };
 
     let item_cp = item.clone();
     let mut impl_item = parse_macro_input!(item_cp as syn::ItemImpl);
-//    let mut wrappers = vec![];
-//    let mut methods = vec![];
+    //    let mut wrappers = vec![];
+    //    let mut methods = vec![];
 
     for item_impl in &impl_item.items {
         if let ImplItem::Method(call) = item_impl {
             {
-                let (__async,__await) = match call.sig.asyncness {
-                    None => (quote! {},quote!{}),
-                    Some(_) => (quote! {async},quote!{.await})
+                let (__async, __await) = match call.sig.asyncness {
+                    None => (quote! {}, quote! {}),
+                    Some(_) => (quote! {async}, quote! {.await}),
                 };
 
                 let mut inner_call = call.clone();
                 inner_call.vis = Visibility::Inherited;
-                inner_call.sig.ident = format_ident!("__{}",call.sig.ident);
-                inner_call.attrs=vec![];
+                inner_call.sig.ident = format_ident!("__{}", call.sig.ident);
+                inner_call.attrs = vec![];
+                /*
                 let args: Vec<TokenStream>  = inner_call.sig.inputs.clone().into_iter().map( |arg| match arg.clone() {
 
                    FnArg::Receiver(r) => {
@@ -522,16 +523,19 @@ pub fn logger(attr: TokenStream, item: TokenStream) -> TokenStream {
 
                 ).collect_into();
 
+
                 let args = quote!{#( #args )*};
                 panic!("ARGS: {}",args.to_string());
+                 */
+                todo!();
 
                 let attributes = call.attrs.clone();
-                let vis= call.vis.clone();
+                let vis = call.vis.clone();
                 let sig = call.sig.clone();
                 let block = call.block.clone();
 
                 call.clone();
-                let blah =quote! {
+                let blah = quote! {
                    #(#attributes)*
                    #vis
                    #__async
@@ -540,19 +544,14 @@ pub fn logger(attr: TokenStream, item: TokenStream) -> TokenStream {
                         #inner_call
                     }
                 };
-                panic!("{}",blah);
+                panic!("{}", blah);
             }
-
-
         }
     }
 
-
-//    TokenStream2::from_iter(vec![rtn, TokenStream2::from(item)]).into()
+    //    TokenStream2::from_iter(vec![rtn, TokenStream2::from(item)]).into()
     todo!()
 }
-
-
 
 fn find_impl_type(item_impl: &ItemImpl) -> Ident {
     if let Type::Path(path) = &*item_impl.self_ty {
@@ -561,9 +560,6 @@ fn find_impl_type(item_impl: &ItemImpl) -> Ident {
         panic!("could not get impl name")
     }
 }
-
-
-
 
 fn find_log_attr(attrs: &Vec<Attribute>) -> TokenStream {
     for attr in attrs {
@@ -584,5 +580,3 @@ fn find_log_attr(attrs: &Vec<Attribute>) -> TokenStream {
     let rtn = quote!(logger);
     rtn.into()
 }
-
-

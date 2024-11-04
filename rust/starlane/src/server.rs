@@ -294,7 +294,7 @@ impl Starlane {
         let handle = PostgresRegistryContextHandle::new(&db.database, ctx, db.handle);
 
         let logger = root_logger();
-        let logger = logger.point(Point::global_registry());
+        let logger = logger.push_loc(Point::global_registry());
         let registry = Arc::new(RegistryWrapper::new(Arc::new(
             PostgresRegistry::new(handle, Box::new(lookups), logger).await?,
         )));
@@ -433,7 +433,7 @@ where
 
         let logger = self
             .logger()
-            .point(Point::from_str("control-blah").unwrap());
+            .push_loc(Point::from_str("control-blah").unwrap());
 
         if !is_local_ipv4_port_free(STARLANE_CONTROL_PORT.clone()) {
             panic_shutdown(format!(

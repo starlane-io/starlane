@@ -54,7 +54,7 @@ pub struct Hyperway {
 
 impl Hyperway {
     pub fn new(remote: Surface, agent: Agent, logger: PointLogger) -> Self {
-        let logger = logger.point(remote.point.clone());
+        let logger = logger.loc(remote.point.clone());
         let mut inbound = Hyperlane::new(format!("{}<Inbound>", remote.to_string()));
         inbound
             .tx
@@ -927,7 +927,7 @@ impl TokenDispensingHyperwayInterchange {
         let token = Token::new_uuid();
         let remote_point = self.remote_point_factory.create().await?.to_surface();
         let lane_point = self.lane_point_factory.create().await?;
-        let logger = self.logger.point(lane_point);
+        let logger = self.logger.loc(lane_point);
         let stub = HyperwayStub {
             agent: self.agent.clone(),
             remote: remote_point,
@@ -2031,7 +2031,7 @@ pub mod test_util {
     impl SingleInterchangePlatform {
         pub async fn new() -> Self {
             let root_logger = root_logger();
-            let logger = root_logger.point(Point::from_str("point").unwrap());
+            let logger = root_logger.push_loc(Point::from_str("point").unwrap());
             let interchange = Arc::new(HyperwayInterchange::new(
                 logger.push_point("interchange").unwrap(),
             ));
@@ -2105,14 +2105,14 @@ pub mod test_util {
             );
 
             let root_logger = root_logger();
-            let logger = root_logger.point(Point::from_str("less-client").unwrap());
+            let logger = root_logger.push_loc(Point::from_str("less-client").unwrap());
             let less_client = HyperClient::new_with_exchanger(
                 self.less_factory,
                 Some(less_exchanger.clone()),
                 logger,
             )
             .unwrap();
-            let logger = root_logger.point(Point::from_str("fae-client").unwrap());
+            let logger = root_logger.push_loc(Point::from_str("fae-client").unwrap());
             let fae_client = HyperClient::new_with_exchanger(
                 self.fae_factory,
                 Some(fae_exchanger.clone()),
@@ -2204,14 +2204,14 @@ pub mod test_util {
             );
 
             let root_logger = root_logger();
-            let logger = root_logger.point(Point::from_str("less-client").unwrap());
+            let logger = root_logger.push_loc(Point::from_str("less-client").unwrap());
             let less_client = HyperClient::new_with_exchanger(
                 self.less_factory,
                 Some(less_exchanger.clone()),
                 logger,
             )
             .unwrap();
-            let logger = root_logger.point(Point::from_str("fae-client").unwrap());
+            let logger = root_logger.push_loc(Point::from_str("fae-client").unwrap());
             let fae_client = HyperClient::new_with_exchanger(
                 self.fae_factory,
                 Some(fae_exchanger.clone()),
@@ -2477,7 +2477,7 @@ pub mod test {
             let factory = Box::new(TestFactory::new());
             let mut inbound_rx = factory.inbound_rx().await;
             let root_logger = root_logger();
-            let logger = root_logger.point(Point::from_str("client").unwrap());
+            let logger = root_logger.push_loc(Point::from_str("client").unwrap());
             let client = HyperClient::new(factory, logger).unwrap();
 
             let client_listener_rx = client.rx();
@@ -2499,7 +2499,7 @@ pub mod test {
             let factory = Box::new(TestFactory::new());
             let outbound_tx = factory.outbound_tx();
             let root_logger = root_logger();
-            let logger = root_logger.point(Point::from_str("client").unwrap());
+            let logger = root_logger.push_loc(Point::from_str("client").unwrap());
             let client = HyperClient::new(factory, logger).unwrap();
 
             let mut client_listener_rx = client.rx();
@@ -2526,7 +2526,7 @@ pub mod test {
 
     #[tokio::test]
     pub async fn test_dual_interchange() {
-        let logger = root_logger().point(Point::from_str("point").unwrap());
+        let logger = root_logger().push_loc(Point::from_str("point").unwrap());
         let interchange = Arc::new(HyperwayInterchange::new(
             logger.push_point("interchange").unwrap(),
         ));
@@ -2579,11 +2579,11 @@ pub mod test {
         );
 
         let root_logger = root_logger();
-        let logger = root_logger.point(Point::from_str("less-client").unwrap());
+        let logger = root_logger.push_loc(Point::from_str("less-client").unwrap());
         let less_client =
             HyperClient::new_with_exchanger(less_factory, Some(less_exchanger.clone()), logger)
                 .unwrap();
-        let logger = root_logger.point(Point::from_str("fae-client").unwrap());
+        let logger = root_logger.push_loc(Point::from_str("fae-client").unwrap());
         let fae_client =
             HyperClient::new_with_exchanger(fae_factory, Some(fae_exchanger.clone()), logger)
                 .unwrap();
@@ -2636,7 +2636,7 @@ pub mod test {
     pub async fn test_bridge() {
         pub fn create(name: &str) -> (Arc<HyperwayInterchange>, Arc<dyn HyperGate>) {
             let root_logger = root_logger();
-            let logger = root_logger.point(Point::from_str(name).unwrap());
+            let logger = root_logger.push_loc(Point::from_str(name).unwrap());
             let interchange = Arc::new(HyperwayInterchange::new(
                 logger.push_point("interchange").unwrap(),
             ));
@@ -2700,7 +2700,7 @@ pub mod test {
             LESS.clone().to_surface(),
             fae_gate.clone(),
         ));
-        let logger  = root_logger().point(Point::from_str("bridge").unwrap());
+        let logger  = root_logger().push_loc(Point::from_str("bridge").unwrap());
         let bridge = Bridge::new(fae_endpoint_from_less, fae_factory, logger);
 
         let mut less_access = less_interchange

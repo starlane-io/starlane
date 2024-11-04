@@ -66,7 +66,7 @@ impl PostgresRegistry {
         platform: Box<dyn PostgresPlatform>,
         logger: PointLogger
     ) -> Result<Self, RegErr> {
-        let logger = logger.point(Point::global_registry());
+        let logger = logger.loc(Point::global_registry());
         /*
         let pool = PgPoolOptions::new()
             .max_connections(5)

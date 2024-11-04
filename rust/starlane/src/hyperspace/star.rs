@@ -156,7 +156,7 @@ impl HyperStarSkel
         star_tx: &mut HyperStarTx,
     ) -> Self where P: Platform{
         let point = template.key.clone().to_point();
-        let logger = machine.logger.point(point.clone());
+        let logger = machine.logger.push_loc(point.clone());
         let exchanger = Exchanger::new(
             point.clone().to_surface(),
             machine.timeouts.clone(),
@@ -1493,7 +1493,7 @@ impl LayerTraversalEngine
                 }
             }
 
-            let traversal_logger = self.skel.logger.point(to.to_point());
+            let traversal_logger = self.skel.logger.loc(to.to_point());
             let traversal_logger = traversal_logger.span();
 
             let point = if dir == TraversalDirection::Core {
