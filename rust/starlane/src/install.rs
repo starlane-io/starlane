@@ -2,12 +2,9 @@ use crate::env::{config, config_path, config_save, context, context_dir, GlobalM
 use crate::foundation::{Foundation, StandAloneFoundation};
 use crate::registry::postgres::embed::PgEmbedSettings;
 use crate::shutdown::shutdown;
-use crate::{env, Database, PgRegistryConfig, StarlaneConfig, COLORS, VERSION};
-use cliclack::{
-    clear_screen, confirm, input, intro, outro, outro_cancel, select, set_theme, spinner, Confirm,
-    Input, ProgressBar, Select, Theme, ThemeState, Validate,
-};
-use colored::Colorize;
+use crate::{env, Database, PgRegistryConfig, StarlaneConfig, COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION};
+use cliclack::{clear_screen, confirm, input, intro, outro, outro_cancel, progress_bar, select, set_theme, spinner, Confirm, Input, ProgressBar, Select, Theme, ThemeState, Validate};
+use colored::{Colorize, CustomColor};
 use console::style;
 use lerp::Lerp;
 use nom::combinator::all_consuming;
@@ -22,47 +19,62 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{io, thread};
+use anyhow::anyhow;
+use cliclack::log::{error, remark};
+use crossterm::style::Color;
+use serde::Serialize;
 use text_to_ascii_art::to_art;
 use textwrap::Options;
 use tokio::fs;
+use starlane_space::space::particle::Status;
 
 #[tokio::main]
-pub async fn install() -> Result<(), anyhow::Error> {
-    let installer = Installer::new();
+pub async fn install(edit: bool) -> Result<(), anyhow::Error> {
+    let installer = Installer::new(edit);
     installer.start().await
 }
 
 pub struct Installer {
     pub console: Console,
+    pub edit: bool
 }
 
 impl Installer {
-    pub fn new() -> Installer {
+    pub fn new(edit: bool) -> Installer {
         Self {
             console: Console::new(),
+            edit
         }
     }
 
     pub async fn start(self) -> Result<(), anyhow::Error> {
+        self.console.intro("INSTALL STARLANE")?;
+
         let context = context();
         {
             self.console.splash();
             println!("{}", self.console.center("* I N S T A L L E R *"));
             println!();
-            println!(
-                "{}",
-                self.console.center(format!(
-                    "context: '{}'   version: {}",
-                    context,
-                    VERSION.to_string()
-                ))
-            );
+
+
+            let version = VERSION.to_string();
+            let home = STARLANE_HOME.to_string();
+            self.console.remark(self.console.key_value(format!(
+r#"   home: {home}
+context: {context}
+version: {version}
+"#).as_str()));
+
         }
 
-        self.console.intro("INSTALL STARLANE")?;
 
         match env::config() {
             Ok(Some(_)) => {
+                if !self.edit {
+                    let msg  = format!("A config for context '{}' already exists.  To overwrite run install with the --edit flag i.e. `{}`", context, "starlane install --edit".custom_color(self.console.theme.important()));
+                    self.console.outro_err(msg.as_str())?;
+                    Err(anyhow!("{}",msg))?;
+                }
                 self.console.warning(format!("A valid starlane configuration already exists: '{}' this install process will overwrite the existing config", env::config_path()))?;
                 self.console.newlines(1usize);
                 let should_continue = self
@@ -76,11 +88,9 @@ impl Installer {
                     println!();
                     shutdown(0);
                 } else {
-                    fs::remove_file(env::config_path()).await?;
                     self.console.success("configuration reset.\n")?;
                 }
             }
-
             Err(err) => {
                 self.console.warning(format!("An invalid (corrupted or out of date) starlane configuration already exists: '{}' the installation process will overwrite this config file.", env::config_path())).unwrap_or_default();
                 self.console.newlines(1usize);
@@ -93,7 +103,8 @@ impl Installer {
                     println!();
                     shutdown(0);
                 } else {
-                    fs::remove_file(env::config_path()).await?;
+                    let config = StarlaneConfig::default();
+                    config_save(config)?;
                     self.console.success("configuration reset.\n")?;
                 }
             }
@@ -157,16 +168,18 @@ impl StandaloneInstaller {
         spinner.stop("config saved");
         let foundation = StandAloneFoundation::new();
 
+        let mut spinner = self.console.spinner();
         match &config.registry {
             PgRegistryConfig::Embedded(db) => {
                 let configurator = DbConfigurator::new(self.console.clone(), db.clone());
                 let db = configurator.start().await?;
-                let spinner = self.console.spinner();
                 spinner.start(format!("saving registry config -> ({})", config_path()));
                 let mut config = config.clone();
-                config.registry = db;
-                config_save(config)?;
-                self.console.success("registry configuration saved")?;
+                config.registry = PgRegistryConfig::Embedded(db.clone());
+                config_save(config.clone())?;
+                spinner.next("registry configuration saved", "creating registry data directory");
+                tokio::fs::create_dir_all(db.settings.database_dir.unwrap_or_default()).await?;
+                spinner.next("data directory created successfully", "installing registry database");
             }
             PgRegistryConfig::External(_) => {}
         }
@@ -187,7 +200,7 @@ impl DbConfigurator {
         Self { config, console }
     }
 
-    pub async fn start(self) -> Result<PgRegistryConfig, anyhow::Error> {
+    pub async fn start(self) -> Result<Database<PgEmbedSettings>, anyhow::Error> {
         self.console.section_intro(
             "POSTGRES REGISTRY CONFIGURATION",
             "customize standalone postgres registry",
@@ -219,7 +232,7 @@ password: {password}
                 .interact()?;
 
             if !customize {
-                return Ok(PgRegistryConfig::Embedded(cfg));
+                return Ok(cfg);
             }
 
             let database_dir: PathBuf = self
@@ -316,7 +329,7 @@ password: {password}
 #[derive(Clone)]
 pub struct Console {
     pub enviro: Arc<dyn Enviro>,
-    pub theme: Arc<dyn Theme>,
+    pub theme: StarlaneTheme,
 }
 
 impl Console {
@@ -324,7 +337,7 @@ impl Console {
         set_theme(StarlaneTheme());
         Self {
             enviro: Arc::new(StdEnviro::default()),
-            theme: Arc::new(StarlaneTheme()),
+            theme: StarlaneTheme::default()
         }
     }
 
@@ -352,6 +365,26 @@ impl Console {
 
     fn splash(&self) {
         self.splash_with_params(1, 1, 50);
+    }
+
+    pub fn status<L>( &self, label: L, status: Status ) -> io::Result<()> where L: AsRef<str>{
+        let theme = self.theme.clone();
+
+        let color = match status {
+            Status::Unknown => theme.under(),
+            Status::Pending => theme.under(),
+            Status::Init => theme.cool(),
+            Status::Panic => theme.err(),
+            Status::Fatal => theme.err(),
+            Status::Ready => theme.ok(),
+            Status::Paused => theme.under(),
+            Status::Resuming => theme.cool(),
+            Status::Done => theme.under()
+        };
+
+        let status= status.to_string().custom_color(color);
+        let label = label.as_ref().custom_color(theme.under());
+        self.info(format!("{}: [{}]", label, status))
     }
 
     pub fn section_intro(&self, prompt: impl Display, message: impl Display) -> io::Result<()> {
@@ -471,6 +504,15 @@ impl Console {
         cliclack::note(prompt, text)
     }
 
+    pub fn error(&self, text: impl Display) -> io::Result<()> {
+        error(text)
+    }
+
+
+    pub fn remark(&self, text: impl Display) -> io::Result<()> {
+        remark(text)
+    }
+
     pub fn wrap(&self, text: impl Display) -> impl Display {
         let padding = 10usize;
         let size = self.enviro.term_width();
@@ -498,7 +540,7 @@ impl Console {
         } else if size > self.splash_widest("STAR") {
             self.splash_with_params_and_banners(pre, post, interval, vec!["STAR", "LANE"]);
         } else {
-            let begin = COLORS;
+            let begin = COOL;
             let end = (0xFF, 0xFF, 0xFF);
             let banner = "* S T A R L A N E *";
             let buffer = self.center(banner).len() - banner.len();
@@ -570,7 +612,7 @@ impl Console {
                 Ok(string) => {
                     let string = self.center(string);
                     let begin = (0xFF, 0xFF, 0xFF);
-                    let end = COLORS;
+                    let end = COOL;
 
                     //let begin = (0x00, 0x00, 0x00);
                     // this is bad code however I couldn't find out how to get lines().len() withou
@@ -613,7 +655,7 @@ impl Console {
 
                 let begin = (0xFF, 0xFF, 0xFF);
                 let end = (0xEE, 0xAA, 0x5A);
-                let end = COLORS;
+                let end = COOL;
 
                 //let begin = (0x00, 0x00, 0x00);
                 // this is bad code however I couldn't find out how to get lines().len() withou
@@ -658,6 +700,13 @@ impl Console {
 
     pub fn outro(&self, m: impl Display) -> io::Result<()> {
         outro(m)?;
+        self.long_delay();
+        Ok(())
+    }
+
+
+    pub fn outro_err(&self, m: impl Display) -> io::Result<()> {
+        outro_cancel(m)?;
         self.long_delay();
         Ok(())
     }
@@ -715,6 +764,57 @@ pub struct StarlaneTheme();
 impl Theme for StarlaneTheme {
     fn format_log(&self, text: &str, symbol: &str) -> String {
         self.format_log_with_spacing(text, symbol, false)
+    }
+}
+
+impl StarlaneTheme {
+
+    pub fn ok(&self) -> CustomColor {
+        CustomColor::new(OK.0,OK.1,OK.2)
+    }
+
+    pub fn err(&self) -> CustomColor {
+        CustomColor::new(ERR.0,ERR.1,ERR.2)
+    }
+
+    pub fn cool(&self) -> CustomColor{
+        CustomColor::new(COOL.0,COOL.1,COOL.2)
+    }
+
+    pub fn under(&self) -> CustomColor {
+        CustomColor::new(UNDERSTATED.0,UNDERSTATED.1,UNDERSTATED.2)
+    }
+
+    pub fn important(&self) -> CustomColor{
+        CustomColor::new(IMPORTANT.0,IMPORTANT.1,IMPORTANT.2)
+    }
+
+    pub fn with_ok<R>(&self,string: R) -> String where R: AsRef<str> {
+        string.as_ref().truecolor(OK.0, OK.1, OK.2).to_string()
+    }
+
+
+    pub fn with_err<R>(&self,string: R) -> String where R: AsRef<str> {
+        string.as_ref().truecolor(ERR.0, ERR.1, ERR.2).to_string()
+    }
+
+
+    pub fn with_cool<R>(&self,string: R) -> String where R: AsRef<str> {
+        string.as_ref().truecolor(COOL.0, COOL.1, COOL.2).to_string()
+    }
+
+    pub fn with_under<R>(&self,string: R) -> String where R: AsRef<str> {
+        string.as_ref().truecolor(UNDERSTATED.0, UNDERSTATED.1, UNDERSTATED.2).to_string()
+    }
+
+    pub fn with_important<R>(&self,string: R) -> String where R: AsRef<str> {
+        string.as_ref().truecolor(IMPORTANT.0, IMPORTANT.1, IMPORTANT.2).to_string()
+    }
+}
+
+impl Default for StarlaneTheme {
+    fn default() -> Self {
+       StarlaneTheme()
     }
 }
 

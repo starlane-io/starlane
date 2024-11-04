@@ -79,7 +79,10 @@ use std::str::FromStr;
 use std::time::Duration;
 use std::any::Any;
 use std::fmt::Display;
+use std::io;
 use anyhow::{anyhow, ensure};
+use crossterm::execute;
+use crossterm::style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor, Stylize};
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;
@@ -87,9 +90,10 @@ use tracing::Instrument;
 use zip::write::FileOptions;
 use starlane_space::space::err::PrintErr;
 use starlane_space::space::parse::SkewerCase;
+use starlane_space::space::particle::Status;
 use crate::foundation::Foundation;
 use crate::foundation::StandAloneFoundation;
-use crate::install::Console;
+use crate::install::{Console, StarlaneTheme};
 use crate::shutdown::shutdown;
 
 /*
@@ -122,7 +126,12 @@ pub fn main() -> Result<(), anyhow::Error> {
             console.splash2();
             Ok(())
         }
-        Commands::Install => install::install(),
+        Commands::Install{ edit, nuke } => {
+            if nuke {
+                crate::nuke(false);
+            }
+            install::install(edit)
+        },
         Commands::Run => run(),
         Commands::Term(args) => {
             let runtime = Builder::new_multi_thread().enable_all().build()?;
@@ -156,7 +165,8 @@ pub fn main() -> Result<(), anyhow::Error> {
                     {
                         Err(anyhow!("context '{}' already exists", context_name))?;
                     }
-                    install::install()?;
+
+                    println!("Context '{}' created.  Next you may want to run '{}'", context_name.truecolor(COOL.0, COOL.1, COOL.2), "starlane install".to_string().truecolor(COOL.0, COOL.1, COOL.2));
                 }
                 ContextCmd::Switch { context_name } => {
                     let context_name = SkewerCase::from_str(context_name.as_str()).map_err(|e|{ e.print(); anyhow!("illegal context name") })?;
@@ -178,7 +188,7 @@ pub fn main() -> Result<(), anyhow::Error> {
                             if context == dir {
                                 println!("{}{}", "*", dir.truecolor(0xff, 0xff, 0xff));
                             }else {
-                                println!(" {}", dir.truecolor(COLORS.0, COLORS.1, COLORS.2));
+                                println!(" {}", dir.truecolor(COOL.0, COOL.1, COOL.2));
                             }
                         }
                     }
@@ -209,24 +219,25 @@ fn run() -> Result<(), anyhow::Error> {
 
     runtime.block_on(async move {
 
-        intro("RUN STARLANE").unwrap_or_default();
+        console.intro("RUN STARLANE").unwrap_or_default();
 
         async fn runner(console: &Console) -> Result<(),anyhow::Error> {
             console.spinner().start("initializing");
             console.info("initialization complete.")?;
 
             console.long_delay();
-            spinner().set_message("loading configuration");
+            let mut spinner = console.spinner();
+            spinner.start("loading configuration");
 
             let config = match env::config() {
                 Ok(Some(config)) => config,
                 Ok(None) => {
                     console.long_delay();
-                    spinner().error("Starlane configuration not found.");
+                    spinner.error("Starlane configuration not found.");
 
                     error(format!("Starlane looked for a configuration here: '{}' But none was found.", env::config_path()))?;
 
-                    console.note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", env::config_path()))?;
+                    console.remark(format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", env::config_path()))?;
 
                     console.note("install", "please run `starlane install` to configure a new Starlane runner")?;
 
@@ -236,8 +247,8 @@ fn run() -> Result<(), anyhow::Error> {
                     panic!();
                 }
                 Err(err) => {
-                    console.spinner().error("invalid configuration");
-                    error(format!("{}", err.to_string()))?;
+                    spinner.error("invalid configuration");
+                    console.error(format!("{}", err.to_string()))?;
                     console.note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", env::config_path()))?;
                     console.note("fresh install", "To create a fresh configuration please run: `starlane install`")?;
                     outro("Good Luck!")?;
@@ -248,29 +259,26 @@ fn run() -> Result<(), anyhow::Error> {
             };
 
             console.long_delay();
-            success("starlane configured.")?;
+            console.success("starlane configured.")?;
+            spinner.next("configuration loaded.","launching registry [this may take a while]");
 
-            spinner().set_message("launching registry [this may take a while]");
             console.long_delay();
             let starlane = Starlane::new(config,StandAloneFoundation()).await.map_err(|e|{println!("{}",e.to_string()); e}).unwrap();
-            success("registry ready.")?;
 
-            spinner().set_message("starting starlane...");
+            spinner.next("registry status: [Ready]","acquiring machine API");
 
             let machine_api = starlane.machine();
 
 
-            success("starlane started.")?;
+            spinner.next("machine API acquired","waiting for Starlane [Ready] status");
 
-            spinner().set_message("waiting for ready status...");
             let api = tokio::time::timeout(Duration::from_secs(30), machine_api).await??;
 
-            success("starlane ready.")?;
+            spinner.clear();
 
+            console.status( "Starlane status:", Status::Ready)?;
 
-            spinner().clear();
             console.newlines(3);
-
 
             console.splash_with_params(1, 2, 25);
 
@@ -458,9 +466,13 @@ impl Color {
 
  */
 
-static COLORS: (u8, u8, u8) = (0x6D, 0xD7, 0xFD);
+static COOL: (u8, u8, u8) = (0x6D, 0xD7, 0xFD);
+static UNDERSTATED: (u8, u8, u8) = (0x66, 0x66, 0xFD);
 
+static IMPORTANT : (u8, u8, u8) = (0xFF, 0xFF, 0xFF);
+static ERR : (u8, u8, u8) = (0xcc, 0x00, 0x00);
 
+static OK : (u8, u8, u8) = (0x00, 0xcc, 0x00);
 #[derive(ToBase)]
 pub enum StartSequence {
     Starting(String),
@@ -494,9 +506,6 @@ async fn scorch()  {
 }
 
 fn nuke(all: bool)  {
-    println!("nuke --all ? {}", all);
-
-
     if all {
         let global = ensure_global_settings();
         if global.nuke {

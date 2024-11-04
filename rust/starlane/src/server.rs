@@ -272,9 +272,7 @@ impl Starlane {
 
         let db = match config.clone().registry {
             PgRegistryConfig::Embedded(db) => {
-                println!("provisioning embedded...");
                 let rtn = foundation.provision_registry(&config).await?;
-                println!("embedded. provisioned....");
                 rtn
             }
             PgRegistryConfig::External(db) => {
