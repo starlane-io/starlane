@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use crate::space::loc::{ToPoint, ToSurface};
-use crate::space::log::{ PointLogger, Trackable, Tracker};
+use crate::space::log::{Logger, Trackable, Tracker};
 use crate::space::particle::traversal::Traversal;
 use crate::space::point::Point;
 use crate::space::settings::Timeouts;
@@ -295,13 +295,13 @@ pub struct Exchanger {
     pub multis: Arc<DashMap<WaveId, mpsc::Sender<ReflectedWave>>>,
     pub singles: Arc<DashMap<WaveId, oneshot::Sender<ReflectedAggregate>>>,
     pub timeouts: Timeouts,
-    pub logger: PointLogger,
+    pub logger: Logger,
     #[cfg(test)]
     pub claimed: Arc<DashSet<String>>,
 }
 
 impl Exchanger {
-    pub fn new(surface: Surface, timeouts: Timeouts, logger: PointLogger) -> Self {
+    pub fn new(surface: Surface, timeouts: Timeouts, logger: Logger) -> Self {
         let logger = logger.push(surface.clone());
         Self {
             surface,

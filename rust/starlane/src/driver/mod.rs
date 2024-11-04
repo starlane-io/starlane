@@ -41,7 +41,7 @@ use starlane::space::err::{any_result, CoreReflector, SpaceErr, SpatialError};
 use starlane::space::hyper::{Assign, HyperSubstance, ParticleRecord};
 use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, Surface, ToBaseKind, ToPoint, ToSurface};
-use starlane::space::log::{PointLogger, Tracker};
+use starlane::space::log::{Logger, Tracker};
 use starlane::space::parse::bind_config;
 use starlane::space::parse::util::{parse_errs, result};
 use starlane::space::particle::traversal::{
@@ -618,7 +618,7 @@ impl Drivers {
             async fn register(
                 skel: &HyperStarSkel,
                 point: &Point,
-                logger: &PointLogger,
+                logger: &Logger,
             ) -> Result<(), DriverErr> {
                 let registration = Registration {
                     point: point.clone(),
@@ -1131,7 +1131,7 @@ pub struct DriverRunner {
     call_rx: mpsc::Receiver<DriverRunnerCall>,
     driver: Box<dyn Driver>,
     router: LayerInjectionRouter,
-    logger: PointLogger,
+    logger: Logger,
     status_rx: watch::Receiver<DriverStatus>,
     layer: Layer,
 }
@@ -1350,7 +1350,7 @@ pub struct DriverSkel {
     pub selector: KindSelector,
     pub kind: Kind,
     pub point: Point,
-    pub logger: PointLogger,
+    pub logger: Logger,
     pub status_rx: watch::Receiver<DriverStatus>,
     pub status_tx: mpsc::Sender<DriverStatus>,
     pub request_tx: mpsc::Sender<DriverRunnerRequest>,
@@ -1397,7 +1397,7 @@ impl DriverSkel {
         point: Point,
         selector: KindSelector,
         transmitter: ProtoTransmitter,
-        logger: PointLogger,
+        logger: Logger,
         status_tx: watch::Sender<DriverStatus>,
         request_tx: mpsc::Sender<DriverRunnerRequest>,
     ) -> Self {

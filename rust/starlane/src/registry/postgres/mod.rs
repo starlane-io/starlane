@@ -18,7 +18,7 @@ use starlane::space::err::SpaceErr;
 use starlane::space::hyper::{ParticleLocation, ParticleRecord};
 use starlane::space::kind::{BaseKind, Kind, KindParts, Specific};
 use starlane::space::loc::{StarKey, ToBaseKind, Version};
-use starlane::space::log::PointLogger;
+use starlane::space::log::Logger;
 use starlane::space::parse::util::{result, parse_errs};
 use starlane::space::parse::{CamelCase, Domain, SkewerCase};
 use starlane::space::particle::{Details, Properties, Property, Status, Stub};
@@ -53,7 +53,7 @@ pub trait PostgresPlatform: Send + Sync {
 }
 
 pub struct PostgresRegistry {
-    logger: PointLogger,
+    logger: Logger,
     ctx: PostgresRegistryContextHandle,
     platform: Box<dyn PostgresPlatform>,
 
@@ -65,7 +65,7 @@ impl PostgresRegistry {
     pub async fn new(
         ctx: PostgresRegistryContextHandle,
         platform: Box<dyn PostgresPlatform>,
-        logger: PointLogger
+        logger: Logger
     ) -> Result<Self, RegErr> {
         let logger = push_loc!((logger,Point::global_registry()));
         /*

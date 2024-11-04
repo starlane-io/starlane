@@ -7,7 +7,7 @@ use starlane::space::command::common::StateSrc;
 use starlane::space::command::{Command, RawCommand};
 use starlane::space::err::SpaceErr;
 use starlane::space::loc::{Layer, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
-use starlane::space::log::PointLogger;
+use starlane::space::log::Logger;
 use starlane::space::parse::{command_line, Env};
 use starlane::space::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
 use starlane::space::point::Point;
@@ -34,7 +34,7 @@ pub struct Shell
 {
     skel: HyperStarSkel,
     state: ShellState,
-    logger: PointLogger,
+    logger: Logger,
 }
 
 impl Shell

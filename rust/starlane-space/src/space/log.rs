@@ -38,8 +38,6 @@ use std::sync::{Arc, LazyLock};
 use anyhow::anyhow;
 use tokio::task_local;
 
-pub type PointLogger = Logger;
-
 task_local! {
     static STACK: Logger;
 }
@@ -554,7 +552,7 @@ impl RootLogger {
         self.appender.pointless(log);
     }
 
-    pub fn push_loc<P>(&self, loc: P, mark: LogMark) -> PointLogger
+    pub fn push_loc<P>(&self, loc: P, mark: LogMark) -> Logger
     where
         P: Into<Loc>,
     {

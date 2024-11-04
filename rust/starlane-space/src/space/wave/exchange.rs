@@ -11,7 +11,7 @@ use tokio::sync::broadcast;
 use starlane_primitive_macros::{log_span, push_loc};
 use crate::space::config::bind::RouteSelector;
 use crate::space::loc::{ToPoint, ToSurface, Topic};
-use crate::space::log::{PointLogger, Logger};
+use crate::space::log::{Logger};
 use crate::space::wave::core::Method;
 use crate::space::wave::{
     Bounce, DirectedProto, DirectedWave, EchoCore, FromReflectedAggregate,
@@ -22,7 +22,7 @@ use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 
 #[derive(Clone)]
 pub struct DirectedHandlerShellDef<D, T> {
-    logger: PointLogger,
+    logger: Logger,
     handler: D,
     surface: Surface,
     builder: T,

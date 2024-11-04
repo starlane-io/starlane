@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 use starlane::space::err::SpaceErr;
 use starlane::space::hyper::{Greet, InterchangeKind, Knock};
 use starlane::space::loc::{Layer, PointFactory, Surface, ToSurface};
-use starlane::space::log::{PointLogger, Tracker};
+use starlane::space::log::{Logger, Tracker};
 use starlane::space::point::Point;
 use starlane::space::substance::{Substance, Token};
 use starlane::space::wave::core::ext::ExtMethod;
@@ -47,14 +47,14 @@ pub struct Hyperway {
     pub remote: Surface,
     outbound: Hyperlane,
     inbound: Hyperlane,
-    logger: PointLogger,
+    logger: Logger,
 
     #[cfg(test)]
     pub diagnostic: HyperwayDiagnostic,
 }
 
 impl Hyperway {
-    pub fn new(remote: Surface, agent: Agent, logger: PointLogger) -> Self {
+    pub fn new(remote: Surface, agent: Agent, logger: Logger) -> Self {
         let logger = push_loc!((logger,&remote.point));
 
         let mut inbound = Hyperlane::new(format!("{}<Inbound>", remote.to_string()));
@@ -157,7 +157,7 @@ pub struct HyperwayEndpoint {
     drop_tx: Option<oneshot::Sender<()>>,
     pub tx: mpsc::Sender<Wave>,
     pub rx: mpsc::Receiver<Wave>,
-    pub logger: PointLogger,
+    pub logger: Logger,
 }
 
 impl ToString for HyperwayEndpoint {
@@ -170,7 +170,7 @@ impl HyperwayEndpoint {
     pub fn new(
         tx: mpsc::Sender<Wave>,
         rx: mpsc::Receiver<Wave>,
-        logger: PointLogger,
+        logger: Logger,
     ) -> Self {
         let drop_tx = None;
         Self {
@@ -185,7 +185,7 @@ impl HyperwayEndpoint {
         tx: mpsc::Sender<Wave>,
         rx: mpsc::Receiver<Wave>,
         drop_tx: oneshot::Sender<()>,
-        logger: PointLogger,
+        logger: Logger,
     ) -> Self {
         let drop_tx = Some(drop_tx);
         Self {
@@ -535,13 +535,13 @@ impl Hyperlane {
 
 pub struct HyperwayInterchange {
     call_tx: mpsc::Sender<HyperwayInterchangeCall>,
-    logger: PointLogger,
+    logger: Logger,
     singular_to: Option<Surface>,
     point: Point
 }
 
 impl HyperwayInterchange {
-    pub fn new(point: Point, logger: PointLogger) -> Self {
+    pub fn new(point: Point, logger: Logger) -> Self {
         let (call_tx, mut call_rx) = mpsc::channel(1024);
 
         {
@@ -684,12 +684,12 @@ pub trait HyperRouter: Send + Sync {
 }
 
 pub struct OutboundRouter {
-    pub logger: PointLogger,
+    pub logger: Logger,
     pub call_tx: mpsc::Sender<HyperwayInterchangeCall>,
 }
 
 impl OutboundRouter {
-    pub fn new(call_tx: mpsc::Sender<HyperwayInterchangeCall>, logger: PointLogger) -> Self {
+    pub fn new(call_tx: mpsc::Sender<HyperwayInterchangeCall>, logger: Logger) -> Self {
         Self { call_tx, logger }
     }
 }
@@ -837,12 +837,12 @@ impl HyperAuthenticator for AnonHyperAuthenticator {
 
 #[derive(Clone)]
 pub struct AnonHyperAuthenticatorAssignEndPoint {
-    pub logger: PointLogger,
+    pub logger: Logger,
     pub remote_point_factory: Arc<dyn PointFactory>,
 }
 
 impl AnonHyperAuthenticatorAssignEndPoint {
-    pub fn new(remote_point_factory: Arc<dyn PointFactory>, logger: PointLogger) -> Self {
+    pub fn new(remote_point_factory: Arc<dyn PointFactory>, logger: Logger) -> Self {
         Self {
             remote_point_factory,
             logger,
@@ -866,12 +866,12 @@ impl HyperAuthenticator for AnonHyperAuthenticatorAssignEndPoint {
 
 #[derive(Clone)]
 pub struct TokensFromHeavenHyperAuthenticatorAssignEndPoint {
-    pub logger: PointLogger,
+    pub logger: Logger,
     pub tokens: Arc<DashMap<Token, HyperwayStub>>,
 }
 
 impl TokensFromHeavenHyperAuthenticatorAssignEndPoint {
-    pub fn new(tokens: Arc<DashMap<Token, HyperwayStub>>, logger: PointLogger) -> Self {
+    pub fn new(tokens: Arc<DashMap<Token, HyperwayStub>>, logger: Logger) -> Self {
         Self { logger, tokens }
     }
 }
@@ -896,7 +896,7 @@ impl HyperAuthenticator for TokensFromHeavenHyperAuthenticatorAssignEndPoint {
 
 pub struct TokenDispensingHyperwayInterchange {
     pub agent: Agent,
-    pub logger: PointLogger,
+    pub logger: Logger,
     pub tokens: Arc<DashMap<Token, HyperwayStub>>,
     pub lane_point_factory: Box<dyn PointFactory>,
     pub remote_point_factory: Box<dyn PointFactory>,
@@ -910,7 +910,7 @@ impl TokenDispensingHyperwayInterchange {
         router: Box<dyn HyperRouter>,
         lane_point_factory: Box<dyn PointFactory>,
         end_point_factory: Box<dyn PointFactory>,
-        logger: PointLogger,
+        logger: Logger,
     ) -> Self {
         let tokens = Arc::new(DashMap::new());
         /*
@@ -1029,7 +1029,7 @@ pub struct HyperApi {
 }
 
 impl HyperApi {
-    pub fn new(hyperway: HyperwayEndpoint, greet: Greet, logger: PointLogger) -> Self {
+    pub fn new(hyperway: HyperwayEndpoint, greet: Greet, logger: Logger) -> Self {
         let exchanger = Exchanger::new(greet.surface.clone(), Default::default(), logger);
         Self {
             greet,
@@ -1126,7 +1126,7 @@ where
     G: HyperGreeter,
     C: HyperwayConfigurator,
 {
-    logger: PointLogger,
+    logger: Logger,
     auth: A,
     greeter: G,
     interchange: Arc<HyperwayInterchange>,
@@ -1144,7 +1144,7 @@ where
         greeter: G,
         configurator: C,
         interchange: Arc<HyperwayInterchange>,
-        logger: PointLogger,
+        logger: Logger,
     ) -> Self {
         Self {
             auth,
@@ -1225,7 +1225,7 @@ where
     A: HyperAuthenticator,
     G: HyperGreeter,
 {
-    logger: PointLogger,
+    logger: Logger,
     auth: A,
     greeter: G,
     interchange: Arc<HyperwayInterchange>,
@@ -1240,7 +1240,7 @@ where
         auth: A,
         greeter: G,
         interchange: Arc<HyperwayInterchange>,
-        logger: PointLogger,
+        logger: Logger,
     ) -> Self {
         Self {
             auth,
@@ -1288,7 +1288,7 @@ pub struct HyperClient {
     tx: mpsc::Sender<Wave>,
     status_rx: watch::Receiver<HyperConnectionStatus>,
     to_client_listener_tx: broadcast::Sender<Wave>,
-    logger: PointLogger,
+    logger: Logger,
     greet_rx: watch::Receiver<Option<Greet>>,
     exchanger: Option<Exchanger>,
 }
@@ -1296,7 +1296,7 @@ pub struct HyperClient {
 impl HyperClient {
     pub fn new(
         factory: Box<dyn HyperwayEndpointFactory>,
-        logger: PointLogger,
+        logger: Logger,
     ) -> Result<HyperClient, SpaceErr> {
         Self::new_with_exchanger(factory, None, logger)
     }
@@ -1304,7 +1304,7 @@ impl HyperClient {
     pub fn new_with_exchanger(
         factory: Box<dyn HyperwayEndpointFactory>,
         exchanger: Option<Exchanger>,
-        logger: PointLogger,
+        logger: Logger,
     ) -> Result<HyperClient, SpaceErr> {
         let (to_client_listener_tx, _) = broadcast::channel(1024);
         let (to_hyperway_tx, from_client_rx) = mpsc::channel(1024);
@@ -1368,7 +1368,7 @@ impl HyperClient {
                     status_tx: mpsc::Sender<HyperConnectionStatus>,
                     greet_tx: watch::Sender<Option<Greet>>,
                     exchanger: Option<Exchanger>,
-                    logger: PointLogger,
+                    logger: Logger,
                 ) -> Result<(), SpaceErr> {
                     if let Some(wave) = from_runner_rx.recv().await {
                         logger.track(&wave, || Tracker::new("client", "ReceiveReflected"));
@@ -1657,7 +1657,7 @@ pub struct HyperClientRunner {
     status_tx: mpsc::Sender<HyperConnectionStatus>,
     to_client_tx: mpsc::Sender<Wave>,
     from_client_rx: mpsc::Receiver<Wave>,
-    logger: PointLogger,
+    logger: Logger,
 }
 
 impl HyperClientRunner {
@@ -1665,7 +1665,7 @@ impl HyperClientRunner {
         factory: Box<dyn HyperwayEndpointFactory>,
         from_client_rx: mpsc::Receiver<Wave>,
         status_tx: mpsc::Sender<HyperConnectionStatus>,
-        logger: PointLogger,
+        logger: Logger,
     ) -> mpsc::Receiver<Wave> {
         let (to_client_tx, from_runner_rx) = mpsc::channel(1024);
         let logger = push_mark!(logger);
@@ -1900,7 +1900,7 @@ impl Bridge {
     pub fn new(
         mut local_hyperway_endpoint: HyperwayEndpoint,
         remote_factory: Box<dyn HyperwayEndpointFactory>,
-        logger: PointLogger,
+        logger: Logger,
     ) -> Result<Self, SpaceErr> {
         let client = HyperClient::new(remote_factory, logger)?;
         let client_router = client.router();
@@ -2013,7 +2013,7 @@ pub mod test_util {
     use starlane::space::err::SpaceErr;
     use starlane::space::hyper::{Greet, InterchangeKind, Knock};
     use starlane::space::loc::{Layer, Surface, ToSurface};
-    use starlane::space::log::{ PointLogger };
+    use starlane::space::log::{Logger};
     use starlane::space::point::Point;
     use starlane::space::settings::Timeouts;
     use starlane::space::substance::Substance;
@@ -2108,12 +2108,12 @@ pub mod test_util {
             let less_exchanger = Exchanger::new(
                 LESS.push("exchanger").unwrap().to_surface(),
                 Timeouts::default(),
-                PointLogger::default(),
+                Logger::default(),
             );
             let fae_exchanger = Exchanger::new(
                 FAE.push("exchanger").unwrap().to_surface(),
                 Timeouts::default(),
-                PointLogger::default(),
+                Logger::default(),
             );
 
             let logger = logger!(Point::from_str("less-client").unwrap());
@@ -2207,12 +2207,12 @@ pub mod test_util {
             let less_exchanger = Exchanger::new(
                 LESS.push("exchanger").unwrap().to_surface(),
                 Timeouts::default(),
-                PointLogger::default(),
+                Logger::default(),
             );
             let fae_exchanger = Exchanger::new(
                 FAE.push("exchanger").unwrap().to_surface(),
                 Timeouts::default(),
-                PointLogger::default(),
+                Logger::default(),
             );
 
             let logger = logger!(Point::from_str("less-client").unwrap());

@@ -10,7 +10,7 @@ use starlane::space::command::RawCommand;
 use starlane::space::config::bind::BindConfig;
 use starlane::space::err::{CoreReflector, SpaceErr};
 use starlane::space::loc::{ToPoint, ToSurface};
-use starlane::space::log::PointLogger;
+use starlane::space::log::Logger;
 use starlane::space::parse::util::result;
 use starlane::space::parse::{bind_config, command_line};
 use starlane::space::particle::{Details, Status};
@@ -104,7 +104,7 @@ impl GlobalCommandExecutionHandler {
 
 pub struct GlobalExecutionChamber {
     pub skel: HyperStarSkel,
-    pub logger: PointLogger,
+    pub logger: Logger,
 }
 
 impl GlobalExecutionChamber {

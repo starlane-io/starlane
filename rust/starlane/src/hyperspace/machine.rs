@@ -29,7 +29,7 @@ use starlane::space::err::{HyperSpatialError, SpaceErr, SpatialError};
 use starlane::space::hyper::{InterchangeKind, Knock};
 use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface};
-use starlane::space::log::{PointLogger };
+use starlane::space::log::{Logger};
 use starlane::space::particle::property::PropertiesConfig;
 use starlane::space::particle::{Property, Status, Stub};
 use starlane::space::point::Point;
@@ -180,7 +180,7 @@ where
     pub platform: P,
     pub registry: Registry,
     pub artifacts: Artifacts,
-    pub logger: PointLogger,
+    pub logger: Logger,
     pub timeouts: Timeouts,
     pub api: MachineApi,
     pub status_rx: watch::Receiver<MachineStatus>,
@@ -200,7 +200,7 @@ where
     pub call_tx: mpsc::Sender<MachineCall>,
     pub call_rx: mpsc::Receiver<MachineCall>,
     pub termination_broadcast_tx: broadcast::Sender<Result<(), String>>,
-    pub logger: PointLogger,
+    pub logger: Logger,
 }
 
 impl<P> Machine<P>
@@ -738,7 +738,7 @@ impl HyperwayEndpointFactory for MachineHyperwayEndpointFactory {
 
 pub struct MachineApiExtFactory {
     pub machine_api: MachineApi,
-    pub logger: PointLogger,
+    pub logger: Logger,
 }
 
 #[async_trait]

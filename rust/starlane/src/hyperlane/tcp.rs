@@ -7,7 +7,7 @@ use rustls::pki_types::ServerName;
 use rustls::{RootCertStore, ServerConfig};
 use starlane::space::err::SpaceErr;
 use starlane::space::hyper::Knock;
-use starlane::space::log::PointLogger;
+use starlane::space::log::Logger;
 use starlane::space::substance::Substance;
 use starlane::space::wave::{PingCore, Wave, WaveVariantDef};
 use starlane::space::VERSION;
@@ -29,12 +29,12 @@ pub struct HyperlaneTcpClient {
     host: String,
     cert_dir: String,
     knock: Knock,
-    logger: PointLogger,
+    logger: Logger,
     verify: bool,
 }
 
 impl HyperlaneTcpClient {
-    pub fn new<H, S>(host: H, cert_dir: S, knock: Knock, verify: bool, logger: PointLogger) -> Self
+    pub fn new<H, S>(host: H, cert_dir: S, knock: Knock, verify: bool, logger: Logger) -> Self
     where
         S: ToString,
         H: ToString,
@@ -221,14 +221,14 @@ pub struct FrameMuxer {
     tx: mpsc::Sender<Wave>,
     rx: mpsc::Receiver<Wave>,
     terminate_rx: mpsc::Receiver<()>,
-    logger: PointLogger,
+    logger: Logger,
 }
 
 impl FrameMuxer {
     pub async fn handshake(
         mut stream: FrameStream,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
-        logger: PointLogger,
+        logger: Logger,
     ) -> Result<HyperwayEndpoint, SpaceErr> {
         stream.write_version(&VERSION.clone()).await?;
         let in_version =
@@ -267,7 +267,7 @@ impl FrameMuxer {
         Ok(Self::new(stream, logger))
     }
 
-    pub fn new(stream: FrameStream, logger: PointLogger) -> HyperwayEndpoint {
+    pub fn new(stream: FrameStream, logger: Logger) -> HyperwayEndpoint {
         let (in_tx, in_rx) = mpsc::channel(1024);
         let (out_tx, out_rx) = mpsc::channel(1024);
         let (terminate_tx, mut terminate_rx) = mpsc::channel(1);
@@ -381,7 +381,7 @@ impl HyperlaneTcpServerApi {
 pub struct HyperlaneTcpServer {
     gate: Arc<HyperGateSelector>,
     listener: TcpListener,
-    logger: PointLogger,
+    logger: Logger,
     acceptor: TlsAcceptor,
     server_kill_tx: broadcast::Sender<()>,
     server_kill_rx: broadcast::Receiver<()>,
@@ -392,7 +392,7 @@ impl HyperlaneTcpServer {
         port: u16,
         cert_dir: String,
         gate: Arc<HyperGateSelector>,
-        logger: PointLogger,
+        logger: Logger,
     ) -> Result<Self, Error> {
         let (server_kill_tx, server_kill_rx) = broadcast::channel(1);
 
@@ -461,7 +461,7 @@ impl HyperlaneTcpServer {
                     acceptor: TlsAcceptor,
                     gate: Arc<HyperGateSelector>,
                     server_kill_rx: broadcast::Receiver<()>,
-                    logger: PointLogger,
+                    logger: Logger,
                 ) -> Result<(), Error> {
                     let mut stream = acceptor.accept(stream).await?;
 

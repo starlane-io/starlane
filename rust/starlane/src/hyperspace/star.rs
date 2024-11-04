@@ -36,7 +36,7 @@ use starlane::space::loc::{
     Layer, StarKey, Surface, SurfaceSelector, ToPoint, ToSurface,
     GLOBAL_EXEC,
 };
-use starlane::space::log::{PointLogger, Trackable, Tracker};
+use starlane::space::log::{Logger, Trackable, Tracker};
 use starlane::space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
@@ -124,7 +124,7 @@ pub struct HyperStarSkel
     pub key: StarKey,
     pub point: Point,
     pub kind: StarSub,
-    pub logger: PointLogger,
+    pub logger: Logger,
     pub registry: Registry,
     pub golden_path: Arc<DashMap<StarKey, StarKey>>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<Wave>>,

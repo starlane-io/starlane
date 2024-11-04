@@ -8,7 +8,7 @@ use starlane::space::artifact::asynch::ArtErr;
 use starlane::space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
 use starlane::space::err::{CoreReflector, SpaceErr, StatusErr};
 use starlane::space::loc::{Layer, Surface, ToSurface};
-use starlane::space::log::{PointLogger, Trackable};
+use starlane::space::log::{Logger, Trackable};
 use starlane::space::parse::model::{PipelineSegmentVar, PipelineVar};
 use starlane::space::parse::{Env, RegexCapturesResolver};
 use starlane::space::particle::traversal::{Traversal, TraversalLayer};
@@ -31,7 +31,7 @@ pub struct Field
 {
     pub port: Surface,
     pub skel: HyperStarSkel,
-    pub logger: PointLogger,
+    pub logger: Logger,
     pub shell_transmitter: TraversalTransmitter,
 }
 
@@ -184,7 +184,7 @@ pub struct PipeEx
 {
     pub skel: HyperStarSkel,
     pub surface: Surface,
-    pub logger: PointLogger,
+    pub logger: Logger,
     pub env: Env,
     pub reflection: Result<Reflection, SpaceErr>,
     pub pipeline: PipelineVar,
@@ -210,7 +210,7 @@ impl PipeEx
         env: Env,
         shell_transmitter: TraversalTransmitter,
         gravity_transmitter: ProtoTransmitter,
-        logger: PointLogger,
+        logger: Logger,
     ) {
         tokio::spawn(async move {
             let pipex = Self {
