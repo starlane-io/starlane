@@ -1,13 +1,14 @@
 
 VERSION := $(shell cat VERSION)
-BRANCH := $(git rev-parse --abbrev-ref HEAD)
+BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 
 .PHONY : clean version
 
 
 check: 
-	COMMITED := $$(shell git diff --exit-code &> /dev/null)
-
+	@echo ${BRANCH}
+	@git diff --exit-code > /dev/null 2> /dev/null
+	@echo $$?
 
 clean :
 	find . -type f -name "*.toml" -exec touch {} +
