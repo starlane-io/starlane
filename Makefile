@@ -6,7 +6,7 @@ BRANCH := $(git rev-parse --abbrev-ref HEAD)
 
 
 check: 
-	git diff --exit-code &> /dev/null 
+	COMMITED := $$(shell git diff --exit-code &> /dev/null)
 
 
 clean :
