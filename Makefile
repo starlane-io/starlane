@@ -1,6 +1,8 @@
 
 VERSION := $(shell cat VERSION)
 
+BRANCH := $(git rev-parse --abbrev-ref HEAD)
+
 .PHONY : clean version
 clean :
 	find . -type f -name "*.toml" -exec touch {} +
@@ -10,6 +12,8 @@ version:
 	$(MAKE) -C rust version
 
 release:
+	
+	git rev-parse --verify release/${VERSION} || exit 0
 	git flow release start ${VERSION}
 	git push --set-upstream origin release/${VERSION}
 	gh release create v${VERSION}
