@@ -1,4 +1,0 @@
-kind: App
-spec:
-  main: "{bundle}:/mechtron/appy.yaml"
-

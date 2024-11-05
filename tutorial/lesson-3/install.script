@@ -1,7 +1,0 @@
-create? repo<Repo>;
-create? repo:profile<BundleSeries>;
-publish ^[ bundle.zip ]-> repo:profile:1.0.0;
-create! localhost<Base>{ +bind=repo:profile:1.0.0:/bind/localhost.bind };
-create? profiles<Base>;
-create! profiles:uberscott<Mechtron>{ +config=repo:profile:1.0.0:/config/my-mechtron.mechtron };
-exit;
