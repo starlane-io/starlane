@@ -2,23 +2,21 @@
 
 #[macro_use]
 extern crate lazy_static;
-
 #[macro_use]
-extern crate cosmic_macros;
+extern crate starlane_macros;
 
-use cosmic_macros::handler_sync;
-use cosmic_space::err::SpaceErr;
-use cosmic_space::log::{PointLogger, RootLogger};
-use cosmic_space::particle::Details;
-use cosmic_space::wave::core::CoreBounce;
-use cosmic_space::wave::exchange::synch::{
-    DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
-};
 use mechtron::err::{GuestErr, MechErr};
 use mechtron::guest::GuestSkel;
 use mechtron::{guest, Guest, MechtronFactories, MechtronFactory, Platform};
 use mechtron::{Mechtron, MechtronLifecycle, MechtronSkel};
-use std::marker::PhantomData;
+use starlane_macros::handler_sync;
+use starlane_space::err::SpaceErr;
+use starlane_space::log::{PointLogger, RootLogger};
+use starlane_space::particle::Details;
+use starlane_space::wave::core::CoreBounce;
+use starlane_space::wave::exchange::synch::{
+    DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
+};
 use std::sync::Arc;
 
 #[no_mangle]

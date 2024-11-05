@@ -1,0 +1,21 @@
+[package]
+name = "filestore"
+
+license = "MIT"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative.git"
+
+version = "0.3.14"
+
+edition = "2021" 
+rust-version = "1.80.0"
+authors = []
+homepage = "https://starlane.io"
+description="..."
+
+
+
+
+[dependencies]
+clap = { version = "4.5.16", features = ["derive"] }
+strum_macros = "0.26.4"
+strum = "0.26.3"

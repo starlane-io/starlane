@@ -1,0 +1,40 @@
+[package]
+name = "mechtron"
+description = "Part of http://starlane.io This package--MECHTRON--provides an API and framework that allows a Wasm component to send and receive messages from other Wasm components."
+resolver="2"
+
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+
+
+
+
+#[lib]
+#crate-type = ["cdylib", "rlib"]
+
+
+[dependencies]
+lazy_static = {workspace = true, features=["spin_no_std"] }
+bincode = { workspace = true}
+starlane-space = {workspace = true}
+starlane-macros= { workspace = true }
+serde = { workspace = true, features=['derive','rc'] }
+dashmap = { workspace = true}
+starlane-primitive-macros = {workspace = true}
+# `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
+# compared to the default allocator's ~10K. It is slower than the default
+# allocator, however.
+#
+# Unfortunately, `wee_alloc` requires nightly Rust when targeting wasm for now.
+#wee_alloc = { version = "0.4.5", optional = true }
+
+[dev-dependencies]
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+#opt-level = "s"

@@ -1,9 +1,9 @@
-use std::sync::Arc;
-use serde_json::json;
 use handlebars::Handlebars;
 use handlebars::RenderError;
 use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::payload::{Payload, Primitive};
+use serde_json::json;
+use std::sync::Arc;
 
 lazy_static! {
   pub static ref HTML: Handlebars<'static> = {
@@ -99,7 +99,7 @@ section{
 
   "#);
 
-  reg.register_template_string("mechtron-page", r#"<!DOCTYPE html>
+  reg.register_template_string("mech-old-page", r#"<!DOCTYPE html>
 <html lang="en" >
 <head>
   <meta charset="UTF-8">
@@ -408,7 +408,7 @@ footer {
 
 pub fn greeting( name: &str ) -> Result<ResponseCore,Error> {
     let json = json!({"title": "Greetings!", "message": format!("Hello {}",name).as_str() });
-    let response = ResponseCore::ok(Payload::Primitive(Primitive::Bin((Arc::new(HTML.render("mechtron-page", &json)?.as_bytes().to_vec())))));
+    let response = ResponseCore::ok(Payload::Primitive(Primitive::Bin((Arc::new(HTML.render("mech-old-page", &json)?.as_bytes().to_vec())))));
     Ok(response)
 }
 
