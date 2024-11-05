@@ -1,10 +1,8 @@
-# COSMIC MACROS PRIMITIVE
+# STARLANE PRIMITIVE MACROS
 
-`cosmic-macros-primitive` is one of the packages that compose [THE COSMIC INITIATIVE](http://thecosmicinitiative.io) a WebAssembly orchestration framework.
+`starlane-primitive-macros` provide proc macros for [starlane-space](../starlane-space) and [starlane](../starlane);
 
-Unfortunately it will only work with a framework that also implements
-[cosmic-space](https://crates.io/crates/cosmic-space) as it makes use of the `UniErr`
-
+More sophisticated macros can be found in [starlane-macros](../starlane-macros).
 
 
 

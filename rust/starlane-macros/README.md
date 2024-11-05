@@ -1,3 +1,8 @@
-Part of [THE COSMIC INITIATIVE](http://thecosmicinitiative.io) a WebAssembly orchestration framework.
+# STARLANE MACROS
 
-**this code is out of date for the current version is scheduled to be revised**
+`starlane-macros` provide advanced derive and attribute for implementors of [starlane-space](../starlane-space) and [starlane](../starlane);
+
+
+
+
+

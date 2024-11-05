@@ -74,7 +74,7 @@ pub fn _logger() -> Logger {
 }
 
 macro_rules! enter{
-    ($args: expr) => {
+    ($args: ident) => {
     }
 }
 
