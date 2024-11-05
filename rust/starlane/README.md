@@ -1,7 +1,7 @@
 # STARLANE
 Starlane aims to reduce the drudgery of creating infrastructure code and shift developer focus to code that adds value to their users. [https://starlane.io](https://starlane.io)
 
-This packaged manages `HyperSpace` which provides infrastructure for [Space](../starlane-space)
+This packaged manages `HyperSpace` which provides infrastructure for [starlane-space](../starlane-space)
 
 Apis (WebAssembly & external programs meant to provide custom behaviors in Starlane),
 
