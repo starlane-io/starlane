@@ -9,6 +9,9 @@ clean :
 version:
 	$(MAKE) -C rust version
 
+release:
+	git flow release start ${VERSION}
+
 publish-dry-run-impl: 
 	rustup default stable
   
