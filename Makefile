@@ -1,18 +1,25 @@
 
 VERSION := $(shell cat VERSION)
-
 BRANCH := $(git rev-parse --abbrev-ref HEAD)
 
 .PHONY : clean version
+
+
+check: 
+	test $(git diff --exit-code &> /dev/null) 
+
+
 clean :
 	find . -type f -name "*.toml" -exec touch {} +
 	find . -type f -name "Makefile" -exec touch {} +
+	$(MAKE) -C rust clean 
 
 version:
 	$(MAKE) -C rust version
 
-release:
-	
+release: check
+	echo ${COMMITED}
+	exit 0
 	git rev-parse --verify release/${VERSION} || exit 0
 	git flow release start ${VERSION}
 	git push --set-upstream origin release/${VERSION}
