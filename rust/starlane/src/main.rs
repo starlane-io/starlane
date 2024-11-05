@@ -27,6 +27,8 @@ pub mod test;
 
 pub mod install;
 
+pub mod trace;
+
 //#[cfg(feature="space")]
 //pub extern crate starlane_space as starlane;
 #[cfg(feature = "space")]
@@ -87,7 +89,7 @@ use starlane_space::space::particle::Status;
 use std::any::Any;
 use std::fmt::Display;
 use std::fs::File;
-use std::io;
+use std::{io, process};
 use std::io::{Read, Seek, Write};
 use std::ops::{Add, Index, Mul};
 use std::path::Path;

@@ -33,7 +33,7 @@ hyperspace=["dep:futures","dep:dashmap","dep:semver", "parse", "dep:zip","hypere
 hyperlane=["hypererr"]
 hyperlane-tcp =  ["hyperlane","dep:rcgen","rustls","dep:tokio-rustls","dep:tls-api-rustls"]
 hyperlane-quic =  ["hyperlane","dep:rcgen","rustls", "dep:quinn"]
-postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion" ]
+postgres=[ "dep:sqlx","dep:serde","dep:async-recursion" ]
 postgres-embedded=[ "postgres", "dep:postgresql_embedded" ]
 parse=["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
 rustls=["dep:rustls","dep:rcgen","rustls-pemfile"]
@@ -78,10 +78,10 @@ dashmap = {workspace=true, optional = true}
 semver = { workspace=true, features=['serde'], optional = true }
 
 
+
 # postgres deps
 sqlx = { workspace = true, features = [ "runtime-tokio","runtime-tokio-rustls", "postgres", "macros", "any" ], optional = true }
 serde = { workspace = true, features=['derive','rc'], optional=true }
-tracing = { workspace = true, optional = true}
 async-recursion = { workspace = true, optional=true }
 
 
@@ -136,6 +136,14 @@ crossterm = {workspace = true}
 textwrap = {workspace = true}
 console = {workspace = true}
 derive-name = {workspace = true}
+
+#tracing = { workspace = true, features=["std","log","attributes","tracing-attributes","max_level_trace"]}
+tracing = { workspace = true, features=["std","log","attributes","tracing-attributes","async-await"]}
+
+tracing-subscriber = { workspace = true, features = ["default"]}
+tracing-attributes= { workspace = true,  features=["async-await"]}
+tracing-core= { workspace = true,  features = ["valuable","default"] }
+
 
 [lib]
 name = "starlane"
