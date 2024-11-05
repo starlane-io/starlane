@@ -119,10 +119,11 @@ atty = "0.2.14"
 #rolling-file = "0.2.0"
 termsize = "0.1.9"
 textwrap = "0.16.1"
-#postgresql_embedded = "0.17.2"
+postgresql_embedded = "0.17.2"
 port_check = "0.2.1"
 function_name = "0.3.0"
 derive-name = "1.1.0"
 tokio-scoped = "0.2.0"
 prettyplease = "0.2.25"
-postgresql_embedded =  { path="../../postgresql-embedded" }
+[patch.crates-io]
+postgresql_embedded =  { path="../../postgresql-embedded/postgresql_embedded" }
