@@ -3,6 +3,6 @@ Starlane aims to reduce the drudgery of creating infrastructure code and shift d
 
 This package provides the `Space` API and SDK for a Starlane 3rd party component.
 
-Infrastructure code for Space projects are furnished via the `[starlane](../starlane)` Package.
+Infrastructure code for Space projects are furnished via the [starlane](../starlane) Package.
 
 

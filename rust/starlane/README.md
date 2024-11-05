@@ -5,7 +5,7 @@ This packaged manages `HyperSpace` which provides infrastructure for [starlane-s
 
 Apis (WebAssembly & external programs meant to provide custom behaviors in Starlane),
 
-This package references the `[starlane-space](../starlane-space)` package and reuses of it to run the infrastructure and it also contains mechanisms (Drivers) for extending the Starlane Type system
+This package references the [starlane-space](../starlane-space) package and reuses of it to run the infrastructure and it also contains mechanisms (Drivers) for extending the Starlane Type system
 
 
 ## WebAssembly And The Enterprise
