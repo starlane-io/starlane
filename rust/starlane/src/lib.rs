@@ -54,6 +54,8 @@ pub mod host;
 
 pub mod cli;
 
+pub mod trace;
+
 //pub mod store;
 
 pub mod driver;
@@ -65,7 +67,6 @@ pub mod platform;
 
 #[cfg(feature = "service")]
 pub mod service;
-
 
 
 

@@ -1,11 +1,11 @@
 # STARLANE
 Starlane aims to reduce the drudgery of creating infrastructure code and shift developer focus to code that adds value to their users. [https://starlane.io](https://starlane.io)
 
-This packaged manages `HyperSpace` which provides infrastructure for [https://github.com/starlane-io/starlane/tree/main/rust/starlane-space]`Space`
+This packaged manages `HyperSpace` which provides infrastructure for [starlane-space](../starlane-space)
 
 Apis (WebAssembly & external programs meant to provide custom behaviors in Starlane),
 
-This package references the `[starlane-space](https://crates.io/crates/starlane-space)` package and reuses of it to run the infrastructure and it also contains mechanisms (Drivers) for extending the Starlane Type system
+This package references the [starlane-space](../starlane-space) package and reuses of it to run the infrastructure and it also contains mechanisms (Drivers) for extending the Starlane Type system
 
 
 ## WebAssembly And The Enterprise
@@ -17,7 +17,7 @@ If you haven't heard about WebAssembly--or Wasm for short--it's basically a new 
 ## Deploy Starlane in Your Production Environment Today!
 **WAIT! DON'T DO IT!**  Starlane is still a work in progress and not ready for anything approaching a production environment.    PLEASE! PLEASE! DON'T! 
 
-A demonstratable version that folks can play with should be available in a week or two (Some poor developer yanked an essential crate that Starlane relied on and I have some rewriting to do!
+A demonstrable version that folks can play with should be available in a week or two (Some poor developer yanked an essential crate that Starlane relied on and I have some rewriting to do!
 
 ## RUN LOCALLY
 To install Starlane for local development simply run:
