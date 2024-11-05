@@ -1,8 +1,0 @@
-apiVersion: starlane.starlane.io/v1alpha1
-kind: Postgres
-metadata:
-  name: my-postgres
-spec:
-  service-type: ClusterIP
-  storage-class: gp2
-  manage-pvc: true

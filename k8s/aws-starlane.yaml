@@ -1,8 +1,0 @@
-apiVersion: starlane.starlane.io/v1alpha1
-kind: Starlane
-metadata:
-  name: my-starlane
-spec:
-  web-service-type: LoadBalancer
-  gateway-service-type: ClusterIP
-  storage-class: gp2
