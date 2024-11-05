@@ -11,6 +11,10 @@ version:
 
 release:
 	git flow release start ${VERSION}
+	git push --set-upstream origin release/${VERSION}
+	gh release create v${VERSION}
+
+
 
 publish-dry-run-impl: 
 	rustup default stable
