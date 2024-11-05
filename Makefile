@@ -1,3 +1,25 @@
+
+VERSION := $(shell cat VERSION)
+
+.PHONY : clean version
+clean :
+	find . -type f -name "*.toml" -exec touch {} +
+	find . -type f -name "Makefile" -exec touch {} +
+
+version:
+	$(MAKE) -C rust version
+
+publish-dry-run-impl: 
+	rustup default stable
+  
+
+publish-impl:
+	$(MAKE) -C rust publish
+
+publish-dry-run: version publish-dry-run-impl
+publish: version publish-impl
+
+
 build-docker:
 	docker build . --tag starlane/starlane:latest
 	docker push starlane/starlane:latest

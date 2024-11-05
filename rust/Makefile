@@ -5,6 +5,8 @@ VERSION := $(shell cat ../VERSION)
 clean :
 	find . -type f -name "*.toml" -exec touch {} +
 	find . -type f -name "Makefile" -exec touch {} +
+	cargo clean
+
 
 
 version:

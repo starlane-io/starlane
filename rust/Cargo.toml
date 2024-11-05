@@ -3,7 +3,7 @@
 license = "MIT"
 repository = "https://github.com/starlane-io/starlane.git"
 
-version = "0.3.19"
+version = "0.3.20"
 
 edition = "2021" 
 rust-version = "1.81.0"
@@ -25,10 +25,10 @@ members = [ "starlane", "starlane-macros", "starlane-primitive-macros", "starlan
 exclude = [ ]
 
 [workspace.dependencies]
-starlane = { path="./starlane" , version = "0.3.19" }
-starlane-macros = { path="./starlane-macros", version = "0.3.19" }
-starlane-primitive-macros = { path="./starlane-primitive-macros", version = "0.3.19" }
-starlane-space = { path="./starlane-space", version = "0.3.19" }
+starlane = { path="./starlane" , version = "0.3.20" }
+starlane-macros = { path="./starlane-macros", version = "0.3.20" }
+starlane-primitive-macros = { path="./starlane-primitive-macros", version = "0.3.20" }
+starlane-space = { path="./starlane-space", version = "0.3.20" }
 lazy_static = "1.5.0"
 uuid = { version="1.1.2" }
 chrono = { version="0.4.19" }
