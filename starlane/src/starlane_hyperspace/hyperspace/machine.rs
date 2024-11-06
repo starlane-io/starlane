@@ -43,7 +43,7 @@ use thiserror::Error;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use starlane_primitive_macros::{push_loc, push_mark};
-use crate::starlane_hyperspace::hyperspace::err2::{err, HyperErr2};
+use crate::starlane_hyperspace::hyperspace::err::{err, HyperErr2};
 
 #[derive(Clone)]
 pub struct MachineApi {

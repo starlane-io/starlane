@@ -36,7 +36,7 @@ use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
 use starlane_primitive_macros::{logger, push_loc};
-use crate::starlane_hyperspace::hyperspace::err2::HypErr;
+use crate::starlane_hyperspace::hyperspace::err::HypErr;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {

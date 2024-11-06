@@ -15,7 +15,6 @@ use crate::starlane_hyperspace::hyperspace::env::{StarlaneWriteLogs, STARLANE_LO
 
 pub mod layer;
 pub mod err;
-pub mod err2;
 pub mod global;
 pub mod machine;
 pub mod reg;

@@ -11,7 +11,7 @@ use std::string::ToString;
 use std::{fs, process};
 use tempdir::TempDir;
 use uuid::Uuid;
-use crate::starlane_hyperspace::hyperspace::err2::HypErr;
+use crate::starlane_hyperspace::hyperspace::err::HypErr;
 
 pub fn context() -> String {
     fs::read_to_string(format!("{}/.context", STARLANE_HOME.as_str()).to_string())
