@@ -13,10 +13,7 @@ pub static VERSION: Lazy<semver::Version> =
 
 pub mod starlane_hyperspace;
 
-pub mod properties;
 pub mod template;
-
-pub mod platform;
 
 
 #[cfg(test)]
@@ -55,7 +52,7 @@ use crate::starlane_hyperspace::hyperspace::env::{
 use self::starlane_hyperspace::hyperspace::foundation::Foundation;
 use self::starlane_hyperspace::hyperspace::foundation::StandAloneFoundation;
 use crate::install::{Console, StarlaneTheme};
-use crate::platform::Platform;
+use self::starlane_hyperspace::hyperspace::platform::Platform;
 use self::starlane_hyperspace::hyperspace::shutdown::shutdown;
 use anyhow::{anyhow, ensure};
 use clap::Parser;

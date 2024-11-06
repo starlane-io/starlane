@@ -1,4 +1,4 @@
-use crate::platform::Platform;
+use crate::starlane_hyperspace::hyperspace::platform::Platform;
 use crate::starlane_hyperspace::hyperspace::reg::Registration;
 use crate::starlane_hyperspace::hyperspace::star::{HyperStarSkel, SmartLocator, StarErr};
 use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;

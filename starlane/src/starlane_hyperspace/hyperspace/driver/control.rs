@@ -8,7 +8,7 @@ use crate::starlane_hyperspace::hyperspace::hyperlane::{
     InterchangeGate, TransportTransform,
 };
 use crate::starlane_hyperspace::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::platform::Platform;
+use crate::starlane_hyperspace::hyperspace::platform::Platform;
 use dashmap::DashMap;
 use starlane::space::artifact::ArtRef;
 use starlane::space::command::common::StateSrc;

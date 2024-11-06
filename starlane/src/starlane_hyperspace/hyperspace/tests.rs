@@ -12,7 +12,7 @@ use crate::starlane_hyperspace::hyperspace::driver::control::ControlClient;
 use crate::err2::OldStarErr;
 use crate::starlane_hyperspace::hyperspace::hyperlane::HyperClient;
 use crate::starlane_hyperspace::hyperspace::machine::MachineApiExtFactory;
-use crate::platform::Platform;
+use crate::starlane_hyperspace::hyperspace::platform::Platform;
 use crate::starlane_hyperspace::hyperspace::star::HyperStarApi;
 use starlane::space::command::common::StateSrc;
 use starlane::space::command::direct::create::{

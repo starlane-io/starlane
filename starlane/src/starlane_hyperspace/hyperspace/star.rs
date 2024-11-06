@@ -21,7 +21,7 @@ use crate::starlane_hyperspace::hyperspace::global::{GlobalCommandExecutionHandl
 use crate::starlane_hyperspace::hyperspace::layer::field::Field;
 use crate::starlane_hyperspace::hyperspace::layer::shell::{Shell, ShellState};
 use crate::starlane_hyperspace::hyperspace::machine::{MachineApi, MachineErr, MachineSkel};
-use crate::platform::Platform;
+use crate::starlane_hyperspace::hyperspace::platform::Platform;
 use crate::starlane_hyperspace::hyperspace::reg::{Registration, Registry};
 use starlane::space::command::common::StateSrc;
 use starlane::space::command::direct::create::{Create, Strategy};

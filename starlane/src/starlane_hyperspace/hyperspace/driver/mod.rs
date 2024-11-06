@@ -17,7 +17,7 @@ use crate::starlane_hyperspace::hyperspace::executor::dialect::filestore::FileSt
 use crate::starlane_hyperspace::hyperspace::machine::MachineErr;
 use crate::starlane_hyperspace::hyperspace::reg::{Registration, Registry};
 use crate::starlane_hyperspace::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
-use crate::platform::Platform;
+use crate::starlane_hyperspace::hyperspace::platform::Platform;
 use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;
 use crate::service::{
     Service, ServiceErr, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate,

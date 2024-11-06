@@ -25,7 +25,7 @@ use starlane::space::wave::{
 
 use starlane::space::parse::util::result;
 use starlane_primitive_macros::push_loc;
-use crate::platform::Platform;
+use crate::starlane_hyperspace::hyperspace::platform::Platform;
 use crate::starlane_hyperspace::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 
 #[derive(DirectedHandler)]

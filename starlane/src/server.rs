@@ -24,7 +24,7 @@ use crate::starlane_hyperspace::hyperspace::hyperlane::tcp::{CertGenerator, Hype
 use crate::starlane_hyperspace::hyperspace::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
 use crate::starlane_hyperspace::hyperspace::machine::MachineTemplate;
 use crate::starlane_hyperspace::hyperspace::reg::{Registry, RegistryWrapper};
-use crate::platform::{Platform, PlatformConfig};
+use crate::starlane_hyperspace::hyperspace::platform::{Platform, PlatformConfig};
 use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;
 use crate::starlane_hyperspace::hyperspace::registry::postgres::embed::PgEmbedSettings;
 use crate::starlane_hyperspace::hyperspace::registry::postgres::PostgresDbKey;

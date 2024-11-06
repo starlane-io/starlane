@@ -14,7 +14,7 @@ use crate::starlane_hyperspace::hyperspace::reg::Registry;
 use crate::starlane_hyperspace::hyperspace::star::{
     HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
 };
-use crate::platform::Platform;
+use crate::starlane_hyperspace::hyperspace::platform::Platform;
 use crate::service::{
     service_conf, Service,  ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate,
 };

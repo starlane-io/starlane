@@ -23,7 +23,7 @@ use starlane::space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, PongCore, Reflection, Wave, WaveVariantDef,
 };
 use starlane_primitive_macros::push_loc;
-use crate::platform::Platform;
+use crate::starlane_hyperspace::hyperspace::platform::Platform;
 use crate::starlane_hyperspace::hyperspace::star::{HyperStarSkel, TraverseToNextRouter};
 
 pub struct Field

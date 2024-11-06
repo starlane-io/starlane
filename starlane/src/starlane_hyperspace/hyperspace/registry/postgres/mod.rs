@@ -1,6 +1,6 @@
 pub mod embed;
 
-use crate::platform::Platform;
+use crate::starlane_hyperspace::hyperspace::platform::Platform;
 use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
