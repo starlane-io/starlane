@@ -2,7 +2,7 @@ use crate::starlane_hyperspace::hyperspace::env::{
     config, config_path, config_save, context, context_dir, GlobalMode, STARLANE_GLOBAL_SETTINGS,
     STARLANE_HOME,
 };
-use crate::foundation::{Foundation, StandAloneFoundation};
+use crate::starlane_hyperspace::hyperspace::foundation::{Foundation, StandAloneFoundation};
 use crate::starlane_hyperspace::hyperspace::registry::postgres::embed::PgEmbedSettings;
 use crate::starlane_hyperspace::hyperspace::shutdown::shutdown;
 use crate::{

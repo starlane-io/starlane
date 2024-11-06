@@ -18,7 +18,7 @@ use anyhow::anyhow;
 use starlane::space::log::Logger;
 use starlane_primitive_macros::logger;
 use crate::starlane_hyperspace::hyperspace::env::config_path;
-use crate::foundation::Foundation;
+use crate::starlane_hyperspace::hyperspace::foundation::Foundation;
 use crate::PgRegistryConfig;
 
 #[async_trait]

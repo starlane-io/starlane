@@ -18,8 +18,6 @@ pub mod template;
 
 pub mod platform;
 
-pub mod foundation;
-
 
 #[cfg(test)]
 pub mod test;
@@ -54,8 +52,8 @@ use crate::starlane_hyperspace::hyperspace::env::{
     config_exists, context, context_dir, ensure_global_settings, save_global_settings, set_context,
     STARLANE_HOME,
 };
-use crate::foundation::Foundation;
-use crate::foundation::StandAloneFoundation;
+use self::starlane_hyperspace::hyperspace::foundation::Foundation;
+use self::starlane_hyperspace::hyperspace::foundation::StandAloneFoundation;
 use crate::install::{Console, StarlaneTheme};
 use crate::platform::Platform;
 use self::starlane_hyperspace::hyperspace::shutdown::shutdown;

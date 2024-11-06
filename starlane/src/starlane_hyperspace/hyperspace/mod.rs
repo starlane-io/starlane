@@ -33,6 +33,7 @@ pub mod executor;
 pub mod host;
 pub mod env;
 pub mod shutdown;
+pub mod foundation;
 
 #[no_mangle]
 pub extern "C" fn starlane_uuid() -> String {

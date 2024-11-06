@@ -19,7 +19,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::starlane_hyperspace::hyperspace::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
-use crate::foundation::{Foundation, StandAloneFoundation};
+use crate::starlane_hyperspace::hyperspace::foundation::{Foundation, StandAloneFoundation};
 use crate::starlane_hyperspace::hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
 use crate::starlane_hyperspace::hyperspace::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
 use crate::starlane_hyperspace::hyperspace::machine::MachineTemplate;
