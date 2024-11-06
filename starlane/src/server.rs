@@ -4,11 +4,11 @@ use crate::registry::postgres::{
     PostgresRegistryContextHandle,
 };
 
-use crate::driver::base::BaseDriverFactory;
-use crate::driver::control::ControlDriverFactory;
-use crate::driver::root::RootDriverFactory;
-use crate::driver::space::SpaceDriverFactory;
-use crate::driver::{DriverAvail, DriversBuilder};
+use crate::starlane_hyperspace::hyperspace::driver::base::BaseDriverFactory;
+use crate::starlane_hyperspace::hyperspace::driver::control::ControlDriverFactory;
+use crate::starlane_hyperspace::hyperspace::driver::root::RootDriverFactory;
+use crate::starlane_hyperspace::hyperspace::driver::space::SpaceDriverFactory;
+use crate::starlane_hyperspace::hyperspace::driver::{DriverAvail, DriversBuilder};
 use starlane::space::artifact::asynch::Artifacts;
 use starlane::space::kind::StarSub;
 use starlane::space::loc::{MachineName, StarKey};

@@ -8,7 +8,7 @@ use std::time::Duration;
 use once_cell::sync::Lazy;
 use serde::Serialize;
 
-use crate::driver::control::ControlClient;
+use crate::starlane_hyperspace::hyperspace::driver::control::ControlClient;
 use crate::err::OldStarErr;
 use crate::hyperlane::HyperClient;
 use crate::starlane_hyperspace::hyperspace::machine::MachineApiExtFactory;

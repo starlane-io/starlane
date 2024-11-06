@@ -11,8 +11,8 @@ pub mod artifact;
 
 pub mod filestore;
 
-use crate::driver::control::ControlErr;
-use crate::driver::star::StarDriverFactory;
+use crate::starlane_hyperspace::hyperspace::driver::control::ControlErr;
+use crate::starlane_hyperspace::hyperspace::driver::star::StarDriverFactory;
 use crate::executor::dialect::filestore::FileStoreErr;
 use crate::starlane_hyperspace::hyperspace::machine::MachineErr;
 use crate::starlane_hyperspace::hyperspace::reg::{Registration, Registry};

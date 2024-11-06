@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, StdParticleErr};
+use crate::starlane_hyperspace::hyperspace::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, StdParticleErr};
 
 pub use starlane_space as starlane;
 

@@ -1479,7 +1479,7 @@ pub mod test {
     use std::str::FromStr;
     use std::sync::Arc;
 
-    use crate::driver::DriversBuilder;
+    use crate::starlane_hyperspace::hyperspace::driver::DriversBuilder;
     use crate::err::{HypErr, OldStarErr};
     use crate::hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
     use crate::starlane_hyperspace::hyperspace::err::HyperErr;

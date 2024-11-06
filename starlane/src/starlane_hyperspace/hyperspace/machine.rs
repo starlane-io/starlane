@@ -4,7 +4,7 @@ use std::sync::mpsc::SendError;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::driver::DriverErr;
+use crate::starlane_hyperspace::hyperspace::driver::DriverErr;
 use crate::err::{err, HypErr, HyperErr2};
 use crate::hyperlane::{
     HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,

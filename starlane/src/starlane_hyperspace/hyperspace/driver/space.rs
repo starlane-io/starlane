@@ -1,6 +1,4 @@
-use crate::driver::{Driver, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, StdParticleErr};
-pub use starlane_space as starlane;
-
+use crate::starlane_hyperspace::hyperspace::driver::{Driver, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, StdParticleErr};
 use crate::platform::Platform;
 use crate::starlane_hyperspace::hyperspace::star::HyperStarSkel;
 use once_cell::sync::Lazy;
@@ -11,31 +9,29 @@ use starlane::space::parse::bind_config;
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
 use starlane::space::util::log;
-use starlane::space::wave::exchange::asynch::DirectedHandler;
-use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use starlane::space::wave::core::CoreBounce;
+use starlane::space::wave::exchange::asynch::{DirectedHandler, RootInCtx};
 
 
+pub struct SpaceDriverFactory;
 
-pub struct RootDriverFactory;
-
-impl RootDriverFactory {
+impl SpaceDriverFactory {
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
 #[async_trait]
-impl HyperDriverFactory for RootDriverFactory
-
+impl HyperDriverFactory for SpaceDriverFactory
 {
     fn kind(&self) -> Kind {
-        Kind::Root
+        Kind::Space
     }
 
     fn selector(&self) -> KindSelector {
-        KindSelector::from_base(BaseKind::Root)
+        KindSelector::from_base(BaseKind::Space)
     }
 
     async fn create(
@@ -44,60 +40,45 @@ impl HyperDriverFactory for RootDriverFactory
         driver_skel: DriverSkel,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver>, DriverErr> {
-        Ok(Box::new(RootDriver {}))
+        Ok(Box::new(SpaceDriver))
     }
 }
 
-pub struct RootDriver;
+pub struct SpaceDriver;
 
 #[async_trait]
-impl Driver for RootDriver
-
+impl Driver for SpaceDriver
 {
     fn kind(&self) -> Kind {
-        Kind::Root
+        Kind::Space
     }
 
     async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
-        let root = Root::restore((), (), ());
-        Ok(root.sphere()?)
+        let space = Space::restore((),(),());
+        Ok(space.sphere()?)
     }
 }
 
 #[derive(DirectedHandler)]
-pub struct Root
+pub struct Space;
 
-{
-}
+#[handler]
+impl Space {}
 
-impl Root
-
-{
-    pub fn new() -> Self {
-        Self {
-        }
-    }
-}
-
-impl Particle for Root
-
-{
+impl Particle for Space {
     type Skel = ();
     type Ctx = ();
     type State = ();
     type Err = StdParticleErr;
 
     fn restore(_: Self::Skel, _: Self::Ctx, _: Self::State) -> Self {
-        Self::new()
+        Space
     }
 
-    fn sphere(self) -> Result<ParticleSphere,Self::Err> {
-        Ok(ParticleSphere::new_handler(self))
-    }
 
+    fn sphere(self) -> Result<ParticleSphere, Self::Err> {
+       Ok(ParticleSphere::new_handler(self))
+    }
 }
-
-#[handler]
-impl Root {}
 
 

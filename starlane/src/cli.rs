@@ -1,4 +1,4 @@
-use crate::driver::control::{ControlCliSession, ControlClient};
+use crate::starlane_hyperspace::hyperspace::driver::control::{ControlCliSession, ControlClient};
 use crate::hyperlane::tcp::HyperlaneTcpClient;
 use crate::hyperlane::HyperwayEndpointFactory;
 use clap::clap_derive::{Args, Subcommand};

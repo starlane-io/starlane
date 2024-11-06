@@ -1,4 +1,4 @@
-use crate::driver::DriversBuilder;
+use crate::starlane_hyperspace::hyperspace::driver::DriversBuilder;
 use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
 use crate::starlane_hyperspace::hyperspace::machine::{Machine, MachineApi, MachineTemplate};
 use crate::starlane_hyperspace::hyperspace::reg::Registry;

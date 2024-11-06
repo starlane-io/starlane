@@ -11,8 +11,8 @@ use std::time::Duration;
 use anyhow::{Context, Error};
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
-use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
-use crate::driver::{DriverErr, DriverStatus, DriversApi, DriversBuilder, DriversCall};
+use crate::starlane_hyperspace::hyperspace::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
+use crate::starlane_hyperspace::hyperspace::driver::{DriverErr, DriverStatus, DriversApi, DriversBuilder, DriversCall};
 use crate::hyperlane::{
     Bridge, HyperwayEndpoint, HyperwayEndpointFactory,
     HyperwayInterchange, HyperwayStub,

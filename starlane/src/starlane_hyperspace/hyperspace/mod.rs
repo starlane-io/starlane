@@ -25,6 +25,7 @@ pub mod tests;
 
 #[cfg(not(feature="postgres"))]
 pub mod tests;
+pub mod driver;
 
 #[no_mangle]
 pub extern "C" fn starlane_uuid() -> String {

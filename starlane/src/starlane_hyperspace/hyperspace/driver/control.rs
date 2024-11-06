@@ -1,4 +1,4 @@
-use crate::driver::{
+use crate::starlane_hyperspace::hyperspace::driver::{
     Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory,
     HyperSkel, Particle, ParticleErr, ParticleRouter, ParticleSphere, ParticleSphereInner,
 };

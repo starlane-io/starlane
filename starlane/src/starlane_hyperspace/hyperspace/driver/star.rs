@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, ParticleStarErr};
+use crate::starlane_hyperspace::hyperspace::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, ParticleStarErr};
 use crate::platform::Platform;
 use crate::starlane_hyperspace::hyperspace::reg::Registration;
 use crate::starlane_hyperspace::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};

@@ -49,8 +49,6 @@ pub mod host;
 #[cfg(feature = "cli")]
 pub mod cli;
 
-pub mod driver;
-
 #[cfg(feature = "server")]
 mod server;
 
