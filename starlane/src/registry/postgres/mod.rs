@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 use starlane_primitive_macros::push_loc;
 use crate::Database;
 use crate::env::STARLANE_CONFIG;
-use crate::hyperspace::reg::{Registration, RegistryApi};
+use crate::starlane_hyperspace::hyperspace::reg::{Registration, RegistryApi};
 
 pub trait PostgresPlatform: Send + Sync {
     fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr>;
@@ -1482,9 +1482,9 @@ pub mod test {
     use crate::driver::DriversBuilder;
     use crate::err::{HypErr, OldStarErr};
     use crate::hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
-    use crate::hyperspace::err::HyperErr;
-    use crate::hyperspace::machine::MachineTemplate;
-    use crate::hyperspace::reg::{Registration, Registry};
+    use crate::starlane_hyperspace::hyperspace::err::HyperErr;
+    use crate::starlane_hyperspace::hyperspace::machine::MachineTemplate;
+    use crate::starlane_hyperspace::hyperspace::reg::{Registration, Registry};
     use crate::registry::err::RegErr;
     use crate::registry::postgres::{
         PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,

@@ -1,5 +1,5 @@
 use crate::platform::Platform;
-use crate::hyperspace::reg::{Registration, RegistryApi};
+use crate::starlane_hyperspace::hyperspace::reg::{Registration, RegistryApi};
 use dashmap::DashMap;
 use starlane::space::command::common::{PropertyMod, SetProperties};
 use starlane::space::command::direct::delete::Delete;

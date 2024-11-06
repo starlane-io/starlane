@@ -14,9 +14,9 @@ pub mod filestore;
 use crate::driver::control::ControlErr;
 use crate::driver::star::StarDriverFactory;
 use crate::executor::dialect::filestore::FileStoreErr;
-use crate::hyperspace::machine::MachineErr;
-use crate::hyperspace::reg::{Registration, Registry};
-use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
+use crate::starlane_hyperspace::hyperspace::machine::MachineErr;
+use crate::starlane_hyperspace::hyperspace::reg::{Registration, Registry};
+use crate::starlane_hyperspace::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
 use crate::platform::Platform;
 use crate::registry::err::RegErr;
 use crate::service::{

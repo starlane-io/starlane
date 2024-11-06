@@ -1,6 +1,6 @@
 use crate::driver::{Driver, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, StdParticleErr};
 use crate::platform::Platform;
-use crate::hyperspace::star::HyperStarSkel;
+use crate::starlane_hyperspace::hyperspace::star::HyperStarSkel;
 use once_cell::sync::Lazy;
 use starlane::space::artifact::ArtRef;
 use starlane::space::config::bind::BindConfig;

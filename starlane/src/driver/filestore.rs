@@ -3,7 +3,7 @@ use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, Hyper
 pub use starlane_space as starlane;
 
 use crate::platform::Platform;
-use crate::hyperspace::star::HyperStarSkel;
+use crate::starlane_hyperspace::hyperspace::star::HyperStarSkel;
 use once_cell::sync::Lazy;
 use starlane::space::artifact::ArtRef;
 use starlane::space::config::bind::BindConfig;

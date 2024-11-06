@@ -17,12 +17,12 @@ use crate::hyperlane::{
     Bridge, HyperwayEndpoint, HyperwayEndpointFactory,
     HyperwayInterchange, HyperwayStub,
 };
-use crate::hyperspace::global::{GlobalCommandExecutionHandler,  GlobalExecutionChamber};
+use crate::starlane_hyperspace::hyperspace::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
 use crate::starlane_hyperspace::hyperspace::layer::field::Field;
 use crate::starlane_hyperspace::hyperspace::layer::shell::{Shell, ShellState};
-use crate::hyperspace::machine::{MachineApi, MachineErr, MachineSkel};
+use crate::starlane_hyperspace::hyperspace::machine::{MachineApi, MachineErr, MachineSkel};
 use crate::platform::Platform;
-use crate::hyperspace::reg::{Registration, Registry};
+use crate::starlane_hyperspace::hyperspace::reg::{Registration, Registry};
 use starlane::space::command::common::StateSrc;
 use starlane::space::command::direct::create::{Create, Strategy};
 use starlane::space::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError};

@@ -29,7 +29,7 @@ use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::dialect::filestore::{FileStore, FileStoreErr, FILE_STORE_ROOT};
 use crate::host::{ExeStub, Host, HostCli};
 use crate::host::err::HostErr;
-use crate::hyperspace::machine::MachineErr;
+use crate::starlane_hyperspace::hyperspace::machine::MachineErr;
 
 pub type FileStoreService = Service<FileStore>;
 

@@ -1,6 +1,6 @@
 use crate::platform::Platform;
-use crate::hyperspace::reg::Registration;
-use crate::hyperspace::star::{HyperStarSkel, SmartLocator, StarErr};
+use crate::starlane_hyperspace::hyperspace::reg::Registration;
+use crate::starlane_hyperspace::hyperspace::star::{HyperStarSkel, SmartLocator, StarErr};
 use crate::registry::err::RegErr;
 use once_cell::sync::Lazy;
 use starlane::space::artifact::ArtRef;

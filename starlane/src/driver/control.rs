@@ -7,7 +7,7 @@ use crate::hyperlane::{
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
     InterchangeGate, TransportTransform,
 };
-use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
+use crate::starlane_hyperspace::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::platform::Platform;
 use dashmap::DashMap;
 use starlane::space::artifact::ArtRef;

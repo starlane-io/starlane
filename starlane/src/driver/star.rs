@@ -1,7 +1,7 @@
 use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, ParticleStarErr};
 use crate::platform::Platform;
-use crate::hyperspace::reg::Registration;
-use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
+use crate::starlane_hyperspace::hyperspace::reg::Registration;
+use crate::starlane_hyperspace::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use starlane::space::artifact::ArtRef;

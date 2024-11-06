@@ -1,6 +1,6 @@
 use crate::driver::{Driver, DriverCtx, DriverErr, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Particle, ParticleSkel, ParticleSphere, ParticleSphereInner, StdParticleErr};
 use crate::executor::dialect::filestore::FileStoreIn;
-use crate::hyperspace::star::HyperStarSkel;
+use crate::starlane_hyperspace::hyperspace::star::HyperStarSkel;
 use crate::platform::Platform;
 use crate::service::{FileStoreService, Service, ServiceKind, ServiceRunner, ServiceSelector};
 use once_cell::sync::Lazy;

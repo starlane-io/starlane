@@ -18,7 +18,7 @@ use starlane::space::wave::core::ReflectedCore;
 
 pub type HyperErr2 = anyhow::Error;
 pub use anyhow::anyhow as err;
-use crate::hyperspace::star::StarErr;
+use crate::starlane_hyperspace::hyperspace::star::StarErr;
 
 #[derive(Error, Debug)]
 pub enum HypErr {

@@ -24,7 +24,7 @@ use starlane::space::wave::{
 };
 use starlane_primitive_macros::push_loc;
 use crate::platform::Platform;
-use crate::hyperspace::star::{HyperStarSkel, TraverseToNextRouter};
+use crate::starlane_hyperspace::hyperspace::star::{HyperStarSkel, TraverseToNextRouter};
 
 pub struct Field
 

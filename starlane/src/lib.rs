@@ -33,8 +33,6 @@ pub mod properties;
 
 pub mod env;
 
-#[cfg(feature = "hyperspace")]
-pub mod hyperspace;
 
 #[cfg(feature = "hyperlane")]
 pub mod hyperlane;

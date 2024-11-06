@@ -38,8 +38,6 @@ pub mod space {}
 #[cfg(feature = "service")]
 pub mod service;
 
-#[cfg(feature = "hyperspace")]
-pub mod hyperspace;
 
 #[cfg(feature = "hyperlane")]
 pub mod hyperlane;

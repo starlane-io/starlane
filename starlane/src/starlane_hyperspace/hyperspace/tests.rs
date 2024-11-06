@@ -11,9 +11,9 @@ use serde::Serialize;
 use crate::driver::control::ControlClient;
 use crate::err::OldStarErr;
 use crate::hyperlane::HyperClient;
-use crate::hyperspace::machine::MachineApiExtFactory;
+use crate::starlane_hyperspace::hyperspace::machine::MachineApiExtFactory;
 use crate::platform::Platform;
-use crate::hyperspace::star::HyperStarApi;
+use crate::starlane_hyperspace::hyperspace::star::HyperStarApi;
 use starlane::space::command::common::StateSrc;
 use starlane::space::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,

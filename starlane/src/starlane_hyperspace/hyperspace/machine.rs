@@ -11,8 +11,8 @@ use crate::hyperlane::{
     HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
     SimpleGreeter,
 };
-use crate::hyperspace::reg::Registry;
-use crate::hyperspace::star::{
+use crate::starlane_hyperspace::hyperspace::reg::Registry;
+use crate::starlane_hyperspace::hyperspace::star::{
     HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
 };
 use crate::platform::Platform;
