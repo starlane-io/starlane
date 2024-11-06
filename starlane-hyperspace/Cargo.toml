@@ -1,5 +1,5 @@
 [package]
-name = "starlane"
+name = "starlane-hyperspace"
 
 description = """
 Starlane -- An Orchestration and Infrastructure Framework for WebAssembly Components (https://starlane.io)
@@ -46,7 +46,6 @@ wasm=[]
 
 [dependencies]
 starlane-space = { workspace = true  }
-starlane-hyperspace = { workspace = true  }
 starlane-macros = { workspace = true  }
 starlane-primitive-macros = { workspace = true}
 
@@ -147,13 +146,3 @@ tracing-subscriber = { workspace = true, features = ["default"]}
 tracing-attributes= { workspace = true,  features=["async-await"]}
 tracing-core= { workspace = true,  features = ["valuable","default"] }
 
-
-[lib]
-name = "starlane"
-path= "src/lib.rs"
-
-
-[[bin]]
-name = "starlane"
-doc = false
-path = "src/main.rs"
