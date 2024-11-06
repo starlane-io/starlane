@@ -9,8 +9,8 @@ use once_cell::sync::Lazy;
 use serde::Serialize;
 
 use crate::starlane_hyperspace::hyperspace::driver::control::ControlClient;
-use crate::err::OldStarErr;
-use crate::hyperlane::HyperClient;
+use crate::err2::OldStarErr;
+use crate::starlane_hyperspace::hyperspace::hyperlane::HyperClient;
 use crate::starlane_hyperspace::hyperspace::machine::MachineApiExtFactory;
 use crate::platform::Platform;
 use crate::starlane_hyperspace::hyperspace::star::HyperStarApi;

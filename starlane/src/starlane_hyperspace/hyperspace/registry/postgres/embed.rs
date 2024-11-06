@@ -1,6 +1,6 @@
 
-use crate::registry::err::RegErr;
-use crate::shutdown::{add_shutdown_hook, panic_shutdown};
+use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;
+use crate::starlane_hyperspace::hyperspace::shutdown::{add_shutdown_hook, panic_shutdown};
 use crate::{Database, PgRegistryConfig, StarlaneConfig};
 use derive_builder::Builder;
 use port_check::is_local_ipv4_port_free;
@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::fs;
-use crate::registry::postgres::PostgresConnectInfo;
+use crate::starlane_hyperspace::hyperspace::registry::postgres::PostgresConnectInfo;
 
 pub struct Postgres {
     config: Database<PgEmbedSettings>,

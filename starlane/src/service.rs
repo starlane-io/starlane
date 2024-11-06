@@ -1,6 +1,6 @@
 use std::env;
 use std::fmt::{Display, Formatter};
-use crate::executor::{ExeConf, Executor};
+use crate::starlane_hyperspace::hyperspace::executor::{ExeConf, Executor};
 use itertools::Itertools;
 use nom::AsBytes;
 use starlane::space::loc::ToBaseKind;
@@ -23,12 +23,12 @@ use starlane::space::kind::Kind;
 use starlane::space::particle::Status;
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
-use crate::env::STARLANE_DATA_DIR;
-use crate::executor::cli::HostEnv;
-use crate::executor::cli::os::CliOsExecutor;
-use crate::executor::dialect::filestore::{FileStore, FileStoreErr, FILE_STORE_ROOT};
-use crate::host::{ExeStub, Host, HostCli};
-use crate::host::err::HostErr;
+use crate::starlane_hyperspace::hyperspace::env::STARLANE_DATA_DIR;
+use crate::starlane_hyperspace::hyperspace::executor::cli::HostEnv;
+use crate::starlane_hyperspace::hyperspace::executor::cli::os::CliOsExecutor;
+use crate::starlane_hyperspace::hyperspace::executor::dialect::filestore::{FileStore, FileStoreErr, FILE_STORE_ROOT};
+use crate::starlane_hyperspace::hyperspace::host::{ExeStub, Host, HostCli};
+use crate::starlane_hyperspace::hyperspace::host::err::HostErr;
 use crate::starlane_hyperspace::hyperspace::machine::MachineErr;
 
 pub type FileStoreService = Service<FileStore>;
@@ -292,12 +292,12 @@ pub fn service_conf() -> ServiceConf{
 
 #[cfg(test)]
 pub mod tests {
-    use crate::host::{ExeStub, Host};
+    use crate::starlane_hyperspace::hyperspace::host::{ExeStub, Host};
 
-    use crate::executor::cli::HostEnv;
-    use crate::executor::dialect::filestore::{FileStore, FileStoreIn, FileStoreOut};
-    use crate::host::HostCli;
-    use crate::executor::{ExeConf, Executor};
+    use crate::starlane_hyperspace::hyperspace::executor::cli::HostEnv;
+    use crate::starlane_hyperspace::hyperspace::executor::dialect::filestore::{FileStore, FileStoreIn, FileStoreOut};
+    use crate::starlane_hyperspace::hyperspace::host::HostCli;
+    use crate::starlane_hyperspace::hyperspace::executor::{ExeConf, Executor};
     use std::path::{absolute, PathBuf};
     use std::{env, io};
     use tokio::fs;

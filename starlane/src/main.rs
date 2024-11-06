@@ -12,8 +12,7 @@ pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
 
 pub mod starlane_hyperspace;
-pub mod env;
-pub mod err;
+
 pub mod properties;
 pub mod template;
 
@@ -21,7 +20,6 @@ pub mod platform;
 
 pub mod foundation;
 
-pub mod shutdown;
 
 #[cfg(test)]
 pub mod test;
@@ -32,19 +30,13 @@ pub mod trace;
 
 //#[cfg(feature="space")]
 //pub extern crate starlane_space as starlane;
-#[cfg(feature = "space")]
+
+pub extern crate starlane_space as starlane;
 pub mod space {}
 
 #[cfg(feature = "service")]
 pub mod service;
 
-
-#[cfg(feature = "hyperlane")]
-pub mod hyperlane;
-pub mod registry;
-
-pub mod executor;
-pub mod host;
 
 #[cfg(feature = "cli")]
 pub mod cli;
@@ -58,7 +50,7 @@ pub use server::*;
 
 
 use crate::cli::{Cli, Commands, ContextCmd};
-use crate::env::{
+use crate::starlane_hyperspace::hyperspace::env::{
     config_exists, context, context_dir, ensure_global_settings, save_global_settings, set_context,
     STARLANE_HOME,
 };
@@ -66,7 +58,7 @@ use crate::foundation::Foundation;
 use crate::foundation::StandAloneFoundation;
 use crate::install::{Console, StarlaneTheme};
 use crate::platform::Platform;
-use crate::shutdown::shutdown;
+use self::starlane_hyperspace::hyperspace::shutdown::shutdown;
 use anyhow::{anyhow, ensure};
 use clap::Parser;
 use cliclack::log::{error, success};
@@ -97,7 +89,7 @@ use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::FileOptions;
-
+use crate::starlane_hyperspace::hyperspace::env;
 /*
 let config = Default::default();
 

@@ -1,10 +1,10 @@
-use crate::env::{
+use crate::starlane_hyperspace::hyperspace::env::{
     config, config_path, config_save, context, context_dir, GlobalMode, STARLANE_GLOBAL_SETTINGS,
     STARLANE_HOME,
 };
 use crate::foundation::{Foundation, StandAloneFoundation};
-use crate::registry::postgres::embed::PgEmbedSettings;
-use crate::shutdown::shutdown;
+use crate::starlane_hyperspace::hyperspace::registry::postgres::embed::PgEmbedSettings;
+use crate::starlane_hyperspace::hyperspace::shutdown::shutdown;
 use crate::{
     env, Database, PgRegistryConfig, StarlaneConfig, COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION,
 };
@@ -20,7 +20,7 @@ use crossterm::style::Color;
 use lerp::Lerp;
 use nom::combinator::all_consuming;
 use serde::Serialize;
-use starlane::env::{Enviro, StdEnviro};
+use crate::starlane_hyperspace::hyperspace::env::{Enviro, StdEnviro};
 use starlane_space::space::parse::util::{new_span, result};
 use starlane_space::space::parse::{path, var_case, VarCase};
 use starlane_space::space::particle::Status;

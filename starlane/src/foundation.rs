@@ -1,6 +1,6 @@
-use crate::registry::err::RegErr;
-use crate::registry::postgres::embed::{PgEmbedSettings, Postgres};
-use crate::registry::postgres::PostgresConnectInfo;
+use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;
+use crate::starlane_hyperspace::hyperspace::registry::postgres::embed::{PgEmbedSettings, Postgres};
+use crate::starlane_hyperspace::hyperspace::registry::postgres::PostgresConnectInfo;
 use crate::{Database, LiveDatabase, StarlaneConfig};
 use std::sync::Arc;
 use tokio::fs;

@@ -5,8 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::starlane_hyperspace::hyperspace::driver::DriverErr;
-use crate::err::{err, HypErr, HyperErr2};
-use crate::hyperlane::{
+use crate::starlane_hyperspace::hyperspace::hyperlane::{
     HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,
     HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
     SimpleGreeter,
@@ -44,6 +43,7 @@ use thiserror::Error;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use starlane_primitive_macros::{push_loc, push_mark};
+use crate::starlane_hyperspace::hyperspace::err2::{err, HyperErr2};
 
 #[derive(Clone)]
 pub struct MachineApi {

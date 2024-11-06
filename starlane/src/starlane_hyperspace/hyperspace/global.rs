@@ -1,7 +1,7 @@
 use crate::platform::Platform;
 use crate::starlane_hyperspace::hyperspace::reg::Registration;
 use crate::starlane_hyperspace::hyperspace::star::{HyperStarSkel, SmartLocator, StarErr};
-use crate::registry::err::RegErr;
+use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;
 use once_cell::sync::Lazy;
 use starlane::space::artifact::ArtRef;
 use starlane::space::command::direct::create::{Create, PointSegTemplate};

@@ -1,5 +1,5 @@
 use crate::starlane_hyperspace::hyperspace::driver::DriversBuilder;
-use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
+use crate::starlane_hyperspace::hyperspace::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
 use crate::starlane_hyperspace::hyperspace::machine::{Machine, MachineApi, MachineTemplate};
 use crate::starlane_hyperspace::hyperspace::reg::Registry;
 use starlane::space::artifact::asynch::Artifacts;
@@ -17,7 +17,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use starlane::space::log::Logger;
 use starlane_primitive_macros::logger;
-use crate::env::config_path;
+use crate::starlane_hyperspace::hyperspace::env::config_path;
 use crate::foundation::Foundation;
 use crate::PgRegistryConfig;
 

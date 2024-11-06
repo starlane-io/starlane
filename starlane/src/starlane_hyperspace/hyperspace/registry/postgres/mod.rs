@@ -1,7 +1,7 @@
 pub mod embed;
 
 use crate::platform::Platform;
-use crate::registry::err::RegErr;
+use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
@@ -44,7 +44,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use starlane_primitive_macros::push_loc;
 use crate::Database;
-use crate::env::STARLANE_CONFIG;
+use crate::starlane_hyperspace::hyperspace::env::STARLANE_CONFIG;
 use crate::starlane_hyperspace::hyperspace::reg::{Registration, RegistryApi};
 
 pub trait PostgresPlatform: Send + Sync {
@@ -1480,13 +1480,13 @@ pub mod test {
     use std::sync::Arc;
 
     use crate::starlane_hyperspace::hyperspace::driver::DriversBuilder;
-    use crate::err::{HypErr, OldStarErr};
-    use crate::hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
+    use crate::err2::{HypErr, OldStarErr};
+    use crate::starlane_hyperspace::hyperspace::hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
     use crate::starlane_hyperspace::hyperspace::err::HyperErr;
     use crate::starlane_hyperspace::hyperspace::machine::MachineTemplate;
     use crate::starlane_hyperspace::hyperspace::reg::{Registration, Registry};
-    use crate::registry::err::RegErr;
-    use crate::registry::postgres::{
+    use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;
+    use crate::starlane_hyperspace::hyperspace::registry::postgres::{
         PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
     };

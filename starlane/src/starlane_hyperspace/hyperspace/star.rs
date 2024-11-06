@@ -13,7 +13,7 @@ use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use crate::starlane_hyperspace::hyperspace::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::starlane_hyperspace::hyperspace::driver::{DriverErr, DriverStatus, DriversApi, DriversBuilder, DriversCall};
-use crate::hyperlane::{
+use crate::starlane_hyperspace::hyperspace::hyperlane::{
     Bridge, HyperwayEndpoint, HyperwayEndpointFactory,
     HyperwayInterchange, HyperwayStub,
 };
@@ -55,7 +55,7 @@ use starlane::space::wave::{Agent, DirectedProto, Handling, HandlingKind, PongCo
 use starlane::space::wave::core::ReflectedCore;
 use starlane::space::wave::Wave;
 use starlane_primitive_macros::{log_span, push_loc, push_mark};
-use crate::registry::err::RegErr;
+use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;
 use crate::service::ServiceTemplate;
 use crate::template::Templates;
 

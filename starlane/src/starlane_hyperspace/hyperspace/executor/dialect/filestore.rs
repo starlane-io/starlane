@@ -1,6 +1,6 @@
-use crate::executor::cli::os::CliOsExecutor;
-use crate::executor::cli::{CliErr, CliExecutor, CliIn, CliOut};
-use crate::executor::Executor;
+use crate::starlane_hyperspace::hyperspace::executor::cli::os::CliOsExecutor;
+use crate::starlane_hyperspace::hyperspace::executor::cli::{CliErr, CliExecutor, CliIn, CliOut};
+use crate::starlane_hyperspace::hyperspace::executor::Executor;
 use clap::{Parser, Subcommand};
 use itertools::Itertools;
 use path_clean::PathClean;
@@ -14,7 +14,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use strum_macros::EnumString;
 use thiserror::Error;
-use crate::host::err::HostErr;
+use crate::starlane_hyperspace::hyperspace::host::err::HostErr;
 /*
 impl <E> From<Box<E>> for FileStore
 where E: Executor<In=CliIn,Out=CliOut> {

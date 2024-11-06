@@ -1,6 +1,6 @@
 use crate::starlane_hyperspace::hyperspace::driver::control::{ControlCliSession, ControlClient};
-use crate::hyperlane::tcp::HyperlaneTcpClient;
-use crate::hyperlane::HyperwayEndpointFactory;
+use crate::starlane_hyperspace::hyperspace::hyperlane::tcp::HyperlaneTcpClient;
+use crate::starlane_hyperspace::hyperspace::hyperlane::HyperwayEndpointFactory;
 use clap::clap_derive::{Args, Subcommand};
 use clap::Parser;
 use starlane_space::space::parse::util::new_span;
@@ -22,7 +22,7 @@ use walkdir::{DirEntry, WalkDir};
 use zip::write::FileOptions;
 use starlane::space::parse::util::result;
 use starlane_primitive_macros::logger;
-use crate::env::STARLANE_HOME;
+use crate::starlane_hyperspace::hyperspace::env::STARLANE_HOME;
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]

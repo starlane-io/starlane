@@ -1,5 +1,4 @@
-use crate::err::HypErr;
-use crate::shutdown::{panic_shutdown, shutdown};
+use crate::starlane_hyperspace::hyperspace::shutdown::{panic_shutdown, shutdown};
 use crate::StarlaneConfig;
 use anyhow::anyhow;
 use ascii::AsciiChar::G;
@@ -12,6 +11,7 @@ use std::string::ToString;
 use std::{fs, process};
 use tempdir::TempDir;
 use uuid::Uuid;
+use crate::starlane_hyperspace::hyperspace::err2::HypErr;
 
 pub fn context() -> String {
     fs::read_to_string(format!("{}/.context", STARLANE_HOME.as_str()).to_string())

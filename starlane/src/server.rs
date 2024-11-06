@@ -1,5 +1,5 @@
 #[cfg(feature = "postgres")]
-use crate::registry::postgres::{
+use crate::starlane_hyperspace::hyperspace::registry::postgres::{
     PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
@@ -18,18 +18,17 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
-use crate::err::HypErr;
+use crate::starlane_hyperspace::hyperspace::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
 use crate::foundation::{Foundation, StandAloneFoundation};
-use crate::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
-use crate::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
+use crate::starlane_hyperspace::hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
+use crate::starlane_hyperspace::hyperspace::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
 use crate::starlane_hyperspace::hyperspace::machine::MachineTemplate;
 use crate::starlane_hyperspace::hyperspace::reg::{Registry, RegistryWrapper};
 use crate::platform::{Platform, PlatformConfig};
-use crate::registry::err::RegErr;
-use crate::registry::postgres::embed::PgEmbedSettings;
-use crate::registry::postgres::PostgresDbKey;
-use crate::shutdown::panic_shutdown;
+use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;
+use crate::starlane_hyperspace::hyperspace::registry::postgres::embed::PgEmbedSettings;
+use crate::starlane_hyperspace::hyperspace::registry::postgres::PostgresDbKey;
+use crate::starlane_hyperspace::hyperspace::shutdown::panic_shutdown;
 use anyhow::anyhow;
 use port_check::is_local_ipv4_port_free;
 use serde::{Deserialize, Serialize};
@@ -37,6 +36,7 @@ use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
 use starlane_primitive_macros::{logger, push_loc};
+use crate::starlane_hyperspace::hyperspace::err2::HypErr;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {

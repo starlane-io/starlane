@@ -1,9 +1,9 @@
 pub mod cli;
 pub mod dialect;
 
-use crate::executor::cli::os::CliOsExecutor;
-use crate::host::err::HostErr;
-use crate::host::Host;
+use crate::starlane_hyperspace::hyperspace::executor::cli::os::CliOsExecutor;
+use crate::starlane_hyperspace::hyperspace::host::err::HostErr;
+use crate::starlane_hyperspace::hyperspace::host::Host;
 use crate::service::ServiceErr;
 
 #[async_trait]

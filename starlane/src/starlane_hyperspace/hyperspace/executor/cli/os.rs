@@ -4,9 +4,9 @@ use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use std::process::Stdio;
 use std::ops::{Deref, DerefMut};
 use tokio::io::AsyncWriteExt;
-use crate::executor::cli::{CliErr, CliIn, CliOut, HostEnv};
-use crate::executor::{ExeConf, Executor};
-use crate::host::{ ExeStub, Host, HostCli, Proc};
+use crate::starlane_hyperspace::hyperspace::executor::cli::{CliErr, CliIn, CliOut, HostEnv};
+use crate::starlane_hyperspace::hyperspace::executor::{ExeConf, Executor};
+use crate::starlane_hyperspace::hyperspace::host::{ExeStub, Host, HostCli, Proc};
 
 #[derive(Clone)]
 pub struct CliOsExecutor

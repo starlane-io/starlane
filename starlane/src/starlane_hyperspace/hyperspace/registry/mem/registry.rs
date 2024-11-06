@@ -15,7 +15,7 @@ use starlane::space::substance::SubstanceList;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU64;
 use std::sync::{atomic, Arc};
-use crate::registry::err::RegErr;
+use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;
 
 impl MemoryRegistryCtx {
     pub fn new() -> Self {

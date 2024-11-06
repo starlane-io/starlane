@@ -2,7 +2,7 @@ use crate::starlane_hyperspace::hyperspace::driver::{
     Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory,
     HyperSkel, Particle, ParticleErr, ParticleRouter, ParticleSphere, ParticleSphereInner,
 };
-use crate::hyperlane::{
+use crate::starlane_hyperspace::hyperspace::hyperlane::{
     AnonHyperAuthenticatorAssignEndPoint, FromTransform, HopTransform, HyperClient, HyperGreeter,
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
     InterchangeGate, TransportTransform,

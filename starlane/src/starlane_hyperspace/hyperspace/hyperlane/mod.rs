@@ -1936,7 +1936,7 @@ impl Bridge {
 
 #[cfg(test)]
 mod tests {
-    use crate::hyperlane::HyperRouter;
+    use crate::starlane_hyperspace::hyperspace::hyperlane::HyperRouter;
     use starlane::space::wave::HyperWave;
 
     /*
@@ -2005,7 +2005,7 @@ pub mod test_util {
     use once_cell::sync::Lazy;
     use tokio::sync::oneshot;
 
-    use crate::hyperlane::{
+    use crate::starlane_hyperspace::hyperspace::hyperlane::{
         AnonHyperAuthenticator, HyperClient, HyperGate, HyperGateSelector, HyperGreeter, Hyperway,
         HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
         MountInterchangeGate,
@@ -2332,8 +2332,8 @@ pub mod test {
         , Wave, WaveVariantDef,
     };
     use starlane_primitive_macros::{create_mark, logger, push_mark};
-    use crate::hyperlane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest};
-    use crate::hyperlane::{
+    use crate::starlane_hyperspace::hyperspace::hyperlane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest};
+    use crate::starlane_hyperspace::hyperspace::hyperlane::{
         AnonHyperAuthenticator, Bridge, HyperClient, HyperConnectionDetails, HyperGate,
         HyperGateSelector, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint,
         HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,

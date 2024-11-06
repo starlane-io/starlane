@@ -1,6 +1,6 @@
-use crate::executor::cli::os::CliOsExecutor;
-use crate::executor::cli::{CliIn, CliOut, HostEnv};
-use crate::executor::{ExeConf, Executor};
+use crate::starlane_hyperspace::hyperspace::executor::cli::os::CliOsExecutor;
+use crate::starlane_hyperspace::hyperspace::executor::cli::{CliIn, CliOut, HostEnv};
+use crate::starlane_hyperspace::hyperspace::executor::{ExeConf, Executor};
 use clap::CommandFactory;
 use itertools::Itertools;
 use nom::AsBytes;
@@ -10,7 +10,7 @@ use std::hash::{Hash, Hasher};
 use std::io::Read;
 use std::ops::{Deref, DerefMut};
 use tokio::io::AsyncWriteExt;
-use crate::host::err::HostErr;
+use crate::starlane_hyperspace::hyperspace::host::err::HostErr;
 use crate::service::ServiceErr;
 
 pub mod err;
