@@ -16,7 +16,6 @@ use crate::env::{StarlaneWriteLogs, STARLANE_LOG_DIR, STARLANE_WRITE_LOGS};
 
 pub mod err;
 pub mod global;
-pub mod layer;
 pub mod machine;
 pub mod reg;
 pub mod star;

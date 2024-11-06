@@ -18,8 +18,8 @@ use crate::hyperlane::{
     HyperwayInterchange, HyperwayStub,
 };
 use crate::hyperspace::global::{GlobalCommandExecutionHandler,  GlobalExecutionChamber};
-use crate::hyperspace::layer::field::Field;
-use crate::hyperspace::layer::shell::{Shell, ShellState};
+use crate::starlane_hyperspace::hyperspace::layer::field::Field;
+use crate::starlane_hyperspace::hyperspace::layer::shell::{Shell, ShellState};
 use crate::hyperspace::machine::{MachineApi, MachineErr, MachineSkel};
 use crate::platform::Platform;
 use crate::hyperspace::reg::{Registration, Registry};

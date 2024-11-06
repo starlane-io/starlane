@@ -4558,7 +4558,6 @@ dependencies = [
  "serde_urlencoded",
  "serde_yaml",
  "sqlx",
- "starlane-hyperspace",
  "starlane-macros",
  "starlane-primitive-macros",
  "starlane-space",

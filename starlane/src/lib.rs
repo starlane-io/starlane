@@ -39,6 +39,8 @@ pub mod hyperspace;
 #[cfg(feature = "hyperlane")]
 pub mod hyperlane;
 
+pub mod starlane_hyperspace;
+
 //pub mod space;
 
 pub mod registry;
