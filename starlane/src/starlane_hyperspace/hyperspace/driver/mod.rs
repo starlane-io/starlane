@@ -19,7 +19,7 @@ use crate::starlane_hyperspace::hyperspace::reg::{Registration, Registry};
 use crate::starlane_hyperspace::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
 use crate::starlane_hyperspace::hyperspace::platform::Platform;
 use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;
-use crate::service::{
+use crate::starlane_hyperspace::hyperspace::service::{
     Service, ServiceErr, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate,
 };
 use anyhow::__private::kind::TraitKind;

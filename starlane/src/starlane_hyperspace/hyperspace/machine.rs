@@ -15,10 +15,10 @@ use crate::starlane_hyperspace::hyperspace::star::{
     HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
 };
 use crate::starlane_hyperspace::hyperspace::platform::Platform;
-use crate::service::{
+use crate::starlane_hyperspace::hyperspace::service::{
     service_conf, Service,  ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate,
 };
-use crate::template::Templates;
+use crate::starlane_hyperspace::hyperspace::template::Templates;
 use dashmap::DashMap;
 use futures::future::{join_all, select_all, BoxFuture};
 use futures::{FutureExt, TryFutureExt};

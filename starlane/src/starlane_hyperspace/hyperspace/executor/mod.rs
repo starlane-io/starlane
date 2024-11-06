@@ -4,7 +4,7 @@ pub mod dialect;
 use crate::starlane_hyperspace::hyperspace::executor::cli::os::CliOsExecutor;
 use crate::starlane_hyperspace::hyperspace::host::err::HostErr;
 use crate::starlane_hyperspace::hyperspace::host::Host;
-use crate::service::ServiceErr;
+use crate::starlane_hyperspace::hyperspace::service::ServiceErr;
 
 #[async_trait]
 pub trait Executor where Self::Err: std::error::Error + 'static

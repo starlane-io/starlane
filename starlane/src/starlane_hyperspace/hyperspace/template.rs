@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use itertools::Itertools;
 use starlane::space::selector::KindSelector;
-use crate::service::{ServiceSelector, ServiceTemplate};
+use crate::starlane_hyperspace::hyperspace::service::{ServiceSelector, ServiceTemplate};
 
 #[derive(Clone)]
 pub struct Templates<T>

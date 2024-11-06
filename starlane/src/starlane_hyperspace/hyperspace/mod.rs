@@ -36,6 +36,9 @@ pub mod shutdown;
 pub mod foundation;
 pub mod platform;
 pub mod properties;
+#[cfg(feature = "service")]
+pub mod service;
+pub mod template;
 
 #[no_mangle]
 pub extern "C" fn starlane_uuid() -> String {

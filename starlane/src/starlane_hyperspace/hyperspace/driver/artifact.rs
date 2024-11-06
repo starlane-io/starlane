@@ -2,7 +2,7 @@ use crate::starlane_hyperspace::hyperspace::driver::{Driver, DriverCtx, DriverEr
 use crate::starlane_hyperspace::hyperspace::executor::dialect::filestore::FileStoreIn;
 use crate::starlane_hyperspace::hyperspace::star::HyperStarSkel;
 use crate::starlane_hyperspace::hyperspace::platform::Platform;
-use crate::service::{FileStoreService, Service, ServiceKind, ServiceRunner, ServiceSelector};
+use crate::starlane_hyperspace::hyperspace::service::{FileStoreService, Service, ServiceKind, ServiceRunner, ServiceSelector};
 use once_cell::sync::Lazy;
 use starlane::space::artifact::ArtRef;
 use starlane::space::command::common::{SetProperties, StateSrc};

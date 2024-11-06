@@ -304,7 +304,7 @@ pub mod tests {
     use starlane::space::kind::{BaseKind, Kind};
     use starlane::space::selector::KindSelector;
     use starlane::space::util::OptSelector;
-    use crate::service::{service_conf, Service, ServiceConf, ServiceErr, ServiceKind, ServiceTemplate};
+    use crate::starlane_hyperspace::hyperspace::service::{service_conf, Service, ServiceConf, ServiceErr, ServiceKind, ServiceTemplate};
 
     fn filestore() -> FileStore {
         if std::fs::exists("./tmp").unwrap() {

@@ -11,7 +11,7 @@ use std::io::Read;
 use std::ops::{Deref, DerefMut};
 use tokio::io::AsyncWriteExt;
 use crate::starlane_hyperspace::hyperspace::host::err::HostErr;
-use crate::service::ServiceErr;
+use crate::starlane_hyperspace::hyperspace::service::ServiceErr;
 
 pub mod err;
 

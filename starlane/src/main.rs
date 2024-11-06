@@ -13,24 +13,16 @@ pub static VERSION: Lazy<semver::Version> =
 
 pub mod starlane_hyperspace;
 
-pub mod template;
-
 
 #[cfg(test)]
 pub mod test;
 
 pub mod install;
-
-pub mod trace;
-
 //#[cfg(feature="space")]
 //pub extern crate starlane_space as starlane;
 
 pub extern crate starlane_space as starlane;
 pub mod space {}
-
-#[cfg(feature = "service")]
-pub mod service;
 
 
 #[cfg(feature = "cli")]
