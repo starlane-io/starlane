@@ -578,15 +578,19 @@ impl From<&str> for Error {
 mod tests {
     use starlane_space::loc::ToSurface;
     use std::str::FromStr;
+    use std::sync::Arc;
     use anyhow::anyhow;
+    use chrono::{DateTime, Utc};
     use crate::hyperlane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
     use crate::hyperlane::test_util::{
         LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
     };
     use starlane_space::point::Point;
     use starlane_primitive_macros::{logger, push_loc};
-    /*
-        #[no_mangle]
+    use starlane_space::err::SpaceErr;
+    use starlane_space::log::{LogAppender, StdOutAppender};
+
+    #[no_mangle]
         pub extern "C" fn starlane_uuid() -> String {
             uuid::Uuid::new_v4().to_string()
         }
@@ -595,7 +599,15 @@ mod tests {
         pub extern "C" fn starlane_timestamp() -> DateTime<Utc> {
             Utc::now()
         }
-         */
+
+    #[no_mangle]
+    extern "C" fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>,SpaceErr> {
+
+            Ok(Arc::new(StdOutAppender()))
+
+    }
+
+
 
     //#[tokio::test]
     async fn test_tcp() -> Result<(), Error> {

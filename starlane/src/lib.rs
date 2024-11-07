@@ -14,7 +14,19 @@ use std::str::FromStr;
 use once_cell::sync::Lazy;
 
 pub mod space {
-    pub use starlane_space::space::*;
+    use chrono::Utc;
+    use starlane::wasm::Timestamp;
+    pub use starlane_space::*;
+
+    #[no_mangle]
+    extern "C" fn starlane_uuid() -> loc::Uuid {
+        loc::Uuid::from(uuid::Uuid::new_v4().to_string()).unwrap()
+    }
+
+    #[no_mangle]
+    extern "C" fn starlane_timestamp() -> Timestamp {
+        Timestamp::new(Utc::now().timestamp_millis())
+    }
 }
 
 
