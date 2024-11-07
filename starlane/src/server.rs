@@ -1,14 +1,14 @@
 #[cfg(feature = "postgres")]
-use crate::starlane_hyperspace::hyperspace::registry::postgres::{
+use crate::starlane_hyperspace::registry::postgres::{
     PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
 
-use crate::starlane_hyperspace::hyperspace::driver::base::BaseDriverFactory;
-use crate::starlane_hyperspace::hyperspace::driver::control::ControlDriverFactory;
-use crate::starlane_hyperspace::hyperspace::driver::root::RootDriverFactory;
-use crate::starlane_hyperspace::hyperspace::driver::space::SpaceDriverFactory;
-use crate::starlane_hyperspace::hyperspace::driver::{DriverAvail, DriversBuilder};
+use crate::starlane_hyperspace::driver::base::BaseDriverFactory;
+use crate::starlane_hyperspace::driver::control::ControlDriverFactory;
+use crate::starlane_hyperspace::driver::root::RootDriverFactory;
+use crate::starlane_hyperspace::driver::space::SpaceDriverFactory;
+use crate::starlane_hyperspace::driver::{DriverAvail, DriversBuilder};
 use starlane::space::artifact::asynch::Artifacts;
 use starlane::space::kind::StarSub;
 use starlane::space::loc::{MachineName, StarKey};
@@ -18,17 +18,16 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::starlane_hyperspace::hyperspace::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
-use crate::starlane_hyperspace::hyperspace::foundation::{Foundation, StandAloneFoundation};
-use crate::starlane_hyperspace::hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
-use crate::starlane_hyperspace::hyperspace::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
-use crate::starlane_hyperspace::hyperspace::machine::MachineTemplate;
-use crate::starlane_hyperspace::hyperspace::reg::{Registry, RegistryWrapper};
-use crate::starlane_hyperspace::hyperspace::platform::{Platform, PlatformConfig};
-use crate::starlane_hyperspace::hyperspace::registry::err::RegErr;
-use crate::starlane_hyperspace::hyperspace::registry::postgres::embed::PgEmbedSettings;
-use crate::starlane_hyperspace::hyperspace::registry::postgres::PostgresDbKey;
-use crate::starlane_hyperspace::hyperspace::shutdown::panic_shutdown;
+use crate::starlane_hyperspace::foundation::{Foundation, StandAloneFoundation};
+use crate::starlane_hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
+use crate::starlane_hyperspace::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
+use crate::starlane_hyperspace::machine::MachineTemplate;
+use crate::starlane_hyperspace::reg::{PgRegistryConfig, Registry, RegistryWrapper};
+use crate::starlane_hyperspace::platform::{Platform, PlatformConfig};
+use crate::starlane_hyperspace::registry::err::RegErr;
+use crate::starlane_hyperspace::registry::postgres::embed::PgEmbedSettings;
+use crate::starlane_hyperspace::registry::postgres::PostgresDbKey;
+use crate::starlane_hyperspace::shutdown::panic_shutdown;
 use anyhow::anyhow;
 use port_check::is_local_ipv4_port_free;
 use serde::{Deserialize, Serialize};
@@ -36,7 +35,13 @@ use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
 use starlane_primitive_macros::{logger, push_loc};
-use crate::starlane_hyperspace::hyperspace::err::HypErr;
+use crate::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
+use crate::starlane_hyperspace::database::{Database, LiveDatabase};
+use crate::starlane_hyperspace::err::HypErr;
+
+
+
+
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
@@ -59,6 +64,10 @@ impl PlatformConfig for StarlaneConfig {
 
     fn registry(&self) -> &PgRegistryConfig {
         &self.registry
+    }
+
+    fn home(&self) -> &String {
+        &self.home
     }
 }
 
@@ -83,84 +92,6 @@ pub struct Starlane {
     foundation: StandAloneFoundation,
 }
 
-pub enum RegistryConfig {
-    #[cfg(feature = "postgres")]
-    Postgres(PgRegistryConfig),
-}
-#[cfg(feature = "postgres")]
-#[derive(Clone, Serialize, Deserialize)]
-pub enum PgRegistryConfig {
-    #[cfg(feature = "postgres-embedded")]
-    Embedded(Database<PgEmbedSettings>),
-    External(Database<PostgresConnectInfo>),
-}
-
-impl PgRegistryConfig {
-    pub fn database(&self) -> String {
-        match self {
-            PgRegistryConfig::Embedded(d) => d.database.clone(),
-            PgRegistryConfig::External(d) => d.database.clone(),
-        }
-    }
-}
-
-impl Into<Database<PostgresConnectInfo>> for PgRegistryConfig {
-    fn into(self) -> Database<PostgresConnectInfo> {
-        match self {
-            PgRegistryConfig::Embedded(p) => p.into(),
-            PgRegistryConfig::External(p) => p,
-        }
-    }
-}
-
-impl TryInto<Database<PgEmbedSettings>> for PgRegistryConfig {
-    type Error = RegErr;
-
-    fn try_into(self) -> Result<Database<PgEmbedSettings>, Self::Error> {
-        match self {
-            PgRegistryConfig::Embedded(registry) => Ok(registry),
-            _ => Err(RegErr::Msg(
-                "cannot get PgEmbedSettings from None Embedded Registry config".to_string(),
-            )),
-        }
-    }
-}
-
-#[cfg(feature = "postgres")]
-impl Default for PgRegistryConfig {
-    fn default() -> Self {
-        let database = Database::new(
-            "starlane".to_string(),
-            "public".to_string(),
-            PgEmbedSettings::default(),
-        );
-        Self::Embedded(database)
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct Database<S> {
-    pub database: String,
-    pub schema: String,
-    pub settings: S,
-}
-
-impl<Info> Database<Info> {
-    pub fn new<D, S>(database: D, schema: S, settings: Info) -> Database<Info>
-    where
-        D: ToString,
-        S: ToString,
-    {
-        let database = database.to_string();
-        let schema = schema.to_string();
-        Database {
-            database,
-            settings,
-            schema,
-        }
-    }
-}
-
 /*
 impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
     fn into(self) -> Database<PostgresConnectInfo> {
@@ -177,90 +108,6 @@ impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
 }
 
  */
-
-pub struct LiveDatabase {
-    pub database: Database<PostgresConnectInfo>,
-    pub(crate) handle: tokio::sync::mpsc::Sender<()>,
-}
-
-impl LiveDatabase {
-    pub fn new(
-        database: Database<PostgresConnectInfo>,
-        handle: tokio::sync::mpsc::Sender<()>,
-    ) -> Self {
-        Self { database, handle }
-    }
-}
-
-impl Database<PostgresConnectInfo> {
-    pub fn from_con<D, S>(
-        database: D,
-        schema: S,
-        info: PostgresConnectInfo,
-    ) -> Database<PostgresConnectInfo>
-    where
-        D: ToString,
-        S: ToString,
-    {
-        Database::new(database, schema, info)
-    }
-
-    pub fn to_key(&self) -> PostgresDbKey {
-        PostgresDbKey {
-            url: self.url.clone(),
-            user: self.user.clone(),
-            database: self.database.clone(),
-        }
-    }
-
-    pub fn to_uri(&self) -> String {
-        /*
-        format!(
-            "postgres://{}:{}@{}/{}",
-            self.user, self.password, self.url, self.database
-        )
-
-         */
-        self.url.clone()
-    }
-}
-
-impl Database<PgEmbedSettings> {
-    pub fn from_embed<D, S>(
-        database: D,
-        schema: S,
-        settings: PgEmbedSettings,
-    ) -> Database<PgEmbedSettings>
-    where
-        D: ToString,
-        S: ToString,
-    {
-        Self::new(database, schema, settings)
-    }
-
-    pub fn to_key(&self) -> PostgresDbKey {
-        PostgresDbKey {
-            url: "localhost".to_string(),
-            user: self.settings.username.clone(),
-            database: self.database.clone(),
-        }
-    }
-
-    pub fn to_uri(&self) -> String {
-        format!(
-            "postgres://{}:{}@localhost/{}",
-            self.username, self.password, self.database
-        )
-    }
-}
-
-impl<S> Deref for Database<S> {
-    type Target = S;
-
-    fn deref(&self) -> &Self::Target {
-        &self.settings
-    }
-}
 
 #[cfg(feature = "postgres")]
 impl Starlane {

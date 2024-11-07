@@ -17,6 +17,12 @@ pub mod space {
     pub use starlane_space::space::*;
 }
 
+pub mod starlane_hyperspace;
+
+pub mod env;
+
+pub mod server;
+
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap() );
 

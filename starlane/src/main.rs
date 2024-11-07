@@ -29,23 +29,17 @@ pub mod space {}
 pub mod cli;
 
 #[cfg(feature = "server")]
-mod server;
-
-#[cfg(feature = "server")]
-pub use server::*;
+pub mod server;
+pub mod env;
 
 
 
 use crate::cli::{Cli, Commands, ContextCmd};
-use crate::starlane_hyperspace::hyperspace::env::{
-    config_exists, context, context_dir, ensure_global_settings, save_global_settings, set_context,
-    STARLANE_HOME,
-};
-use self::starlane_hyperspace::hyperspace::foundation::Foundation;
-use self::starlane_hyperspace::hyperspace::foundation::StandAloneFoundation;
+use self::starlane_hyperspace::foundation::Foundation;
+use self::starlane_hyperspace::foundation::StandAloneFoundation;
 use crate::install::{Console, StarlaneTheme};
-use self::starlane_hyperspace::hyperspace::platform::Platform;
-use self::starlane_hyperspace::hyperspace::shutdown::shutdown;
+use self::starlane_hyperspace::platform::Platform;
+use self::starlane_hyperspace::shutdown::shutdown;
 use anyhow::{anyhow, ensure};
 use clap::Parser;
 use cliclack::log::{error, success};
@@ -76,7 +70,8 @@ use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::FileOptions;
-use crate::starlane_hyperspace::hyperspace::env;
+use crate::env::{config_exists, context, context_dir, ensure_global_settings, save_global_settings, set_context, STARLANE_HOME};
+use crate::server::Starlane;
 /*
 let config = Default::default();
 

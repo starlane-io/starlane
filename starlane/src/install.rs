@@ -1,13 +1,8 @@
-use crate::starlane_hyperspace::hyperspace::env::{
-    config, config_path, config_save, context, context_dir, GlobalMode, STARLANE_GLOBAL_SETTINGS,
-    STARLANE_HOME,
-};
-use crate::starlane_hyperspace::hyperspace::foundation::{Foundation, StandAloneFoundation};
-use crate::starlane_hyperspace::hyperspace::registry::postgres::embed::PgEmbedSettings;
-use crate::starlane_hyperspace::hyperspace::shutdown::shutdown;
-use crate::{
-    env, Database, PgRegistryConfig, StarlaneConfig, COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION,
-};
+use crate::env::{config, config_path, config_save, context, context_dir, Enviro, GlobalMode, StdEnviro, STARLANE_GLOBAL_SETTINGS, STARLANE_HOME};
+use crate::starlane_hyperspace::foundation::{Foundation, StandAloneFoundation};
+use crate::starlane_hyperspace::registry::postgres::embed::PgEmbedSettings;
+use crate::starlane_hyperspace::shutdown::shutdown;
+use crate::{env, COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION};
 use anyhow::anyhow;
 use cliclack::log::{error, remark};
 use cliclack::{
@@ -16,11 +11,9 @@ use cliclack::{
 };
 use colored::{Colorize, CustomColor};
 use console::style;
-use crossterm::style::Color;
 use lerp::Lerp;
 use nom::combinator::all_consuming;
 use serde::Serialize;
-use crate::starlane_hyperspace::hyperspace::env::{Enviro, StdEnviro};
 use starlane_space::space::parse::util::{new_span, result};
 use starlane_space::space::parse::{path, var_case, VarCase};
 use starlane_space::space::particle::Status;
@@ -34,7 +27,9 @@ use std::time::Duration;
 use std::{io, thread};
 use text_to_ascii_art::to_art;
 use textwrap::Options;
-use tokio::fs;
+use crate::server::StarlaneConfig;
+use crate::starlane_hyperspace::database::Database;
+use crate::starlane_hyperspace::reg::PgRegistryConfig;
 
 #[tokio::main]
 pub async fn install(edit: bool) -> Result<(), anyhow::Error> {
