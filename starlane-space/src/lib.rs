@@ -19,36 +19,35 @@ extern crate strum_macros;
 
 extern crate core;
 
-use core::str::FromStr;
 use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
 
-use space::artifact::asynch::ArtifactFetcher;
-use space::command::common::SetProperties;
-use space::command::direct::create::KindTemplate;
-use space::command::direct::delete::Delete;
-use space::command::direct::select::Select;
-use space::config::bind::BindConfig;
-use space::kind::{BaseKind, Kind, StarSub};
-use space::loc::Surface;
-use space::particle::{Details, Status, Stub};
-use space::substance::Bin;
-use space::substance::{Substance, ToSubstance};
-use space::wave::core::ReflectedCore;
+use crate::artifact::asynch::ArtifactFetcher;
+use crate::command::common::SetProperties;
+use crate::command::direct::create::KindTemplate;
+use crate::command::direct::delete::Delete;
+use crate::command::direct::select::Select;
+use crate::config::bind::BindConfig;
+use crate::kind::{BaseKind, Kind, StarSub};
+use crate::loc::Surface;
+use crate::particle::{Details, Status, Stub};
+use crate::substance::Bin;
+use crate::substance::{Substance, ToSubstance};
+use crate::wave::core::ReflectedCore;
 
-use space::err::SpaceErr;
-use space::hyper::ParticleRecord;
-use space::wave::Agent;
-
-
-pub extern crate self as starlane;
+use crate::err::SpaceErr;
+use crate::hyper::ParticleRecord;
+use crate::wave::Agent;
 
 
+pub(crate) extern crate self as starlane;
+
+pub(crate) mod space {
+    pub use crate::*;
+}
 
 
-
-pub mod space;
 
 
 /*
@@ -61,12 +60,56 @@ pub fn starlane_timestamp() -> DateTime<Utc> {
 
  */
 
+
+use core::str::FromStr;
+use once_cell::sync::Lazy;
+use crate::point::Point;
+
+pub mod artifact;
+pub mod config;
+pub mod parse;
+pub mod particle;
+pub mod wave;
+pub mod asynch;
+pub mod command;
+pub mod err;
+pub mod fail;
+pub mod frame;
+pub mod hyper;
+pub mod kind;
+
+#[cfg(feature = "kind2")]
+pub mod kind2;
+
+pub mod loc;
+pub mod log;
+pub mod path;
+pub mod point;
+pub mod security;
+pub mod selector;
+pub mod settings;
+pub mod substance;
+pub mod util;
+pub mod wasm;
+
+pub mod prelude;
+pub mod task;
+
+
+pub static VERSION: Lazy<semver::Version> =
+    Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap() );
+
+pub static HYPERUSER: Lazy<Point> =
+    Lazy::new(|| Point::from_str("hyperspace:users:hyperuser").expect("point"));
+pub static ANONYMOUS: Lazy<Point> =
+    Lazy::new(|| Point::from_str("hyperspace:users:anonymous").expect("point"));
+
 #[cfg(test)]
-pub mod tests {
-    use crate::space::VERSION;
+pub mod test {
+    use crate::VERSION;
 
     #[test]
-    fn version() {
-        println!("VERSION: {}", VERSION.to_string());
+    pub fn test_version() {
+                println!("{}", VERSION.to_string());
     }
 }
