@@ -11,7 +11,6 @@ extern crate starlane_macros;
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
 
-pub mod starlane_hyperspace;
 
 
 #[cfg(test)]

@@ -17,7 +17,6 @@ pub mod space {
     pub use starlane_space::space::*;
 }
 
-pub mod starlane_hyperspace;
 
 pub mod env;
 

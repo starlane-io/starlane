@@ -1,14 +1,48 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+
+pub mod layer;
+pub mod err;
+pub mod global;
+pub mod machine;
+pub mod reg;
+pub mod star;
+
+
+#[cfg(not(feature="postgres"))]
+pub mod tests;
+pub mod driver;
+#[cfg(feature = "hyperlane")]
+pub mod hyperlane;
+pub mod registry;
+pub mod executor;
+pub mod host;
+pub mod shutdown;
+pub mod foundation;
+pub mod platform;
+pub mod properties;
+#[cfg(feature = "service")]
+pub mod service;
+pub mod template;
+pub mod database;
+
+
+
+
+pub extern crate starlane_space as starlane;
+
+pub mod starlane_hyperspace {
+    pub use crate::*;
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
+pub mod tests {
     #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    pub fn test() {
+
     }
 }
+
+
+
+
+
+

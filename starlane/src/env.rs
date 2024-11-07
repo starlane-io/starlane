@@ -1,4 +1,4 @@
-use crate::starlane_hyperspace::shutdown::panic_shutdown;
+use crate::shutdown::panic_shutdown;
 use anyhow::anyhow;
 use atty::Stream;
 use once_cell::sync::Lazy;
@@ -16,7 +16,7 @@ use starlane::space::log::{FileAppender, LogAppender, StdOutAppender};
 use std::fs::File;
 use std::ops::Deref;
 use crate::server::StarlaneConfig;
-use crate::starlane_hyperspace::err::HypErr;
+use crate::err::HypErr;
 
 pub fn context() -> String {
     fs::read_to_string(format!("{}/.context", STARLANE_HOME.as_str()).to_string())
