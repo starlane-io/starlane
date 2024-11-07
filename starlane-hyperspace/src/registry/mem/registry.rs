@@ -1,20 +1,21 @@
 use crate::platform::Platform;
 use crate::reg::{Registration, RegistryApi};
 use dashmap::DashMap;
-use starlane::space::command::common::{PropertyMod, SetProperties};
-use starlane::space::command::direct::delete::Delete;
-use starlane::space::command::direct::query::{Query, QueryResult};
-use starlane::space::command::direct::select::{Select, SubSelect};
-use starlane::space::hyper::{ParticleLocation, ParticleRecord};
-use starlane::space::particle::{Details, Properties, Property, Status, Stub};
-use starlane::space::point::Point;
-use starlane::space::security::{Access, AccessGrant, IndexedAccessGrant};
-use starlane::space::selector::Selector;
-use starlane::space::util::ValueMatcher;
-use starlane::space::substance::SubstanceList;
+use starlane_space::command::common::{PropertyMod, SetProperties};
+use starlane_space::command::direct::delete::Delete;
+use starlane_space::command::direct::query::{Query, QueryResult};
+use starlane_space::command::direct::select::{Select, SubSelect};
+use starlane_space::hyper::{ParticleLocation, ParticleRecord};
+use starlane_space::particle::{Details, Properties, Property, Status, Stub};
+use starlane_space::point::Point;
+use starlane_space::security::{Access, AccessGrant, IndexedAccessGrant};
+use starlane_space::selector::Selector;
+use starlane_space::util::ValueMatcher;
+use starlane_space::substance::SubstanceList;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU64;
 use std::sync::{atomic, Arc};
+use async_trait::async_trait;
 use crate::registry::err::RegErr;
 
 impl MemoryRegistryCtx {

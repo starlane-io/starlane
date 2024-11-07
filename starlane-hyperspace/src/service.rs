@@ -3,9 +3,9 @@ use std::fmt::{Display, Formatter};
 use crate::executor::{ExeConf, Executor};
 use itertools::Itertools;
 use nom::AsBytes;
-use starlane::space::loc::ToBaseKind;
-use starlane::space::util::{IdSelector, MatchSelector, OptSelector, RegexMatcher, ValueMatcher};
-use starlane::space::wave::exchange::asynch::{
+use starlane_space::loc::ToBaseKind;
+use starlane_space::util::{IdSelector, MatchSelector, OptSelector, RegexMatcher, ValueMatcher};
+use starlane_space::wave::exchange::asynch::{
     DirectedHandler, Router,
 };
 use starlane_space as starlane;
@@ -18,12 +18,11 @@ use std::str::FromStr;
 use strum_macros::EnumString;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use starlane::space::err::SpaceErr;
-use starlane::space::kind::Kind;
-use starlane::space::particle::Status;
-use starlane::space::point::Point;
-use starlane::space::selector::KindSelector;
-use crate::env::STARLANE_DATA_DIR;
+use starlane_space::err::SpaceErr;
+use starlane_space::kind::Kind;
+use starlane_space::particle::Status;
+use starlane_space::point::Point;
+use starlane_space::selector::KindSelector;
 use crate::executor::cli::HostEnv;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::dialect::filestore::{FileStore, FileStoreErr, FILE_STORE_ROOT};
@@ -267,6 +266,7 @@ pub trait ServiceCore<C>
 
 pub fn service_conf() -> ServiceConf{
 
+    /*
     let mut builder = HostEnv::builder();
     builder.pwd(
         absolute(env::current_dir().unwrap())
@@ -288,6 +288,9 @@ pub fn service_conf() -> ServiceConf{
 
     ServiceConf::Exe(ExeConf::Host(Host::Cli(HostCli::Os(stub))))
 
+     */
+    todo!("service_config() needs a minor refactor before it can be used again")
+
 }
 
 #[cfg(test)]
@@ -301,9 +304,9 @@ pub mod tests {
     use std::path::{absolute, PathBuf};
     use std::{env, io};
     use tokio::fs;
-    use starlane::space::kind::{BaseKind, Kind};
-    use starlane::space::selector::KindSelector;
-    use starlane::space::util::OptSelector;
+    use starlane_space::kind::{BaseKind, Kind};
+    use starlane_space::selector::KindSelector;
+    use starlane_space::util::OptSelector;
     use crate::service::{service_conf, Service, ServiceConf, ServiceErr, ServiceKind, ServiceTemplate};
 
     fn filestore() -> FileStore {

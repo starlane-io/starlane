@@ -945,7 +945,7 @@ where
 }
 
 
-pub fn log_parse_err<I,O>(result: crate::space::parse::Res<I,O>) -> crate::space::parse::Res<I,O> where I: Span{
+pub fn log_parse_err<I,O>(result: crate::parse::Res<I,O>) -> crate::parse::Res<I,O> where I: Span{
 
     if let Result::Err(err) = &result {
         match err {

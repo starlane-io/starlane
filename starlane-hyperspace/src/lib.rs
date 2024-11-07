@@ -10,7 +10,6 @@ pub mod star;
 #[cfg(not(feature="postgres"))]
 pub mod tests;
 pub mod driver;
-#[cfg(feature = "hyperlane")]
 pub mod hyperlane;
 pub mod registry;
 pub mod executor;
@@ -27,9 +26,19 @@ pub mod database;
 
 
 
-pub extern crate starlane_space as starlane;
 
-pub mod starlane_hyperspace {
+
+
+pub mod starlane{
+  pub extern crate starlane_space as space;
+}
+
+
+mod space {
+   pub use starlane_space::*;
+}
+
+pub(crate) mod hyperspace {
     pub use crate::*;
 }
 

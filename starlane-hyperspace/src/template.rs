@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use itertools::Itertools;
-use starlane::space::selector::KindSelector;
+use starlane_space::selector::KindSelector;
 use crate::service::{ServiceSelector, ServiceTemplate};
 
 #[derive(Clone)]

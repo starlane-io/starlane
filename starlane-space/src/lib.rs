@@ -41,11 +41,9 @@ use crate::hyper::ParticleRecord;
 use crate::wave::Agent;
 
 
-pub(crate) extern crate self as starlane;
+pub(crate) extern crate self as starlane_space;
 
-pub(crate) mod space {
-    pub use crate::*;
-}
+
 
 
 

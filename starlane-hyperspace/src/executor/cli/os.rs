@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use std::process::Stdio;
 use std::ops::{Deref, DerefMut};
+use async_trait::async_trait;
 use tokio::io::AsyncWriteExt;
 use crate::executor::cli::{CliErr, CliIn, CliOut, HostEnv};
 use crate::executor::{ExeConf, Executor};

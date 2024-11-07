@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod dialect;
 
+use async_trait::async_trait;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::host::err::HostErr;
 use crate::host::Host;

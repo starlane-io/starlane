@@ -2,22 +2,22 @@ use crate::driver::DriversBuilder;
 use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 use crate::reg::Registry;
-use starlane::space::artifact::asynch::Artifacts;
-use starlane::space::command::direct::create::KindTemplate;
-use starlane::space::err::SpaceErr;
-use starlane::space::kind::{
+use starlane_space::artifact::asynch::Artifacts;
+use starlane_space::command::direct::create::KindTemplate;
+use starlane_space::err::SpaceErr;
+use starlane_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind,  Specific, StarSub, UserBaseSubKind,
     UserBaseSubKindBase,
 };
-use starlane::space::loc::{MachineName, StarKey, ToBaseKind};
-use starlane::space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
-use starlane::space::settings::Timeouts;
+use starlane_space::loc::{MachineName, StarKey, ToBaseKind};
+use starlane_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
+use starlane_space::settings::Timeouts;
 use std::str::FromStr;
 use std::sync::Arc;
 use anyhow::anyhow;
-use starlane::space::log::Logger;
+use async_trait::async_trait;
+use starlane_space::log::Logger;
 use starlane_primitive_macros::logger;
-use crate::env::config_path;
 use crate::foundation::Foundation;
 use crate::reg::PgRegistryConfig;
 
@@ -48,11 +48,15 @@ where
 
     /// exactly like `scorch` except the `context` is also deleted
     async fn nuke(&self) -> Result<(),Self::Err> {
+        /*
         if !self.config().can_nuke() {
             Err(anyhow!("in config '{}' can_nuke=false", config_path()))?;
         }
         self.scorch().await?;
         Ok(())
+
+         */
+        todo!("nuke is disabled until the packaging reorg settles down")
     }
 
 

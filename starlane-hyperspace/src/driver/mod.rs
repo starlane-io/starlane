@@ -29,46 +29,47 @@ use futures::future::select_all;
 use futures::task::Spawn;
 use futures::{FutureExt, TryFutureExt};
 use once_cell::sync::Lazy;
-use starlane::space::artifact::asynch::{ArtErr, Artifacts};
-use starlane::space::artifact::ArtRef;
-use starlane::space::command::common::StateSrc::Subst;
-use starlane::space::command::common::{SetProperties, StateSrc};
-use starlane::space::command::direct::create::{
+use starlane_space::artifact::asynch::{ArtErr, Artifacts};
+use starlane_space::artifact::ArtRef;
+use starlane_space::command::common::StateSrc::Subst;
+use starlane_space::command::common::{SetProperties, StateSrc};
+use starlane_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use starlane::space::config::bind::BindConfig;
-use starlane::space::err::{any_result, CoreReflector, SpaceErr, SpatialError};
-use starlane::space::hyper::{Assign, HyperSubstance, ParticleRecord};
-use starlane::space::kind::{BaseKind, Kind, StarSub};
-use starlane::space::loc::{Layer, Surface, ToBaseKind, ToPoint, ToSurface};
-use starlane::space::log::{Logger, Tracker};
-use starlane::space::parse::bind_config;
-use starlane::space::parse::util::{parse_errs, result};
-use starlane::space::particle::traversal::{
+use starlane_space::config::bind::BindConfig;
+use starlane_space::err::{any_result, CoreReflector, SpaceErr, SpatialError};
+use starlane_space::hyper::{Assign, HyperSubstance, ParticleRecord};
+use starlane_space::kind::{BaseKind, Kind, StarSub};
+use starlane_space::loc::{Layer, Surface, ToBaseKind, ToPoint, ToSurface};
+use starlane_space::log::{Logger, Tracker};
+use starlane_space::parse::bind_config;
+use starlane_space::parse::util::{parse_errs, result};
+use starlane_space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
-use starlane::space::particle::{Details, Status, Stub};
-use starlane::space::point::Point;
-use starlane::space::selector::KindSelector;
-use starlane::space::substance::{Substance, SubstanceErr};
-use starlane::space::util::{log, IdSelector, ValueMatcher};
-use starlane::space::wave::core::cmd::CmdMethod;
-use starlane::space::wave::core::http2::StatusCode;
-use starlane::space::wave::core::{CoreBounce, Method, ReflectedCore};
-use starlane::space::wave::exchange::asynch::{
+use starlane_space::particle::{Details, Status, Stub};
+use starlane_space::point::Point;
+use starlane_space::selector::KindSelector;
+use starlane_space::substance::{Substance, SubstanceErr};
+use starlane_space::util::{log, IdSelector, ValueMatcher};
+use starlane_space::wave::core::cmd::CmdMethod;
+use starlane_space::wave::core::http2::StatusCode;
+use starlane_space::wave::core::{CoreBounce, Method, ReflectedCore};
+use starlane_space::wave::exchange::asynch::{
     DirectedHandler, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
     Router, TraversalRouter,
 };
-use starlane::space::wave::exchange::SetStrategy;
-use starlane::space::wave::{Agent, DirectedWave, ReflectedWave, Wave};
-use starlane::space::HYPERUSER;
-use starlane_macros::DirectedHandler;
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::{Agent, DirectedWave, ReflectedWave, Wave};
+use starlane_space::HYPERUSER;
+use starlane_macros::{handler, route, DirectedHandler, ToSpaceErr};
 use starlane_primitive_macros::push_loc;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
+use async_trait::async_trait;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
@@ -1047,7 +1048,7 @@ impl ParticleOuter {}
 
 #[async_trait]
 impl TraversalLayer for ParticleOuter {
-    fn surface(&self) -> starlane::space::loc::Surface {
+    fn surface(&self) -> starlane_space::loc::Surface {
         self.surface.clone()
     }
 

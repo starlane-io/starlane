@@ -8,12 +8,12 @@ use tokio::sync::oneshot::error::RecvError;
 
 #[cfg(feature = "postgres")]
 use crate::registry::err::RegErr;
-use starlane::space::err::{CoreReflector, HyperSpatialError, SpaceErr, SpatialError};
-use starlane::space::kind::Kind;
-use starlane::space::point::Point;
-use starlane::space::substance::{Substance, SubstanceKind};
-use starlane::space::wave::core::http2::StatusCode;
-use starlane::space::wave::core::ReflectedCore;
+use starlane_space::err::{CoreReflector, HyperSpatialError, SpaceErr, SpatialError};
+use starlane_space::kind::Kind;
+use starlane_space::point::Point;
+use starlane_space::substance::{Substance, SubstanceKind};
+use starlane_space::wave::core::http2::StatusCode;
+use starlane_space::wave::core::ReflectedCore;
 
 
 pub type HyperErr2 = anyhow::Error;
@@ -112,7 +112,7 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-    use starlane::space::err::SpaceErr;
+    use starlane_space::err::SpaceErr;
 
     impl From<strum::ParseError> for OldStarErr {
         fn from(e: strum::ParseError) -> Self {

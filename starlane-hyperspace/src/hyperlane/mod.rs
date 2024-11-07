@@ -6,19 +6,19 @@ pub mod quic;
 
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
-use starlane::space::err::SpaceErr;
-use starlane::space::hyper::{Greet, InterchangeKind, Knock};
-use starlane::space::loc::{Layer, PointFactory, Surface, ToSurface};
-use starlane::space::log::{Logger, Tracker};
-use starlane::space::point::Point;
-use starlane::space::substance::{Substance, Token};
-use starlane::space::wave::core::ext::ExtMethod;
-use starlane::space::wave::exchange::asynch::{
+use starlane_space::err::SpaceErr;
+use starlane_space::hyper::{Greet, InterchangeKind, Knock};
+use starlane_space::loc::{Layer, PointFactory, Surface, ToSurface};
+use starlane_space::log::{Logger, Tracker};
+use starlane_space::point::Point;
+use starlane_space::substance::{Substance, Token};
+use starlane_space::wave::core::ext::ExtMethod;
+use starlane_space::wave::exchange::asynch::{
     Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
 };
-use starlane::space::wave::exchange::SetStrategy;
-use starlane::space::wave::{Agent, DirectedProto, HyperWave, Wave};
-use starlane::space::VERSION;
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::{Agent, DirectedProto, HyperWave, Wave};
+use starlane_space::VERSION;
 use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
 use std::process;
@@ -26,6 +26,7 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use async_trait::async_trait;
 use derive_name::Name;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use starlane_primitive_macros::{push_loc, push_mark};
@@ -1936,8 +1937,9 @@ impl Bridge {
 
 #[cfg(test)]
 mod tests {
+    use async_trait::async_trait;
     use crate::hyperlane::HyperRouter;
-    use starlane::space::wave::HyperWave;
+    use starlane_space::wave::HyperWave;
 
     /*
     #[no_mangle]
@@ -2000,7 +2002,7 @@ pub mod test_util {
     use std::str::FromStr;
     use std::sync::Arc;
     use std::time::Duration;
-
+    use async_trait::async_trait;
     use dashmap::DashMap;
     use once_cell::sync::Lazy;
     use tokio::sync::oneshot;
@@ -2010,18 +2012,18 @@ pub mod test_util {
         HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
         MountInterchangeGate,
     };
-    use starlane::space::err::SpaceErr;
-    use starlane::space::hyper::{Greet, InterchangeKind, Knock};
-    use starlane::space::loc::{Layer, Surface, ToSurface};
-    use starlane::space::log::{Logger};
-    use starlane::space::point::Point;
-    use starlane::space::settings::Timeouts;
-    use starlane::space::substance::Substance;
-    use starlane::space::wave::core::ext::ExtMethod;
-    use starlane::space::wave::exchange::asynch::{
+    use starlane_space::err::SpaceErr;
+    use starlane_space::hyper::{Greet, InterchangeKind, Knock};
+    use starlane_space::loc::{Layer, Surface, ToSurface};
+    use starlane_space::log::{Logger};
+    use starlane_space::point::Point;
+    use starlane_space::settings::Timeouts;
+    use starlane_space::substance::Substance;
+    use starlane_space::wave::core::ext::ExtMethod;
+    use starlane_space::wave::exchange::asynch::{
         Exchanger, ProtoTransmitter, Router,
     };
-    use starlane::space::wave::{
+    use starlane_space::wave::{
         DirectedProto, PongCore, ReflectedKind, ReflectedProto
         , WaveVariantDef,
     };
@@ -2309,25 +2311,25 @@ pub mod test {
     use std::str::FromStr;
     use std::sync::Arc;
     use std::time::Duration;
-
+    use async_trait::async_trait;
     use dashmap::DashMap;
     use once_cell::sync::Lazy;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
-    use starlane::space::err::SpaceErr;
-    use starlane::space::hyper::InterchangeKind;
-    use starlane::space::loc::{Layer, ToSurface};
-    use starlane::space::point::Point;
-    use starlane::space::settings::Timeouts;
-    use starlane::space::substance::Substance;
-    use starlane::space::wave::core::cmd::CmdMethod;
-    use starlane::space::wave::core::ext::ExtMethod;
-    use starlane::space::wave::core::{Method, ReflectedCore};
-    use starlane::space::wave::exchange::asynch::{
+    use starlane_space::err::SpaceErr;
+    use starlane_space::hyper::InterchangeKind;
+    use starlane_space::loc::{Layer, ToSurface};
+    use starlane_space::point::Point;
+    use starlane_space::settings::Timeouts;
+    use starlane_space::substance::Substance;
+    use starlane_space::wave::core::cmd::CmdMethod;
+    use starlane_space::wave::core::ext::ExtMethod;
+    use starlane_space::wave::core::{Method, ReflectedCore};
+    use starlane_space::wave::exchange::asynch::{
         Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
     };
-    use starlane::space::wave::exchange::SetStrategy;
-    use starlane::space::wave::{
+    use starlane_space::wave::exchange::SetStrategy;
+    use starlane_space::wave::{
         Agent, DirectedProto, HyperWave, PongCore, ReflectedKind, ReflectedProto
         , Wave, WaveVariantDef,
     };

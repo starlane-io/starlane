@@ -4,30 +4,31 @@ use crate::star::HyperStarSkel;
 use crate::platform::Platform;
 use crate::service::{FileStoreService, Service, ServiceKind, ServiceRunner, ServiceSelector};
 use once_cell::sync::Lazy;
-use starlane::space::artifact::ArtRef;
-use starlane::space::command::common::{SetProperties, StateSrc};
-use starlane::space::command::direct::create::{
+use starlane_space::artifact::ArtRef;
+use starlane_space::command::common::{SetProperties, StateSrc};
+use starlane_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use starlane::space::config::bind::BindConfig;
-use starlane::space::err::SpaceErr;
-use starlane::space::hyper::HyperSubstance;
-use starlane::space::kind::{ArtifactSubKind, BaseKind, Kind};
-use starlane::space::loc::ToBaseKind;
-use starlane::space::parse::bind_config;
-use starlane::space::particle::PointKind;
-use starlane::space::point::Point;
-use starlane::space::selector::KindSelector;
-use starlane::space::substance::Substance;
-use starlane::space::util::{log, IdSelector};
-use starlane::space::wave::exchange::asynch::InCtx;
-use starlane::space::wave::{DirectedProto, Pong, Wave};
+use starlane_space::config::bind::BindConfig;
+use starlane_space::err::SpaceErr;
+use starlane_space::hyper::HyperSubstance;
+use starlane_space::kind::{ArtifactSubKind, BaseKind, Kind};
+use starlane_space::loc::ToBaseKind;
+use starlane_space::parse::bind_config;
+use starlane_space::particle::PointKind;
+use starlane_space::point::Point;
+use starlane_space::selector::KindSelector;
+use starlane_space::substance::Substance;
+use starlane_space::util::{log, IdSelector};
+use starlane_space::wave::exchange::asynch::InCtx;
+use starlane_space::wave::{DirectedProto, Pong, Wave};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use async_trait::async_trait;
 use tempdir::TempDir;
 use tracing::Instrument;
-
+use starlane_macros::{handler, DirectedHandler};
 
 pub struct RepoDriverFactory {}
 
