@@ -1,27 +1,26 @@
 #[cfg(feature = "postgres")]
-use crate::registry::postgres::{
+use starlane_hyperspace::registry::postgres::{
     PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
 
-use crate::driver::base::BaseDriverFactory;
-use crate::driver::control::ControlDriverFactory;
-use crate::driver::root::RootDriverFactory;
-use crate::driver::space::SpaceDriverFactory;
-use crate::driver::{DriverAvail, DriversBuilder};
-use starlane::space::artifact::asynch::Artifacts;
-use starlane::space::kind::StarSub;
-use starlane::space::loc::{MachineName, StarKey};
-use starlane::space::point::Point;
+use starlane_hyperspace::driverbase::BaseDriverFactory;
+use starlane_hyperspace::drivercontrol::ControlDriverFactory;
+use starlane_hyperspace::driverroot::RootDriverFactory;
+use starlane_hyperspace::driver::SpaceDriverFactory;
+use starlane_hyperspace::driver::{DriverAvail, DriversBuilder};
+use starlane_space::artifact::asynch::Artifacts;
+use starlane_space::kind::StarSub;
+use starlane_space::loc::{MachineName, StarKey};
+use starlane_space::point::Point;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::foundation::{Foundation, StandAloneFoundation};
+
 use crate::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
 use crate::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
-use crate::machine::MachineTemplate;
 use crate::reg::{PgRegistryConfig, Registry, RegistryWrapper};
 use crate::platform::{Platform, PlatformConfig};
 use crate::registry::err::RegErr;

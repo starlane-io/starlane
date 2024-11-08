@@ -7,7 +7,6 @@ extern crate lazy_static;
 #[macro_use]
 extern crate starlane_macros;
 
-pub extern crate starlane_space as starlane;
 extern crate core;
 
 use std::str::FromStr;
@@ -15,8 +14,8 @@ use once_cell::sync::Lazy;
 
 pub mod space {
     use chrono::Utc;
-    use starlane::wasm::Timestamp;
     pub use starlane_space::*;
+    use starlane_space::wasm::Timestamp;
 
     #[no_mangle]
     extern "C" fn starlane_uuid() -> loc::Uuid {

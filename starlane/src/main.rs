@@ -20,8 +20,8 @@ pub mod install;
 //#[cfg(feature="space")]
 //pub extern crate starlane_space as starlane;
 
-pub extern crate starlane_space as starlane;
-pub mod space {}
+//pub extern crate starlane_space as starlane;
+//pub mod space {}
 
 
 #[cfg(feature = "cli")]
@@ -37,7 +37,7 @@ use crate::cli::{Cli, Commands, ContextCmd};
 use self::starlane_hyperspace::foundation::Foundation;
 use self::starlane_hyperspace::foundation::StandAloneFoundation;
 use crate::install::{Console, StarlaneTheme};
-use self::starlane_hyperspace::platform::Platform;
+pub use self::starlane_hyperspace::platform::Platform;
 use self::starlane_hyperspace::shutdown::shutdown;
 use anyhow::{anyhow, ensure};
 use clap::Parser;
@@ -49,7 +49,7 @@ use crossterm::style::{Color, Print, ResetColor, SetBackgroundColor, SetForegrou
 use lerp::Lerp;
 use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
-use starlane::space::loc::ToBaseKind;
+use starlane_space::loc::ToBaseKind;
 use starlane_primitive_macros::{create_mark, ToBase};
 use starlane_space::space::err::PrintErr;
 use starlane_space::space::log::push_scope;

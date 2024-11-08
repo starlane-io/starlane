@@ -38,9 +38,6 @@ mod space {
    pub use starlane_space::*;
 }
 
-pub(crate) mod hyperspace {
-    pub use crate::*;
-}
 
 #[cfg(test)]
 pub mod tests {

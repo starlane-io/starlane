@@ -1,4 +1,3 @@
-use crate::shutdown::panic_shutdown;
 use anyhow::anyhow;
 use atty::Stream;
 use once_cell::sync::Lazy;
@@ -9,14 +8,11 @@ use std::string::ToString;
 use std::fs;
 use uuid::Uuid;
 use chrono::Utc;
-use starlane::space::wasm::Timestamp;
 use std::sync::Arc;
-use starlane::space::err::SpaceErr;
-use starlane::space::log::{FileAppender, LogAppender, StdOutAppender};
 use std::fs::File;
 use std::ops::Deref;
+
 use crate::server::StarlaneConfig;
-use crate::err::HypErr;
 
 pub fn context() -> String {
     fs::read_to_string(format!("{}/.context", STARLANE_HOME.as_str()).to_string())
