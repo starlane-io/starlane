@@ -3,17 +3,18 @@ use core::str::FromStr;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
+use crate::parse::util::Tw;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use thiserror::Error;
-use crate::parse::util::Tw;
 use starlane_primitive_macros::Autobox;
+use thiserror::Error;
 
 use crate::command::{Command, RawCommand};
 use crate::err::{ParseErrs, SpatialError};
 use crate::hyper::{Greet, HyperSubstance, HyperSubstanceKind, Knock, ParticleLocation};
+use crate::kind::Sub;
 use crate::loc::Meta;
-use crate::log::{Log, LogSpan, SpanEvent, PointlessLog};
+use crate::log::{Log, LogSpan, PointlessLog, SpanEvent};
 use crate::parse::model::Subst;
 use crate::parse::Env;
 use crate::particle::Particle;
@@ -28,7 +29,6 @@ use crate::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::wave::{PongCore, Wave};
 use crate::{Details, SpaceErr, Status, Stub, Surface};
 use url::Url;
-use crate::kind::Sub;
 
 #[derive(
     Debug,
@@ -64,7 +64,7 @@ pub enum SubstanceKind {
     Command,
     DirectedCore,
     ReflectedCore,
-    #[strum(to_string="Hyp<{0}>")]
+    #[strum(to_string = "Hyp<{0}>")]
     Hyper(HyperSubstanceKind),
     Token,
     Wave,
@@ -117,14 +117,7 @@ pub enum Substance {
     Log(LogSubstance),
     Err(SubstanceErr),
 }
-#[derive(
-    Debug,
-    Clone,
-    Serialize,
-    Deserialize,
-    Eq,
-    PartialEq,
-)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct SubstanceErr(pub String);
 
 impl ToString for SubstanceErr {
@@ -133,13 +126,14 @@ impl ToString for SubstanceErr {
     }
 }
 
-
-impl <E> From<E> for SubstanceErr where E: SpatialError {
+impl<E> From<E> for SubstanceErr
+where
+    E: SpatialError,
+{
     fn from(err: E) -> Self {
-       Self(err.to_string())
+        Self(err.to_string())
     }
 }
-
 
 impl Substance {
     pub fn wave(&self) -> Option<&Wave> {
@@ -158,9 +152,13 @@ impl Substance {
         }
     }
 
-    pub fn expect( self, expect: SubstanceKind ) -> Result<Self, ParseErrs> {
+    pub fn expect(self, expect: SubstanceKind) -> Result<Self, ParseErrs> {
         if self.kind() != expect {
-            Err(ParseErrs::expected("SubstanceKind", &expect.to_string(), &self.kind().to_string()))
+            Err(ParseErrs::expected(
+                "SubstanceKind",
+                &expect.to_string(),
+                &self.kind().to_string(),
+            ))
         } else {
             Ok(self)
         }
@@ -382,12 +380,10 @@ impl SubstanceMap {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Error,)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Error)]
 pub struct FormErrs {
     map: HashMap<String, String>,
 }
-
-
 
 impl FormErrs {
     pub fn to_starlane_err(&self) -> SpaceErr {
@@ -414,14 +410,12 @@ impl From<SpaceErr> for FormErrs {
                 Self::default(format!("{} {}", status, message).as_str())
             }
             SpaceErr::ParseErrs(_) => Self::default("500: parse error"),
-            e => Self::default(e.to_string())
+            e => Self::default(e.to_string()),
         }
     }
 }
 
 impl Display for FormErrs {
-
-
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let mut rtn = String::new();
         for (index, (key, value)) in self.iter().enumerate() {

@@ -1,12 +1,12 @@
 #![cfg(test)]
 
+use once_cell::sync::Lazy;
+use serde::Serialize;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use once_cell::sync::Lazy;
-use serde::Serialize;
 
 use crate::driver::control::ControlClient;
 use crate::err2::OldStarErr;
@@ -37,8 +37,8 @@ use starlane_space::wave::exchange::asynch::Exchanger;
 use starlane_space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
 use starlane_space::HYPERUSER;
 
-pub static LESS: Lazy<Point> = Lazy::new( || {Point::from_str("space:users:less").expect("point") } );
-pub static FAE: Lazy<Point> = Lazy::new( || {Point::from_str("space:users:fae").expect("point") } );
+pub static LESS: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:less").expect("point"));
+pub static FAE: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:fae").expect("point"));
 
 #[async_trait]
 pub trait Test: Sync + Send + Copy {
@@ -130,9 +130,7 @@ fn test_control() -> Result<(), OldStarErr> {
             .await
             .unwrap();
 
-        let factory = MachineApiExtFactory {
-            machine_api,
-        };
+        let factory = MachineApiExtFactory { machine_api };
 
         let exchanger = Exchanger::new(
             Point::from_str("client").unwrap().to_surface(),
@@ -260,9 +258,7 @@ fn test_provision_and_assign() -> Result<(), OldStarErr> {
             .await
             .unwrap();
 
-        let factory = MachineApiExtFactory {
-            machine_api,
-        };
+        let factory = MachineApiExtFactory { machine_api };
 
         let client = ControlClient::new(Box::new(factory))?;
         client.wait_for_ready(Duration::from_secs(5)).await?;
@@ -328,9 +324,7 @@ fn test_control_cli() -> Result<(), OldStarErr> {
 
         tokio::time::sleep(Duration::from_secs(5)).await;
 
-        let factory = MachineApiExtFactory {
-            machine_api,
-        };
+        let factory = MachineApiExtFactory { machine_api };
 
         let client = ControlClient::new(Box::new(factory))?;
         client.wait_for_ready(Duration::from_secs(5)).await?;
@@ -365,9 +359,7 @@ fn test_publish() -> Result<(), OldStarErr> {
             .await
             .unwrap();
 
-        let factory = MachineApiExtFactory {
-            machine_api,
-        };
+        let factory = MachineApiExtFactory { machine_api };
 
         let client = ControlClient::new(Box::new(factory))?;
         client.wait_for_ready(Duration::from_secs(5)).await?;

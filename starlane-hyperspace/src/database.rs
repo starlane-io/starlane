@@ -1,7 +1,7 @@
+use crate::registry::postgres::embed::PgEmbedSettings;
+use crate::registry::postgres::{PostgresConnectInfo, PostgresDbKey};
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
-use crate::registry::postgres::{PostgresConnectInfo, PostgresDbKey};
-use crate::registry::postgres::embed::PgEmbedSettings;
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct Database<S> {

@@ -2,11 +2,10 @@ use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
 use thiserror::Error;
 
-#[derive(Clone, Debug,Error)]
+#[derive(Clone, Debug, Error)]
 pub struct HostErr {
     message: String,
 }
-
 
 impl Display for HostErr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

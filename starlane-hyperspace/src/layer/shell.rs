@@ -1,14 +1,12 @@
-use std::sync::atomic::AtomicU16;
-use lazy_static::lazy_static;
-use std::sync::Arc;
 use async_trait::async_trait;
 use dashmap::{DashMap, DashSet};
-use starlane_space::parse::util::new_span;
+use lazy_static::lazy_static;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::{Command, RawCommand};
 use starlane_space::err::SpaceErr;
 use starlane_space::loc::{Layer, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
 use starlane_space::log::Logger;
+use starlane_space::parse::util::new_span;
 use starlane_space::parse::{command_line, Env};
 use starlane_space::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
 use starlane_space::point::Point;
@@ -19,31 +17,26 @@ use starlane_space::wave::exchange::asynch::{
     DirectedHandler, Exchanger, InCtx, ProtoTransmitterBuilder, RootInCtx,
 };
 use starlane_space::wave::exchange::SetStrategy;
-use starlane_space::wave::{
-    DirectedProto, DirectedWave, PongCore, Wave, WaveVariantDef,
-    WaveId,
-};
+use starlane_space::wave::{DirectedProto, DirectedWave, PongCore, Wave, WaveId, WaveVariantDef};
+use std::sync::atomic::AtomicU16;
+use std::sync::Arc;
 
-use starlane_space::parse::util::result;
-use starlane_macros::{handler, route, DirectedHandler};
-use starlane_primitive_macros::push_loc;
 use crate::platform::Platform;
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
+use starlane_macros::{handler, route, DirectedHandler};
+use starlane_primitive_macros::push_loc;
+use starlane_space::parse::util::result;
 
 #[derive(DirectedHandler)]
-pub struct Shell
-
-{
+pub struct Shell {
     skel: HyperStarSkel,
     state: ShellState,
     logger: Logger,
 }
 
-impl Shell
-
-{
+impl Shell {
     pub fn new(skel: HyperStarSkel, state: ShellState) -> Self {
-        let logger = push_loc!((skel.logger,&state.point));
+        let logger = push_loc!((skel.logger, &state.point));
         Self {
             skel,
             state,
@@ -53,9 +46,7 @@ impl Shell
 }
 
 #[async_trait]
-impl TraversalLayer for Shell
-
-{
+impl TraversalLayer for Shell {
     fn surface(&self) -> Surface {
         self.state
             .point
@@ -86,7 +77,7 @@ impl TraversalLayer for Shell
                 .insert(directed.id().clone(), AtomicU16::new(1));
         }
 
-        let logger = push_loc!((self.skel.logger,&directed.to));
+        let logger = push_loc!((self.skel.logger, &directed.to));
         let injector = directed
             .from()
             .clone()
@@ -211,9 +202,7 @@ impl TraversalLayer for Shell
 }
 
 #[handler]
-impl Shell
-
-{
+impl Shell {
     #[route("Ext<NewCliSession>")]
     pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Surface, SpaceErr> {
         // only allow a cli session to be created by any layer of THIS particle

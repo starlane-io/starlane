@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use crate::loc::{ToPoint, ToSurface};
 use crate::log::{Logger, Trackable, Tracker};
 use crate::particle::traversal::Traversal;
@@ -13,16 +12,17 @@ use crate::wave::exchange::{
 };
 use crate::wave::{
     BounceBacks, BounceProto, DirectedKind, DirectedProto, DirectedWave, EchoCore,
-    FromReflectedAggregate, Handling, PongCore, RecipientSelector, ReflectedAggregate, ReflectedProto,
-    ReflectedWave, Scope, Wave, WaveId, WaveVariantDef,
+    FromReflectedAggregate, Handling, PongCore, RecipientSelector, ReflectedAggregate,
+    ReflectedProto, ReflectedWave, Scope, Wave, WaveId, WaveVariantDef,
 };
 use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 use dashmap::{DashMap, DashSet};
+use nom_supreme::error::StackContext;
+use starlane_primitive_macros::{log_span, logger};
+use std::borrow::Cow;
 use std::sync::Arc;
 use std::time::Duration;
-use nom_supreme::error::StackContext;
 use tokio::sync::{mpsc, oneshot};
-use starlane_primitive_macros::{log_span, logger};
 
 #[async_trait]
 impl Router for TxRouter {
@@ -328,7 +328,6 @@ impl Exchanger {
     }
 
     pub async fn reflected(&self, reflect: ReflectedWave) -> Result<(), SpaceErr> {
-
         if let Some(multi) = self.multis.get(reflect.reflection_of()) {
             multi.value().send(reflect).await;
         } else if let Some((_, tx)) = self.singles.remove(reflect.reflection_of()) {
@@ -481,11 +480,7 @@ impl Exchanger {
 
 impl Default for Exchanger {
     fn default() -> Self {
-        Self::new(
-            Point::root().to_surface(),
-            Default::default(),
-            logger!()
-        )
+        Self::new(Point::root().to_surface(), Default::default(), logger!())
     }
 }
 
@@ -496,7 +491,6 @@ where
     D: DirectedHandler,
 {
     pub async fn handle(&self, wave: DirectedWave) {
-
         let mut transmitter = self.builder.clone().build();
         let reflection = wave.reflection();
         let logger = log_span!(self.logger);

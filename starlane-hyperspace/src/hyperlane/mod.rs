@@ -1,11 +1,13 @@
-#[cfg(feature = "hyperlane-tcp")]
 pub mod tcp;
 
-#[cfg(feature = "hyperlane-quic")]
+#[cfg(feature = "quic")]
 pub mod quic;
 
+use async_trait::async_trait;
 use dashmap::DashMap;
+use derive_name::Name;
 use once_cell::sync::Lazy;
+use starlane_primitive_macros::{push_loc, push_mark};
 use starlane_space::err::SpaceErr;
 use starlane_space::hyper::{Greet, InterchangeKind, Knock};
 use starlane_space::loc::{Layer, PointFactory, Surface, ToSurface};
@@ -26,10 +28,7 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use async_trait::async_trait;
-use derive_name::Name;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
-use starlane_primitive_macros::{push_loc, push_mark};
 
 pub static LOCAL_CLIENT: Lazy<Point> =
     Lazy::new(|| Point::from_str("LOCAL::client").expect("point"));
@@ -56,7 +55,7 @@ pub struct Hyperway {
 
 impl Hyperway {
     pub fn new(remote: Surface, agent: Agent, logger: Logger) -> Self {
-        let logger = push_loc!((logger,&remote.point));
+        let logger = push_loc!((logger, &remote.point));
 
         let mut inbound = Hyperlane::new(format!("{}<Inbound>", remote.to_string()));
         inbound
@@ -168,11 +167,7 @@ impl ToString for HyperwayEndpoint {
 }
 
 impl HyperwayEndpoint {
-    pub fn new(
-        tx: mpsc::Sender<Wave>,
-        rx: mpsc::Receiver<Wave>,
-        logger: Logger,
-    ) -> Self {
+    pub fn new(tx: mpsc::Sender<Wave>, rx: mpsc::Receiver<Wave>, logger: Logger) -> Self {
         let drop_tx = None;
         Self {
             tx,
@@ -538,7 +533,7 @@ pub struct HyperwayInterchange {
     call_tx: mpsc::Sender<HyperwayInterchangeCall>,
     logger: Logger,
     singular_to: Option<Surface>,
-    point: Point
+    point: Point,
 }
 
 impl HyperwayInterchange {
@@ -923,7 +918,7 @@ impl TokenDispensingHyperwayInterchange {
 
          */
 
-        let interchange = HyperwayInterchange::new(point,logger.clone());
+        let interchange = HyperwayInterchange::new(point, logger.clone());
         Self {
             agent,
             tokens,
@@ -1237,12 +1232,7 @@ where
     A: HyperAuthenticator,
     G: HyperGreeter,
 {
-    pub fn new(
-        auth: A,
-        greeter: G,
-        interchange: Arc<HyperwayInterchange>,
-        logger: Logger,
-    ) -> Self {
+    pub fn new(auth: A, greeter: G, interchange: Arc<HyperwayInterchange>, logger: Logger) -> Self {
         Self {
             auth,
             greeter,
@@ -1937,8 +1927,8 @@ impl Bridge {
 
 #[cfg(test)]
 mod tests {
-    use async_trait::async_trait;
     use crate::hyperlane::HyperRouter;
+    use async_trait::async_trait;
     use starlane_space::wave::HyperWave;
 
     /*
@@ -1999,12 +1989,12 @@ mod tests {
 }
 
 pub mod test_util {
-    use std::str::FromStr;
-    use std::sync::Arc;
-    use std::time::Duration;
     use async_trait::async_trait;
     use dashmap::DashMap;
     use once_cell::sync::Lazy;
+    use std::str::FromStr;
+    use std::sync::Arc;
+    use std::time::Duration;
     use tokio::sync::oneshot;
 
     use crate::hyperlane::{
@@ -2012,22 +2002,19 @@ pub mod test_util {
         HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
         MountInterchangeGate,
     };
+    use starlane_primitive_macros::{create_mark, logger, push_loc, push_mark};
     use starlane_space::err::SpaceErr;
     use starlane_space::hyper::{Greet, InterchangeKind, Knock};
     use starlane_space::loc::{Layer, Surface, ToSurface};
-    use starlane_space::log::{Logger};
+    use starlane_space::log::Logger;
     use starlane_space::point::Point;
     use starlane_space::settings::Timeouts;
     use starlane_space::substance::Substance;
     use starlane_space::wave::core::ext::ExtMethod;
-    use starlane_space::wave::exchange::asynch::{
-        Exchanger, ProtoTransmitter, Router,
-    };
+    use starlane_space::wave::exchange::asynch::{Exchanger, ProtoTransmitter, Router};
     use starlane_space::wave::{
-        DirectedProto, PongCore, ReflectedKind, ReflectedProto
-        , WaveVariantDef,
+        DirectedProto, PongCore, ReflectedKind, ReflectedProto, WaveVariantDef,
     };
-    use starlane_primitive_macros::{create_mark, logger, push_loc, push_mark};
 
     pub static LESS: Lazy<Point> =
         Lazy::new(|| Point::from_str("space:users:less").expect("point"));
@@ -2044,10 +2031,7 @@ pub mod test_util {
         pub async fn new() -> Self {
             let point = Point::from_str("point").unwrap();
             let logger = logger!(&point);
-            let interchange = Arc::new(HyperwayInterchange::new(
-                point.clone(),
-                push_mark!(logger)
-            ));
+            let interchange = Arc::new(HyperwayInterchange::new(point.clone(), push_mark!(logger)));
 
             interchange
                 .add(Hyperway::new(
@@ -2069,7 +2053,7 @@ pub mod test_util {
                 auth,
                 TestGreeter::new(),
                 interchange.clone(),
-                logger
+                logger,
             ));
             let mut gates: Arc<DashMap<InterchangeKind, Arc<dyn HyperGate>>> =
                 Arc::new(DashMap::new());
@@ -2126,7 +2110,7 @@ pub mod test_util {
                 logger.clone(),
             )
             .unwrap();
-            let logger = push_loc!((logger,Point::from_str("fae-client").unwrap()));
+            let logger = push_loc!((logger, Point::from_str("fae-client").unwrap()));
             let fae_client = HyperClient::new_with_exchanger(
                 self.fae_factory,
                 Some(fae_exchanger.clone()),
@@ -2224,7 +2208,7 @@ pub mod test_util {
                 logger.clone(),
             )
             .unwrap();
-            let logger = push_loc!((logger.clone(),Point::from_str("fae-client").unwrap()));
+            let logger = push_loc!((logger.clone(), Point::from_str("fae-client").unwrap()));
             let fae_client = HyperClient::new_with_exchanger(
                 self.fae_factory,
                 Some(fae_exchanger.clone()),
@@ -2308,14 +2292,22 @@ pub mod test_util {
 
 #[cfg(test)]
 pub mod test {
-    use std::str::FromStr;
-    use std::sync::Arc;
-    use std::time::Duration;
     use async_trait::async_trait;
     use dashmap::DashMap;
     use once_cell::sync::Lazy;
+    use std::str::FromStr;
+    use std::sync::Arc;
+    use std::time::Duration;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
+    use crate::hyperlane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest};
+    use crate::hyperlane::{
+        AnonHyperAuthenticator, Bridge, HyperClient, HyperConnectionDetails, HyperGate,
+        HyperGateSelector, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint,
+        HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
+        MountInterchangeGate,
+    };
+    use starlane_primitive_macros::{create_mark, logger, push_mark};
     use starlane_space::err::SpaceErr;
     use starlane_space::hyper::InterchangeKind;
     use starlane_space::loc::{Layer, ToSurface};
@@ -2330,20 +2322,12 @@ pub mod test {
     };
     use starlane_space::wave::exchange::SetStrategy;
     use starlane_space::wave::{
-        Agent, DirectedProto, HyperWave, PongCore, ReflectedKind, ReflectedProto
-        , Wave, WaveVariantDef,
+        Agent, DirectedProto, HyperWave, PongCore, ReflectedKind, ReflectedProto, Wave,
+        WaveVariantDef,
     };
-    use starlane_primitive_macros::{create_mark, logger, push_mark};
-    use crate::hyperlane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest};
-    use crate::hyperlane::{
-        AnonHyperAuthenticator, Bridge, HyperClient, HyperConnectionDetails, HyperGate,
-        HyperGateSelector, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint,
-        HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
-        MountInterchangeGate,
-    };
-    pub static LESS: Lazy<Point> = Lazy::new( || {Point::from_str("space:users:less").expect("point") } );
-    pub static FAE: Lazy<Point> = Lazy::new( || {Point::from_str("space:users:fae").expect("point") } );
-
+    pub static LESS: Lazy<Point> =
+        Lazy::new(|| Point::from_str("space:users:less").expect("point"));
+    pub static FAE: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:fae").expect("point"));
 
     pub struct TestRouter {}
 
@@ -2538,10 +2522,7 @@ pub mod test {
     pub async fn test_dual_interchange() {
         let point = Point::from_str("point").unwrap();
         let logger = logger!(&point);
-        let interchange = Arc::new(HyperwayInterchange::new(
-            point.clone(),
-            logger.clone(),
-        ));
+        let interchange = Arc::new(HyperwayInterchange::new(point.clone(), logger.clone()));
 
         interchange
             .add(Hyperway::new(
@@ -2563,7 +2544,7 @@ pub mod test {
             auth,
             TestGreeter::new(),
             interchange.clone(),
-            logger.clone()
+            logger.clone(),
         ));
         let mut gates: Arc<DashMap<InterchangeKind, Arc<dyn HyperGate>>> = Arc::new(DashMap::new());
         gates.insert(InterchangeKind::Singleton, gate);
@@ -2649,19 +2630,15 @@ pub mod test {
             let point = Point::from_str(name).unwrap();
             let logger = logger!(&point);
 
-            let interchange =
-                Arc::new(HyperwayInterchange::new(
-                    point,
-                    push_mark!(logger)
-                ));
+            let interchange = Arc::new(HyperwayInterchange::new(point, push_mark!(logger)));
 
             let gate = {
                 let auth = AnonHyperAuthenticator::new();
-                 Arc::new(MountInterchangeGate::new(
+                Arc::new(MountInterchangeGate::new(
                     auth,
                     TestGreeter::new(),
                     interchange.clone(),
-                    push_mark!(logger)
+                    push_mark!(logger),
                 ))
             };
             let mut gates: Arc<DashMap<InterchangeKind, Arc<dyn HyperGate>>> =
@@ -2716,7 +2693,7 @@ pub mod test {
             LESS.clone().to_surface(),
             fae_gate.clone(),
         ));
-        let logger  = logger!(Point::from_str("bridge").unwrap());
+        let logger = logger!(Point::from_str("bridge").unwrap());
         let bridge = Bridge::new(fae_endpoint_from_less, fae_factory, logger);
 
         let mut less_access = less_interchange

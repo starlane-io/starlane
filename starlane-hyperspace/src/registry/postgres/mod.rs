@@ -1,18 +1,22 @@
 pub mod embed;
 
+use crate::database::Database;
 use crate::platform::Platform;
+use crate::reg::{PgRegistryConfig, Registration, RegistryApi};
 use crate::registry::err::RegErr;
+use crate::registry::postgres::embed::PgEmbedSettings;
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
+use starlane_primitive_macros::push_loc;
 use starlane_space::command::common::{PropertyMod, SetProperties};
 use starlane_space::command::direct::create::Strategy;
 use starlane_space::command::direct::delete::Delete;
 use starlane_space::command::direct::get::{Get, GetOp};
 use starlane_space::command::direct::query::{Query, QueryResult};
-use starlane_space::command::direct::select::{
-    Select, SelectIntoSubstance, SelectKind, SubSelect,
-};
+use starlane_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
 use starlane_space::command::direct::set::Set;
 use starlane_space::err::SpaceErr;
 use starlane_space::hyper::{ParticleLocation, ParticleRecord};
@@ -41,12 +45,6 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use starlane_primitive_macros::push_loc;
-use crate::database::Database;
-use crate::reg::{PgRegistryConfig, Registration, RegistryApi};
-use crate::registry::postgres::embed::PgEmbedSettings;
 
 pub trait PostgresPlatform: Send + Sync {
     fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr>;
@@ -57,18 +55,15 @@ pub struct PostgresRegistry {
     logger: Logger,
     ctx: PostgresRegistryContextHandle,
     platform: Box<dyn PostgresPlatform>,
-
-
 }
-
 
 impl PostgresRegistry {
     pub async fn new(
         ctx: PostgresRegistryContextHandle,
         platform: Box<dyn PostgresPlatform>,
-        logger: Logger
+        logger: Logger,
     ) -> Result<Self, RegErr> {
-        let logger = push_loc!((logger,Point::global_registry()));
+        let logger = push_loc!((logger, Point::global_registry()));
         /*
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -102,7 +97,6 @@ impl PostgresRegistry {
         let mode = r#"CREATE TYPE reset_mode_enum AS ENUM ('None', 'Scorch');
                             CREATE TABLE reset_mode (mode reset_mode_enum DEFAULT 'none' NOT NULL UNIQUE);
 w                           INSERT INTO reset_mode VALUES ('None');"#;
-
 
         let particles = r#"CREATE TABLE IF NOT EXISTS particles (
          id SERIAL PRIMARY KEY,
@@ -199,8 +193,6 @@ impl RegistryApi for PostgresRegistry {
         self.logger.info("scorching database!");
         let mut conn = self.ctx.acquire().await?;
 
-
-
         let mut trans = conn.begin().await?;
 
         struct CanScorch(bool);
@@ -211,20 +203,19 @@ impl RegistryApi for PostgresRegistry {
             }
         }
 
-
-        impl sqlx::FromRow<'_, PgRow> for CanScorch{
+        impl sqlx::FromRow<'_, PgRow> for CanScorch {
             fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
-                let v:i64 = row.get(0);
+                let v: i64 = row.get(0);
                 let v = v != 0;
                 Ok(Self(v))
             }
         }
 
-        let scorch= sqlx::query_as::<Postgres,CanScorch>(
+        let scorch = sqlx::query_as::<Postgres, CanScorch>(
             "SELECT count(*) FROM reset_mode WHERE mode=('Scorch')",
         )
-            .fetch_one(&mut *trans)
-            .await?;
+        .fetch_one(&mut *trans)
+        .await?;
 
         if !scorch.can() {
             let err = "database has scorch guard enabled.  To change this: 'INSERT INTO reset_mode VALUES ('Scorch')'";
@@ -241,8 +232,6 @@ impl RegistryApi for PostgresRegistry {
     }
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr> {
-
-
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),Erroror> {
             let params = RegistryParams::from_registration(registration)?;
@@ -549,7 +538,6 @@ impl RegistryApi for PostgresRegistry {
         Ok(list)
     }
 
-
     //    #[async_recursion]
     async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, RegErr> {
         // build a 'matching so far' query.  Here we will find every child that matches the subselect
@@ -594,10 +582,10 @@ impl RegistryApi for PostgresRegistry {
                 KindBaseSelector::Exact(kind) => match &hop.kind_selector.sub {
                     SubKindSelector::Always => {}
                     SubKindSelector::Exact(sub) => {
-                            index = index + 1;
-                            where_clause.push_str(format!(" AND sub=${}", index).as_str());
-                            params.push(sub.to_string());
-                    },
+                        index = index + 1;
+                        where_clause.push_str(format!(" AND sub=${}", index).as_str());
+                        params.push(sub.to_string());
+                    }
                     SubKindSelector::None => {}
                     SubKindSelector::Never => {}
                 },
@@ -928,7 +916,12 @@ impl RegistryApi for PostgresRegistry {
         let to: Option<PointHierarchy> = match to {
             None => None,
             //Some(to) => Some(self.query(*to, &Query::PointHierarchy).await?.try_into()?),
-            Some(to) => Some(self.query(*to, &Query::PointHierarchy).await?.try_into().expect("convert point to ...")),
+            Some(to) => Some(
+                self.query(*to, &Query::PointHierarchy)
+                    .await?
+                    .try_into()
+                    .expect("convert point to ..."),
+            ),
         };
 
         let selection = self.select(&mut select).await?;
@@ -1058,9 +1051,7 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
         }
 
         match wrap(row) {
-            Ok(record) => {
-                Ok(WrappedIndexedAccessGrant { grant: record })
-            }
+            Ok(record) => Ok(WrappedIndexedAccessGrant { grant: record }),
             Err(err) => Err(sqlx::error::Error::PoolClosed),
         }
     }
@@ -1360,16 +1351,20 @@ pub struct PostgresRegistryContextHandle {
     /// which needs to remain alive OR it may be nothing. Either way
     /// this handle will ensure that everything on the foundation that is needed
     /// to support this registry will stay alive
-    keep_alive: tokio::sync::mpsc::Sender<()>
+    keep_alive: tokio::sync::mpsc::Sender<()>,
 }
 
 impl PostgresRegistryContextHandle {
-    pub fn new(db: &Database<PostgresConnectInfo>, pool: Arc<PostgresRegistryContext>, keep_alive: tokio::sync::mpsc::Sender<()>) -> Self {
+    pub fn new(
+        db: &Database<PostgresConnectInfo>,
+        pool: Arc<PostgresRegistryContext>,
+        keep_alive: tokio::sync::mpsc::Sender<()>,
+    ) -> Self {
         Self {
             key: db.to_key(),
             schema: db.schema.clone(),
             pool,
-            keep_alive
+            keep_alive,
         }
     }
 
@@ -1455,7 +1450,6 @@ pub struct PostgresConnectInfo {
     pub password: String,
 }
 
-
 impl PostgresConnectInfo {
     pub fn new<Url, User, Pass>(url: Url, user: User, password: Pass) -> Self
     where
@@ -1469,11 +1463,10 @@ impl PostgresConnectInfo {
             password: password.to_string(),
         }
     }
-
 }
 
 #[cfg(test)]
-#[cfg(feature = "never")]
+
 pub mod test {
     use std::collections::HashSet;
     use std::convert::TryInto;
@@ -1481,9 +1474,9 @@ pub mod test {
     use std::sync::Arc;
 
     use crate::driver::DriversBuilder;
+    use crate::err::HyperErr;
     use crate::err2::{HypErr, OldStarErr};
     use crate::hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
-    use crate::err::HyperErr;
     use crate::machine::MachineTemplate;
     use crate::reg::{Registration, Registry};
     use crate::registry::err::RegErr;
@@ -1953,7 +1946,6 @@ pub mod test {
     }
 }
 
-#[cfg(feature = "postgres")]
 impl Default for PgRegistryConfig {
     fn default() -> Self {
         let database = Database::new(

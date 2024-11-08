@@ -1,30 +1,29 @@
-use std::collections::{HashMap, HashSet};
-use std::str::FromStr;
-use std::sync::mpsc::SendError;
-use std::sync::Arc;
-use std::time::Duration;
-use async_trait::async_trait;
 use crate::driver::DriverErr;
-use crate::hyperlane::{HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate, SimpleGreeter};
-use crate::reg::Registry;
-use crate::star::{
-    HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
+use crate::err::{err, HyperErr2};
+use crate::hyperlane::{
+    HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,
+    HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
+    SimpleGreeter,
 };
 use crate::platform::Platform;
+use crate::reg::Registry;
 use crate::service::{
-    service_conf, Service,  ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate,
+    service_conf, Service, ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate,
 };
+use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 use crate::template::Templates;
+use async_trait::async_trait;
 use dashmap::DashMap;
 use futures::future::{join_all, select_all, BoxFuture};
 use futures::{FutureExt, TryFutureExt};
+use starlane_primitive_macros::{push_loc, push_mark};
 use starlane_space::artifact::asynch::{ArtErr, ArtifactFetcher, Artifacts};
 use starlane_space::command::direct::create::KindTemplate;
 use starlane_space::err::{HyperSpatialError, SpaceErr, SpatialError};
 use starlane_space::hyper::{InterchangeKind, Knock};
 use starlane_space::kind::{BaseKind, Kind, StarSub};
 use starlane_space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface};
-use starlane_space::log::{Logger};
+use starlane_space::log::Logger;
 use starlane_space::particle::property::PropertiesConfig;
 use starlane_space::particle::{Property, Status, Stub};
 use starlane_space::point::Point;
@@ -35,11 +34,14 @@ use starlane_space::util::{OptSelector, ValuePattern};
 use starlane_space::wave::core::cmd::CmdMethod;
 use starlane_space::wave::exchange::asynch::Exchanger;
 use starlane_space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
+use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
+use std::sync::mpsc::SendError;
+use std::sync::Arc;
+use std::time::Duration;
 use thiserror::Error;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
-use starlane_primitive_macros::{push_loc, push_mark};
-use crate::err::{err, HyperErr2};
 
 #[derive(Clone)]
 pub struct MachineApi {
@@ -231,12 +233,11 @@ where
             }
         });
 
-
         let machine_star = StarKey::machine(machine_name.clone())
             .to_point()
             .to_surface()
             .with_layer(Layer::Gravity);
-        let logger = push_loc!((platform.logger(),machine_star.point.clone()));
+        let logger = push_loc!((platform.logger(), machine_star.point.clone()));
         let global = machine_star
             .point
             .push("global")
@@ -268,7 +269,7 @@ where
             let star_port = star_point.clone().to_surface().with_layer(Layer::Core);
 
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
-            let logger = push_loc!((skel.logger,&drivers_point));
+            let logger = push_loc!((skel.logger, &drivers_point));
 
             let mut star_tx: HyperStarTx = HyperStarTx::new(star_point.clone());
             let star_skel =
@@ -352,7 +353,7 @@ where
             });
         }
 
-        let logger = push_loc!((skel.logger,&machine_point));
+        let logger = push_loc!((skel.logger, &machine_point));
 
         let (term_tx, _) = broadcast::channel(1);
         let stars = Arc::new(stars);
@@ -497,11 +498,11 @@ where
                 }
                 MachineCall::Knock { knock, rtn } => {
                     let gate_selector = self.gate_selector.clone();
-                    let logger = push_loc!((self.skel.logger,self.skel.machine_star.point.clone()));
+                    let logger =
+                        push_loc!((self.skel.logger, self.skel.machine_star.point.clone()));
                     tokio::spawn(async move {
-                        rtn.send(
-                            gate_selector.knock(knock).await
-                        ).unwrap_or_default();
+                        rtn.send(gate_selector.knock(knock).await)
+                            .unwrap_or_default();
                     });
                 }
                 MachineCall::EndpointFactory { from, to, rtn } => {
@@ -543,8 +544,6 @@ where
                     };
                 }
             }
-
-
         }
         self.termination_broadcast_tx
             .send(Err(err!("machine quit unexpectedly."))?);
@@ -750,8 +749,8 @@ impl HyperwayEndpointFactory for MachineApiExtFactory {
         };
 
         self.machine_api.knock(knock).await
- //       self.logger
-//            .result_ctx("machine_api.knock()", )
+        //       self.logger
+        //            .result_ctx("machine_api.knock()", )
     }
 }
 

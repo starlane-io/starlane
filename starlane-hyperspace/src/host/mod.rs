@@ -1,6 +1,8 @@
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::cli::{CliIn, CliOut, HostEnv};
 use crate::executor::{ExeConf, Executor};
+use crate::host::err::HostErr;
+use crate::service::ServiceErr;
 use clap::CommandFactory;
 use itertools::Itertools;
 use nom::AsBytes;
@@ -10,8 +12,6 @@ use std::hash::{Hash, Hasher};
 use std::io::Read;
 use std::ops::{Deref, DerefMut};
 use tokio::io::AsyncWriteExt;
-use crate::host::err::HostErr;
-use crate::service::ServiceErr;
 
 pub mod err;
 
@@ -50,7 +50,6 @@ pub struct ExeStub {
     pub args: Vec<String>,
 }
 
-
 impl ExeStub {
     pub fn new(loc: String, env: HostEnv) -> Self {
         let args = vec![];
@@ -66,36 +65,31 @@ pub fn stringify_args(args: Vec<&str>) -> Vec<String> {
     args.iter().map(|arg| arg.to_string()).collect()
 }
 
-
-
-
 #[derive(Clone, Hash, Eq, PartialEq)]
 pub enum Host {
     Cli(HostCli),
 }
 
 impl Host {
-
-    pub fn env( &self, key: &str ) -> Option<&String> {
+    pub fn env(&self, key: &str) -> Option<&String> {
         match self {
-            Host::Cli(cli) => cli.env(key)
+            Host::Cli(cli) => cli.env(key),
         }
     }
     pub fn create<D>(&self) -> Result<D, HostErr>
     where
-        D: TryFrom<CliOsExecutor, Error =HostErr>,
+        D: TryFrom<CliOsExecutor, Error = HostErr>,
     {
         match self {
             Host::Cli(host) => host.create(),
         }
     }
 
-    pub fn with_env( &self, key: &str, value: &str) -> Self {
+    pub fn with_env(&self, key: &str, value: &str) -> Self {
         match self {
-            Host::Cli(cli) => Host::Cli(cli.with_env(key,value))
+            Host::Cli(cli) => Host::Cli(cli.with_env(key, value)),
         }
     }
-
 }
 
 #[derive(Clone, Hash, Eq, PartialEq)]
@@ -104,25 +98,23 @@ pub enum HostCli {
 }
 
 impl HostCli {
-
-    pub fn env( &self, key: &str ) -> Option<&String> {
+    pub fn env(&self, key: &str) -> Option<&String> {
         let key = key.to_string();
         match self {
-            HostCli::Os(stub) => stub.env.env.get( &key )
+            HostCli::Os(stub) => stub.env.env.get(&key),
         }
     }
 
     pub fn create<D>(&self) -> Result<D, HostErr>
     where
-        D: TryFrom<CliOsExecutor, Error =HostErr>,
+        D: TryFrom<CliOsExecutor, Error = HostErr>,
     {
         match self {
             HostCli::Os(stub) => Ok(D::try_from(CliOsExecutor::new(stub.clone()))?),
         }
     }
 
-
-    pub fn with_env( &self, key: &str, value: &str) -> Self {
+    pub fn with_env(&self, key: &str, value: &str) -> Self {
         match self {
             HostCli::Os(stub) => {
                 let mut stub = stub.clone();

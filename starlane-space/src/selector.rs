@@ -316,7 +316,10 @@ impl Selector {
         } else {
             let mut hops = self.hops.clone();
             hops.remove(0);
-            Option::Some(Selector { hops, always:false })
+            Option::Some(Selector {
+                hops,
+                always: false,
+            })
         }
     }
 
@@ -390,12 +393,11 @@ impl Selector {
         self.matches_found_opt(&opt)
     }
 
-    pub fn matches_found_opt(&self, hierarchy: & PointHierarchyOpt) -> bool
+    pub fn matches_found_opt(&self, hierarchy: &PointHierarchyOpt) -> bool
     where
         BaseKind: Clone,
         KindParts: Clone,
     {
-
         if hierarchy.is_root() && self.is_root() {
             return true;
         }
@@ -1096,7 +1098,6 @@ pub type PointHierarchy = PointDef<RouteSeg, PointKindSeg>;
 
 pub type PointHierarchyOpt = PointDef<RouteSeg, PointKindSegOpt>;
 
-
 impl From<&PointHierarchy> for PointHierarchyOpt {
     fn from(value: &PointHierarchy) -> Self {
         Self {
@@ -1106,12 +1107,18 @@ impl From<&PointHierarchy> for PointHierarchyOpt {
     }
 }
 
-
 impl From<&Point> for PointHierarchyOpt {
     fn from(value: &Point) -> Self {
         Self {
             route: value.route.clone(),
-            segments: value.segments.iter().map(|s| {PointKindSegOpt{ segment: s.clone(), kind: None }} ).collect(),
+            segments: value
+                .segments
+                .iter()
+                .map(|s| PointKindSegOpt {
+                    segment: s.clone(),
+                    kind: None,
+                })
+                .collect(),
         }
     }
 }
@@ -1120,7 +1127,14 @@ impl From<Point> for PointHierarchyOpt {
     fn from(value: Point) -> Self {
         Self {
             route: value.route.clone(),
-            segments: value.segments.into_iter().map(|segment| {PointKindSegOpt{ segment, kind: None }} ).collect(),
+            segments: value
+                .segments
+                .into_iter()
+                .map(|segment| PointKindSegOpt {
+                    segment,
+                    kind: None,
+                })
+                .collect(),
         }
     }
 }
@@ -1353,7 +1367,6 @@ impl ToResolved<PayloadBlock> for PayloadBlockVar {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use crate::kind::BaseKind;
@@ -1364,7 +1377,7 @@ mod test {
     pub fn test() {
         let selector = PointSelector::always();
         let point = BaseKind::Driver.bind();
-        assert!( selector.is_match(&point).is_ok())
+        assert!(selector.is_match(&point).is_ok())
     }
 
     #[test]
@@ -1373,5 +1386,4 @@ mod test {
         let point = BaseKind::Driver.bind();
         assert!(selector.is_match(point.segments.first().unwrap()).is_ok());
     }
-
 }

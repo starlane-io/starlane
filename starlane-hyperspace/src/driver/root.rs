@@ -1,8 +1,13 @@
-use crate::driver::{Driver, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, StdParticleErr};
+use crate::driver::{
+    Driver, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleSphere,
+    ParticleSphereInner, StdParticleErr,
+};
 
 use crate::platform::Platform;
 use crate::star::HyperStarSkel;
+use async_trait::async_trait;
 use once_cell::sync::Lazy;
+use starlane_macros::{handler, DirectedHandler};
 use starlane_space::artifact::ArtRef;
 use starlane_space::config::bind::BindConfig;
 use starlane_space::kind::{BaseKind, Kind};
@@ -14,8 +19,6 @@ use starlane_space::wave::exchange::asynch::DirectedHandler;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
-use async_trait::async_trait;
-use starlane_macros::{handler, DirectedHandler};
 
 pub struct RootDriverFactory;
 
@@ -26,9 +29,7 @@ impl RootDriverFactory {
 }
 
 #[async_trait]
-impl HyperDriverFactory for RootDriverFactory
-
-{
+impl HyperDriverFactory for RootDriverFactory {
     fn kind(&self) -> Kind {
         Kind::Root
     }
@@ -50,9 +51,7 @@ impl HyperDriverFactory for RootDriverFactory
 pub struct RootDriver;
 
 #[async_trait]
-impl Driver for RootDriver
-
-{
+impl Driver for RootDriver {
     fn kind(&self) -> Kind {
         Kind::Root
     }
@@ -64,23 +63,15 @@ impl Driver for RootDriver
 }
 
 #[derive(DirectedHandler)]
-pub struct Root
+pub struct Root {}
 
-{
-}
-
-impl Root
-
-{
+impl Root {
     pub fn new() -> Self {
-        Self {
-        }
+        Self {}
     }
 }
 
-impl Particle for Root
-
-{
+impl Particle for Root {
     type Skel = ();
     type Ctx = ();
     type State = ();
@@ -90,13 +81,10 @@ impl Particle for Root
         Self::new()
     }
 
-    fn sphere(self) -> Result<ParticleSphere,Self::Err> {
+    fn sphere(self) -> Result<ParticleSphere, Self::Err> {
         Ok(ParticleSphere::new_handler(self))
     }
-
 }
 
 #[handler]
 impl Root {}
-
-

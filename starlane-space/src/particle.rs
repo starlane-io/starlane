@@ -55,11 +55,7 @@ pub enum Status {
     /// this particle had a life span and has now completed succesfully it can no longer receive requests.
     Done,
 }
-#[derive(
-    Debug,
-    Clone,
-    strum_macros::Display,
-)]
+#[derive(Debug, Clone, strum_macros::Display)]
 
 pub enum StatusDetail {
     Unknown,
@@ -90,14 +86,14 @@ impl Into<Status> for StatusDetail {
             StatusDetail::Ready => Status::Ready,
             StatusDetail::Paused => Status::Paused,
             StatusDetail::Resuming => Status::Resuming,
-            StatusDetail::Done => Status::Done
+            StatusDetail::Done => Status::Done,
         }
     }
 }
 
 impl From<Status> for ReflectedCore {
     fn from(status: Status) -> Self {
-        let code= StatusCode::from_u16( match &status{
+        let code = StatusCode::from_u16(match &status {
             Status::Unknown => 520u16,
             Status::Pending => 202u16,
             Status::Init => 200u16,
@@ -106,15 +102,16 @@ impl From<Status> for ReflectedCore {
             Status::Ready => 200u16,
             Status::Paused => 503u16,
             Status::Resuming => 205u16,
-            Status::Done => 200u16
-        }).unwrap_or(StatusCode::fail());
+            Status::Done => 200u16,
+        })
+        .unwrap_or(StatusCode::fail());
 
         let body = Substance::Status(status);
         let status = code;
         ReflectedCore {
             headers: Default::default(),
             status,
-            body
+            body,
         }
     }
 }

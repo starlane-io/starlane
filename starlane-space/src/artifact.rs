@@ -19,12 +19,11 @@ pub struct ArtRef<A> {
 
 impl ArtRef<Document> {}
 
-unsafe impl <A> Send for ArtRef<A> {}
+unsafe impl<A> Send for ArtRef<A> {}
 
+unsafe impl<A> Sync for ArtRef<A> {}
 
-unsafe impl <A> Sync for ArtRef<A> {}
-
-impl <A> Clone for ArtRef<A> {
+impl<A> Clone for ArtRef<A> {
     fn clone(&self) -> Self {
         /// cloning indicates a usage event...
         self.tx.try_send(()).unwrap_or_default();
@@ -39,21 +38,21 @@ impl <A> Clone for ArtRef<A> {
 impl<A> ArtRef<A> {
     fn new(artifact: A, point: Point, tx: tokio::sync::mpsc::Sender<()>) -> Self {
         let artifact = Arc::new(artifact);
-        Self { artifact, point, tx }
+        Self {
+            artifact,
+            point,
+            tx,
+        }
     }
 }
 
-impl<A> ArtRef<A>
-
-{
+impl<A> ArtRef<A> {
     pub fn contents(&self) -> Arc<A> {
         self.artifact.clone()
     }
 }
 
-impl<A> ArtRef<A>
-
-{
+impl<A> ArtRef<A> {
     pub fn bundle(&self) -> Point {
         self.point.clone().to_bundle().unwrap()
     }
@@ -62,9 +61,7 @@ impl<A> ArtRef<A>
     }
 }
 
-impl<A> Deref for ArtRef<A>
-
-{
+impl<A> Deref for ArtRef<A> {
     type Target = A;
 
     fn deref(&self) -> &Self::Target {

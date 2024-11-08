@@ -1,9 +1,6 @@
-
-
 use serde::{Deserialize, Serialize};
 
 pub mod mesh {
-
 
     use serde::{Deserialize, Serialize};
 
@@ -14,7 +11,6 @@ pub mod mesh {
 }
 
 pub mod portal {
-
 
     use serde::{Deserialize, Serialize};
 
@@ -31,7 +27,6 @@ pub mod portal {
 
 pub mod http {
 
-
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +36,6 @@ pub mod http {
 }
 
 pub mod resource {
-
 
     use serde::{Deserialize, Serialize};
 
@@ -80,7 +74,6 @@ pub mod resource {
 }
 
 pub mod ext {
-
 
     use serde::{Deserialize, Serialize};
 

@@ -1,11 +1,14 @@
+use async_trait::async_trait;
 use std::str::FromStr;
 use std::sync::Arc;
-use async_trait::async_trait;
 use tracing_core::Subscriber;
 use url::Url;
 
-use starlane_space::artifact::ArtRef;
+use crate::platform::Platform;
+use crate::star::{HyperStarSkel, TraverseToNextRouter};
+use starlane_primitive_macros::push_loc;
 use starlane_space::artifact::asynch::ArtErr;
+use starlane_space::artifact::ArtRef;
 use starlane_space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
 use starlane_space::err::{CoreReflector, SpaceErr, StatusErr};
 use starlane_space::loc::{Layer, Surface, ToSurface};
@@ -21,27 +24,21 @@ use starlane_space::wave::core::{Method, ReflectedCore};
 use starlane_space::wave::exchange::asynch::ProtoTransmitter;
 use starlane_space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
 use starlane_space::wave::{
-    BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, PongCore, Reflection, Wave, WaveVariantDef,
+    BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, PongCore, Reflection, Wave,
+    WaveVariantDef,
 };
-use starlane_primitive_macros::push_loc;
-use crate::platform::Platform;
-use crate::star::{HyperStarSkel, TraverseToNextRouter};
 
-pub struct Field
-
-{
+pub struct Field {
     pub port: Surface,
     pub skel: HyperStarSkel,
     pub logger: Logger,
     pub shell_transmitter: TraversalTransmitter,
 }
 
-impl Field
-
-{
+impl Field {
     pub fn new(point: Point, skel: HyperStarSkel) -> Self {
         let port = point.to_surface().with_layer(Layer::Field);
-        let logger = push_loc!((skel.logger,&port));
+        let logger = push_loc!((skel.logger, &port));
         let shell_router = Arc::new(TraverseToNextRouter::new(skel.traverse_to_next_tx.clone()));
         let shell_transmitter = TraversalTransmitter::new(shell_router, skel.exchanger.clone());
 
@@ -53,34 +50,39 @@ impl Field
         }
     }
 
-    async fn bind(
-        &self,
-        directed: &Traversal<DirectedWave>,
-    ) -> Result<ArtRef<BindConfig>, ArtErr> {
+    async fn bind(&self, directed: &Traversal<DirectedWave>) -> Result<ArtRef<BindConfig>, ArtErr> {
         let record = self
             .skel
             .registry
             .record(&self.port.point)
-            .await.map_err(anyhow::Error::from)?;
+            .await
+            .map_err(anyhow::Error::from)?;
 
         let properties = self
             .skel
             .registry
             .get_properties(&directed.to.point)
-            .await.map_err(anyhow::Error::from)?;
+            .await
+            .map_err(anyhow::Error::from)?;
 
         let bind_property = properties.get("bind");
         let bind = match bind_property {
             None => {
-                let driver = self.skel.drivers.get(&record.details.stub.kind).await
+                let driver = self
+                    .skel
+                    .drivers
+                    .get(&record.details.stub.kind)
+                    .await
                     .map_err(anyhow::Error::from)?;
                 driver
                     .bind(&directed.to.point)
-                    .await.map_err(anyhow::Error::from)?
+                    .await
+                    .map_err(anyhow::Error::from)?
             }
             Some(bind) => {
                 let bind = Point::from_str(bind.value.as_str()).map_err(anyhow::Error::from)?;
-                log(self.skel.machine_api.artifacts.get_bind(&bind).await).map_err(anyhow::Error::from)?
+                log(self.skel.machine_api.artifacts.get_bind(&bind).await)
+                    .map_err(anyhow::Error::from)?
             }
         };
         Ok(bind)
@@ -101,9 +103,7 @@ impl Field
 }
 
 #[async_trait]
-impl TraversalLayer for Field
-
-{
+impl TraversalLayer for Field {
     fn surface(&self) -> Surface {
         self.port.clone()
     }
@@ -180,9 +180,7 @@ impl TraversalLayer for Field
     }
 }
 
-pub struct PipeEx
-
-{
+pub struct PipeEx {
     pub skel: HyperStarSkel,
     pub surface: Surface,
     pub logger: Logger,
@@ -200,9 +198,7 @@ pub struct PipeEx
     pub status: u16,
 }
 
-impl PipeEx
-
-{
+impl PipeEx {
     pub fn new(
         skel: HyperStarSkel,
         port: Surface,

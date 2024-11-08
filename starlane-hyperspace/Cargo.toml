@@ -11,27 +11,6 @@ description.workspace = true
 
 
 
-[features]
-full=["server"]
-default=["server"]
-#server=["space","service","hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow", "dep:virtual-fs"]
-server=["space","service","hyperspace", "hyperlane","postgres", "postgres-embedded","hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow"]
-cli=["dep:text_io","dep:clap", "dep:walkdir", "parse"]
-hypererr=[]
-hyperspace=["dep:futures","dep:dashmap","dep:semver", "parse", "dep:zip","hypererr"]
-hyperlane=["hypererr"]
-hyperlane-tcp =  ["hyperlane","dep:rcgen","rustls","dep:tokio-rustls","dep:tls-api-rustls"]
-hyperlane-quic =  ["hyperlane","dep:rcgen","rustls", "dep:quinn"]
-postgres=[ "dep:sqlx","dep:serde","dep:async-recursion" ]
-postgres-embedded=[ "postgres", "dep:postgresql_embedded" ]
-parse=["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
-rustls=["dep:rustls","dep:rcgen","rustls-pemfile"]
-driver=["hyperspace"]
-dialect=[]
-dialect-cli=["dialect","dep:clap"]
-service=[]
-space=[]
-wasm=[]
 
 [dependencies]
 starlane-space = { workspace = true  }
@@ -58,54 +37,54 @@ itertools = {workspace = true}
 tempdir = { workspace=true }
 
 once_cell = { workspace=true }
-zip = { workspace=true, optional = true }
+zip = { workspace=true}
 dirs ={ workspace=true}
 ascii ={ workspace=true }
 url ={ workspace=true }
 
 # hyper requirements
-futures = {workspace=true, default-features = true, optional=true }
-dashmap = {workspace=true, optional = true}
-semver = { workspace=true, features=['serde'], optional = true }
+futures = {workspace=true, default-features = true}
+dashmap = {workspace=true }
+semver = { workspace=true, features=['serde']}
 
 
 
 # postgres deps
-sqlx = { workspace = true, features = [ "runtime-tokio","runtime-tokio-rustls", "postgres", "macros", "any" ], optional = true }
-serde = { workspace = true, features=['derive','rc'], optional=true }
-async-recursion = { workspace = true, optional=true }
+sqlx = { workspace = true, features = [ "runtime-tokio","runtime-tokio-rustls", "postgres", "macros", "any" ]}
+serde = { workspace = true, features=['derive','rc']}
+async-recursion = { workspace = true}
 
 
-rcgen = { workspace = true, optional = true, features=["pem", "x509-parser" ]}
-rustls = { workspace = true, optional = true, features=["aws_lc_rs"]}
-rustls-pemfile = { workspace = true, optional = true }
-tokio-rustls =  { workspace = true, optional = true}
-tls-api-rustls =  { workspace = true, optional = true}
+rcgen = { workspace = true, features=["pem", "x509-parser" ]}
+rustls = { workspace = true, features=["aws_lc_rs"]}
+rustls-pemfile = { workspace = true }
+tokio-rustls =  { workspace = true}
+tls-api-rustls =  { workspace = true}
 
-text_io = { workspace = true, optional = true}
-clap =  { workspace = true, optional = true , features=["derive"]}
-walkdir = { workspace = true, optional = true }
+text_io = { workspace = true}
+clap =  { workspace = true , features=["derive"]}
+walkdir = { workspace = true }
 
-ariadne = { workspace = true, optional = true }
-nom ={ workspace = true, optional = true }
-nom-supreme = { workspace = true, optional = true }
-nom_locate = { workspace = true, optional = true }
-regex = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
-serde_urlencoded = { workspace = true, optional = true }
-enum-ordinalize = { workspace = true, optional = true }
-convert_case = { workspace = true, optional = true }
-validator = { workspace = true, optional = true }
-
-
-threadpool ={ workspace = true, optional = true }
-oneshot = { workspace = true, optional = true }
+ariadne = { workspace = true }
+nom ={ workspace = true }
+nom-supreme = { workspace = true }
+nom_locate = { workspace = true }
+regex = { workspace = true }
+serde_json = { workspace = true }
+serde_urlencoded = { workspace = true }
+enum-ordinalize = { workspace = true }
+convert_case = { workspace = true }
+validator = { workspace = true }
 
 
-anyhow = { workspace = true, optional = true }
-##virtual-fs ={ workspace = true, optional = true }
+threadpool ={ workspace = true }
+oneshot = { workspace = true }
 
-quinn ={ workspace = true, optional = true }
+
+anyhow = { workspace = true }
+##virtual-fs ={ workspace = true }
+
+quinn ={ workspace = true }
 webpki-roots = { workspace = true}
 path-clean = { workspace = true}
 thiserror-context = { workspace = true }
@@ -114,7 +93,7 @@ cliclack = { workspace = true }
 
 serde_yaml = { workspace = true }
 derive_builder = { workspace=true }
-postgresql_embedded = { workspace=true, optional = true }
+postgresql_embedded = { workspace=true }
 text-to-ascii-art = { workspace = true}
 colored = {workspace = true}
 lerp = { workspace = true, features=["derive"] }

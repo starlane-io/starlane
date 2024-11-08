@@ -4,7 +4,9 @@ use crate::loc::Layer;
 use crate::log::{Logger, Trackable};
 use crate::point::Point;
 use crate::wave::exchange::asynch::Exchanger;
-use crate::wave::{DirectedWave, PingCore, PongCore, ReflectedWave, SingularDirectedWave, Wave, WaveVariantDef};
+use crate::wave::{
+    DirectedWave, PingCore, PongCore, ReflectedWave, SingularDirectedWave, Wave, WaveVariantDef,
+};
 use crate::{ParticleRecord, SpaceErr, Surface};
 
 #[async_trait]

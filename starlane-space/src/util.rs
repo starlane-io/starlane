@@ -54,7 +54,7 @@ impl ToString for HttpMethodPattern {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq,Serialize,Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum OptSelector<S> {
     Some,
     None,
@@ -106,33 +106,36 @@ where
     }
 }
 
-
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum IdSelector<V>
 where
-    V: Clone+ Eq + PartialEq + Hash,
+    V: Clone + Eq + PartialEq + Hash,
 {
     Always,
     Never,
     Set(HashSet<V>),
 }
 
-impl <V> ToString for IdSelector<V> where V: Clone+ Eq + PartialEq + Hash +ToString {
+impl<V> ToString for IdSelector<V>
+where
+    V: Clone + Eq + PartialEq + Hash + ToString,
+{
     fn to_string(&self) -> String {
         match self {
             IdSelector::Always => "*".to_string(),
             IdSelector::Never => "!".to_string(),
-            IdSelector::Set(set) => {
-                set.into_iter().map(|v| v.to_string()).collect::<Vec<String>>().join("|")
-            }
+            IdSelector::Set(set) => set
+                .into_iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<String>>()
+                .join("|"),
         }
     }
 }
 
 impl<V> IdSelector<V>
 where
-    V: Clone+ Eq + PartialEq + Hash,
+    V: Clone + Eq + PartialEq + Hash,
 {
     pub fn always() -> IdSelector<V> {
         Self::Always
@@ -161,7 +164,7 @@ where
 
 impl<V> PartialEq<V> for IdSelector<V>
 where
-    V: Clone+ Eq + PartialEq + Hash,
+    V: Clone + Eq + PartialEq + Hash,
 {
     fn eq(&self, value: &V) -> bool {
         match self {
@@ -276,8 +279,6 @@ pub enum ValuePattern<T> {
     Pattern(T),
 }
 
-
-
 impl<T> ValuePattern<T>
 where
     T: ToString,
@@ -304,18 +305,18 @@ where
     }
 }
 
-impl<P,T> ValueMatcher<T> for ValuePattern<P> where P: PartialEq<T> {
+impl<P, T> ValueMatcher<T> for ValuePattern<P>
+where
+    P: PartialEq<T>,
+{
     fn is_match(&self, x: &T) -> Result<(), ()> {
         match self {
             ValuePattern::Always => Ok(()),
             ValuePattern::Never => Err(()),
-            ValuePattern::Pattern(pattern)  if *pattern == *x =>  {
-                Ok(())
-            }
-            _ => Err(())
+            ValuePattern::Pattern(pattern) if *pattern == *x => Ok(()),
+            _ => Err(()),
         }
     }
-
 }
 
 impl<T> ValuePattern<T> {
@@ -363,8 +364,6 @@ impl<T> ValuePattern<T> {
         }
     }
 }
-
-
 
 pub trait ValueMatcher<X> {
     fn is_match(&self, x: &X) -> Result<(), ()>;
@@ -460,7 +459,10 @@ where
     fn to_resolved(self, env: &Env) -> Result<R, ParseErrs>;
 }
 
-pub fn log<R,E>(result: Result<R, E>) -> Result<R, E> where E: PrintErr{
+pub fn log<R, E>(result: Result<R, E>) -> Result<R, E>
+where
+    E: PrintErr,
+{
     match result {
         Ok(r) => Ok(r),
         Err(err) => {

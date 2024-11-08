@@ -23,14 +23,14 @@ use crate::kind::BaseKind;
 use crate::parse::model::Subst;
 use crate::parse::ResolverErr;
 use crate::point::PointSegKind;
+use crate::substance::{Substance, SubstanceErr, SubstanceKind};
+use crate::task::OpErr;
 use crate::wave::core::http2::StatusCode;
 use crate::wave::core::{Method, ReflectedCore};
 use serde::{Deserialize, Serialize};
 use strum::{IntoEnumIterator, ParseError};
 use thiserror::Error;
 use tokio::sync::SetError;
-use crate::substance::{Substance, SubstanceErr, SubstanceKind};
-use crate::task::OpErr;
 /*
 #[macro_export]
 macro_rules! err {
@@ -152,21 +152,13 @@ impl SpaceErr {
     }
 }
 
-impl SpatialError for SpaceErr {
-
-}
-
-
-
-
+impl SpatialError for SpaceErr {}
 
 impl From<anyhow::Error> for SpaceErr {
     fn from(err: anyhow::Error) -> Self {
         Arc::new(err).into()
     }
 }
-
-
 
 impl SpatialError for ParseErrs {
     fn anyhow(self) -> Arc<anyhow::Error> {
@@ -178,8 +170,7 @@ impl SpatialError for ParseErrs {
 impl PrintErr for SpaceErr {
     fn print(&self) {
         match self {
-            SpaceErr::Status { status, message } => {
-            }
+            SpaceErr::Status { status, message } => {}
             SpaceErr::ParseErrs(errs) => {
                 for report in &errs.report {
                     let report: ariadne::Report = report.clone().into();
@@ -218,18 +209,17 @@ impl Into<ReflectedCore> for SpaceErr {
             SpaceErr::Status { status, .. } => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(status).unwrap_or(StatusCode::from_u16(500).unwrap()),
-                body: self.to_substance()
+                body: self.to_substance(),
             },
             SpaceErr::ParseErrs(_) => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(500u16).unwrap_or(StatusCode::from_u16(500).unwrap()),
-                body: self.to_substance()
-
+                body: self.to_substance(),
             },
             x => ReflectedCore {
                 headers: Default::default(),
                 status: Default::default(),
-                body: x.to_substance()
+                body: x.to_substance(),
             },
         }
     }
@@ -244,7 +234,7 @@ impl CoreReflector for SpaceErr {
         ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(self.status()).unwrap(),
-            body: self.to_substance()
+            body: self.to_substance(),
         }
     }
 }
@@ -359,7 +349,7 @@ impl<C> From<SendTimeoutError<C>> for SpaceErr {
     }
 }
 
-impl From<&SubstanceErr> for SpaceErr  {
+impl From<&SubstanceErr> for SpaceErr {
     fn from(err: &SubstanceErr) -> Self {
         SpaceErr::from(err.to_string())
     }
@@ -572,7 +562,7 @@ impl From<io::Error> for SpaceErr {
     }
 }
 
-#[derive(Debug, Clone, Error, Serialize,Deserialize)]
+#[derive(Debug, Clone, Error, Serialize, Deserialize)]
 pub struct ParseErrs {
     pub report: Vec<Report>,
     pub src: String,
@@ -1095,7 +1085,10 @@ impl From<strum::ParseErr> for ParseErrs {
 
  */
 
-pub trait SpatialError where Self: Sized+ ToString {
+pub trait SpatialError
+where
+    Self: Sized + ToString,
+{
     fn anyhow(self) -> Arc<anyhow::Error> {
         Arc::new(anyhow!(self.to_string()))
     }
@@ -1103,24 +1096,19 @@ pub trait SpatialError where Self: Sized+ ToString {
     fn to_substance(self) -> Substance {
         Substance::Err(SubstanceErr(self.to_string()))
     }
-
 }
 
-
-pub fn any_result<R,E>( result: Result<R,E>) -> Result<R,Arc<anyhow::Error>> where E: Display{
+pub fn any_result<R, E>(result: Result<R, E>) -> Result<R, Arc<anyhow::Error>>
+where
+    E: Display,
+{
     match result {
         Ok(ok) => Ok(ok),
-        Err(err) => {
-            Err(Arc::new(anyhow!("{}",err)))
-        }
+        Err(err) => Err(Arc::new(anyhow!("{}", err))),
     }
 }
 
-
-
-pub trait HyperSpatialError: SpatialError {
-
-}
+pub trait HyperSpatialError: SpatialError {}
 
 #[cfg(test)]
 pub mod test {

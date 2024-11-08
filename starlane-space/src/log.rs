@@ -17,6 +17,7 @@ use crate::wave::{
     Wave, WaveVariantDef,
 };
 use crate::Agent;
+use anyhow::anyhow;
 use core::str::FromStr;
 use derive_builder::Builder;
 use once_cell::sync::Lazy;
@@ -34,7 +35,6 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::{Arc, LazyLock};
-use anyhow::anyhow;
 use tokio::task_local;
 
 task_local! {
@@ -72,9 +72,8 @@ pub fn _logger() -> Logger {
     STACK.get()
 }
 
-macro_rules! enter{
-    ($args: ident) => {
-    }
+macro_rules! enter {
+    ($args: ident) => {};
 }
 
 macro_rules! async_closure {
@@ -89,7 +88,6 @@ macro_rules! async_closure {
         $name($($init),+)
     }};
 }
-
 
 /*
 #[tokio::main]

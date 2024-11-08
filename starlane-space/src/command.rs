@@ -64,7 +64,7 @@ pub mod common {
             match self {
                 StateSrc::None => vec![],
                 StateSrc::Subst(substance) => {
-                    if let Substance::Bin(bin) = *substance{
+                    if let Substance::Bin(bin) = *substance {
                         bin
                     } else {
                         substance.to_bin().unwrap()
@@ -446,10 +446,10 @@ pub mod direct {
             pub specific: Option<SpecificSelector>,
         }
 
-        impl AsDisplay<'_> for KindTemplate{
+        impl AsDisplay<'_> for KindTemplate {
             type Target = String;
 
-            fn as_display(& self) -> Self::Target {
+            fn as_display(&self) -> Self::Target {
                 self.to_string()
             }
         }
@@ -522,9 +522,9 @@ pub mod direct {
                     StateSrcVar::FileRef(name) => StateSrc::Subst(Box::new(Substance::Bin(
                         env.file(name)
                             .map_err(|e| match e {
-                                ResolverErr::NotAvailable => ParseErrs::from(
-                                    "files are not available in this context",
-                                ),
+                                ResolverErr::NotAvailable => {
+                                    ParseErrs::from("files are not available in this context")
+                                }
                                 ResolverErr::NotFound => {
                                     ParseErrs::from(format!("cannot find file '{}'", name))
                                 }
@@ -536,17 +536,16 @@ pub mod direct {
                             ResolverErr::NotAvailable => {
                                 ParseErrs::from("variable are not available in this context")
                             }
-                            ResolverErr::NotFound => ParseErrs::from(format!(
-                                "cannot find variable '{}'",
-                                var.name
-                            )),
+                            ResolverErr::NotFound => {
+                                ParseErrs::from(format!("cannot find variable '{}'", var.name))
+                            }
                         })?;
                         StateSrc::Subst(Box::new(Substance::Bin(
                             env.file(val.clone())
                                 .map_err(|e| match e {
-                                    ResolverErr::NotAvailable => ParseErrs::from(
-                                        "files are not available in this context",
-                                    ),
+                                    ResolverErr::NotAvailable => {
+                                        ParseErrs::from("files are not available in this context")
+                                    }
                                     ResolverErr::NotFound => ParseErrs::from(format!(
                                         "cannot find file '{}'",
                                         val.to_text().unwrap_or("err".to_string())

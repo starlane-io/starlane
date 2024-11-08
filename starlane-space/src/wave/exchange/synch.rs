@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use crate::loc::ToPoint;
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::CoreBounce;
@@ -7,13 +6,14 @@ use crate::wave::exchange::{
     RootInCtxDef, SetStrategy,
 };
 use crate::wave::{
-    Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, FromReflectedAggregate,
-    Handling, PongCore, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave,
-    Scope, Wave, WaveVariantDef,
+    Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore,
+    FromReflectedAggregate, Handling, PongCore, RecipientSelector, ReflectedAggregate,
+    ReflectedProto, ReflectedWave, Scope, Wave, WaveVariantDef,
 };
 use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
-use std::sync::Arc;
 use starlane_primitive_macros::log_span;
+use std::borrow::Cow;
+use std::sync::Arc;
 
 pub trait ExchangeRouter: Send + Sync {
     fn route(&self, wave: Wave);
@@ -238,7 +238,6 @@ pub type DirectedHandlerShell =
 
 impl DirectedHandlerShell {
     pub fn handle(&self, wave: DirectedWave) -> Bounce<ReflectedWave> {
-
         let mut transmitter = self.builder.clone().build();
         let reflection = wave.reflection();
         let logger = log_span!(self.logger);

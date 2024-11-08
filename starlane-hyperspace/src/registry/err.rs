@@ -1,4 +1,3 @@
-#[cfg(feature = "postgres")]
 use sqlx::Error;
 
 use starlane_space::err::{HyperSpatialError, ParseErrs, SpaceErr, SpatialError};
@@ -29,13 +28,12 @@ pub enum RegErr {
     #[error("{0}")]
     Msg(String),
 
-    #[cfg(feature = "postgres")]
     #[error("postgres error: {0}")]
     SqlxErr(#[from] Arc<sqlx::Error>),
-    #[cfg(feature = "postgres")]
+
     #[error("postgres registry db connection pool '{0}' not found")]
     PoolNotFound(String),
-    #[cfg(feature = "postgres")]
+
     #[error("postgres embed error error: {0}")]
     PgErr(#[from] postgresql_embedded::Error),
     #[error(transparent)]
@@ -43,15 +41,14 @@ pub enum RegErr {
     #[error("database has scorch guard enabled.  To change this: 'INSERT INTO reset_mode VALUES ('Scorch')'")]
     NoScorch,
     #[error("expected an embedded postgres registry but received configuration for a remote postgres registry")]
-    ExpectedEmbeddedRegistry
+    ExpectedEmbeddedRegistry,
 }
 
-impl  From<std::io::Error> for RegErr {
+impl From<std::io::Error> for RegErr {
     fn from(value: std::io::Error) -> Self {
-       Self::IoErr(Arc::new(value))
+        Self::IoErr(Arc::new(value))
     }
 }
-
 
 impl SpatialError for RegErr {}
 
@@ -69,7 +66,6 @@ impl From<&String> for RegErr {
     }
 }
 
-#[cfg(feature = "postgres")]
 impl From<sqlx::Error> for RegErr {
     fn from(value: Error) -> Self {
         RegErr::SqlxErr(Arc::new(value))
@@ -89,7 +85,6 @@ impl RegErr {
         RegErr::Point { point, message }
     }
 
-    #[cfg(feature = "postgres")]
     pub fn pool_not_found<S: ToString>(key: S) -> Self {
         Self::PoolNotFound(key.to_string())
     }

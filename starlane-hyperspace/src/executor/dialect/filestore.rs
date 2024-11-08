@@ -1,6 +1,7 @@
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::cli::{CliErr, CliExecutor, CliIn, CliOut};
 use crate::executor::Executor;
+use crate::host::err::HostErr;
 use clap::{Parser, Subcommand};
 use itertools::Itertools;
 use path_clean::PathClean;
@@ -14,7 +15,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use strum_macros::EnumString;
 use thiserror::Error;
-use crate::host::err::HostErr;
 /*
 impl <E> From<Box<E>> for FileStore
 where E: Executor<In=CliIn,Out=CliOut> {
@@ -60,7 +60,7 @@ impl From<Box<CliOsExecutor>> for FileStore {
 }
 
 pub enum FileStore {
-    Cli(Box<dyn Executor<In = CliIn, Out = CliOut, Err=CliErr >+Send+Sync>),
+    Cli(Box<dyn Executor<In = CliIn, Out = CliOut, Err = CliErr> + Send + Sync>),
 }
 
 impl FileStore {
@@ -68,12 +68,16 @@ impl FileStore {
         match self {
             FileStore::Cli(cli) => {
                 let conf = cli.conf();
-                let value = conf.env(FILE_STORE_ROOT).ok_or(FileStoreErr::expected_env(FILE_STORE_ROOT))?;
+                let value = conf
+                    .env(FILE_STORE_ROOT)
+                    .ok_or(FileStoreErr::expected_env(FILE_STORE_ROOT))?;
                 let path = PathBuf::from(value);
                 let root = RootDir::new(path);
                 let root = root.norm(&sub_root)?;
 
-                let conf = cli.conf().with_env(FILE_STORE_ROOT, &root.to_str().unwrap());
+                let conf = cli
+                    .conf()
+                    .with_env(FILE_STORE_ROOT, &root.to_str().unwrap());
                 Ok(conf.create()?)
             }
         }
@@ -98,17 +102,19 @@ impl FileStore {
                     FileStoreInKind::List { .. } => {
                         out.close_stdin()?;
                         let stdout = out.stdout().await?;
-                        let paths :Vec<std::io::Result<String>> = stdout
-                            .lines().into_iter().collect_vec();
+                        let paths: Vec<std::io::Result<String>> =
+                            stdout.lines().into_iter().collect_vec();
 
-                        let (paths,errs):(Vec<PathBuf>,Vec<_>) = paths.into_iter().map_ok(|path|path.into()).partition_result();
+                        let (paths, errs): (Vec<PathBuf>, Vec<_>) = paths
+                            .into_iter()
+                            .map_ok(|path| path.into())
+                            .partition_result();
                         if !errs.is_empty() {
                             Err(errs.first().unwrap())?;
                         }
                         let paths = paths.into_iter().collect_vec();
 
                         FileStoreOut::List(paths)
-
                     }
                     FileStoreInKind::Exists { .. } => FileStoreOut::Exists(true),
                     FileStoreInKind::Pwd => {
@@ -127,7 +133,6 @@ impl FileStore {
             }
         }
     }
-
 }
 
 pub type FileStoreIn = FileStoreInDef<PathBuf, Bin>;
@@ -239,7 +244,7 @@ impl Into<Vec<String>> for FileStoreCli {
             }
             FileStoreCommand::List { path } => {
                 vec!["list".to_string(), to_str(path)]
-            },
+            }
             FileStoreCommand::Exists { path } => {
                 vec!["exists".to_string(), to_str(path)]
             }
@@ -309,8 +314,7 @@ impl RootDir {
     }
 }
 
-
-#[derive(Error,Debug,Clone)]
+#[derive(Error, Debug, Clone)]
 pub enum FileStoreErr {
     #[error("HostErr: '{0}'")]
     HostErr(#[from] HostErr),
@@ -329,10 +333,13 @@ pub enum FileStoreErr {
     #[error("{0}")]
     StdIoErr(std::io::ErrorKind),
     #[error(transparent)]
-    Inifable(  #[from] core::convert::Infallible),
+    Inifable(#[from] core::convert::Infallible),
     #[error("unknown FileStoreErr: {0}")]
-    Anyhow(#[source] #[from] Arc<anyhow::Error>)
-
+    Anyhow(
+        #[source]
+        #[from]
+        Arc<anyhow::Error>,
+    ),
 }
 
 impl From<anyhow::Error> for FileStoreErr {
@@ -363,12 +370,10 @@ impl From<&std::io::Error> for FileStoreErr {
     }
 }
 
-
-
 impl FileStoreErr {
     pub fn expected_env<S>(key: S) -> Self
     where
-        S: ToString
+        S: ToString,
     {
         Self::ExpectEnvVar(key.to_string())
     }

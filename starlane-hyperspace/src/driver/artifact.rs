@@ -1,9 +1,14 @@
-use crate::driver::{Driver, DriverCtx, DriverErr, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Particle, ParticleSkel, ParticleSphere, ParticleSphereInner, StdParticleErr};
+use crate::driver::{
+    Driver, DriverCtx, DriverErr, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory,
+    HyperSkel, Particle, ParticleSkel, ParticleSphere, ParticleSphereInner, StdParticleErr,
+};
 use crate::executor::dialect::filestore::FileStoreIn;
-use crate::star::HyperStarSkel;
 use crate::platform::Platform;
 use crate::service::{FileStoreService, Service, ServiceKind, ServiceRunner, ServiceSelector};
+use crate::star::HyperStarSkel;
+use async_trait::async_trait;
 use once_cell::sync::Lazy;
+use starlane_macros::{handler, DirectedHandler};
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::{SetProperties, StateSrc};
 use starlane_space::command::direct::create::{
@@ -25,10 +30,8 @@ use starlane_space::wave::{DirectedProto, Pong, Wave};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
-use async_trait::async_trait;
 use tempdir::TempDir;
 use tracing::Instrument;
-use starlane_macros::{handler, DirectedHandler};
 
 pub struct RepoDriverFactory {}
 
@@ -97,13 +100,7 @@ impl Driver for RepoDriver {
     async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
         let filestore = self.filestore.sub_root(point.md5().into()).await?;
 
-        let repo = Repo::restore(
-            (),
-            (),
-            filestore
-        );
-
-        ;
+        let repo = Repo::restore((), (), filestore);
         Ok(repo.sphere()?)
     }
 }
@@ -119,7 +116,7 @@ impl Particle for Repo {
     }
 
     fn sphere(self) -> Result<ParticleSphere, Self::Err> {
-       Ok(ParticleSphere::new_handler(self))
+        Ok(ParticleSphere::new_handler(self))
     }
 }
 
@@ -144,9 +141,7 @@ pub struct Repo {
     filestore: FileStoreService,
 }
 
-impl Repo {
-
-}
+impl Repo {}
 
 #[handler]
 impl Repo {}

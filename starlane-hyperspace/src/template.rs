@@ -1,8 +1,8 @@
-use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
+use crate::service::{ServiceSelector, ServiceTemplate};
 use itertools::Itertools;
 use starlane_space::selector::KindSelector;
-use crate::service::{ServiceSelector, ServiceTemplate};
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]
 pub struct Templates<T>
@@ -17,7 +17,7 @@ where
     T: Clone,
 {
     pub fn new(templates: Vec<T>) -> Self {
-        Self { templates}
+        Self { templates }
     }
 
     pub fn select_one<S>(&self, selector: &S) -> Option<&T>
@@ -31,20 +31,18 @@ where
     }
 }
 
-
-
 impl Templates<ServiceTemplate> {
     pub fn select(&self, selector: &ServiceSelector) -> Vec<ServiceTemplate> {
         todo!()
         //let mut rtn = vec![];
-/*        for template in &self.templates {
-            if selector.matches(&template.kind) {
-                rtn.push(template.clone());
-            }
-        }
-        rtn
+        /*        for template in &self.templates {
+                   if selector.matches(&template.kind) {
+                       rtn.push(template.clone());
+                   }
+               }
+               rtn
 
- */
+        */
     }
 
     /*

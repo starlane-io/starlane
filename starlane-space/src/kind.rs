@@ -1,11 +1,12 @@
-use core::str::FromStr;
-use std::fmt::{Display, Formatter};
 use convert_case::{Case, Casing};
+use core::str::FromStr;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 use crate::parse::util::new_span;
 
+use crate::err::{ParseErrs, PrintErr, SpaceErr};
 use crate::loc::{
     ProvisionAffinity, StarKey, ToBaseKind, Version, CONTROL_WAVE_TRAVERSAL_PLAN,
     MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
@@ -13,12 +14,14 @@ use crate::loc::{
 };
 use crate::parse::util::result;
 use crate::parse::{kind_parts, specific, CamelCase, Domain, SkewerCase};
-use crate::err::{ParseErrs, PrintErr, SpaceErr};
 use crate::particle::traversal::TraversalPlan;
 use crate::point::Point;
-use crate::selector::{KindBaseSelector, KindSelector, Pattern, PointHierarchy, SpecificSelector, SubKindSelector, VersionReq};
+use crate::selector::{
+    KindBaseSelector, KindSelector, Pattern, PointHierarchy, SpecificSelector, SubKindSelector,
+    VersionReq,
+};
 use crate::util::ValuePattern;
-use crate::{KindTemplate};
+use crate::KindTemplate;
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {
@@ -136,11 +139,10 @@ pub enum BaseKind {
     Host,
     Guest,
     Registry,
-    WebServer
+    WebServer,
 }
 
 impl BaseKind {
-
     pub fn bind_point_hierarchy(&self) -> PointHierarchy {
         (match self {
             BaseKind::Star => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>star.bind<File<File>>"),
@@ -161,8 +163,6 @@ impl BaseKind {
     pub fn nothing_bind_point_hierarchy() -> PointHierarchy {
         PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>nothing.bind<File<File>>").unwrap()
     }
-
-
 }
 
 impl BaseKind {
@@ -182,7 +182,7 @@ pub enum Sub {
 }
 
 impl Sub {
-    pub fn sub_kind(self) -> SubKind{
+    pub fn sub_kind(self) -> SubKind {
         match self {
             Sub::None => SubKind::None,
             Sub::Database(_) => SubKind::Database,
@@ -194,7 +194,17 @@ impl Sub {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display,strum_macros::EnumString)]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Hash,
+    strum_macros::Display,
+    strum_macros::EnumString,
+)]
 pub enum SubKind {
     None,
     Database,
@@ -203,7 +213,6 @@ pub enum SubKind {
     UserBase,
     Star,
 }
-
 
 impl Sub {
     pub fn to_camel_case(&self) -> Option<CamelCase> {
@@ -274,7 +283,7 @@ impl TryFrom<CamelCase> for BaseKind {
 
 /// Kind defines the behavior and properties of a Particle.  Each particle has a Kind.
 /// At minimum a Kind must have a BaseKind, it can also have a SubKind and a Specific.
-/// A Particle's complete Kind definition is used to match it with a Driver in the Hyperverse
+/// A Particle's complete Kind definition is used to match it with a Driver in the HyperVerse
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum Kind {
     Root,
@@ -303,7 +312,7 @@ pub enum Kind {
     Host,
     Guest,
     Registry,
-    WebServer
+    WebServer,
 }
 
 impl ToBaseKind for Kind {
@@ -331,20 +340,18 @@ impl ToBaseKind for Kind {
             Kind::Host => BaseKind::Host,
             Kind::Guest => BaseKind::Guest,
             Kind::Registry => BaseKind::Registry,
-            Kind::WebServer => BaseKind::WebServer
+            Kind::WebServer => BaseKind::WebServer,
         }
     }
 }
 
 impl Kind {
-
     pub fn opt_sub(&self) -> Option<Sub> {
         match &self.sub() {
             Sub::None => None,
-            s => Some(s.clone())
+            s => Some(s.clone()),
         }
     }
-
 
     pub fn to_template(&self) -> KindTemplate {
         KindTemplate {
@@ -490,7 +497,7 @@ impl TryFrom<KindParts> for Kind {
             BaseKind::Host => Kind::Host,
             BaseKind::Guest => Kind::Guest,
             BaseKind::Registry => Kind::Registry,
-            BaseKind::WebServer => Kind::WebServer
+            BaseKind::WebServer => Kind::WebServer,
         })
     }
 }
@@ -502,7 +509,6 @@ pub trait Tks {
     fn specific(&self) -> Option<Specific>;
     fn matches(&self, tks: &dyn Tks) -> bool;
 }
-
 
 #[derive(
     Clone,
@@ -531,7 +537,7 @@ impl StarSub {
     pub fn to_selector(self) -> KindSelector {
         KindSelector {
             base: KindBaseSelector::Exact(BaseKind::Star),
-            sub:  SubKindSelector::Exact(self.to_camel_case()),
+            sub: SubKindSelector::Exact(self.to_camel_case()),
             specific: ValuePattern::Always,
         }
     }
@@ -562,9 +568,6 @@ impl StarSub {
     }
 }
 
-
-
-
 impl Into<Sub> for StarSub {
     fn into(self) -> Sub {
         Sub::Star(self)
@@ -583,9 +586,19 @@ impl Into<Option<String>> for StarSub {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, strum_macros::Display, strum_macros::EnumIter)]
+#[derive(
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    Serialize,
+    Deserialize,
+    strum_macros::Display,
+    strum_macros::EnumIter,
+)]
 pub enum UserBaseSubKindBase {
-    OAuth
+    OAuth,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, strum_macros::Display)]
@@ -630,7 +643,7 @@ impl Into<Option<String>> for UserBaseSubKind {
     Deserialize,
     strum_macros::Display,
     strum_macros::EnumString,
-    strum_macros::EnumIter
+    strum_macros::EnumIter,
 )]
 pub enum FileSubKind {
     File,
@@ -665,7 +678,7 @@ impl Into<Option<String>> for FileSubKind {
     Deserialize,
     strum_macros::Display,
     strum_macros::EnumString,
-    strum_macros::EnumIter
+    strum_macros::EnumIter,
 )]
 pub enum ArtifactSubKind {
     Raw,
@@ -725,8 +738,6 @@ impl Into<Option<String>> for DatabaseSubKind {
     }
 }
 
-
-
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct StarStub {
     pub key: StarKey,
@@ -748,14 +759,14 @@ impl StarStub {
 /// * **vendor** - the vendor that provides the product which may have had nothing to do with
 ///                creating the driver
 /// * **product** - the product
-/// * **variant** - many products have variation and here it is where it is specificied
+/// * **variant** - many products have variation and here it is where it is specified
 /// * **version** - this is a SemVer describing the exact version of the Specific
 ///
 /// ## Example:
 /// `mechtronhub.com:postgres.org:postgres:gis:8.0.0`
 /// And the above would be embedde into the appropriate Base Kind and Sub Kind:
 /// `<Database<Rel<mechtronhub.com:postgres.org:postgres:gis:8.0.0>>>`
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash )]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct Specific {
     pub provider: Domain,
     pub vendor: Domain,
@@ -763,7 +774,6 @@ pub struct Specific {
     pub variant: SkewerCase,
     pub version: Version,
 }
-
 
 impl Specific {
     pub fn to_selector(&self) -> SpecificSelector {
@@ -809,25 +819,27 @@ impl TryInto<SpecificSelector> for Specific {
 
 #[cfg(test)]
 pub mod test {
-    use crate::selector::{KindSelector, PointHierarchy, Selector};
-    use crate::util::ValueMatcher;
-    use crate::{Kind,  StarSub};
     use crate::err::{ParseErrs, PrintErr};
-    use crate::parse::{consume_hierarchy, delim_kind, file_point_kind_segment, kind, lex_block, point_kind_hierarchy, resolve_kind, unwrap_block};
+    use crate::kind::FileSubKind;
     use crate::parse::model::{BlockKind, NestedBlockKind};
     use crate::parse::util::{new_span, recognize, result};
-    use std::str::FromStr;
+    use crate::parse::{
+        consume_hierarchy, delim_kind, file_point_kind_segment, kind, lex_block,
+        point_kind_hierarchy, resolve_kind, unwrap_block,
+    };
+    use crate::point::Point;
+    use crate::selector::{KindSelector, PointHierarchy, Selector};
+    use crate::util::ValueMatcher;
+    use crate::{Kind, StarSub};
     use nom::combinator::all_consuming;
     use nom::IResult;
-    use crate::kind::FileSubKind;
-    use crate::point::Point;
+    use std::str::FromStr;
 
     #[test]
     pub fn selector() -> Result<(), ParseErrs> {
         let kind = Kind::Star(StarSub::Fold);
         let selector = KindSelector::from_str("<Star<Fold>>")?;
         assert!(selector.is_match(&kind).is_ok());
-
 
         Ok(())
     }
@@ -836,40 +848,39 @@ pub mod test {
     pub fn star_bind() {
         let s = "GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>star.bind<File<File>>";
         let string = s.to_string();
-        let s = new_span(s );
+        let s = new_span(s);
 
-        let (_,hierarchy) = point_kind_hierarchy(s).unwrap();
+        let (_, hierarchy) = point_kind_hierarchy(s).unwrap();
         let v = hierarchy.to_string();
 
-        assert_eq!(v,string);
+        assert_eq!(v, string);
     }
 
     #[test]
     pub fn file_bind() {
-        println!("File<File> == {}", Kind::File(FileSubKind::File).to_string() );
+        println!(
+            "File<File> == {}",
+            Kind::File(FileSubKind::File).to_string()
+        );
         let s = "star.bind<File<File>>";
-        match result(all_consuming(file_point_kind_segment)(new_span(s)))  {
+        match result(all_consuming(file_point_kind_segment)(new_span(s))) {
             Ok(ok) => {
                 println!("filePoint seg: '{}'", ok.to_string());
             }
             Err(err) => {
-               err.print() ;
+                err.print();
                 assert!(false)
             }
         }
     }
     #[test]
     pub fn star_bind_from_str() {
-
-
-
-
         let s = "GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>star.bind<File<File>>";
         match PointHierarchy::from_str(s) {
             Ok(hierarchy) => {
                 println!("HIERARCHY from_str {}", hierarchy.to_string());
                 let v = s.to_string();
-                assert_eq!(v,hierarchy.to_string());
+                assert_eq!(v, hierarchy.to_string());
             }
             Err(err) => {
                 err.print();

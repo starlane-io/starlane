@@ -11,7 +11,11 @@ use quote::quote;
 use quote::ToTokens;
 use syn::__private::TokenStream2;
 use syn::token::Mut;
-use syn::{parse_file, parse_macro_input, AttrStyle, Attribute, AttributeArgs, Data, DeriveInput, Expr, ExprTuple, File, FnArg, ImplItem, ItemImpl, LitStr, PatType, PathArguments, Token, Type, Visibility};
+use syn::{
+    parse_file, parse_macro_input, AttrStyle, Attribute, AttributeArgs, Data, DeriveInput, Expr,
+    ExprTuple, File, FnArg, ImplItem, ItemImpl, LitStr, PatType, PathArguments, Token, Type,
+    Visibility,
+};
 
 /// Takes a given enum (which in turn accepts child enums) and auto generates a `Parent::From` so the child
 /// can turn into the parent and a `TryInto<Child> for Parent` so the Parent can attempt to turn into the child.
@@ -401,8 +405,6 @@ pub fn loggerhead(_attr: TokenStream, item: TokenStream) -> TokenStream {
     rtn.into()
 }
 
-
-
 #[proc_macro]
 pub fn push_loc(tokens: TokenStream) -> TokenStream {
     let tuple = parse_macro_input!(tokens as ExprTuple);
@@ -424,8 +426,6 @@ pub fn push_loc(tokens: TokenStream) -> TokenStream {
     rtn.into()
 }
 
-
-
 #[proc_macro]
 pub fn log_span(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as Expr);
@@ -445,9 +445,9 @@ pub fn log_span(tokens: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn logger(item: TokenStream) -> TokenStream {
-    let log_pack= quote!(starlane_space::log);
+    let log_pack = quote!(starlane_space::log);
 
-    let loc = if !item.is_empty()  {
+    let loc = if !item.is_empty() {
         let expr = parse_macro_input!(item as Expr);
         quote!( #log_pack::_logger().push(#expr); )
     } else {
@@ -466,13 +466,12 @@ pub fn logger(item: TokenStream) -> TokenStream {
             }
         };
 
-
     rtn.into()
 }
 
 #[proc_macro]
 pub fn push_mark(_item: TokenStream) -> TokenStream {
-    let logger= parse_macro_input!(_item as Expr);
+    let logger = parse_macro_input!(_item as Expr);
     let rtn = quote! {
         {
     let mut builder = starlane_space::log::LogMarkBuilder::default();

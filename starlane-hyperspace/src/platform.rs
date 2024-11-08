@@ -1,35 +1,35 @@
 use crate::driver::DriversBuilder;
+use crate::foundation::Foundation;
 use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
+use crate::reg::PgRegistryConfig;
 use crate::reg::Registry;
+use anyhow::anyhow;
+use async_trait::async_trait;
+use starlane_primitive_macros::logger;
 use starlane_space::artifact::asynch::Artifacts;
 use starlane_space::command::direct::create::KindTemplate;
 use starlane_space::err::SpaceErr;
 use starlane_space::kind::{
-    ArtifactSubKind, BaseKind, FileSubKind, Kind,  Specific, StarSub, UserBaseSubKind,
+    ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind,
     UserBaseSubKindBase,
 };
 use starlane_space::loc::{MachineName, StarKey, ToBaseKind};
+use starlane_space::log::Logger;
 use starlane_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
 use starlane_space::settings::Timeouts;
 use std::str::FromStr;
 use std::sync::Arc;
-use anyhow::anyhow;
-use async_trait::async_trait;
-use starlane_space::log::Logger;
-use starlane_primitive_macros::logger;
-use crate::foundation::Foundation;
-use crate::reg::PgRegistryConfig;
 
 #[async_trait]
 pub trait Platform: Send + Sync + Sized + Clone
 where
-    Self::Err: std::error::Error + Send + Sync+ From<anyhow::Error>,
+    Self::Err: std::error::Error + Send + Sync + From<anyhow::Error>,
     Self: 'static,
     Self::StarAuth: HyperAuthenticator,
     Self::RemoteStarConnectionFactory: HyperwayEndpointFactory,
-    Self::Foundation: Foundation+Clone+Send+Sync,
-    Self::Config: PlatformConfig
+    Self::Foundation: Foundation + Clone + Send + Sync,
+    Self::Config: PlatformConfig,
 {
     type Err;
     type StarAuth;
@@ -44,10 +44,10 @@ where
     }
 
     /// delete the registry
-    async fn scorch(&self) -> Result<(),Self::Err>;
+    async fn scorch(&self) -> Result<(), Self::Err>;
 
     /// exactly like `scorch` except the `context` is also deleted
-    async fn nuke(&self) -> Result<(),Self::Err> {
+    async fn nuke(&self) -> Result<(), Self::Err> {
         /*
         if !self.config().can_nuke() {
             Err(anyhow!("in config '{}' can_nuke=false", config_path()))?;
@@ -59,9 +59,7 @@ where
         todo!("nuke is disabled until the packaging reorg settles down")
     }
 
-
     fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err>;
-
 
     fn remote_connection_factory_for_star(
         &self,
@@ -163,7 +161,7 @@ where
             BaseKind::Host => Kind::Host,
             BaseKind::Guest => Kind::Guest,
             BaseKind::Registry => Kind::Registry,
-            BaseKind::WebServer => Kind::WebServer
+            BaseKind::WebServer => Kind::WebServer,
         })
     }
 
@@ -200,7 +198,6 @@ where
         }
         result
     }
-
 }
 
 pub struct Settings {
@@ -215,16 +212,10 @@ impl Default for Settings {
     }
 }
 
-
-pub trait PlatformConfig: Send+Sync
-{
+pub trait PlatformConfig: Send + Sync {
     fn can_scorch(&self) -> bool;
     fn can_nuke(&self) -> bool;
     fn registry(&self) -> &PgRegistryConfig;
 
     fn home(&self) -> &String;
 }
-
-
-
-

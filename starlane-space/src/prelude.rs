@@ -1,3 +1,1 @@
-pub trait Autobox {
-
-}
+pub trait Autobox {}

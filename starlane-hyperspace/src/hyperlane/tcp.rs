@@ -2,6 +2,7 @@ use crate::hyperlane::{
     HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
     HyperwayEndpointFactory,
 };
+use async_trait::async_trait;
 use rcgen::{generate_simple_self_signed, RcgenError};
 use rustls::pki_types::ServerName;
 use rustls::{RootCertStore, ServerConfig};
@@ -11,13 +12,12 @@ use starlane_space::log::Logger;
 use starlane_space::substance::Substance;
 use starlane_space::wave::{PingCore, Wave, WaveVariantDef};
 use starlane_space::VERSION;
+use std::io;
 use std::io::{BufReader, Read};
 use std::str::FromStr;
 use std::string::FromUtf8Error;
 use std::sync::Arc;
 use std::time::Duration;
-use std::io;
-use async_trait::async_trait;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -576,38 +576,34 @@ impl From<&str> for Error {
 
 #[cfg(test)]
 mod tests {
-    use starlane_space::loc::ToSurface;
-    use std::str::FromStr;
-    use std::sync::Arc;
-    use anyhow::anyhow;
-    use chrono::{DateTime, Utc};
     use crate::hyperlane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
     use crate::hyperlane::test_util::{
         LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
     };
-    use starlane_space::point::Point;
+    use anyhow::anyhow;
+    use chrono::{DateTime, Utc};
     use starlane_primitive_macros::{logger, push_loc};
     use starlane_space::err::SpaceErr;
+    use starlane_space::loc::ToSurface;
     use starlane_space::log::{LogAppender, StdOutAppender};
+    use starlane_space::point::Point;
+    use std::str::FromStr;
+    use std::sync::Arc;
 
     #[no_mangle]
-        pub extern "C" fn starlane_uuid() -> String {
-            uuid::Uuid::new_v4().to_string()
-        }
-
-        #[no_mangle]
-        pub extern "C" fn starlane_timestamp() -> DateTime<Utc> {
-            Utc::now()
-        }
-
-    #[no_mangle]
-    extern "C" fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>,SpaceErr> {
-
-            Ok(Arc::new(StdOutAppender()))
-
+    pub extern "C" fn starlane_uuid() -> String {
+        uuid::Uuid::new_v4().to_string()
     }
 
+    #[no_mangle]
+    pub extern "C" fn starlane_timestamp() -> DateTime<Utc> {
+        Utc::now()
+    }
 
+    #[no_mangle]
+    extern "C" fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>, SpaceErr> {
+        Ok(Arc::new(StdOutAppender()))
+    }
 
     //#[tokio::test]
     async fn test_tcp() -> Result<(), Error> {
@@ -617,14 +613,14 @@ mod tests {
             .write_to_dir(".".to_string())
             .await?;
         let logger = logger!();
-        let logger = push_loc!((logger,Point::from_str("tcp-blah").unwrap()));
+        let logger = push_loc!((logger, Point::from_str("tcp-blah").unwrap()));
         let port = 4344u16;
         let server =
             HyperlaneTcpServer::new(port, ".".to_string(), platform.gate.clone(), logger.clone())
                 .await?;
         let api = server.start()?;
 
-        let less_logger = push_loc!((logger,&*LESS));
+        let less_logger = push_loc!((logger, &*LESS));
         let less_client = Box::new(HyperlaneTcpClient::new(
             format!("localhost:{}", port),
             ".",
@@ -633,7 +629,7 @@ mod tests {
             less_logger,
         ));
 
-        let fae_logger = push_loc!((logger,&*FAE));
+        let fae_logger = push_loc!((logger, &*FAE));
         let fae_client = Box::new(HyperlaneTcpClient::new(
             format!("localhost:{}", port),
             ".",
@@ -657,14 +653,14 @@ mod tests {
             .write_to_dir(".".to_string())
             .await?;
         let logger = logger!();
-        let logger = push_loc!((logger,Point::from_str("tcp-blah").unwrap()));
+        let logger = push_loc!((logger, Point::from_str("tcp-blah").unwrap()));
         let port = 4345u16;
         let server =
             HyperlaneTcpServer::new(port, ".".to_string(), platform.gate.clone(), logger.clone())
                 .await?;
         let api = server.start()?;
 
-        let less_logger = push_loc!((logger,&*LESS));
+        let less_logger = push_loc!((logger, &*LESS));
         let less_client = Box::new(HyperlaneTcpClient::new(
             format!("localhost:{}", port),
             ".",
@@ -673,7 +669,7 @@ mod tests {
             less_logger,
         ));
 
-        let fae_logger = push_loc!((logger,&*FAE));
+        let fae_logger = push_loc!((logger, &*FAE));
         let fae_client = Box::new(HyperlaneTcpClient::new(
             format!("localhost:{}", port),
             ".",

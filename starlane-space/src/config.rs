@@ -75,15 +75,13 @@ pub enum Document {
 }
 
 impl Document {
-   pub fn kind(&self) -> DocKind {
-       match self {
-           Document::BindConfig(_) => DocKind::BindConfig,
-           Document::MechtronConfig(_) => DocKind::MechtronConfig,
-       }
-   }
+    pub fn kind(&self) -> DocKind {
+        match self {
+            Document::BindConfig(_) => DocKind::BindConfig,
+            Document::MechtronConfig(_) => DocKind::MechtronConfig,
+        }
+    }
 }
-
-
 
 impl FromStr for Document {
     type Err = ParseErrs;
@@ -93,10 +91,10 @@ impl FromStr for Document {
     }
 }
 
-#[derive(Clone,Hash,Eq,PartialEq,strum_macros::Display,strum_macros::EnumString)]
+#[derive(Clone, Hash, Eq, PartialEq, strum_macros::Display, strum_macros::EnumString)]
 pub enum DocKind {
     BindConfig,
-    MechtronConfig
+    MechtronConfig,
 }
 
 impl AsRef<str> for DocKind {
@@ -104,8 +102,6 @@ impl AsRef<str> for DocKind {
         self.as_ref()
     }
 }
-
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ParticleConfigBody {

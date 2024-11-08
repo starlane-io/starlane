@@ -1,5 +1,8 @@
-
+use crate::database::Database;
+use crate::platform::PlatformConfig;
+use crate::reg::PgRegistryConfig;
 use crate::registry::err::RegErr;
+use crate::registry::postgres::PostgresConnectInfo;
 use crate::shutdown::{add_shutdown_hook, panic_shutdown};
 use derive_builder::Builder;
 use port_check::is_local_ipv4_port_free;
@@ -9,10 +12,6 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::fs;
-use crate::database::Database;
-use crate::platform::PlatformConfig;
-use crate::reg::PgRegistryConfig;
-use crate::registry::postgres::PostgresConnectInfo;
 
 pub struct Postgres {
     config: Database<PgEmbedSettings>,
@@ -35,26 +34,29 @@ impl Postgres {
 
      */
 
-    fn embedded_postgresql(config: &dyn PlatformConfig) -> Result<Settings,RegErr> {
-
+    fn embedded_postgresql(config: &dyn PlatformConfig) -> Result<Settings, RegErr> {
         match config.registry() {
             PgRegistryConfig::Embedded(pg_config) => {
                 let mut settings = Settings::default();
-                settings.data_dir = format!("{}/registry", pg_config.database_dir(config.home()).display())
-                    .to_string()
-                    .into();
-                settings.password_file = format!("{}/.password", pg_config.database_dir(&config.home()).display())
-                    .to_string()
-                    .into();
+                settings.data_dir = format!(
+                    "{}/registry",
+                    pg_config.database_dir(config.home()).display()
+                )
+                .to_string()
+                .into();
+                settings.password_file = format!(
+                    "{}/.password",
+                    pg_config.database_dir(&config.home()).display()
+                )
+                .to_string()
+                .into();
                 settings.port = pg_config.port;
                 settings.temporary = !pg_config.persistent;
                 settings.username = pg_config.username.clone();
                 settings.password = pg_config.password.clone();
                 Ok(settings)
             }
-            PgRegistryConfig::External(_) => {
-                Err(RegErr::ExpectedEmbeddedRegistry)
-            }
+            PgRegistryConfig::External(_) => Err(RegErr::ExpectedEmbeddedRegistry),
         }
     }
 
@@ -69,7 +71,10 @@ impl Postgres {
                 postgres.setup().await?;
 
                 if !is_local_ipv4_port_free(settings.port.clone()) {
-                    let err = format!("postgres registry port '{}' is being used by another process", settings.port);
+                    let err = format!(
+                        "postgres registry port '{}' is being used by another process",
+                        settings.port
+                    );
                     panic_shutdown(err.clone());
                     Err(RegErr::Msg(err.to_string()))?;
                 }
@@ -88,11 +93,8 @@ impl Postgres {
 
                 database.clone().into()
             }
-            PgRegistryConfig::External(database) => {
-                database.clone()
-            }
+            PgRegistryConfig::External(database) => database.clone(),
         };
-
 
         Ok(())
     }
@@ -188,15 +190,13 @@ impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
             database: self.database.clone(),
             schema: self.schema.clone(),
             settings: PostgresConnectInfo {
-            url: self.to_uri(),
-            user: self.username.clone(),
-            password: self.password.clone(),
+                url: self.to_uri(),
+                user: self.username.clone(),
+                password: self.password.clone(),
+            },
         }
     }
-    }
 }
-
-
 
 impl Default for PgEmbedSettings {
     fn default() -> Self {
@@ -224,5 +224,3 @@ impl Default for PgEmbedAuthMethod {
         PgEmbedAuthMethod::Plain
     }
 }
-
-

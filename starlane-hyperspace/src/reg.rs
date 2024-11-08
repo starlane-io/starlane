@@ -1,4 +1,10 @@
+use crate::database::Database;
 use crate::platform::Platform;
+use crate::registry::err::RegErr;
+use crate::registry::postgres::embed::PgEmbedSettings;
+use crate::registry::postgres::PostgresConnectInfo;
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use starlane_space::command::common::{SetProperties, SetRegistry};
 use starlane_space::command::direct::create::Strategy;
 use starlane_space::command::direct::delete::Delete;
@@ -12,18 +18,11 @@ use starlane_space::security::{Access, AccessGrant, IndexedAccessGrant};
 use starlane_space::selector::Selector;
 use starlane_space::substance::SubstanceList;
 use std::sync::Arc;
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use crate::database::Database;
-use crate::registry::err::RegErr;
-use crate::registry::postgres::embed::PgEmbedSettings;
-use crate::registry::postgres::PostgresConnectInfo;
 
 pub type Registry = Arc<dyn RegistryApi>;
 
 #[async_trait]
-pub trait RegistryApi: Send + Sync
-{
+pub trait RegistryApi: Send + Sync {
     async fn scorch<'a>(&'a self) -> Result<(), RegErr>;
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr>;
@@ -51,7 +50,7 @@ pub trait RegistryApi: Send + Sync
 
     async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, RegErr>;
 
-//    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr>;
+    //    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr>;
 
     async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr> {
         let point = select.pattern.query_root();
@@ -79,7 +78,6 @@ pub trait RegistryApi: Send + Sync
         Ok(list)
     }
 
-
     async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, RegErr>;
 
     async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), RegErr>;
@@ -102,21 +100,18 @@ pub trait RegistryApi: Send + Sync
     async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), RegErr>;
 }
 
-pub struct RegistryWrapper
-{
+pub struct RegistryWrapper {
     registry: Registry,
 }
 
-impl RegistryWrapper
-{
+impl RegistryWrapper {
     pub fn new(registry: Registry) -> Self {
         Self { registry }
     }
 }
 
 #[async_trait]
-impl RegistryApi for RegistryWrapper
-{
+impl RegistryApi for RegistryWrapper {
     async fn scorch<'a>(&'a self) -> Result<(), RegErr> {
         self.registry.scorch().await
     }
@@ -236,14 +231,11 @@ pub struct Registration {
 }
 
 pub enum RegistryConfig {
-    #[cfg(feature = "postgres")]
     Postgres(PgRegistryConfig),
 }
 
-#[cfg(feature = "postgres")]
 #[derive(Clone, Serialize, Deserialize)]
 pub enum PgRegistryConfig {
-    #[cfg(feature = "postgres-embedded")]
     Embedded(Database<PgEmbedSettings>),
     External(Database<PostgresConnectInfo>),
 }
@@ -278,4 +270,3 @@ impl TryInto<Database<PgEmbedSettings>> for PgRegistryConfig {
         }
     }
 }
-

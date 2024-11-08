@@ -4,11 +4,11 @@ use starlane_hyperspace::registry::postgres::{
     PostgresRegistryContextHandle,
 };
 
+use starlane_hyperspace::driver::SpaceDriverFactory;
+use starlane_hyperspace::driver::{DriverAvail, DriversBuilder};
 use starlane_hyperspace::driverbase::BaseDriverFactory;
 use starlane_hyperspace::drivercontrol::ControlDriverFactory;
 use starlane_hyperspace::driverroot::RootDriverFactory;
-use starlane_hyperspace::driver::SpaceDriverFactory;
-use starlane_hyperspace::driver::{DriverAvail, DriversBuilder};
 use starlane_space::artifact::asynch::Artifacts;
 use starlane_space::kind::StarSub;
 use starlane_space::loc::{MachineName, StarKey};
@@ -18,11 +18,13 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-
+use crate::database::{Database, LiveDatabase};
+use crate::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
+use crate::err::HypErr;
 use crate::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
 use crate::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
-use crate::reg::{PgRegistryConfig, Registry, RegistryWrapper};
 use crate::platform::{Platform, PlatformConfig};
+use crate::reg::{PgRegistryConfig, Registry, RegistryWrapper};
 use crate::registry::err::RegErr;
 use crate::registry::postgres::embed::PgEmbedSettings;
 use crate::registry::postgres::PostgresDbKey;
@@ -30,17 +32,10 @@ use crate::shutdown::panic_shutdown;
 use anyhow::anyhow;
 use port_check::is_local_ipv4_port_free;
 use serde::{Deserialize, Serialize};
+use starlane_primitive_macros::{logger, push_loc};
 use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
-use starlane_primitive_macros::{logger, push_loc};
-use crate::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
-use crate::database::{Database, LiveDatabase};
-use crate::err::HypErr;
-
-
-
-
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
@@ -276,7 +271,7 @@ where
                 .unwrap();
         };
 
-        let logger = push_loc!((self.logger(),Point::from_str("control-blah").unwrap()));
+        let logger = push_loc!((self.logger(), Point::from_str("control-blah").unwrap()));
 
         if !is_local_ipv4_port_free(STARLANE_CONTROL_PORT.clone()) {
             panic_shutdown(format!(

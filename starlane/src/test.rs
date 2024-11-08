@@ -1,7 +1,4 @@
 use anyhow::anyhow;
 
 #[test]
-pub fn test() {
-
-
-}
+pub fn test() {}

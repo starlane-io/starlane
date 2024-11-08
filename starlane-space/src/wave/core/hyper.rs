@@ -31,7 +31,6 @@ impl Default for HypMethod {
     }
 }
 
-
 // this need ei
 /*
 impl HypMethod {

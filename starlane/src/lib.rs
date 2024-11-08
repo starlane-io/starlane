@@ -9,13 +9,13 @@ extern crate starlane_macros;
 
 extern crate core;
 
-use std::str::FromStr;
 use once_cell::sync::Lazy;
+use std::str::FromStr;
 
 pub mod space {
     use chrono::Utc;
-    pub use starlane_space::*;
     use starlane_space::wasm::Timestamp;
+    pub use starlane_space::*;
 
     #[no_mangle]
     extern "C" fn starlane_uuid() -> loc::Uuid {
@@ -28,13 +28,14 @@ pub mod space {
     }
 }
 
+pub use singularity::*;
 
 pub mod env;
 
 pub mod server;
 
 pub static VERSION: Lazy<semver::Version> =
-    Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap() );
+    Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
 
 pub fn init() {
     #[cfg(feature = "cli")]

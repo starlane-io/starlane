@@ -29,8 +29,6 @@ pub enum AssignmentKind {
     Restore,
 }
 
-
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Location {
     Central,
@@ -117,8 +115,8 @@ impl ParticleRecord {
             },
             location: ParticleLocation {
                 star: Some(Point::central()),
-                host: None
-            }
+                host: None,
+            },
         }
     }
 
@@ -134,12 +132,11 @@ impl ParticleRecord {
             },
             location: ParticleLocation {
                 star: Some(Point::local_star()),
-                host: None
-            }
+                host: None,
+            },
         }
     }
 }
-
 
 impl Into<Stub> for ParticleRecord {
     fn into(self) -> Stub {
@@ -261,20 +258,18 @@ pub enum HyperSubstance {
 
 impl HyperSubstance {
     pub fn kind(&self) -> HyperSubstanceKind {
-       match self {
-           HyperSubstance::Empty => HyperSubstanceKind::Empty,
-           HyperSubstance::Provision(_) => HyperSubstanceKind::Provision,
-           HyperSubstance::Assign(_) => HyperSubstanceKind::Assign,
-           HyperSubstance::Host(_) => HyperSubstanceKind::Host,
-           HyperSubstance::Event(_) => HyperSubstanceKind::Event,
-           HyperSubstance::Log(_) => HyperSubstanceKind::Log,
-           HyperSubstance::Search(_) => HyperSubstanceKind::Search,
-           HyperSubstance::Discoveries(_) => HyperSubstanceKind::Discoveries
-       }
+        match self {
+            HyperSubstance::Empty => HyperSubstanceKind::Empty,
+            HyperSubstance::Provision(_) => HyperSubstanceKind::Provision,
+            HyperSubstance::Assign(_) => HyperSubstanceKind::Assign,
+            HyperSubstance::Host(_) => HyperSubstanceKind::Host,
+            HyperSubstance::Event(_) => HyperSubstanceKind::Event,
+            HyperSubstance::Log(_) => HyperSubstanceKind::Log,
+            HyperSubstance::Search(_) => HyperSubstanceKind::Search,
+            HyperSubstance::Discoveries(_) => HyperSubstanceKind::Discoveries,
+        }
     }
 }
-
-
 
 #[derive(
     Debug,
@@ -333,7 +328,7 @@ pub struct Discoveries {
 impl Default for Discoveries {
     fn default() -> Self {
         Self {
-            vec: Default::default()
+            vec: Default::default(),
         }
     }
 }

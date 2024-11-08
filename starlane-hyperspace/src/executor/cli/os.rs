@@ -1,31 +1,27 @@
-use std::env;
-use std::path::PathBuf;
-use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
-use std::process::Stdio;
-use std::ops::{Deref, DerefMut};
-use async_trait::async_trait;
-use tokio::io::AsyncWriteExt;
 use crate::executor::cli::{CliErr, CliIn, CliOut, HostEnv};
 use crate::executor::{ExeConf, Executor};
 use crate::host::{ExeStub, Host, HostCli, Proc};
+use async_trait::async_trait;
+use std::env;
+use std::ops::{Deref, DerefMut};
+use std::path::PathBuf;
+use std::process::Stdio;
+use tokio::io::AsyncWriteExt;
+use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 
 #[derive(Clone)]
-pub struct CliOsExecutor
-{
+pub struct CliOsExecutor {
     pub stub: ExeStub,
 }
 
 impl CliOsExecutor {
-    pub fn new(stub: ExeStub) -> Self
-    {
+    pub fn new(stub: ExeStub) -> Self {
         Self { stub }
     }
 }
 
-
 #[async_trait]
 impl Executor for CliOsExecutor {
-
     type In = CliIn;
     type Out = CliOut;
     type Err = CliErr;
@@ -35,7 +31,6 @@ impl Executor for CliOsExecutor {
         if !path.exists() {
             Result::Err(CliErr::FileNotFound(self.stub.loc.clone()))?;
         }
-
 
         let mut command = Command::new(self.stub.loc.clone());
 
@@ -62,7 +57,6 @@ impl Executor for CliOsExecutor {
 
         process.close_stdin()?;
 
-
         Ok(CliOut::Os(process))
     }
 
@@ -70,8 +64,6 @@ impl Executor for CliOsExecutor {
         ExeConf::Host(Host::Cli(HostCli::Os(self.stub.clone())))
     }
 }
-
-
 
 pub struct OsProcess {
     child: Child,

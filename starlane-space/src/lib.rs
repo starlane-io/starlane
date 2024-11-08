@@ -16,7 +16,6 @@ extern crate lazy_static;
 #[macro_use]
 extern crate strum_macros;
 
-
 extern crate core;
 
 use std::ops::Deref;
@@ -40,13 +39,7 @@ use crate::err::SpaceErr;
 use crate::hyper::ParticleRecord;
 use crate::wave::Agent;
 
-
 pub(crate) extern crate self as starlane_space;
-
-
-
-
-
 
 /*
 pub fn starlane_uuid() -> Uuid {
@@ -58,23 +51,22 @@ pub fn starlane_timestamp() -> DateTime<Utc> {
 
  */
 
-
+use crate::point::Point;
 use core::str::FromStr;
 use once_cell::sync::Lazy;
-use crate::point::Point;
 
 pub mod artifact;
-pub mod config;
-pub mod parse;
-pub mod particle;
-pub mod wave;
 pub mod asynch;
 pub mod command;
+pub mod config;
 pub mod err;
 pub mod fail;
 pub mod frame;
 pub mod hyper;
 pub mod kind;
+pub mod parse;
+pub mod particle;
+pub mod wave;
 
 #[cfg(feature = "kind2")]
 pub mod kind2;
@@ -93,9 +85,8 @@ pub mod wasm;
 pub mod prelude;
 pub mod task;
 
-
 pub static VERSION: Lazy<semver::Version> =
-    Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap() );
+    Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
 
 pub static HYPERUSER: Lazy<Point> =
     Lazy::new(|| Point::from_str("hyperspace:users:hyperuser").expect("point"));
@@ -108,6 +99,6 @@ pub mod test {
 
     #[test]
     pub fn test_version() {
-                println!("{}", VERSION.to_string());
+        println!("{}", VERSION.to_string());
     }
 }

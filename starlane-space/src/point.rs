@@ -1,7 +1,11 @@
-use crate::err::{ParseErrs};
-use crate::loc::{Layer, PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Topic, VarVal, Variable, Version, CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT};
-use crate::parse::util::{new_span, Trace};
+use crate::err::ParseErrs;
+use crate::loc::{
+    Layer, PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Topic, VarVal,
+    Variable, Version, CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT,
+    LOCAL_HYPERGATE, LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT,
+};
 use crate::parse::util::result;
+use crate::parse::util::{new_span, Trace};
 use crate::parse::{
     consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, Env,
     ResolverErr,
@@ -59,12 +63,8 @@ pub enum RouteSegVar {
 impl From<VarVal<RouteSeg>> for RouteSegVar {
     fn from(value: VarVal<RouteSeg>) -> Self {
         match value {
-            VarVal::Var(var) => {
-               RouteSegVar::Var(var.into())
-            }
-            VarVal::Val(val) => {
-                val.w.into()
-            }
+            VarVal::Var(var) => RouteSegVar::Var(var.into()),
+            VarVal::Val(val) => val.w.into(),
         }
     }
 }
@@ -101,7 +101,8 @@ impl TryInto<RouteSeg> for RouteSegVar {
                 "variable not allowed here",
                 var.trace.range,
                 var.trace.extra,
-            ).into()),
+            )
+            .into()),
             RouteSegVar::Remote => Ok(RouteSeg::Remote),
         }
     }
@@ -268,10 +269,10 @@ impl PointSegKind {
         }
     }
 
-    pub fn is_terminator(&self)  -> bool {
+    pub fn is_terminator(&self) -> bool {
         match self {
             PointSegKind::File => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -370,18 +371,11 @@ pub enum PointSegVar {
     Var(Variable),
 }
 
-
-
 impl From<VarVal<PointSegCtx>> for PointSegVar {
     fn from(value: VarVal<PointSegCtx>) -> Self {
         match value {
-            VarVal::Var(var) => {
-                Self::Var(var.into())
-            }
-            VarVal::Val(val) =>
-                {
-                    val.w.into()
-                }
+            VarVal::Var(var) => Self::Var(var.into()),
+            VarVal::Val(val) => val.w.into(),
         }
     }
 }
@@ -446,19 +440,22 @@ impl TryInto<PointSegCtx> for PointSegVar {
                 "working point not available",
                 trace.range,
                 trace.extra,
-            ).into()),
+            )
+            .into()),
             PointSegVar::Pop(trace) => Err(ParseErrs::from_range(
                 "point pop not available in this context",
                 "point pop not available",
                 trace.range,
                 trace.extra,
-            ).into()),
+            )
+            .into()),
             PointSegVar::Var(var) => Err(ParseErrs::from_range(
                 "variable substitution not available in this context",
                 "var subst not available",
                 var.trace.range,
                 var.trace.extra,
-            ).into()),
+            )
+            .into()),
         }
     }
 }
@@ -480,13 +477,15 @@ impl TryInto<PointSeg> for PointSegCtx {
                 "working point not available",
                 trace.range,
                 trace.extra,
-            ).into()),
+            )
+            .into()),
             PointSegCtx::Pop(trace) => Err(ParseErrs::from_range(
                 "point pop not available in this context",
                 "point pop not available",
                 trace.range,
                 trace.extra,
-            ).into()),
+            )
+            .into()),
         }
     }
 }
@@ -838,7 +837,8 @@ impl ToResolved<Point> for PointCtx {
                             "first segment only",
                             trace.range.clone(),
                             trace.extra.clone(),
-                        ).into());
+                        )
+                        .into());
                     }
                     point = match env.point_or() {
                         Ok(point) => point.clone(),
@@ -848,7 +848,8 @@ impl ToResolved<Point> for PointCtx {
                                 "not available",
                                 trace.range.clone(),
                                 trace.extra.clone(),
-                            ).into());
+                            )
+                            .into());
                         }
                     };
                 }
@@ -876,7 +877,8 @@ impl ToResolved<Point> for PointCtx {
                             "too many point pops",
                             trace.range.clone(),
                             trace.extra.clone(),
-                        ).into());
+                        )
+                        .into());
                     }
                 }
                 PointSegCtx::FilesystemRootDir => {
@@ -958,28 +960,28 @@ where
     pub fn is_root(&self) -> bool {
         self.segments.is_empty()
     }
-
-
 }
 
-
-
-
 impl Point {
-
-
     /// this is kind of a hack because I want to reuse my Selector code on points where
     /// the kind for each segment is not known... I really need to create a PointSelector
     /// that only selects on Point in the future.
     pub fn to_opt_hierarchy(self) -> PointHierarchyOpt {
         PointHierarchyOpt {
             route: self.route,
-            segments: self.segments.into_iter().map( |segment| PointKindSegOpt{ segment, kind: None }).collect()
+            segments: self
+                .segments
+                .into_iter()
+                .map(|segment| PointKindSegOpt {
+                    segment,
+                    kind: None,
+                })
+                .collect(),
         }
     }
 
     pub fn into_surface(self, layer: Layer) -> Surface {
-        Surface::new(self,layer,Topic::None)
+        Surface::new(self, layer, Topic::None)
     }
 
     pub fn to_path(&self) -> PathBuf {
@@ -1285,7 +1287,12 @@ impl Point {
                         format!("{}:{}", self.to_string(), segment)
                     }
                 }
-                PointSeg::File(_) => return Err(ParseErrs::new(&format!("cannot push segment to '{}' segment which is terminal", PointSegKind::File))),
+                PointSeg::File(_) => {
+                    return Err(ParseErrs::new(&format!(
+                        "cannot push segment to '{}' segment which is terminal",
+                        PointSegKind::File
+                    )))
+                }
             };
             Self::from_str(point.as_str())
         }
@@ -1302,7 +1309,10 @@ impl Point {
             Ok(point)
         } else {
             if self.has_filesystem() {
-                 Err(ParseErrs::from(format!("cannot push segment on terminating segment type '{}'",PointSegKind::File)))?
+                Err(ParseErrs::from(format!(
+                    "cannot push segment on terminating segment type '{}'",
+                    PointSegKind::File
+                )))?
             } else {
                 Err(ParseErrs::from(format!("cannot push a non FileSystem PointSegment '{0}' onto a point until after the FileSystemRoot ':/' segment has been pushed",segment.kind())))?
             }
@@ -1360,12 +1370,11 @@ impl Point {
             }
         }
 
-        Err(ParseErrs::from(
-             format!(
-                "Point segment kind: {} not found in point: {}",
-                kind.to_string(),
-                self.to_string()
-            )))
+        Err(ParseErrs::from(format!(
+            "Point segment kind: {} not found in point: {}",
+            kind.to_string(),
+            self.to_string()
+        )))
     }
 
     pub fn md5(&self) -> String {
@@ -1375,7 +1384,6 @@ impl Point {
         format!("{:x}", result)
     }
 }
-
 
 impl FromStr for Point {
     type Err = ParseErrs;
@@ -1454,10 +1462,6 @@ where
     }
 }
 
-
-
-
-
 impl<Route, Seg> ToString for PointDef<Route, Seg>
 where
     Route: RouteSegQuery + ToString,
@@ -1478,11 +1482,10 @@ where
     }
 }
 
-impl <Route,Seg> AsDisplay<'_> for PointDef<Route,Seg>
+impl<Route, Seg> AsDisplay<'_> for PointDef<Route, Seg>
 where
     Route: RouteSegQuery + ToString,
     Seg: PointSegQuery + ToString,
-
 {
     type Target = String;
 
@@ -1570,7 +1573,3 @@ pub type PointCtx = PointDef<RouteSeg, PointSegCtx>;
 /// let point: Point = point_var.to_resolve(&env)?;
 /// ```
 pub type PointVar = PointDef<RouteSegVar, PointSegVar>;
-
-
-
-

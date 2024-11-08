@@ -6,7 +6,6 @@ use thiserror::Error;
 use tokio::io;
 use tokio::sync::oneshot::error::RecvError;
 
-#[cfg(feature = "postgres")]
 use crate::registry::err::RegErr;
 use starlane_space::err::{CoreReflector, HyperSpatialError, SpaceErr, SpatialError};
 use starlane_space::kind::Kind;
@@ -15,10 +14,9 @@ use starlane_space::substance::{Substance, SubstanceKind};
 use starlane_space::wave::core::http2::StatusCode;
 use starlane_space::wave::core::ReflectedCore;
 
-
 pub type HyperErr2 = anyhow::Error;
-pub use anyhow::anyhow as err;
 use crate::star::StarErr;
+pub use anyhow::anyhow as err;
 
 #[derive(Error, Debug)]
 pub enum HypErr {
@@ -67,7 +65,7 @@ impl CoreReflector for HypErr {
                 ReflectedCore {
                     headers: Default::default(),
                     status: StatusCode::from_u16(500u16).unwrap(),
-                    body: err.to_substance()
+                    body: err.to_substance(),
                 }
             }
         }
@@ -250,5 +248,3 @@ pub mod convert {
 }
 
  */
-
-

@@ -25,7 +25,7 @@ pub enum CmdMethod {
     RawCommand,
     Log,
 }
-impl Default for CmdMethod{
+impl Default for CmdMethod {
     fn default() -> Self {
         Self::Init
     }

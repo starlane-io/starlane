@@ -260,31 +260,34 @@ impl TryInto<http::Response<Bin>> for ReflectedCore {
 
  */
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Autobox, strum_macros::EnumString,strum_macros::Display )]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Autobox,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
 pub enum Method {
-    #[strum(to_string="Hyp<{0}>")]
+    #[strum(to_string = "Hyp<{0}>")]
     Hyp(HypMethod),
-    #[strum(to_string="Cmd<{0}>")]
+    #[strum(to_string = "Cmd<{0}>")]
     Cmd(CmdMethod),
-    #[strum(to_string="Http<{0}>")]
+    #[strum(to_string = "Http<{0}>")]
     Http(HttpMethod),
-    #[strum(to_string="Ext<{0}>")]
+    #[strum(to_string = "Ext<{0}>")]
     Ext(ExtMethod),
 }
 
-
-
-
-
-
-pub trait BodyExpect {
-}
-
+pub trait BodyExpect {}
 
 impl AsDisplay<'_> for Method {
     type Target = String;
 
-    fn as_display(& self) -> Self::Target {
+    fn as_display(&self) -> Self::Target {
         self.to_deep_string()
     }
 }
@@ -382,8 +385,6 @@ impl Method {
         }
     }
 }
-
-
 
 impl Into<DirectedCore> for Method {
     fn into(self) -> DirectedCore {

@@ -1,11 +1,11 @@
 use ::core::borrow::Borrow;
 use ::core::fmt::{write, Display, Formatter};
+use anyhow::anyhow;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ops;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use anyhow::anyhow;
-use serde::{Deserialize, Serialize};
 
 use self::core::cmd::CmdMethod;
 use self::core::ext::ExtMethod;
@@ -15,9 +15,7 @@ use self::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
 use crate::command::RawCommand;
 use crate::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError, StatusErr};
 use crate::loc::{Surface, ToPoint, ToSurface, Uuid};
-use crate::log::{
-    Spanner, Trackable, TrailSpanId,
-};
+use crate::log::{Spanner, Trackable, TrailSpanId};
 use crate::parse::model::Subst;
 use crate::particle::Watch;
 use crate::point::{Point, PointSeg, RouteSeg};
@@ -25,8 +23,7 @@ use crate::security::{Permissions, Privilege};
 use crate::selector::Selector;
 use crate::substance::Bin;
 use crate::substance::{
-    Call, CallKind, CmdCall, ExtCall, HttpCall, HypCall, Substance
-    , ToRequestCore, ToSubstance,
+    Call, CallKind, CmdCall, ExtCall, HttpCall, HypCall, Substance, ToRequestCore, ToSubstance,
 };
 use crate::util::{uuid, ValueMatcher};
 use crate::wave::core::http2::StatusCode;
@@ -90,8 +87,7 @@ impl SingularWave {
 pub type Ping = WaveVariantDef<PingCore>;
 pub type Pong = WaveVariantDef<PongCore>;
 pub type Echo = WaveVariantDef<EchoCore>;
-pub type Signal  = WaveVariantDef<SignalCore>;
-
+pub type Signal = WaveVariantDef<SignalCore>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum WaveDef<T>
@@ -592,7 +588,6 @@ impl Display for WaveId {
     }
 }
 
-
 impl WaveId {
     pub fn new(kind: WaveKind) -> Self {
         let uuid = uuid();
@@ -628,7 +623,6 @@ impl ToString for WaveId {
 }
 
  */
-
 
 pub trait Reflectable<R> {
     fn forbidden(self, responder: Surface) -> R
@@ -1728,7 +1722,7 @@ impl PongCore {
         self.core.as_result()
     }
     pub fn ok_or_anyhow(&self) -> Result<(), Arc<anyhow::Error>> {
-        self.ok_or().map_err(|e|e.anyhow())
+        self.ok_or().map_err(|e| e.anyhow())
     }
 
     pub fn ok_or(&self) -> Result<(), SpaceErr> {
@@ -1736,7 +1730,10 @@ impl PongCore {
             Ok(())
         } else {
             if let Substance::FormErrs(errs) = &self.core.body {
-                Err(SpaceErr::Status {status: self.core.status.as_u16(), message: errs.to_string() })
+                Err(SpaceErr::Status {
+                    status: self.core.status.as_u16(),
+                    message: errs.to_string(),
+                })
             } else if let Substance::Err(err) = &self.core.body {
                 Err(SpaceErr::Msg(err.to_string()))
             } else {

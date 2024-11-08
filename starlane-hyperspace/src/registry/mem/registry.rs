@@ -1,5 +1,7 @@
 use crate::platform::Platform;
 use crate::reg::{Registration, RegistryApi};
+use crate::registry::err::RegErr;
+use async_trait::async_trait;
 use dashmap::DashMap;
 use starlane_space::command::common::{PropertyMod, SetProperties};
 use starlane_space::command::direct::delete::Delete;
@@ -10,13 +12,11 @@ use starlane_space::particle::{Details, Properties, Property, Status, Stub};
 use starlane_space::point::Point;
 use starlane_space::security::{Access, AccessGrant, IndexedAccessGrant};
 use starlane_space::selector::Selector;
-use starlane_space::util::ValueMatcher;
 use starlane_space::substance::SubstanceList;
+use starlane_space::util::ValueMatcher;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU64;
 use std::sync::{atomic, Arc};
-use async_trait::async_trait;
-use crate::registry::err::RegErr;
 
 impl MemoryRegistryCtx {
     pub fn new() -> Self {
@@ -35,16 +35,14 @@ pub struct MemoryRegistryCtx {
     pub properties: Arc<DashMap<Point, Properties>>,
 }
 
-pub struct MemoryRegistry
-{
+pub struct MemoryRegistry {
     ctx: MemoryRegistryCtx,
 }
 
-impl MemoryRegistry
-{
+impl MemoryRegistry {
     pub fn new() -> Self {
         let ctx = MemoryRegistryCtx::new();
-        Self {  ctx }
+        Self { ctx }
     }
 
     fn ctx(&self) -> &MemoryRegistryCtx {
@@ -53,8 +51,7 @@ impl MemoryRegistry
 }
 
 #[async_trait]
-impl RegistryApi for MemoryRegistry
-{
+impl RegistryApi for MemoryRegistry {
     async fn scorch<'a>(&'a self) -> Result<(), RegErr> {
         Ok(())
     }
@@ -162,7 +159,6 @@ impl RegistryApi for MemoryRegistry
         todo!()
     }
 
-
     async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, RegErr> {
         todo!()
     }
@@ -196,5 +192,3 @@ impl RegistryApi for MemoryRegistry
         todo!()
     }
 }
-
-

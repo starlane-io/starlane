@@ -1,14 +1,17 @@
-use starlane_hyperspace::drivercontrol::{ControlCliSession, ControlClient};
+use crate::env::STARLANE_HOME;
 use crate::hyperlane::tcp::HyperlaneTcpClient;
 use crate::hyperlane::HyperwayEndpointFactory;
 use clap::clap_derive::{Args, Subcommand};
 use clap::Parser;
-use starlane_space::space::parse::util::new_span;
+use starlane_hyperspace::drivercontrol::{ControlCliSession, ControlClient};
+use starlane_primitive_macros::logger;
 use starlane_space::command::{CmdTransfer, RawCommand};
 use starlane_space::err::SpaceErr;
 use starlane_space::hyper::Knock;
+use starlane_space::parse::util::result;
 use starlane_space::parse::{upload_blocks, SkewerCase};
 use starlane_space::point::Point;
+use starlane_space::space::parse::util::new_span;
 use starlane_space::substance::Substance;
 use starlane_space::wave::core::ReflectedCore;
 use std::fs::File;
@@ -20,18 +23,11 @@ use strum_macros::EnumString;
 use tokio::io::AsyncWriteExt;
 use walkdir::{DirEntry, WalkDir};
 use zip::write::FileOptions;
-use starlane_space::parse::util::result;
-use starlane_primitive_macros::logger;
-use crate::env::STARLANE_HOME;
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
 pub struct Cli {
-    #[arg(
-    short,
-            long,
-            default_value_t = true
-    )]
+    #[arg(short, long, default_value_t = true)]
     pub logs: bool,
 
     #[command(subcommand)]
@@ -41,26 +37,26 @@ pub struct Cli {
 #[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
 #[command(version, about, long_about = None)]
 pub enum Commands {
-    Install{
-        #[arg(long,short)]
+    Install {
+        #[arg(long, short)]
         edit: bool,
-        #[arg(long,short)]
-        nuke: bool
+        #[arg(long, short)]
+        nuke: bool,
     },
     Run,
     Term(TermArgs),
     Version,
     Splash,
     Scorch,
-    Nuke{
+    Nuke {
         #[arg(long)]
-        all: bool
+        all: bool,
     },
-    Context(ContextArgs)
+    Context(ContextArgs),
 }
 
-#[derive(Debug,Args)]
-pub struct ContextArgs{
+#[derive(Debug, Args)]
+pub struct ContextArgs {
     #[clap(subcommand)]
     pub command: ContextCmd,
 }
@@ -71,13 +67,13 @@ impl Default for ContextArgs {
     }
 }
 
-#[derive(Debug,Subcommand,EnumString, strum_macros::Display)]
+#[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
 pub enum ContextCmd {
-    Create{ context_name: String},
-    Switch{ context_name: String},
+    Create { context_name: String },
+    Switch { context_name: String },
     Default,
     List,
-    Which
+    Which,
 }
 
 #[derive(Debug, Args)]
@@ -90,16 +86,15 @@ pub struct TermArgs {
     certs: Option<String>,
 
     #[arg(long)]
-    history_log: Option<String>
+    history_log: Option<String>,
 }
 
 impl Default for TermArgs {
     fn default() -> Self {
-
         Self {
             host: None,
             certs: None,
-            history_log: None
+            history_log: None,
         }
     }
 }
@@ -120,7 +115,6 @@ pub async fn term(args: TermArgs) -> Result<(), SpaceErr> {
         Some(host) => host.clone(),
     };
 
-
     let session = Session::new(host, certs).await?;
 
     let mut rl = rustyline::DefaultEditor::new().unwrap();
@@ -128,7 +122,6 @@ pub async fn term(args: TermArgs) -> Result<(), SpaceErr> {
     rl.save_history(history_log.as_str());
 
     loop {
-
         let line = rl.readline(">> ").unwrap();
         rl.add_history_entry(history_log.as_str());
 
@@ -142,7 +135,6 @@ pub async fn term(args: TermArgs) -> Result<(), SpaceErr> {
             session.command(line.as_str()).await?;
         }
     }
-
 }
 
 pub struct Session {

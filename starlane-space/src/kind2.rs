@@ -657,17 +657,15 @@ pub mod parse {
     #[cfg(test)]
     pub mod test {
         use crate::kind2::parse::{
-            camel_case_sub_types, camel_case_sub_types_selector, opt_pattern,
-            preceded_opt_pattern, proto_kind, proto_variant, specific, specific_full_selector,
-            specific_selector, specific_sub_types,
+            camel_case_sub_types, camel_case_sub_types_selector, opt_pattern, preceded_opt_pattern,
+            proto_kind, proto_variant, specific, specific_full_selector, specific_selector,
+            specific_sub_types,
         };
         use crate::kind2::{IsMatch, OptPattern};
 
         use crate::parse::util::new_span;
         use crate::parse::util::result;
-        use crate::parse::{
-            camel_case, expect, CamelCase,
-        };
+        use crate::parse::{camel_case, expect, CamelCase};
         use crate::util::log;
         use core::str::FromStr;
         use nom::bytes::complete::tag;

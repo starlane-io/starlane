@@ -1,7 +1,9 @@
 use crate::reg::Registration;
-use crate::star::{HyperStarSkel, SmartLocator, StarErr};
 use crate::registry::err::RegErr;
+use crate::star::{HyperStarSkel, SmartLocator, StarErr};
 use once_cell::sync::Lazy;
+use starlane_macros::{handler, route, DirectedHandler};
+use starlane_primitive_macros::push_mark;
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::direct::create::{Create, PointSegTemplate};
 use starlane_space::command::Command;
@@ -10,6 +12,7 @@ use starlane_space::config::bind::BindConfig;
 use starlane_space::err::{CoreReflector, SpaceErr};
 use starlane_space::loc::{ToPoint, ToSurface};
 use starlane_space::log::Logger;
+use starlane_space::parse::util::new_span;
 use starlane_space::parse::util::result;
 use starlane_space::parse::{bind_config, command_line};
 use starlane_space::particle::{Details, Status};
@@ -21,13 +24,10 @@ use starlane_space::wave::core::http2::StatusCode;
 use starlane_space::wave::core::ReflectedCore;
 use starlane_space::wave::exchange::asynch::{DirectedHandler, InCtx};
 use starlane_space::wave::{Agent, DirectedProto};
-use starlane_space::parse::util::new_span;
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
 use thiserror_context::impl_context;
-use starlane_macros::{handler, route, DirectedHandler};
-use starlane_primitive_macros::push_mark;
 /*
 #[derive(DirectedHandler,Clone)]
 pub struct Global where P: Platform {
@@ -110,7 +110,7 @@ pub struct GlobalExecutionChamber {
 impl GlobalExecutionChamber {
     pub fn new(skel: HyperStarSkel) -> Self {
         let logger = push_mark!(skel.logger);
-        Self { skel, logger}
+        Self { skel, logger }
     }
 
     #[track_caller]
@@ -190,7 +190,3 @@ impl GlobalExecutionChamber {
         Ok(record.details)
     }
 }
-
-
-
-

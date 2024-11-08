@@ -2,6 +2,7 @@ pub mod os;
 
 use crate::executor::Executor;
 use itertools::Itertools;
+use nom::AsBytes;
 use os::OsProcess;
 use std::collections::HashMap;
 use std::env;
@@ -10,7 +11,6 @@ use std::io::Error;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::sync::Arc;
-use nom::AsBytes;
 use thiserror::Error;
 use tokio::io::AsyncWriteExt;
 
@@ -166,7 +166,7 @@ impl CliOut {
     }
 }
 
-pub type CliExecutor = Box<dyn Executor<In = CliIn, Out = CliOut, Err=CliErr>>;
+pub type CliExecutor = Box<dyn Executor<In = CliIn, Out = CliOut, Err = CliErr>>;
 
 // CLiErr should really be limited in scope to bad or missin args,env variable etc...
 // things like stdout dropping etc... should be part of HostErr...

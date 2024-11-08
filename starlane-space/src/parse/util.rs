@@ -5,7 +5,10 @@ use core::fmt::Display;
 use nom::character::complete::multispace0;
 use nom::error::{ErrorKind, ParseError};
 use nom::sequence::delimited;
-use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Needed, Offset, Slice};
+use nom::{
+    AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength,
+    InputTake, InputTakeAtPosition, Needed, Offset, Slice,
+};
 use nom_locate::LocatedSpan;
 use nom_supreme::error::{GenericErrorTree, StackContext};
 use nom_supreme::final_parser::ExtractContext;
@@ -190,7 +193,7 @@ impl Trace {
     pub fn scan<F, I: Span, O, C, E>(f: F, input: I) -> Self
     where
         F: FnMut(I) -> Res<I, O, C, E> + Copy,
-        E: std::error::Error + Send + Sync + 'static
+        E: std::error::Error + Send + Sync + 'static,
     {
         let extra = input.extra();
         let range = input.location_offset()..len(f)(input);
@@ -857,22 +860,23 @@ where
     }
 }
 
-type Res<I: Span, O, C, E: std::error::Error + Send + Sync + 'static> = IResult<I, O, GenericErrorTree<I, &'static str, C, E>>;
+type Res<I: Span, O, C, E: std::error::Error + Send + Sync + 'static> =
+    IResult<I, O, GenericErrorTree<I, &'static str, C, E>>;
 
 pub fn wrap<I, F, O, C, E>(mut f: F) -> impl FnMut(I) -> Res<I, O, C, E>
 where
     I: Span,
     F: FnMut(I) -> Res<I, O, C, E> + Copy,
-    E: std::error::Error + Send + Sync + 'static
+    E: std::error::Error + Send + Sync + 'static,
 {
     move |input: I| f(input)
 }
 
-pub fn len<I, F, O, C,E>(f: F) -> impl FnMut(I) -> usize
+pub fn len<I, F, O, C, E>(f: F) -> impl FnMut(I) -> usize
 where
     I: Span,
     F: FnMut(I) -> Res<I, O, C, E> + Copy,
-    E: std::error::Error + Send + Sync + 'static
+    E: std::error::Error + Send + Sync + 'static,
 {
     move |input: I| match recognize(wrap(f))(input) {
         Ok((_, span)) => span.len(),
@@ -884,47 +888,36 @@ pub fn trim<I, F, O, C, E>(f: F) -> impl FnMut(I) -> Res<I, O, C, E>
 where
     I: Span,
     F: FnMut(I) -> Res<I, O, C, E> + Copy,
-    E: std::error::Error + Send + Sync + 'static
+    E: std::error::Error + Send + Sync + 'static,
 {
     move |input: I| delimited(multispace0, f, multispace0)(input)
 }
 
-
 pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<SpaceTree<I>>>) -> Result<R, ParseErrs> {
     match result {
         Ok((_, e)) => Ok(e),
-        Err(nom::Err::Error(err)) => {
-            Result::Err(err.into())
-        }
-        Err(nom::Err::Failure(err)) => {
-            Result::Err(err.into())
-        }
-        _ =>  {
-            Result::Err(ParseErrs::new(&"Unidentified nom parse error"))
-        }
-
+        Err(nom::Err::Error(err)) => Result::Err(err.into()),
+        Err(nom::Err::Failure(err)) => Result::Err(err.into()),
+        _ => Result::Err(ParseErrs::new(&"Unidentified nom parse error")),
     }
 }
 
-
-pub fn parse_errs<R,E>(result: Result<R,E>) -> Result<R, ParseErrs> where E: Display {
+pub fn parse_errs<R, E>(result: Result<R, E>) -> Result<R, ParseErrs>
+where
+    E: Display,
+{
     match result {
         Ok(ok) => Ok(ok),
-        Err(err) => Err(ParseErrs::new(&(err.to_string())))
+        Err(err) => Err(ParseErrs::new(&(err.to_string()))),
     }
 }
 
-pub fn unstack( ctx: &StackContext<ErrCtx>) -> String {
+pub fn unstack(ctx: &StackContext<ErrCtx>) -> String {
     match ctx {
-        StackContext::Kind(k) => {
-            k.description().to_string()
-        }
-        StackContext::Context(c) => {
-            format!("{}",c).to_string()
-        }
+        StackContext::Kind(k) => k.description().to_string(),
+        StackContext::Context(c) => format!("{}", c).to_string(),
     }
 }
-
 
 pub fn recognize<I: Clone + Offset + Slice<RangeTo<usize>>, O, E: ParseError<I>, F>(
     mut parser: F,
@@ -944,45 +937,51 @@ where
     }
 }
 
-
-pub fn log_parse_err<I,O>(result: crate::parse::Res<I,O>) -> crate::parse::Res<I,O> where I: Span{
-
+pub fn log_parse_err<I, O>(result: crate::parse::Res<I, O>) -> crate::parse::Res<I, O>
+where
+    I: Span,
+{
     if let Result::Err(err) = &result {
         match err {
             nom::Err::Incomplete(_) => {}
             nom::Err::Error(e) => print(e),
-            nom::Err::Failure(e) => print(e)
+            nom::Err::Failure(e) => print(e),
         }
     }
     result
 }
 
-pub fn print<I>(err: &SpaceTree<I>) where I: Span{
-
+pub fn print<I>(err: &SpaceTree<I>)
+where
+    I: Span,
+{
     match err {
         SpaceTree::Base { .. } => {
             println!("BASE!");
         }
-        SpaceTree::Stack { base,contexts } => {
-
+        SpaceTree::Stack { base, contexts } => {
             println!("STACK!");
             let mut contexts = contexts.clone();
             contexts.reverse();
             let mut message = String::new();
 
-            if !contexts.is_empty()  {
-                if let (location,err) = contexts.remove(0) {
+            if !contexts.is_empty() {
+                if let (location, err) = contexts.remove(0) {
                     let mut last = &err;
-                    println!("line {} column: {}",location.location_line(), location.get_column());
+                    println!(
+                        "line {} column: {}",
+                        location.location_line(),
+                        location.get_column()
+                    );
                     let line = unstack(&err);
                     message.push_str(line.as_str());
 
-                    for (span,context) in contexts.iter() {
+                    for (span, context) in contexts.iter() {
                         last = context;
-                        let line = format!("\n\t\tcaused by: {}",unstack(&context));
+                        let line = format!("\n\t\tcaused by: {}", unstack(&context));
                         message.push_str(line.as_str());
                     }
-                    ParseErrs::from_loc_span(message.as_str(), last.to_string(), location ).print();
+                    ParseErrs::from_loc_span(message.as_str(), last.to_string(), location).print();
                 }
             }
         }
@@ -990,7 +989,6 @@ pub fn print<I>(err: &SpaceTree<I>) where I: Span{
             println!("ALT!");
         }
     }
-
 }
 
 pub fn preceded<I, O1, O2, E: ParseError<I>, F, G>(
@@ -1006,6 +1004,3 @@ where
         second.parse(input)
     }
 }
-
-
-

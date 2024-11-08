@@ -1,7 +1,6 @@
 #![crate_type = "lib"]
 #![allow(warnings)]
 
-
 use proc_macro::TokenStream;
 use std::str::FromStr;
 
@@ -9,15 +8,18 @@ use chrono::Utc;
 use proc_macro2::Ident;
 use quote::__private::ext::RepToTokensExt;
 use quote::{format_ident, quote, ToTokens};
-use syn::__private::TokenStream2;
-use syn::parse::{Parse, ParseStream};
-use syn::parse_quote::ParseQuote;
-use syn::spanned::Spanned;
-use syn::{parse_macro_input, Attribute, DeriveInput, FnArg, GenericArgument, ImplItem, ItemImpl, PathArguments, PathSegment, ReturnType, Type};
 use starlane_space::loc;
 use starlane_space::parse::route_attribute_value;
 use starlane_space::util::log;
 use starlane_space::wasm::Timestamp;
+use syn::__private::TokenStream2;
+use syn::parse::{Parse, ParseStream};
+use syn::parse_quote::ParseQuote;
+use syn::spanned::Spanned;
+use syn::{
+    parse_macro_input, Attribute, DeriveInput, FnArg, GenericArgument, ImplItem, ItemImpl,
+    PathArguments, PathSegment, ReturnType, Type,
+};
 
 #[no_mangle]
 extern "C" fn starlane_uuid() -> loc::Uuid {
@@ -81,7 +83,6 @@ pub fn handler(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn handler_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
     _handler(attr, item, false)
 }
-
 
 fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
     let item_cp = item.clone();
@@ -314,7 +315,6 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-
 pub(crate) enum Item {
     Request,
     RequestCore,
@@ -423,8 +423,6 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
     }
 }
 
-
-
 struct RouteAttr {
     attribute: Attribute,
 }
@@ -437,7 +435,6 @@ impl Parse for RouteAttr {
         })
     }
 }
-
 
 /// adds a trait to given struct or enum
 #[proc_macro_derive(ToSpaceErr)]
@@ -453,5 +450,3 @@ pub fn to_space_err(item: TokenStream) -> TokenStream {
     };
     rtn.into()
 }
-
-

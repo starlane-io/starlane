@@ -7,9 +7,14 @@ use crate::hyperlane::{
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
     InterchangeGate, TransportTransform,
 };
-use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::platform::Platform;
+use crate::star::{HyperStarSkel, LayerInjectionRouter};
+use anyhow::anyhow;
+use async_trait::async_trait;
 use dashmap::DashMap;
+use starlane_macros::DirectedHandler;
+use starlane_primitive_macros::logger;
+pub use starlane_space as starlane;
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{
@@ -21,6 +26,7 @@ use starlane_space::err::{CoreReflector, SpaceErr};
 use starlane_space::hyper::{ControlPattern, Greet, InterchangeKind};
 use starlane_space::kind::{BaseKind, Kind, StarSub};
 use starlane_space::loc::{Layer, PointFactory, Surface, ToSurface};
+use starlane_space::log::{Logger, Tracker};
 use starlane_space::particle::traversal::Traversal;
 use starlane_space::point::Point;
 use starlane_space::selector::KindSelector;
@@ -33,17 +39,11 @@ use starlane_space::wave::exchange::asynch::{
 };
 use starlane_space::wave::exchange::SetStrategy;
 use starlane_space::wave::{Agent, DirectedProto, PongCore, ToRecipients, Wave, WaveVariantDef};
-pub use starlane_space as starlane;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use anyhow::anyhow;
-use async_trait::async_trait;
 use thiserror::Error;
-use starlane_macros::DirectedHandler;
-use starlane_space::log::{Logger, Tracker};
-use starlane_primitive_macros::logger;
 
 pub struct ControlDriverFactory {}
 
@@ -164,7 +164,7 @@ impl Driver for ControlDriver {
             self.skel.driver.logger.clone(),
         );
         let point = skel.point.clone();
-        let mut interchange = HyperwayInterchange::new(point,self.skel.driver.logger.clone());
+        let mut interchange = HyperwayInterchange::new(point, self.skel.driver.logger.clone());
         let hyperway = Hyperway::new(
             Point::remote_endpoint().to_surface(),
             Agent::HyperUser,
@@ -495,14 +495,12 @@ pub enum ControlErr {
     SpaceErr(#[from] SpaceErr),
 }
 
-
-
 impl CoreReflector for ControlErr {
     fn as_reflected_core(self) -> ReflectedCore {
         ReflectedCore {
             headers: Default::default(),
             status: Default::default(),
-            body: Substance::Err(SubstanceErr(format!("{}",self.to_string())))
+            body: Substance::Err(SubstanceErr(format!("{}", self.to_string()))),
         }
     }
 }

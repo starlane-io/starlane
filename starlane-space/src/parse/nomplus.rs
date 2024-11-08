@@ -1,7 +1,7 @@
-use nom::{AsChar, InputTakeAtPosition};
-use nom::error::ErrorKind;
-use crate::parse::Res;
 use crate::parse::util::Span;
+use crate::parse::Res;
+use nom::error::ErrorKind;
+use nom::{AsChar, InputTakeAtPosition};
 
 pub(crate) fn lowercase1<T: Span>(i: T) -> Res<T, T>
 where

@@ -21,11 +21,11 @@ pub struct ExtMethod {
     string: String,
 }
 
-
-
 impl Default for ExtMethod {
     fn default() -> Self {
-        Self{ string: "Default".to_string() }
+        Self {
+            string: "Default".to_string(),
+        }
     }
 }
 
@@ -42,7 +42,6 @@ impl Display for ExtMethod {
         f.write_str(&self.string)
     }
 }
-
 
 impl ValueMatcher<ExtMethod> for ExtMethod {
     fn is_match(&self, x: &ExtMethod) -> Result<(), ()> {
@@ -86,8 +85,6 @@ impl Deref for ExtMethod {
         &self.string
     }
 }
-
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtDirected {

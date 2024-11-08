@@ -1,13 +1,10 @@
-
-
-
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
 use crate::parse::util::new_span;
 
-use crate::err::{ParseErrs};
+use crate::err::ParseErrs;
 use crate::parse::consume_path;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -56,9 +53,7 @@ impl Path {
                 None => Option::None,
                 Some(some) => match Self::from_str(some) {
                     Ok(parent) => Option::Some(parent),
-                    Err(error) => {
-                        Option::None
-                    }
+                    Err(error) => Option::None,
                 },
             },
         }

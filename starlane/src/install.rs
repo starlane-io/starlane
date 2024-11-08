@@ -1,6 +1,12 @@
-use crate::env::{config, config_path, config_save, context, context_dir, Enviro, GlobalMode, StdEnviro, STARLANE_GLOBAL_SETTINGS, STARLANE_HOME};
+use crate::database::Database;
+use crate::env::{
+    config, config_path, config_save, context, context_dir, Enviro, GlobalMode, StdEnviro,
+    STARLANE_GLOBAL_SETTINGS, STARLANE_HOME,
+};
 use crate::foundation::{Foundation, StandAloneFoundation};
+use crate::reg::PgRegistryConfig;
 use crate::registry::postgres::embed::PgEmbedSettings;
+use crate::server::StarlaneConfig;
 use crate::shutdown::shutdown;
 use crate::{env, COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION};
 use anyhow::anyhow;
@@ -27,9 +33,6 @@ use std::time::Duration;
 use std::{io, thread};
 use text_to_ascii_art::to_art;
 use textwrap::Options;
-use crate::server::StarlaneConfig;
-use crate::database::Database;
-use crate::reg::PgRegistryConfig;
 
 #[tokio::main]
 pub async fn install(edit: bool) -> Result<(), anyhow::Error> {
@@ -166,7 +169,7 @@ impl StandaloneInstaller {
         let mut spinner = self.console.spinner();
         spinner.start("starting Standalone installer");
         self.console.long_delay();
-        spinner.next("Standalone installer started.","generating config");
+        spinner.next("Standalone installer started.", "generating config");
         let config = config().unwrap_or_default().unwrap_or_default();
         spinner.next("config generated", "saving config");
         env::config_save(config.clone())?;
@@ -187,13 +190,10 @@ impl StandaloneInstaller {
                     "creating registry data directory",
                 );
                 tokio::fs::create_dir_all(db.settings.database_dir.unwrap_or_default()).await?;
-                spinner.stop(
-                    "data directory created successfully",
-                );
+                spinner.stop("data directory created successfully");
             }
             PgRegistryConfig::External(_) => {}
         }
-
 
         let bar = self.console.progress_bar(100);
         bar.start("downloading postgres...");

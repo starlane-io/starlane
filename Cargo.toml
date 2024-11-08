@@ -15,7 +15,7 @@ description="The Workspace package for Starlane.  What to see: './starlane-space
 [workspace]
 default-run = "starlane"
 resolver = "2"
-members = [ "starlane", "starlane-hyperspace", "starlane-macros", "starlane-primitive-macros", "starlane-space" ]
+members = [ "singularity", "starlane", "starlane-hyperspace", "starlane-macros", "starlane-primitive-macros", "starlane-space" ]
 
 
 #members = [
@@ -25,6 +25,7 @@ members = [ "starlane", "starlane-hyperspace", "starlane-macros", "starlane-prim
 exclude = [ ]
 
 [workspace.dependencies]
+singularity = { path="./singularity" , version = "0.3.20" }
 starlane = { path="./starlane" , version = "0.3.20" }
 starlane-macros = { path="./starlane-macros", version = "0.3.20" }
 starlane-primitive-macros = { path="./starlane-primitive-macros", version = "0.3.20" }

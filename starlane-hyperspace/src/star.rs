@@ -1,41 +1,31 @@
-use async_recursion::async_recursion;
-use dashmap::DashMap;
-use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
-use std::marker::PhantomData;
-use std::ops::Add;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::Duration;
-use anyhow::{Context, Error};
-use async_trait::async_trait;
-use thiserror::Error;
-use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{DriverErr, DriverStatus, DriversApi, DriversBuilder, DriversCall};
-use crate::hyperlane::{
-    Bridge, HyperwayEndpoint, HyperwayEndpointFactory,
-    HyperwayInterchange, HyperwayStub,
-};
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
+use crate::hyperlane::{
+    Bridge, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
+};
 use crate::layer::field::Field;
 use crate::layer::shell::{Shell, ShellState};
 use crate::machine::{MachineApi, MachineErr, MachineSkel};
 use crate::platform::Platform;
 use crate::reg::{Registration, Registry};
+use crate::registry::err::RegErr;
+use crate::service::ServiceTemplate;
+use crate::template::Templates;
+use anyhow::{Context, Error};
+use async_recursion::async_recursion;
+use async_trait::async_trait;
+use dashmap::DashMap;
+use itertools::Itertools;
+use starlane_primitive_macros::{log_span, push_loc, push_mark};
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{Create, Strategy};
 use starlane_space::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError};
-use starlane_space::hyper::{
-    Assign, AssignmentKind, HyperSubstance,
-    Provision, Search,
-};
+use starlane_space::hyper::{Assign, AssignmentKind, HyperSubstance, Provision, Search};
 use starlane_space::hyper::{MountKind, ParticleLocation};
 use starlane_space::kind::{Kind, StarStub, StarSub};
 use starlane_space::loc::{
-    Layer, StarKey, Surface, SurfaceSelector, ToPoint, ToSurface,
-    GLOBAL_EXEC,
+    Layer, StarKey, Surface, SurfaceSelector, ToPoint, ToSurface, GLOBAL_EXEC,
 };
 use starlane_space::log::{Logger, Trackable, Tracker};
 use starlane_space::particle::traversal::{
@@ -47,30 +37,35 @@ use starlane_space::substance::{Substance, SubstanceErr, SubstanceKind};
 use starlane_space::util::ValueMatcher;
 use starlane_space::wave::core::cmd::CmdMethod;
 use starlane_space::wave::core::hyper::HypMethod;
+use starlane_space::wave::core::ReflectedCore;
 use starlane_space::wave::exchange::asynch::{
-    DirectedHandler, DirectedHandlerShell, Exchanger,
-    ProtoTransmitter, ProtoTransmitterBuilder, Router, TraversalRouter, TxRouter,
+    DirectedHandler, DirectedHandlerShell, Exchanger, ProtoTransmitter, ProtoTransmitterBuilder,
+    Router, TraversalRouter, TxRouter,
 };
 use starlane_space::wave::exchange::SetStrategy;
-use starlane_space::wave::{Agent, DirectedProto, Handling, HandlingKind, PongCore, Priority, Recipients, Reflectable, Retries, Ripple, Scope, SignalCore, SingularRipple, WaitTime, WaveVariantDef, WaveKind, ToReflected, ReflectedWave, WaveId};
-use starlane_space::wave::core::ReflectedCore;
 use starlane_space::wave::Wave;
-use starlane_primitive_macros::{log_span, push_loc, push_mark};
-use crate::registry::err::RegErr;
-use crate::service::ServiceTemplate;
-use crate::template::Templates;
+use starlane_space::wave::{
+    Agent, DirectedProto, Handling, HandlingKind, PongCore, Priority, Recipients, Reflectable,
+    ReflectedWave, Retries, Ripple, Scope, SignalCore, SingularRipple, ToReflected, WaitTime,
+    WaveId, WaveKind, WaveVariantDef,
+};
+use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
+use std::marker::PhantomData;
+use std::ops::Add;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::time::Duration;
+use thiserror::Error;
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 #[derive(Clone)]
-pub struct ParticleStates
-
-{
+pub struct ParticleStates {
     topic: Arc<DashMap<Surface, Arc<dyn TopicHandler>>>,
     shell: Arc<DashMap<Point, ShellState>>,
 }
 
-impl ParticleStates
-
-{
+impl ParticleStates {
     pub fn create_shell(&self, point: Point) {
         self.shell.insert(point.clone(), ShellState::new(point));
     }
@@ -118,8 +113,7 @@ impl ParticleStates
 }
 
 #[derive(Clone)]
-pub struct HyperStarSkel
-{
+pub struct HyperStarSkel {
     pub api: HyperStarApi,
     pub machine_api: MachineApi,
     pub key: StarKey,
@@ -130,7 +124,7 @@ pub struct HyperStarSkel
     pub golden_path: Arc<DashMap<StarKey, StarKey>>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<Wave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
-//    pub machine: MachineSkel,
+    //    pub machine: MachineSkel,
     pub exchanger: Exchanger,
     pub state: ParticleStates,
     pub adjacents: HashMap<Point, StarStub>,
@@ -149,16 +143,17 @@ pub struct HyperStarSkel
     pub diagnostic_interceptors: DiagnosticInterceptors,
 }
 
-impl HyperStarSkel
-
-{
+impl HyperStarSkel {
     pub async fn new<P>(
         template: StarTemplate,
         machine: MachineSkel<P>,
         star_tx: &mut HyperStarTx,
-    ) -> Self where P: Platform{
+    ) -> Self
+    where
+        P: Platform,
+    {
         let point = template.key.clone().to_point();
-        let logger = push_loc!((machine.logger,&point));
+        let logger = push_loc!((machine.logger, &point));
         let exchanger = Exchanger::new(
             point.clone().to_surface(),
             machine.timeouts.clone(),
@@ -254,13 +249,8 @@ impl HyperStarSkel
     }
 
     pub fn data_dir(&self) -> String {
-        format!(
-            "{}/{}/",
-            self.machine_api.data_dir,
-            self.point.to_string()
-        )
+        format!("{}/{}/", self.machine_api.data_dir, self.point.to_string())
     }
-
 
     /*
     pub async fn create_star_particle(&self, point: Point, kind: Kind ) -> Result<(),StarErr> {
@@ -287,7 +277,7 @@ impl HyperStarSkel
 
      */
 
-    pub fn err( &self, err: &StarErr ) {
+    pub fn err(&self, err: &StarErr) {
         self.logger.error(err);
     }
 
@@ -296,7 +286,10 @@ impl HyperStarSkel
         if self.point != create.template.point.parent
             && !self.point.is_parent_of(&create.template.point.parent)
         {
-            Err(StarErr::point_not_in_star(&self.point, &create.template.point.parent))?;
+            Err(StarErr::point_not_in_star(
+                &self.point,
+                &create.template.point.parent,
+            ))?;
         }
 
         let logger = push_mark!(self.logger);
@@ -353,8 +346,7 @@ impl HyperStarSkel
     }
 }
 
-pub enum HyperStarCall
-{
+pub enum HyperStarCall {
     Init,
     CreateStates {
         point: Point,
@@ -381,8 +373,7 @@ pub enum HyperStarCall
     GetSkel(oneshot::Sender<HyperStarSkel>),
 }
 
-pub struct HyperStarTx
-{
+pub struct HyperStarTx {
     pub gravity_tx: mpsc::Sender<Wave>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<Wave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
@@ -397,9 +388,7 @@ pub struct HyperStarTx
     pub status_rx: watch::Receiver<Status>,
 }
 
-impl HyperStarTx
-
-{
+impl HyperStarTx {
     pub fn new(point: Point) -> Self {
         let (gravity_tx, mut gravity_rx) = mpsc::channel(1024);
         let (inject_tx, mut inject_rx): (
@@ -501,15 +490,13 @@ impl HyperStarTx
 }
 
 #[derive(Clone)]
-pub struct HyperStarApi
-{
+pub struct HyperStarApi {
     pub kind: StarSub,
     tx: mpsc::Sender<HyperStarCall>,
     pub status_rx: watch::Receiver<Status>,
 }
 
-impl HyperStarApi
-{
+impl HyperStarApi {
     pub fn new(
         kind: StarSub,
         tx: mpsc::Sender<HyperStarCall>,
@@ -620,9 +607,7 @@ impl HyperStarApi
     }
 }
 
-pub struct HyperStar
-
-{
+pub struct HyperStar {
     skel: HyperStarSkel,
     star_tx: mpsc::Sender<HyperStarCall>,
     star_rx: mpsc::Receiver<HyperStarCall>,
@@ -636,9 +621,7 @@ pub struct HyperStar
     global_handler: DirectedHandlerShell<GlobalCommandExecutionHandler>,
 }
 
-impl HyperStar
-
-{
+impl HyperStar {
     pub async fn new(
         skel: HyperStarSkel,
         mut drivers: DriversBuilder,
@@ -671,7 +654,7 @@ impl HyperStar
             GlobalCommandExecutionHandler::new(skel.clone()),
             transmitter,
             global_executor,
-            push_loc!((skel.logger,&skel.point))
+            push_loc!((skel.logger, &skel.point)),
         );
 
         let mut forwarders = vec![];
@@ -867,7 +850,10 @@ impl HyperStar
                         self.drivers.init().await;
                     }
                     HyperStarCall::FromHyperway { wave, rtn } => {
-                        let result = self.from_hyperway(wave).await.map_err(|e| SpaceErr::to_space_err(e));
+                        let result = self
+                            .from_hyperway(wave)
+                            .await
+                            .map_err(|e| SpaceErr::to_space_err(e));
                         if let Some(tx) = rtn {
                             tx.send(result);
                         } else {
@@ -936,8 +922,7 @@ impl HyperStar
         });
     }
 
-
-    pub fn err( &self, err: &StarErr ) {
+    pub fn err(&self, err: &StarErr) {
         self.skel.logger.error(err)
     }
 
@@ -1053,9 +1038,7 @@ impl HyperStar
                 skel: HyperStarSkel,
                 locator: SmartLocator,
                 gravity: Surface,
-            ) -> Result<(), StarErr>
-
-            {
+            ) -> Result<(), StarErr> {
                 if wave.track() {
                     println!("\tsharding wave...{}", wave.kind().to_string());
                 }
@@ -1285,9 +1268,7 @@ impl HyperStar
 }
 
 #[derive(Clone)]
-pub struct LayerTraversalEngine
-
-{
+pub struct LayerTraversalEngine {
     pub skel: HyperStarSkel,
     pub injector: Surface,
     pub exit_up: mpsc::Sender<Traversal<Wave>>,
@@ -1295,9 +1276,7 @@ pub struct LayerTraversalEngine
     pub layers: HashSet<Layer>,
 }
 
-impl LayerTraversalEngine
-
-{
+impl LayerTraversalEngine {
     pub fn new(
         skel: HyperStarSkel,
         injector: Surface,
@@ -1366,7 +1345,7 @@ impl LayerTraversalEngine
             .send(wave.clone())
             .unwrap_or_default();
 
-            let logger = push_mark!(self.skel.logger);
+        let logger = push_mark!(self.skel.logger);
 
         let tos = match wave.kind() {
             WaveKind::Ripple => {
@@ -1378,7 +1357,12 @@ impl LayerTraversalEngine
                     Recipients::Multi(ports) => {
                         for port in &ports {
                             let record = self.skel.registry.record(&port.point).await?;
-                            let loc = logger.result(record.location.star.ok_or(StarErr::UnprovisionedMultiPortRipple))?;
+                            let loc = logger.result(
+                                record
+                                    .location
+                                    .star
+                                    .ok_or(StarErr::UnprovisionedMultiPortRipple),
+                            )?;
                             if loc == self.skel.point {
                                 tos.push(port.clone());
                             }
@@ -1449,7 +1433,11 @@ impl LayerTraversalEngine
 
                 // make sure we have this layer in the plan
                 if to.layer != Layer::Gravity && !plan.has_layer(&to.layer) {
-                    Err(StarErr::TraversalPlanNotFound{ wave: wave.id(), layer: to.layer.clone(), kind: record.details.stub.kind.clone() })?;
+                    Err(StarErr::TraversalPlanNotFound {
+                        wave: wave.id(),
+                        layer: to.layer.clone(),
+                        kind: record.details.stub.kind.clone(),
+                    })?;
                 }
 
                 // dir is from inject_layer to dest
@@ -1492,8 +1480,7 @@ impl LayerTraversalEngine
                 }
             }
 
-
-            let traversal_logger= push_loc!((self.skel.logger,&to));
+            let traversal_logger = push_loc!((self.skel.logger, &to));
             let traversal_logger = log_span!(traversal_logger);
 
             let point = if dir == TraversalDirection::Core {
@@ -1574,7 +1561,10 @@ impl LayerTraversalEngine
         match traversal.layer {
             Layer::Field => {
                 let field = Field::new(traversal.point.clone(), self.skel.clone());
-                let logger = push_loc!((self.skel.logger,self.skel.point.clone().into_surface(Layer::Field)));
+                let logger = push_loc!((
+                    self.skel.logger,
+                    self.skel.point.clone().into_surface(Layer::Field)
+                ));
                 tokio::spawn(async move {
                     logger
                         .result(field.visit(traversal).await)
@@ -1589,7 +1579,10 @@ impl LayerTraversalEngine
                         .find_shell(&traversal.point.to_surface().with_layer(Layer::Shell))?,
                 );
 
-                let logger = push_loc!((self.skel.logger,self.skel.point.clone().into_surface(Layer::Shell)));
+                let logger = push_loc!((
+                    self.skel.logger,
+                    self.skel.point.clone().into_surface(Layer::Shell)
+                ));
                 tokio::spawn(async move {
                     logger
                         .result(shell.visit(traversal).await)
@@ -1606,7 +1599,6 @@ impl LayerTraversalEngine
     }
 
     async fn traverse_to_next_layer(&self, mut traversal: Traversal<Wave>) {
-
         let logger = push_mark!(self.skel.logger);
 
         self.skel
@@ -1652,9 +1644,7 @@ pub struct LayerInjectionRouter {
 }
 
 impl LayerInjectionRouter {
-    pub fn new(skel: HyperStarSkel, injector: Surface) -> Self
-
-    {
+    pub fn new(skel: HyperStarSkel, injector: Surface) -> Self {
         Self {
             inject_tx: skel.inject_tx.clone(),
             injector,
@@ -1729,7 +1719,7 @@ impl StarTemplate {
             key,
             kind,
             connections: vec![],
-//            services: Templates::default(),
+            //            services: Templates::default(),
         }
     }
 
@@ -1793,8 +1783,7 @@ async fn shard_ripple_by_location(
     ripple: &WaveVariantDef<Ripple>,
     adjacent: &HashMap<Point, StarStub>,
     registry: &Registry,
-) -> Result<HashMap<Point, WaveVariantDef<Ripple>>, StarErr>
-{
+) -> Result<HashMap<Point, WaveVariantDef<Ripple>>, StarErr> {
     let mut map = HashMap::new();
     for (star, recipients) in shard_by_location(ripple.to.clone(), adjacent, registry).await? {
         if !ripple.history.contains(&star) {
@@ -1811,8 +1800,7 @@ pub async fn ripple_to_singulars<E>(
     ripple: WaveVariantDef<Ripple>,
     adjacent: &HashSet<Point>,
     registry: &Registry,
-) -> Result<Vec<WaveVariantDef<SingularRipple>>, StarErr>
-{
+) -> Result<Vec<WaveVariantDef<SingularRipple>>, StarErr> {
     let mut rtn = vec![];
     for port in to_ports(ripple.to.clone(), adjacent, registry).await? {
         let wave = ripple.as_single(port);
@@ -1825,8 +1813,7 @@ pub async fn shard_by_location(
     recipients: Recipients,
     adjacent: &HashMap<Point, StarStub>,
     registry: &Registry,
-) -> Result<HashMap<Point, Recipients>, StarErr>
-{
+) -> Result<HashMap<Point, Recipients>, StarErr> {
     match recipients {
         Recipients::Single(single) => {
             unimplemented!()
@@ -1878,8 +1865,7 @@ pub async fn to_ports(
     recipients: Recipients,
     adjacent: &HashSet<Point>,
     registry: &Registry,
-) -> Result<Vec<Surface>, StarErr>
-{
+) -> Result<Vec<Surface>, StarErr> {
     match recipients {
         Recipients::Single(single) => Ok(vec![single]),
         Recipients::Multi(multi) => Ok(multi.into_iter().map(|p| p).collect()),
@@ -1898,8 +1884,7 @@ pub async fn to_ports(
 }
 
 #[derive(Clone)]
-pub struct DiagnosticInterceptors
-{
+pub struct DiagnosticInterceptors {
     pub from_hyperway: broadcast::Sender<Wave>,
     pub to_gravity: broadcast::Sender<Wave>,
     pub to_hyperway: broadcast::Sender<WaveVariantDef<SignalCore>>,
@@ -1911,8 +1896,7 @@ pub struct DiagnosticInterceptors
     pub err: broadcast::Sender<String>,
 }
 
-impl DiagnosticInterceptors
-{
+impl DiagnosticInterceptors {
     pub fn new() -> Self {
         let (from_hyperway, _) = broadcast::channel(1024);
         let (to_hyperway, _) = broadcast::channel(1024);
@@ -1937,18 +1921,12 @@ impl DiagnosticInterceptors
     }
 }
 
-
-
 #[derive(Clone)]
-pub struct SmartLocator
-
-{
+pub struct SmartLocator {
     pub skel: HyperStarSkel,
 }
 
-impl SmartLocator
-
-{
+impl SmartLocator {
     pub fn new(skel: HyperStarSkel) -> Self {
         Self { skel }
     }
@@ -1981,9 +1959,7 @@ impl SmartLocator
         state: StateSrc,
     ) -> Result<ParticleLocation, StarErr> {
         // check if parent is provisioned
-        let parent = point
-            .parent()
-            .ok_or(StarErr::ExpectedRootProvisioned)?;
+        let parent = point.parent().ok_or(StarErr::ExpectedRootProvisioned)?;
         let mut parent_record = self.skel.registry.record(&parent).await?;
         if parent_record.location.star.is_none() {
             self.provision_inner(&parent, StateSrc::None).await?;
@@ -2000,10 +1976,12 @@ impl SmartLocator
         let pong: WaveVariantDef<PongCore> = self.skel.star_transmitter.direct(wave).await?;
         (pong.core.clone().body).expect(SubstanceKind::Location);
         if pong.core.status.as_u16() == 200 {
-
             let location = match &pong.core.body {
                 Substance::Location(location) => location,
-                s =>  Err(SpaceErr::ExpectedSubstance {expected: SubstanceKind::Location, found: s.kind()})?
+                s => Err(SpaceErr::ExpectedSubstance {
+                    expected: SubstanceKind::Location,
+                    found: s.kind(),
+                })?,
             };
 
             Ok(location.clone())
@@ -2021,17 +1999,20 @@ impl SmartLocator
     }
 }
 
-
-#[derive(Error,Debug)]
+#[derive(Error, Debug)]
 pub enum StarErr {
     #[error("caused by '{0}'")]
     SpaceErr(#[source] SpaceErr),
     #[error("cannot create_in_star in star {point} for parent point {parent} since it is not a point within this star")]
-    PointNotInStar{point: Point, parent: Point},
+    PointNotInStar { point: Point, parent: Point },
     #[error("star expected Root to be already provisioned")]
     ExpectedRootProvisioned,
     #[error("could not find parent '{parent}' caused by '{source}'")]
-    CannotFindParent{ #[source] source: RegErr, parent: Point },
+    CannotFindParent {
+        #[source]
+        source: RegErr,
+        parent: Point,
+    },
     #[error("transport signal exceeded maximum hops")]
     TransportSignalExceededMaxHops,
     #[error("attempt to forward a transport on a non forwarding star")]
@@ -2039,7 +2020,11 @@ pub enum StarErr {
     #[error("star needs to send a transport to a non-adjacent star yet does not have any adjacent forwarders")]
     MissingAdjacentForwarder,
     #[error("attempt to send wave {wave} to layer {layer} that the recipient Kind {kind} does not have in its traversal plan")]
-    TraversalPlanNotFound { wave: WaveId, layer: Layer, kind: Kind },
+    TraversalPlanNotFound {
+        wave: WaveId,
+        layer: Layer,
+        kind: Kind,
+    },
     #[error("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")]
     UnprovisionedMultiPortRipple,
     #[error("could not find assign kind '{0}' to self")]
@@ -2047,25 +2032,23 @@ pub enum StarErr {
     #[error("could not find a host to provision '{0}'")]
     CouldNotFindHostToProvision(Kind),
     #[error("{0}")]
-    Anyhow( Arc<anyhow::Error>)
+    Anyhow(Arc<anyhow::Error>),
 }
 
-
-impl <E> From<E> for StarErr where E: Sized+SpatialError {
+impl<E> From<E> for StarErr
+where
+    E: Sized + SpatialError,
+{
     fn from(err: E) -> Self {
         Self::Anyhow(err.anyhow())
     }
 }
 
-
-
-
 impl CoreReflector for StarErr {
     fn as_reflected_core(self) -> ReflectedCore {
         if let StarErr::SpaceErr(err) = self {
             err.as_reflected_core()
-        }
-        else {
+        } else {
             ReflectedCore {
                 headers: Default::default(),
                 status: Default::default(),
@@ -2075,23 +2058,15 @@ impl CoreReflector for StarErr {
     }
 }
 
-
-
 impl StarErr {
-    pub fn point_not_in_star( point: &Point, parent: &Point ) -> Self {
+    pub fn point_not_in_star(point: &Point, parent: &Point) -> Self {
         let point = point.clone();
         let parent = parent.clone();
-        Self::PointNotInStar {point, parent}
+        Self::PointNotInStar { point, parent }
     }
 }
 
-
-
-
-#[derive(Debug,Clone,strum_macros::EnumString,strum_macros::Display)]
+#[derive(Debug, Clone, strum_macros::EnumString, strum_macros::Display)]
 pub enum StarErrCtx {
-    CreateInStar
+    CreateInStar,
 }
-
-
-

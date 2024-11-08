@@ -8,10 +8,10 @@ use crate::command::common::PropertyMod;
 use crate::parse::SkewerCase;
 use crate::point::Point;
 use crate::{Kind, SetProperties, SpaceErr};
-use serde::Serialize;
 use serde::Deserialize;
+use serde::Serialize;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, )]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PropertyDef {
     //pub pattern: Box<dyn PropertyPattern>,
     pub required: bool,
@@ -36,7 +36,6 @@ impl PropertyDef {
                 .as_ref()
                 .ok_or("if PropertyDef is a constant then 'default' value must be set")?;
         }
-
 
         Ok(Self {
             required,
@@ -299,8 +298,7 @@ impl PropertiesConfig {
     }
 }
 
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash )]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum PropertyPermit {
     Read,
     Write,
@@ -345,22 +343,13 @@ impl PropertiesConfigBuilder {
         constant: bool,
         permits: Vec<PropertyPermit>,
     ) -> Result<(), SpaceErr> {
-        let def = PropertyDef::new(
-             required, mutable, source, default, constant, permits,
-        )?;
+        let def = PropertyDef::new(required, mutable, source, default, constant, permits)?;
         self.properties.insert(name.to_string(), def);
         Ok(())
     }
 
     pub fn add_string(&mut self, name: &str) -> Result<(), SpaceErr> {
-        let def = PropertyDef::new(
-            false,
-            true,
-            PropertySource::Shell,
-            None,
-            false,
-            vec![],
-        )?;
+        let def = PropertyDef::new(false, true, PropertySource::Shell, None, false, vec![])?;
         self.properties.insert(name.to_string(), def);
         Ok(())
     }

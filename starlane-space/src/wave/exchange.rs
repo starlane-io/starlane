@@ -4,21 +4,18 @@ pub mod synch;
 use std::borrow::Cow;
 use std::ops::Deref;
 
-use asynch::{
-    DirectedHandler, Router,
-};
-use tokio::sync::broadcast;
-use starlane_primitive_macros::{log_span, push_loc};
 use crate::config::bind::RouteSelector;
 use crate::loc::{ToPoint, ToSurface, Topic};
-use crate::log::{Logger};
+use crate::log::Logger;
 use crate::wave::core::Method;
 use crate::wave::{
-    Bounce, DirectedProto, DirectedWave, EchoCore, FromReflectedAggregate,
-    Handling, PongCore, Recipients, ReflectedProto,
-    ReflectedWave, Scope, Session, ToRecipients, Wave, WaveVariantDef,
+    Bounce, DirectedProto, DirectedWave, EchoCore, FromReflectedAggregate, Handling, PongCore,
+    Recipients, ReflectedProto, ReflectedWave, Scope, Session, ToRecipients, Wave, WaveVariantDef,
 };
 use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
+use asynch::{DirectedHandler, Router};
+use starlane_primitive_macros::{log_span, push_loc};
+use tokio::sync::broadcast;
 
 #[derive(Clone)]
 pub struct DirectedHandlerShellDef<D, T> {
@@ -36,7 +33,7 @@ where
         Self {
             handler,
             builder,
-            logger: push_loc!((logger,&surface)),
+            logger: push_loc!((logger, &surface)),
             surface,
         }
     }
@@ -74,48 +71,56 @@ impl<T> RootInCtxDef<T> {
 
     pub fn status(self, status: u16, from: Surface) -> Bounce<ReflectedWave> {
         match self.wave {
-            DirectedWave::Ping(ping) => Bounce::Reflected(ReflectedWave::Pong(WaveVariantDef::new(
-                PongCore::new(
-                    ReflectedCore::status(status),
-                    ping.from.clone(),
-                    self.to.clone().to_recipients(),
-                    ping.id.clone(),
-                ),
-                from,
-            ))),
-            DirectedWave::Ripple(ripple) => Bounce::Reflected(ReflectedWave::Echo(WaveVariantDef::new(
-                EchoCore::new(
-                    ReflectedCore::status(status),
-                    ripple.from.clone(),
-                    ripple.to.clone(),
-                    ripple.id.clone(),
-                ),
-                from,
-            ))),
+            DirectedWave::Ping(ping) => {
+                Bounce::Reflected(ReflectedWave::Pong(WaveVariantDef::new(
+                    PongCore::new(
+                        ReflectedCore::status(status),
+                        ping.from.clone(),
+                        self.to.clone().to_recipients(),
+                        ping.id.clone(),
+                    ),
+                    from,
+                )))
+            }
+            DirectedWave::Ripple(ripple) => {
+                Bounce::Reflected(ReflectedWave::Echo(WaveVariantDef::new(
+                    EchoCore::new(
+                        ReflectedCore::status(status),
+                        ripple.from.clone(),
+                        ripple.to.clone(),
+                        ripple.id.clone(),
+                    ),
+                    from,
+                )))
+            }
             DirectedWave::Signal(_) => Bounce::Absorbed,
         }
     }
 
     pub fn err(self, status: u16, from: Surface, msg: String) -> Bounce<ReflectedWave> {
         match self.wave {
-            DirectedWave::Ping(ping) => Bounce::Reflected(ReflectedWave::Pong(WaveVariantDef::new(
-                PongCore::new(
-                    ReflectedCore::fail(status, msg),
-                    ping.from.clone(),
-                    self.to.clone().to_recipients(),
-                    ping.id.clone(),
-                ),
-                from,
-            ))),
-            DirectedWave::Ripple(ripple) => Bounce::Reflected(ReflectedWave::Echo(WaveVariantDef::new(
-                EchoCore::new(
-                    ReflectedCore::fail(status, msg),
-                    ripple.from.clone(),
-                    ripple.to.clone(),
-                    ripple.id.clone(),
-                ),
-                from,
-            ))),
+            DirectedWave::Ping(ping) => {
+                Bounce::Reflected(ReflectedWave::Pong(WaveVariantDef::new(
+                    PongCore::new(
+                        ReflectedCore::fail(status, msg),
+                        ping.from.clone(),
+                        self.to.clone().to_recipients(),
+                        ping.id.clone(),
+                    ),
+                    from,
+                )))
+            }
+            DirectedWave::Ripple(ripple) => {
+                Bounce::Reflected(ReflectedWave::Echo(WaveVariantDef::new(
+                    EchoCore::new(
+                        ReflectedCore::fail(status, msg),
+                        ripple.from.clone(),
+                        ripple.to.clone(),
+                        ripple.id.clone(),
+                    ),
+                    from,
+                )))
+            }
             DirectedWave::Signal(_) => Bounce::Absorbed,
         }
     }
@@ -198,12 +203,7 @@ impl<'a, I, T> InCtxDef<'a, I, T>
 where
     T: Clone,
 {
-    pub fn new(
-        root: &'a RootInCtxDef<T>,
-        input: &'a I,
-        tx: Cow<'a, T>,
-        logger: Logger,
-    ) -> Self {
+    pub fn new(root: &'a RootInCtxDef<T>, input: &'a I, tx: Cow<'a, T>, logger: Logger) -> Self {
         Self {
             root,
             input,

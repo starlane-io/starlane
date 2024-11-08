@@ -189,7 +189,6 @@ impl TryInto<semver::Version> for Version {
 impl FromStr for Version {
     type Err = ParseErrs;
 
-
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let version = semver::Version::from_str(s)?;
         Ok(Self { version })
@@ -246,13 +245,15 @@ where
                             "variables not available",
                             trace.range,
                             trace.extra,
-                        ).into()),
+                        )
+                        .into()),
                         ResolverErr::NotFound => Err(ParseErrs::from_range(
                             format!("variable '{}' not found", var.unwrap().to_string()).as_str(),
                             "not found",
                             trace.range,
                             trace.extra,
-                        ).into()),
+                        )
+                        .into()),
                     }
                 }
             },
