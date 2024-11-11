@@ -1,8 +1,0 @@
-Mechtron(version=1.0.0) {
-
-  Wasm {
-     bin=repo:hello:1.0.0:/wasm/hello.wasm
-     name=hello
-  }
-
-}

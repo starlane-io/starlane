@@ -1,7 +1,0 @@
-apiVersion: starlane.starlane.io/v1alpha1
-kind: Starlane
-metadata:
-  name: starlane
-spec:
-  web-service-type: LoadBalancer
-  gateway-service-type: LoadBalancer

@@ -1,6 +1,0 @@
-apiVersion: starlane.starlane.io/v1alpha1
-kind: Postgres
-metadata:
-  name: postgres-sample
-spec:
-  # TODO(user): Add fields here
