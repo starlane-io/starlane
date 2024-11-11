@@ -8,8 +8,8 @@ BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 check: 
 	@echo ${VERSION}
 	@echo ${BRANCH}
-	@git diff --exit-code 1> /dev/null 2> /dev/null || $(error local changes in '${BRANCH}' not commited to git) 
-	@git merge-base --is-ancestor HEAD @{u}  1> /dev/null 2> /dev/null || $(error local commit for branch: '${BRANCH}' must be pushed to origin) 
+	@$(shell git diff --exit-code 1> /dev/null 2> /dev/null) || $(error local changes in '${BRANCH}' not commited to git) 
+	@$(shell git merge-base --is-ancestor HEAD @{u}  1> /dev/null 2> /dev/null) || $(error local commit for branch: '${BRANCH}' must be pushed to origin) 
 	@echo $$?
 	
 blah:
