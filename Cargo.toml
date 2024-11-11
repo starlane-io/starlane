@@ -15,7 +15,7 @@ description="The Workspace package for Starlane.  What to see: './starlane-space
 [workspace]
 default-run = "starlane"
 resolver = "2"
-members = [  "starlane", "starlane-macros", "starlane-primitive-macros" ]
+members = [  "starlane", "starlane-macros", "starlane-parse", "starlane-primitive-macros" ]
 
 
 #members = [
@@ -28,6 +28,7 @@ exclude = [ ]
 starlane = { path="./starlane" , version = "0.3.20" }
 starlane-macros = { path="./starlane-macros", version = "0.3.20" }
 starlane-primitive-macros = { path="./starlane-primitive-macros", version = "0.3.20" }
+starlane-parse = { path="./starlane-parse", version = "0.3.20" }
 
 lazy_static = "1.5.0"
 uuid = { version="1.1.2" }

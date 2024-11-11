@@ -15,22 +15,22 @@ pub static BUILTIN_FETCHER: Lazy<Arc<BuiltinArtifactFetcher>> = Lazy::new(|| {
 
     builder.insert(
         BaseKind::Star.bind(),
-        Arc::<Vec<u8>>::new(include_bytes!("../../../../starlane-space/conf/star.bind").into()),
+        Arc::<Vec<u8>>::new(include_bytes!("../../../conf/star.bind").into()),
     );
 
     builder.insert(
         BaseKind::Driver.bind(),
-        Arc::<Vec<u8>>::new(include_bytes!("../../../../starlane-space/conf/driver.bind").into()),
+        Arc::<Vec<u8>>::new(include_bytes!("../../../conf/driver.bind").into()),
     );
 
     builder.insert(
         BaseKind::Global.bind(),
-        Arc::<Vec<u8>>::new(include_bytes!("../../../../starlane-space/conf/global.bind").into()),
+        Arc::<Vec<u8>>::new(include_bytes!("../../../conf/global.bind").into()),
     );
 
     builder.insert(
         BaseKind::nothing_bind(),
-        Arc::<Vec<u8>>::new(include_bytes!("../../../../starlane-space/conf/nothing.bind").into()),
+        Arc::<Vec<u8>>::new(include_bytes!("../../../conf/nothing.bind").into()),
     );
 
     Arc::new(builder.build())

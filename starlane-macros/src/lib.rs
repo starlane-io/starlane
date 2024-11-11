@@ -8,9 +8,7 @@ use chrono::Utc;
 use proc_macro2::Ident;
 use quote::__private::ext::RepToTokensExt;
 use quote::{format_ident, quote, ToTokens};
-use starlane_space::loc;
 use starlane_space::parse::route_attribute_value;
-use starlane_space::util::log;
 use starlane_space::wasm::Timestamp;
 use syn::__private::TokenStream2;
 use syn::parse::{Parse, ParseStream};
@@ -21,15 +19,6 @@ use syn::{
     PathArguments, PathSegment, ReturnType, Type,
 };
 
-#[no_mangle]
-extern "C" fn starlane_uuid() -> loc::Uuid {
-    loc::Uuid::from(uuid::Uuid::new_v4().to_string()).unwrap()
-}
-
-#[no_mangle]
-extern "C" fn starlane_timestamp() -> Timestamp {
-    Timestamp::new(Utc::now().timestamp_millis())
-}
 
 /// This macro will auto implement the `starlane_space::wave::exchange::asynch::DirectedHandler` trait.
 /// In order to finalize the implementation a `#[handler]` attribute must also be specified
@@ -449,4 +438,13 @@ pub fn to_space_err(item: TokenStream) -> TokenStream {
         }
     };
     rtn.into()
+}
+
+
+#[cfg(test)]
+mod test {
+   #[test]
+   pub fn test() {
+
+   }
 }
