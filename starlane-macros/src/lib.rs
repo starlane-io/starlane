@@ -236,6 +236,11 @@ pub fn route(attr: TokenStream, item: TokenStream ) -> TokenStream {
 #[proc_macro_attribute]
 pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
     //  let combined = TokenStream::from_iter( vec![attr,item]);
+    let space_crate = if env!("CARGO_PKG_NAME") == "starlane" {
+        format_ident!("{}","crate")
+    } else {
+        format_ident!("{}","starlane")
+    };
 
     let input = parse_macro_input!(input as syn::ImplItemMethod);
 
@@ -257,13 +262,13 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     let root_ctx = match input.sig.asyncness {
-        None => quote! {starlane_space::wave::exchange::synch::RootInCtx},
-        Some(_) => quote! {starlane_space::wave::exchange::asynch::RootInCtx},
+        None => quote! {#space_crate::space::wave::exchange::synch::RootInCtx},
+        Some(_) => quote! {#space_crate::wave::exchange::asynch::RootInCtx},
     };
 
     let in_ctx = match input.sig.asyncness {
-        None => quote! {starlane_space::wave::exchange::synch::InCtx},
-        Some(_) => quote! {starlane_space::wave::exchange::asynch::InCtx},
+        None => quote! {#space_crate::wave::exchange::synch::InCtx},
+        Some(_) => quote! {#space_crate::wave::exchange::asynch::InCtx},
     };
 
     let __async = match input.sig.asyncness {
@@ -277,15 +282,15 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
     let item = ctx.item;
 
     let expanded = quote! {
-      #__async fn #ident( &self, mut ctx: #root_ctx ) -> starlane_space::wave::core::CoreBounce {
+      #__async fn #ident( &self, mut ctx: #root_ctx ) -> #space_crate::wave::core::CoreBounce {
           let ctx: #in_ctx<'_,#item> = match ctx.push::<#item>() {
               Ok(ctx) => ctx,
               Err(err) => {
                     if ctx.wave.is_signal() {
-                      return starlane_space::wave::core::CoreBounce::Absorbed;
+                      return #space_crate::wave::core::CoreBounce::Absorbed;
                     }
                     else {
-                      return starlane_space::wave::core::CoreBounce::Reflected(err.into());
+                      return #space_crate::wave::core::CoreBounce::Reflected(err.into());
                     }
               }
           };
@@ -351,9 +356,14 @@ fn messsage_ctx(input: &FnArg) -> Result<RequestCtx, String> {
 }
 
 fn rtn_type(output: &ReturnType) -> TokenStream2 {
+    let space_crate = if env!("CARGO_PKG_NAME") == "starlane" {
+        format_ident!("{}","crate")
+    } else {
+        format_ident!("{}","starlane")
+    };
     match output {
         ReturnType::Default => {
-            quote! {starlane_space::wave::Bounce::Absorbed}
+            quote! {#space_crate::wave::Bounce::Absorbed}
         }
         ReturnType::Type(_, path) => {
             if let Type::Path(path) = &**path {
@@ -364,18 +374,18 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
                             let arg = brackets.args.first().unwrap();
                             if "Substance" == arg.to_token_stream().to_string().as_str() {
                                 quote! {
-                                 use starlane_space::err::CoreReflector;
+                                 use #space_crate::err::CoreReflector;
                                  match result {
-                                     Ok(rtn) => starlane_space::wave::core::CoreBounce::Reflected(starlane_space::wave::core::ReflectedCore::ok_body(rtn)),
-                                     Err(err) => starlane_space::wave::core::CoreBounce::Reflected(err.as_reflected_core())
+                                     Ok(rtn) => #space_crate::wave::core::CoreBounce::Reflected(starlane_space::wave::core::ReflectedCore::ok_body(rtn)),
+                                     Err(err) => #space_crate::wave::core::CoreBounce::Reflected(err.as_reflected_core())
                                  }
                                 }
                             } else {
                                 quote! {
-                                 use starlane_space::err::CoreReflector;
+                                 use #space_crate::err::CoreReflector;
                                  match result {
-                                     Ok(rtn) => starlane_space::wave::core::CoreBounce::Reflected(rtn.into()),
-                                     Err(err) => starlane_space::wave::core::CoreBounce::Reflected(err.as_reflected_core())
+                                     Ok(rtn) => #space_crate::wave::core::CoreBounce::Reflected(rtn.into()),
+                                     Err(err) => #space_crate::wave::core::CoreBounce::Reflected(err.as_reflected_core())
                                  }
                                 }
                             }
@@ -385,7 +395,7 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
                     }
                     "Bounce" => {
                         quote! {
-                            let rtn : starlane_space::wave::core::CoreBounce = result.to_core_bounce();
+                            let rtn : #space_crate::wave::core::CoreBounce = result.to_core_bounce();
                             rtn
                         }
                     }
@@ -396,7 +406,7 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
                     }
                     "ReflectedCore" => {
                         quote! {
-                           starlane_space::wave::core::CoreBounce::Reflected(result)
+                           #space_crate::wave::core::CoreBounce::Reflected(result)
                         }
                     }
                     what => {
@@ -426,12 +436,17 @@ impl Parse for RouteAttr {
 /// adds a trait to given struct or enum
 #[proc_macro_derive(ToSpaceErr)]
 pub fn to_space_err(item: TokenStream) -> TokenStream {
+    let space_crate = if env!("CARGO_PKG_NAME") == "starlane" {
+        format_ident!("{}","crate")
+    } else {
+        format_ident!("{}","starlane")
+    };
     let input = parse_macro_input!(item as DeriveInput);
     let ident = &input.ident;
     let rtn = quote! {
-       impl starlane_space::err::ToSpaceErr for #ident {
-            fn to_space_err(&self) -> starlane_space::err::SpaceErr {
-                starlane_space::err::SpaceErr::to_space_err(&self.to_string())
+       impl #space_crate::err::ToSpaceErr for #ident {
+            fn to_space_err(&self) -> #space_crate::err::SpaceErr {
+                #space_crate::err::SpaceErr::to_space_err(&self.to_string())
             }
         }
     };
