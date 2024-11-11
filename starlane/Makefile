@@ -8,8 +8,8 @@ clean :
 	cargo clean
 
 version:
-	toml set Cargo.toml dependencies.starlane-macros ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
-	toml set Cargo.toml dependencies.starlane-primitive-macros ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+	toml set Cargo.toml dependencies.starlane-macros.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+	toml set Cargo.toml dependencies.starlane-primitive-macros.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 	echo "starlane version set to ${VERSION}"
 
 

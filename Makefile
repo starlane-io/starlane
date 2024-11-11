@@ -1,15 +1,18 @@
 
 VERSION := $(shell toml get Cargo.toml workspace.package.version )
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+GIT_SHA_FETCH := $(shell git rev-parse HEAD | cut -c 1-8)
 
 .PHONY : clean 
 
 
 check: 
-	@echo ${VERSION}
-	@echo ${BRANCH}
-	@$(shell git diff --exit-code 1> /dev/null 2> /dev/null) || $(error local changes in '${BRANCH}' not commited to git) 
-	@$(shell git merge-base --is-ancestor HEAD @{u}  1> /dev/null 2> /dev/null) || $(error local commit for branch: '${BRANCH}' must be pushed to origin) 
+	@$(shell test -z "$$(git status --porcelain)" )
+	@echo "RESULT: $$?"
+
+check-old:	
+	#&& $(error local changes in '${BRANCH}' not commited to git) 
+	$(shell git merge-base --is-ancestor HEAD @{u}  1> /dev/null 2> /dev/null) || $(error local commit for branch: '${BRANCH}' must be pushed to origin) 
 	@echo $$?
 	
 blah:
