@@ -254,7 +254,7 @@ pub fn mech_err(item: TokenStream) -> TokenStream {
     let from = vec![
         quote!(Box<bincode::ErrorKind>),
         quote!(mechtron::err::MembraneErr),
-        quote!(starlane_space::err::ParseErrs),
+        quote!(starlane::err::ParseErrs),
         quote!(String),
         quote!(&'static str),
         quote!(mechtron::err::GuestErr),
@@ -264,8 +264,8 @@ pub fn mech_err(item: TokenStream) -> TokenStream {
     let rtn = quote! {
 
         impl MechErr for #ident {
-            fn to_uni_err(self) -> starlane_space::err::{
-               starlane_space::err::SpaceErr::server_error(self.to_string())
+            fn to_uni_err(self) -> starlane::err::{
+               starlane::err::SpaceErr::server_error(self.to_string())
             }
         }
 
@@ -277,11 +277,11 @@ pub fn mech_err(item: TokenStream) -> TokenStream {
             }
         }
 
-        impl starlane_space::err::CoreReflector for #ident {
-                fn as_reflected_core(self) -> starlane_space::wave::core::ReflectedCore {
-                   starlane_space::wave::core::ReflectedCore{
+        impl starlane::err::CoreReflector for #ident {
+                fn as_reflected_core(self) -> starlane::wave::core::ReflectedCore {
+                   starlane::wave::core::ReflectedCore{
                         headers: Default::default(),
-                        status: starlane_space::wave::core::http2::StatusCode::from_u16(500u16).unwrap(),
+                        status: starlane::wave::core::http2::StatusCode::from_u16(500u16).unwrap(),
                         body: self.into().into()
                     }
             }
@@ -414,7 +414,7 @@ pub fn push_loc(tokens: TokenStream) -> TokenStream {
 
     let rtn = quote! {
         {
-    let mut builder = starlane_space::log::LogMarkBuilder::default();
+    let mut builder = starlane::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -431,7 +431,7 @@ pub fn log_span(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as Expr);
     let rtn = quote! {
         {
-    let mut builder = starlane_space::log::LogMarkBuilder::default();
+    let mut builder = starlane::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -445,13 +445,13 @@ pub fn log_span(tokens: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn logger(item: TokenStream) -> TokenStream {
-    let log_pack = quote!(starlane_space::log);
+    let log_pack = quote!(starlane::space::log);
 
     let loc = if !item.is_empty() {
         let expr = parse_macro_input!(item as Expr);
-        quote!( #log_pack::_logger().push(#expr); )
+        quote!( #log_pack::logger().push(#expr); )
     } else {
-        quote!( #log_pack::_logger(); )
+        quote!( #log_pack::logger(); )
     };
 
     let rtn = quote! {
@@ -474,7 +474,7 @@ pub fn push_mark(_item: TokenStream) -> TokenStream {
     let logger = parse_macro_input!(_item as Expr);
     let rtn = quote! {
         {
-    let mut builder = stringify!(env!("CARGO_PKG_NAME"))::log::LogMarkBuilder::default();
+    let mut builder = starlane::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -485,6 +485,7 @@ pub fn push_mark(_item: TokenStream) -> TokenStream {
         };
 
     rtn.into()
+
 }
 
 #[proc_macro]
@@ -492,7 +493,7 @@ pub fn create_mark(_item: TokenStream) -> TokenStream {
     let rtn = quote! {
         {
 println!("CARGO_PKG_NAME: {}", env!("CARGO_PKG_NAME"));
-    let mut builder = starlane_space::log::LogMarkBuilder::default();
+    let mut builder = starlane::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -513,10 +514,9 @@ pub fn warn(_item: TokenStream) -> TokenStream {
     {
         use starlane_primitive_macros::mark;
         use starlane_primitive_macros::create_mark;
-        use starlane_space::space::log::Log;
-        use starlane_space::space::log::Log;
-        use starlane_space::space::log::LOGGER;
-        use starlane_space::space::log::root_logger;
+        use starlane::space::log::Log;
+        use starlane::space::log::LOGGER;
+        use starlane::space::log::root_logger;
 
         // need to push_mark somewhere around here...
         LOGGER.try_with(|logger| {

@@ -41,7 +41,7 @@ driver=["hyperspace"]
 dialect=[]
 dialect-cli=["dialect","dep:clap"]
 service=[]
-space=["dep:regex", "dep:validator", "dep:convert_case", "dep:serde_json", "dep:enum-ordinalize"]
+space=["dep:regex", "dep:validator", "dep:convert_case", "dep:serde_json", "dep:enum-ordinalize", "dep:ariadne", "dep:serde_urlencoded"]
 wasm=[]
 
 
@@ -85,6 +85,7 @@ sqlx = { workspace = true, features = [ "runtime-tokio","runtime-tokio-rustls", 
 serde = { workspace = true, features=['derive','rc'], optional=true }
 async-recursion = { workspace = true, optional=true }
 
+md5 = {workspace = true}
 
 rcgen = { workspace = true, optional = true, features=["pem", "x509-parser" ]}
 rustls = { workspace = true, optional = true, features=["aws_lc_rs"]}

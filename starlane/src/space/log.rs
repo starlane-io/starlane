@@ -68,7 +68,7 @@ impl LoggerStack {
     }
 }
 
-pub fn _logger() -> Logger {
+pub fn logger() -> Logger {
     STACK.get()
 }
 
@@ -110,7 +110,7 @@ where
     let logger = root.push_mark(mark);
     STACK
         .scope(logger, async move {
-            _logger().result(match f().await {
+            logger().result(match f().await {
                 Ok(rtn) => Ok(rtn),
                 Err(err) => Err(anyhow!(err)),
             })

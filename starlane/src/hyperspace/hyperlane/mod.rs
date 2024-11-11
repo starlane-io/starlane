@@ -2201,7 +2201,19 @@ pub mod test_util {
                 Logger::default(),
             );
 
-            let logger = logger!(Point::from_str("less-client").unwrap());
+            //let logger = logger!(Point::from_str("less-client").unwrap());
+
+
+            let logger = starlane::space::log::logger().push(Point::from_str("less-client").unwrap());   ;
+            let mut builder = starlane::space::log::LogMarkBuilder::default();
+            builder.package(env!("CARGO_PKG_NAME" ).to_string());
+            builder.file(file!().to_string());
+            builder.line(1.to_string());
+            let mark = builder.build().unwrap();
+            logger.push_mark(mark);
+
+
+
             let less_client = HyperClient::new_with_exchanger(
                 self.less_factory,
                 Some(less_exchanger.clone()),

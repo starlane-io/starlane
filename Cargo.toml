@@ -82,9 +82,10 @@ serde_urlencoded = "0.7.1"
 enum-ordinalize = "3.1.11"
 convert_case = "0.5.0"
 validator = "0.15.0"
-
+proc-macro-crate = "3.2.0"
 threadpool = "1.8.1"
 oneshot = "0.1.5"
+md5 = "0.7.0"
 
 webpki-roots = "0.26.5"
 anyhow = "1.0.92"

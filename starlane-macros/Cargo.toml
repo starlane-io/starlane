@@ -20,6 +20,7 @@ doctest = false
 
 [dependencies]
 
+proc-macro-crate = { workspace = true }
 lazy_static = { workspace = true}
 syn = { workspace = true, features = ["full"] }
 quote = { workspace = true}

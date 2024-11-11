@@ -5,7 +5,8 @@ use proc_macro::TokenStream;
 use std::str::FromStr;
 
 use chrono::Utc;
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span};
+use proc_macro_crate::{crate_name, FoundCrate};
 use quote::__private::ext::RepToTokensExt;
 use quote::{format_ident, quote, ToTokens};
 use syn::__private::TokenStream2;
@@ -18,7 +19,7 @@ use syn::{
 };
 
 
-/// This macro will auto implement the `starlane::wave::exchange::asynch::DirectedHandler` trait.
+/// This macro will auto implement the `#crt::space::wave::exchange::asynch::DirectedHandler` trait.
 /// In order to finalize the implementation a `#[handler]` attribute must also be specified
 /// above one of the impls.
 #[proc_macro_derive(DirectedHandler)]
@@ -31,13 +32,13 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 /// To implement:
 /// ```
 ///
-/// use starlane::err::SpaceErr;
-/// use starlane::hyper::HyperSubstance;
-/// use starlane::log::PointLogger;
-/// use starlane::substance::Substance;
-/// use starlane::substance::Substance::Text;
-/// use starlane::wave::core::ReflectedCore;
-/// use starlane::wave::exchange::asynch::InCtx;
+/// use #crt::space::err::SpaceErr;
+/// use #crt::space::hyper::HyperSubstance;
+/// use #crt::space::log::PointLogger;
+/// use #crt::space::substance::Substance;
+/// use #crt::space::substance::Substance::Text;
+/// use #crt::space::wave::core::ReflectedCore;
+/// use #crt::space::exchange::asynch::InCtx;
 ///
 /// #[derive(DirectedHandler)]
 /// pub struct MyHandler {
@@ -72,6 +73,8 @@ pub fn handler_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
+    let crt = crt_name();
+
     let item_cp = item.clone();
     let mut impl_item = parse_macro_input!(item_cp as syn::ItemImpl);
     //    let mut selectors = vec![];
@@ -91,7 +94,7 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
                 let route_selector = attr.to_token_stream().to_string();
                 static_selector_keys.push(selector_ident.clone());
                 let static_selector = quote! {
-                    static ref #selector_ident : starlane::config::bind::RouteSelector = starlane::parse::route_attribute(#route_selector).unwrap();
+                    static ref #selector_ident : #crt::space::config::bind::RouteSelector = #crt::space::parse::route_attribute(#route_selector).unwrap();
                 };
                 static_selectors.push(static_selector);
             //println!(" ~~ ROUTE {}", attr.tokens.to_string() );
@@ -129,18 +132,18 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
     };
 
     let selector = match _async {
-        true => quote! {starlane::wave::exchange::asynch::DirectedHandlerSelector},
-        false => quote! {starlane::wave::exchange::synch::DirectedHandlerSelector},
+        true => quote! {#crt::space::wave::exchange::asynch::DirectedHandlerSelector},
+        false => quote! {#crt::space::wave::exchange::synch::DirectedHandlerSelector},
     };
 
     let handler = match _async {
-        true => quote! {starlane::wave::exchange::asynch::DirectedHandler},
-        false => quote! {starlane::wave::exchange::synch::DirectedHandler},
+        true => quote! {#crt::space::wave::exchange::asynch::DirectedHandler},
+        false => quote! {#crt::space::wave::exchange::synch::DirectedHandler},
     };
 
     let root_ctx = match _async {
-        true => quote! {starlane::wave::exchange::asynch::RootInCtx},
-        false => quote! {starlane::wave::exchange::synch::RootInCtx},
+        true => quote! {#crt::space::wave::exchange::asynch::RootInCtx},
+        false => quote! {#crt::space::wave::exchange::synch::RootInCtx},
     };
 
     let _await = match _async {
@@ -160,8 +163,8 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
 
     let rtn = quote! {
         impl #generics #selector for #self_ty #where_clause{
-              fn select<'a>( &self, select: &'a starlane::wave::RecipientSelector<'a>, ) -> Result<&dyn #handler, ()> {
-                if select.wave.core().method == starlane::wave::core::Method::Cmd(starlane::wave::core::cmd::CmdMethod::Bounce) {
+              fn select<'a>( &self, select: &'a #crt::space::wave::RecipientSelector<'a>, ) -> Result<&dyn #handler, ()> {
+                if select.wave.core().method == #crt::space::wave::core::Method::Cmd(#crt::space::wave::core::cmd::CmdMethod::Bounce) {
                     return Ok(self);
                 }
                 #(
@@ -175,13 +178,13 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
 
         #_async_trait
         impl #generics #handler for #self_ty #where_clause{
-            #_async fn handle( &self, ctx: #root_ctx) -> starlane::wave::core::CoreBounce {
+            #_async fn handle( &self, ctx: #root_ctx) -> #crt::space::wave::core::CoreBounce {
                 #(
                     if #static_selector_keys.is_match(&ctx.wave).is_ok() {
                        return self.#idents( ctx )#_await;
                     }
                 )*
-                if ctx.wave.core().method == starlane::wave::core::Method::Cmd(starlane::wave::core::cmd::CmdMethod::Bounce) {
+                if ctx.wave.core().method == #crt::space::wave::core::Method::Cmd(#crt::space::wave::core::cmd::CmdMethod::Bounce) {
                     return self.bounce(ctx)#_await;
                 }
                 ctx.not_found().into()
@@ -236,6 +239,7 @@ pub fn route(attr: TokenStream, item: TokenStream ) -> TokenStream {
 #[proc_macro_attribute]
 pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
 
+    let crt = crt_name();
 
     let input = parse_macro_input!(input as syn::ImplItemMethod);
 
@@ -257,13 +261,13 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     let root_ctx = match input.sig.asyncness {
-        None => quote! {starlane::space::space::wave::exchange::synch::RootInCtx},
-        Some(_) => quote! {starlane::space::wave::exchange::asynch::RootInCtx},
+        None => quote! {#crt::space::space::wave::exchange::synch::RootInCtx},
+        Some(_) => quote! {#crt::space::wave::exchange::asynch::RootInCtx},
     };
 
     let in_ctx = match input.sig.asyncness {
-        None => quote! {starlane::space::wave::exchange::synch::InCtx},
-        Some(_) => quote! {starlane::space::wave::exchange::asynch::InCtx},
+        None => quote! {#crt::space::wave::exchange::synch::InCtx},
+        Some(_) => quote! {#crt::space::wave::exchange::asynch::InCtx},
     };
 
     let __async = match input.sig.asyncness {
@@ -277,15 +281,15 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
     let item = ctx.item;
 
     let expanded = quote! {
-      #__async fn #ident( &self, mut ctx: #root_ctx ) -> starlane::space::wave::core::CoreBounce {
+      #__async fn #ident( &self, mut ctx: #root_ctx ) -> #crt::space::wave::core::CoreBounce {
           let ctx: #in_ctx<'_,#item> = match ctx.push::<#item>() {
               Ok(ctx) => ctx,
               Err(err) => {
                     if ctx.wave.is_signal() {
-                      return starlane::space::wave::core::CoreBounce::Absorbed;
+                      return #crt::space::wave::core::CoreBounce::Absorbed;
                     }
                     else {
-                      return starlane::space::wave::core::CoreBounce::Reflected(err.into());
+                      return #crt::space::wave::core::CoreBounce::Reflected(err.into());
                     }
               }
           };
@@ -352,9 +356,10 @@ fn messsage_ctx(input: &FnArg) -> Result<RequestCtx, String> {
 
 fn rtn_type(output: &ReturnType) -> TokenStream2 {
 
+    let crt = crt_name();
     match output {
         ReturnType::Default => {
-            quote! {starlane::space::wave::Bounce::Absorbed}
+            quote! {#crt::space::wave::Bounce::Absorbed}
         }
         ReturnType::Type(_, path) => {
             if let Type::Path(path) = &**path {
@@ -365,18 +370,18 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
                             let arg = brackets.args.first().unwrap();
                             if "Substance" == arg.to_token_stream().to_string().as_str() {
                                 quote! {
-                                 use starlane::space::err::CoreReflector;
+                                 use #crt::space::err::CoreReflector;
                                  match result {
-                                     Ok(rtn) => starlane::space::wave::core::CoreBounce::Reflected(starlane::wave::core::ReflectedCore::ok_body(rtn)),
-                                     Err(err) => starlane::space::wave::core::CoreBounce::Reflected(err.as_reflected_core())
+                                     Ok(rtn) => #crt::space::wave::core::CoreBounce::Reflected(starlane::wave::core::ReflectedCore::ok_body(rtn)),
+                                     Err(err) => #crt::space::wave::core::CoreBounce::Reflected(err.as_reflected_core())
                                  }
                                 }
                             } else {
                                 quote! {
-                                 use starlane::space::err::CoreReflector;
+                                 use #crt::space::err::CoreReflector;
                                  match result {
-                                     Ok(rtn) => starlane::space::wave::core::CoreBounce::Reflected(rtn.into()),
-                                     Err(err) => starlane::space::wave::core::CoreBounce::Reflected(err.as_reflected_core())
+                                     Ok(rtn) => #crt::space::wave::core::CoreBounce::Reflected(rtn.into()),
+                                     Err(err) => #crt::space::wave::core::CoreBounce::Reflected(err.as_reflected_core())
                                  }
                                 }
                             }
@@ -386,7 +391,7 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
                     }
                     "Bounce" => {
                         quote! {
-                            let rtn : starlane::space::wave::core::CoreBounce = result.to_core_bounce();
+                            let rtn : #crt::space::wave::core::CoreBounce = result.to_core_bounce();
                             rtn
                         }
                     }
@@ -397,7 +402,7 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
                     }
                     "ReflectedCore" => {
                         quote! {
-                           starlane::space::wave::core::CoreBounce::Reflected(result)
+                           #crt::space::wave::core::CoreBounce::Reflected(result)
                         }
                     }
                     what => {
@@ -428,16 +433,29 @@ impl Parse for RouteAttr {
 #[proc_macro_derive(ToSpaceErr)]
 pub fn to_space_err(item: TokenStream) -> TokenStream {
 
+    let crt = crt_name();
     let input = parse_macro_input!(item as DeriveInput);
     let ident = &input.ident;
     let rtn = quote! {
-       impl starlane::space::err::ToSpaceErr for #ident {
-            fn to_space_err(&self) -> starlane::space::err::SpaceErr {
-                starlane::space::err::SpaceErr::to_space_err(&self.to_string())
+       impl #crt::space::err::ToSpaceErr for #ident {
+            fn to_space_err(&self) -> #crt::space::err::SpaceErr {
+                #crt::space::err::SpaceErr::to_space_err(&self.to_string())
             }
         }
     };
     rtn.into()
+}
+
+fn crt_name () -> TokenStream2{
+    let found_crate = crate_name("starlane").expect("my-crate is present in `Cargo.toml`");
+
+    let crt = match found_crate {
+        FoundCrate::Itself => quote!( crate ),
+        FoundCrate::Name(name) => {
+            quote!( starlane )
+        }
+    };
+    crt
 }
 
 
