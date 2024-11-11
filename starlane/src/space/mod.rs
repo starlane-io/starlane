@@ -38,10 +38,9 @@ use crate::space::wave::core::ReflectedCore;
 
 use crate::space::err::SpaceErr;
 use crate::space::hyper::ParticleRecord;
-use crate::space::space::point::Point;
+use crate::space::point::Point;
 use crate::space::wave::Agent;
 
-pub(crate) extern crate self as crate::space::space;
 
 /*
 pub fn starlane_uuid() -> Uuid {

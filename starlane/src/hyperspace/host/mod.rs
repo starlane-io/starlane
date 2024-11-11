@@ -6,7 +6,7 @@ use crate::hyperspace::service::ServiceErr;
 use clap::CommandFactory;
 use itertools::Itertools;
 use nom::AsBytes;
-use starlane_space::wave::exchange::asynch::DirectedHandler;
+use starlane::space::wave::exchange::asynch::DirectedHandler;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::io::Read;

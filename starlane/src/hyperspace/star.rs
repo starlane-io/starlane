@@ -18,33 +18,33 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use itertools::Itertools;
 use starlane_primitive_macros::{log_span, push_loc, push_mark};
-use starlane_space::command::common::StateSrc;
-use starlane_space::command::direct::create::{Create, Strategy};
-use starlane_space::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError};
-use starlane_space::hyper::{Assign, AssignmentKind, HyperSubstance, Provision, Search};
-use starlane_space::hyper::{MountKind, ParticleLocation};
-use starlane_space::kind::{Kind, StarStub, StarSub};
-use starlane_space::loc::{
+use starlane::space::command::common::StateSrc;
+use starlane::space::command::direct::create::{Create, Strategy};
+use starlane::space::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError};
+use starlane::space::hyper::{Assign, AssignmentKind, HyperSubstance, Provision, Search};
+use starlane::space::hyper::{MountKind, ParticleLocation};
+use starlane::space::kind::{Kind, StarStub, StarSub};
+use starlane::space::loc::{
     Layer, StarKey, Surface, SurfaceSelector, ToPoint, ToSurface, GLOBAL_EXEC,
 };
-use starlane_space::log::{Logger, Trackable, Tracker};
-use starlane_space::particle::traversal::{
+use starlane::space::log::{Logger, Trackable, Tracker};
+use starlane::space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
-use starlane_space::particle::{Details, Status};
-use starlane_space::point::Point;
-use starlane_space::substance::{Substance, SubstanceErr, SubstanceKind};
-use starlane_space::util::ValueMatcher;
-use starlane_space::wave::core::cmd::CmdMethod;
-use starlane_space::wave::core::hyper::HypMethod;
-use starlane_space::wave::core::ReflectedCore;
-use starlane_space::wave::exchange::asynch::{
+use starlane::space::particle::{Details, Status};
+use starlane::space::point::Point;
+use starlane::space::substance::{Substance, SubstanceErr, SubstanceKind};
+use starlane::space::util::ValueMatcher;
+use starlane::space::wave::core::cmd::CmdMethod;
+use starlane::space::wave::core::hyper::HypMethod;
+use starlane::space::wave::core::ReflectedCore;
+use starlane::space::wave::exchange::asynch::{
     DirectedHandler, DirectedHandlerShell, Exchanger, ProtoTransmitter, ProtoTransmitterBuilder,
     Router, TraversalRouter, TxRouter,
 };
-use starlane_space::wave::exchange::SetStrategy;
-use starlane_space::wave::Wave;
-use starlane_space::wave::{
+use starlane::space::wave::exchange::SetStrategy;
+use starlane::space::wave::Wave;
+use starlane::space::wave::{
     Agent, DirectedProto, Handling, HandlingKind, PongCore, Priority, Recipients, Reflectable,
     ReflectedWave, Retries, Ripple, Scope, SignalCore, SingularRipple, ToReflected, WaitTime,
     WaveId, WaveKind, WaveVariantDef,

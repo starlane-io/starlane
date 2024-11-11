@@ -20,7 +20,6 @@ doctest = false
 
 [dependencies]
 
-starlane-space = { workspace = true }
 lazy_static = { workspace = true}
 syn = { workspace = true, features = ["full"] }
 quote = { workspace = true}

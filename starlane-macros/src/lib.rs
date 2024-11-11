@@ -8,8 +8,6 @@ use chrono::Utc;
 use proc_macro2::Ident;
 use quote::__private::ext::RepToTokensExt;
 use quote::{format_ident, quote, ToTokens};
-use starlane_space::parse::route_attribute_value;
-use starlane_space::wasm::Timestamp;
 use syn::__private::TokenStream2;
 use syn::parse::{Parse, ParseStream};
 use syn::parse_quote::ParseQuote;
@@ -241,7 +239,7 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     let input = parse_macro_input!(input as syn::ImplItemMethod);
 
-    log(route_attribute_value(attr.to_string().as_str())).expect("valid route selector");
+//    log(route_attribute_value(attr.to_string().as_str())).expect("valid route selector");
 
     //    attr.to_tokens().next();
     // we do this just to mem for a valid selector...

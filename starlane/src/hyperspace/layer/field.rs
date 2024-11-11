@@ -7,23 +7,23 @@ use url::Url;
 use crate::hyperspace::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, TraverseToNextRouter};
 use starlane_primitive_macros::push_loc;
-use starlane_space::artifact::asynch::ArtErr;
-use starlane_space::artifact::ArtRef;
-use starlane_space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
-use starlane_space::err::{CoreReflector, SpaceErr, StatusErr};
-use starlane_space::loc::{Layer, Surface, ToSurface};
-use starlane_space::log::{Logger, Trackable};
-use starlane_space::parse::model::{PipelineSegmentVar, PipelineVar};
-use starlane_space::parse::{Env, RegexCapturesResolver};
-use starlane_space::particle::traversal::{Traversal, TraversalLayer};
-use starlane_space::point::Point;
-use starlane_space::selector::PayloadBlock;
-use starlane_space::substance::Substance;
-use starlane_space::util::{log, ToResolved};
-use starlane_space::wave::core::{Method, ReflectedCore};
-use starlane_space::wave::exchange::asynch::ProtoTransmitter;
-use starlane_space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
-use starlane_space::wave::{
+use starlane::space::artifact::asynch::ArtErr;
+use starlane::space::artifact::ArtRef;
+use starlane::space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
+use starlane::space::err::{CoreReflector, SpaceErr, StatusErr};
+use starlane::space::loc::{Layer, Surface, ToSurface};
+use starlane::space::log::{Logger, Trackable};
+use starlane::space::parse::model::{PipelineSegmentVar, PipelineVar};
+use starlane::space::parse::{Env, RegexCapturesResolver};
+use starlane::space::particle::traversal::{Traversal, TraversalLayer};
+use starlane::space::point::Point;
+use starlane::space::selector::PayloadBlock;
+use starlane::space::substance::Substance;
+use starlane::space::util::{log, ToResolved};
+use starlane::space::wave::core::{Method, ReflectedCore};
+use starlane::space::wave::exchange::asynch::ProtoTransmitter;
+use starlane::space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
+use starlane::space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, PongCore, Reflection, Wave,
     WaveVariantDef,
 };

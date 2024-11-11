@@ -11,7 +11,8 @@ use std::str::FromStr;
 use std::string::ToString;
 use std::sync::Arc;
 use uuid::Uuid;
-
+use crate::hyperspace::err::HypErr;
+use crate::hyperspace::shutdown::panic_shutdown;
 use crate::server::StarlaneConfig;
 
 pub fn context() -> String {
@@ -268,6 +269,7 @@ impl Enviro for StdEnviro {
     }
 }
 
+/*
 #[no_mangle]
 pub extern "C" fn starlane_uuid() -> String {
     Uuid::new_v4().to_string()
@@ -277,6 +279,8 @@ pub extern "C" fn starlane_uuid() -> String {
 pub extern "C" fn starlane_timestamp() -> Timestamp {
     Timestamp::new(Utc::now().timestamp_millis())
 }
+
+ */
 
 #[no_mangle]
 extern "C" fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>, SpaceErr> {

@@ -18,8 +18,11 @@ impl Timestamp {
     }
 }
 
+/*
 #[no_mangle]
 extern "C" {
     pub fn starlane_timestamp() -> Timestamp;
     pub fn starlane_uuid() -> loc::Uuid;
 }
+
+ */

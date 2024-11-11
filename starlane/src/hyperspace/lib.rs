@@ -21,11 +21,11 @@ pub mod service;
 pub mod template;
 
 pub mod starlane {
-    pub extern crate starlane_space as space;
+    pub extern crate starlane::space as space;
 }
 
 mod space {
-    pub use starlane_space::*;
+    pub use starlane::space::*;
 }
 
 #[cfg(test)]

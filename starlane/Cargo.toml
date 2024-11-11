@@ -45,7 +45,6 @@ space=[]
 wasm=[]
 
 [dependencies]
-starlane-parse = { workspace = true  }
 starlane-macros = { workspace = true  }
 starlane-primitive-macros = { workspace = true}
 
