@@ -1,7 +1,7 @@
 use crate::space::err::{ParseErrs, PrintErr};
 use crate::space::loc::Uuid;
 use crate::space::parse::Env;
-use crate::space::wasm::{starlane_timestamp, starlane_uuid, Timestamp};
+use crate::space::wasm::{ Timestamp};
 use crate::space::wave::core::http2::HttpMethod;
 
 use core::fmt::Display;
@@ -441,12 +441,25 @@ where
 }
 
 pub fn uuid() -> Uuid {
+    todo!()
+}
+
+pub fn timestamp() -> Timestamp {
+    todo!()
+}
+
+
+
+/*
+pub fn uuid() -> Uuid {
     unsafe { starlane_uuid() }
 }
 
 pub fn timestamp() -> Timestamp {
     unsafe { starlane_timestamp() }
 }
+
+ */
 
 pub trait ToResolved<R>
 where

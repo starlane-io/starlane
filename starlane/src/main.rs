@@ -16,10 +16,7 @@ pub mod test;
 
 pub mod install;
 //#[cfg(feature="space")]
-//pub extern crate crate::space as starlane;
 
-//pub extern crate crate::space as starlane;
-//pub mod space {}
 
 #[cfg(feature = "cli")]
 pub mod cli;

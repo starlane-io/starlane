@@ -132,11 +132,18 @@ fn root_logger() -> RootLogger {
     ROOT_LOGGER.clone()
 }
 
+fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>, SpaceErr> {
+    Ok(Arc::new(StdOutAppender()))
+}
+
+/*
 #[no_mangle]
 extern "C" {
     pub fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>, SpaceErr>;
 }
 
+
+ */
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum Level {
     Trace,

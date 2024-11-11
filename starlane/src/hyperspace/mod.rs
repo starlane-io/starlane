@@ -21,9 +21,7 @@ pub mod service;
 pub mod template;
 
 
-mod space {
-    pub use crate::hyperspace::space::*;
-}
+
 
 #[cfg(test)]
 pub mod tests {

@@ -7,15 +7,14 @@ use crate::hyperspace::host::{ExeStub, Host, HostCli};
 use crate::hyperspace::machine::MachineErr;
 use itertools::Itertools;
 use nom::AsBytes;
-use starlane::space as starlane;
-use starlane::space::err::SpaceErr;
-use starlane::space::kind::Kind;
-use starlane::space::loc::ToBaseKind;
-use starlane::space::particle::Status;
-use starlane::space::point::Point;
-use starlane::space::selector::KindSelector;
-use starlane::space::util::{IdSelector, MatchSelector, OptSelector, RegexMatcher, ValueMatcher};
-use starlane::space::wave::exchange::asynch::{DirectedHandler, Router};
+use crate::space::err::SpaceErr;
+use crate::space::kind::Kind;
+use crate::space::loc::ToBaseKind;
+use crate::space::particle::Status;
+use crate::space::point::Point;
+use crate::space::selector::KindSelector;
+use crate::space::util::{IdSelector, MatchSelector, OptSelector, RegexMatcher, ValueMatcher};
+use crate::space::wave::exchange::asynch::{DirectedHandler, Router};
 use std::env;
 use std::fmt::{Display, Formatter};
 use std::future::Future;
@@ -288,9 +287,9 @@ pub mod tests {
     use crate::hyperspace::service::{
         service_conf, Service, ServiceConf, ServiceErr, ServiceKind, ServiceTemplate,
     };
-    use starlane::space::kind::{BaseKind, Kind};
-    use starlane::space::selector::KindSelector;
-    use starlane::space::util::OptSelector;
+    use crate::space::kind::{BaseKind, Kind};
+    use crate::space::selector::KindSelector;
+    use crate::space::util::OptSelector;
     use std::path::{absolute, PathBuf};
     use std::{env, io};
     use tokio::fs;

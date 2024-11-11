@@ -10,37 +10,37 @@ use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use starlane_macros::{handler, route, DirectedHandler};
 use starlane_primitive_macros::push_mark;
-use starlane::space::artifact::ArtRef;
-use starlane::space::command::common::StateSrc;
-use starlane::space::command::direct::create::Strategy;
-use starlane::space::config::bind::BindConfig;
-use starlane::space::err::{CoreReflector, SpaceErr};
-use starlane::space::hyper::{
+use crate::space::artifact::ArtRef;
+use crate::space::command::common::StateSrc;
+use crate::space::command::direct::create::Strategy;
+use crate::space::config::bind::BindConfig;
+use crate::space::err::{CoreReflector, SpaceErr};
+use crate::space::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, HyperSubstanceKind,
     ParticleLocation, Search,
 };
-use starlane::space::kind::{BaseKind, Kind, StarSub};
-use starlane::space::loc::{Layer, StarKey, ToPoint, ToSurface, LOCAL_STAR};
-use starlane::space::log::{Trackable, Tracker};
-use starlane::space::parse::bind_config;
-use starlane::space::parse::util::{parse_errs, result};
-use starlane::space::particle::traversal::TraversalInjection;
-use starlane::space::particle::Status;
-use starlane::space::point::Point;
-use starlane::space::selector::{KindBaseSelector, KindSelector, Pattern, SubKindSelector};
-use starlane::space::substance::{Substance, SubstanceKind};
-use starlane::space::util::{log, ValueMatcher, ValuePattern};
-use starlane::space::wave::core::http2::StatusCode;
-use starlane::space::wave::core::hyper::HypMethod;
-use starlane::space::wave::core::MethodKind::Hyp;
-use starlane::space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
-use starlane::space::wave::exchange::asynch::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder};
-use starlane::space::wave::exchange::SetStrategy;
-use starlane::space::wave::{
+use crate::space::kind::{BaseKind, Kind, StarSub};
+use crate::space::loc::{Layer, StarKey, ToPoint, ToSurface, LOCAL_STAR};
+use crate::space::log::{Trackable, Tracker};
+use crate::space::parse::bind_config;
+use crate::space::parse::util::{parse_errs, result};
+use crate::space::particle::traversal::TraversalInjection;
+use crate::space::particle::Status;
+use crate::space::point::Point;
+use crate::space::selector::{KindBaseSelector, KindSelector, Pattern, SubKindSelector};
+use crate::space::substance::{Substance, SubstanceKind};
+use crate::space::util::{log, ValueMatcher, ValuePattern};
+use crate::space::wave::core::http2::StatusCode;
+use crate::space::wave::core::hyper::HypMethod;
+use crate::space::wave::core::MethodKind::Hyp;
+use crate::space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
+use crate::space::wave::exchange::asynch::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder};
+use crate::space::wave::exchange::SetStrategy;
+use crate::space::wave::{
     Agent, BounceBacks, DirectedProto, Echoes, Handling, HandlingKind, PongCore, Priority,
     Recipients, Retries, WaitTime, Wave, WaveVariantDef,
 };
-use starlane::space::HYPERUSER;
+use crate::space::HYPERUSER;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::marker::PhantomData;

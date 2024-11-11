@@ -297,7 +297,7 @@ mod tests {
     use dashmap::DashMap;
 
     use crate::hyperspace::hyperlane::{HyperGateSelector, VersionGate};
-    use starlane::space::err::SpaceErr;
+    use crate::space::err::SpaceErr;
 
     use crate::hyperspace::HyperServerQuic;
 

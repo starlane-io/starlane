@@ -36,7 +36,6 @@ pub mod space;
 
 pub mod hyperspace;
 
-pub use singularity::*;
 
 pub mod env;
 

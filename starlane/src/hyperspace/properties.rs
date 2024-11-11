@@ -1,8 +1,8 @@
 use once_cell::sync::Lazy;
-use starlane::space::err::SpaceErr;
-use starlane::space::kind::BaseKind;
-use starlane::space::loc::ToBaseKind;
-use starlane::space::particle::property::{
+use crate::space::err::SpaceErr;
+use crate::space::kind::BaseKind;
+use crate::space::loc::ToBaseKind;
+use crate::space::particle::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
     PropertySource, U64Pattern, UsernamePattern,
 };

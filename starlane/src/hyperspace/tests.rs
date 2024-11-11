@@ -14,28 +14,28 @@ use crate::hyperspace::hyperlane::HyperClient;
 use crate::hyperspace::machine::MachineApiExtFactory;
 use crate::hyperspace::platform::Platform;
 use crate::hyperspace::star::HyperStarApi;
-use starlane::space::command::common::StateSrc;
-use starlane::space::command::direct::create::{
+use crate::space::command::common::StateSrc;
+use crate::space::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use starlane::space::command::{CmdTransfer, RawCommand};
-use starlane::space::hyper::{
+use crate::space::command::{CmdTransfer, RawCommand};
+use crate::space::hyper::{
     Assign, AssignmentKind, HyperSubstance, ParticleLocation, ParticleRecord,
 };
-use starlane::space::kind::Kind;
-use starlane::space::loc::{Layer, StarHandle, StarKey, ToSurface};
-use starlane::space::log::{LogSource, RootLogger, StdOutAppender};
-use starlane::space::particle::{Details, Properties, Status, Stub};
-use starlane::space::point::Point;
-use starlane::space::settings::Timeouts;
-use starlane::space::substance::Substance;
-use starlane::space::wave::core::cmd::CmdMethod;
-use starlane::space::wave::core::ext::ExtMethod;
-use starlane::space::wave::core::hyper::HypMethod;
-use starlane::space::wave::core::{Method, ReflectedCore};
-use starlane::space::wave::exchange::asynch::Exchanger;
-use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
-use starlane::space::HYPERUSER;
+use crate::space::kind::Kind;
+use crate::space::loc::{Layer, StarHandle, StarKey, ToSurface};
+use crate::space::log::{LogSource, RootLogger, StdOutAppender};
+use crate::space::particle::{Details, Properties, Status, Stub};
+use crate::space::point::Point;
+use crate::space::settings::Timeouts;
+use crate::space::substance::Substance;
+use crate::space::wave::core::cmd::CmdMethod;
+use crate::space::wave::core::ext::ExtMethod;
+use crate::space::wave::core::hyper::HypMethod;
+use crate::space::wave::core::{Method, ReflectedCore};
+use crate::space::wave::exchange::asynch::Exchanger;
+use crate::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
+use crate::space::HYPERUSER;
 
 pub static LESS: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:less").expect("point"));
 pub static FAE: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:fae").expect("point"));

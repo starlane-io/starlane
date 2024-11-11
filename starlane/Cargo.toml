@@ -41,8 +41,9 @@ driver=["hyperspace"]
 dialect=[]
 dialect-cli=["dialect","dep:clap"]
 service=[]
-space=[]
+space=["dep:regex", "dep:validator", "dep:convert_case", "dep:serde_json"]
 wasm=[]
+
 
 [dependencies]
 starlane-macros = { workspace = true  }

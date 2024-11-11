@@ -4,11 +4,10 @@ use crate::hyperspace::registry::postgres::{
     PostgresRegistryContextHandle,
 };
 
-use crate::hyperspace::driver::SpaceDriverFactory;
 use crate::hyperspace::driver::{DriverAvail, DriversBuilder};
-use crate::hyperspace::driverbase::BaseDriverFactory;
-use crate::hyperspace::drivercontrol::ControlDriverFactory;
-use crate::hyperspace::driverroot::RootDriverFactory;
+use crate::hyperspace::driver::base::BaseDriverFactory;
+use crate::hyperspace::driver::control::ControlDriverFactory;
+use crate::hyperspace::driver::root::RootDriverFactory;
 use crate::space::artifact::asynch::Artifacts;
 use crate::space::kind::StarSub;
 use crate::space::loc::{MachineName, StarKey};
@@ -18,17 +17,17 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::database::{Database, LiveDatabase};
+use crate::hyperspace::database::{Database, LiveDatabase};
 use crate::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
-use crate::err::HypErr;
-use crate::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
-use crate::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
-use crate::platform::{Platform, PlatformConfig};
-use crate::reg::{PgRegistryConfig, Registry, RegistryWrapper};
-use crate::registry::err::RegErr;
-use crate::registry::postgres::embed::PgEmbedSettings;
-use crate::registry::postgres::PostgresDbKey;
-use crate::shutdown::panic_shutdown;
+use crate::hyperspace::err::HypErr;
+use crate::hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
+use crate::hyperspace::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
+use crate::hyperspace::platform::{Platform, PlatformConfig};
+use crate::hyperspace::reg::{PgRegistryConfig, Registry, RegistryWrapper};
+use crate::hyperspace::registry::err::RegErr;
+use crate::hyperspace::registry::postgres::embed::PgEmbedSettings;
+use crate::hyperspace::registry::postgres::PostgresDbKey;
+use crate::hyperspace::shutdown::panic_shutdown;
 use anyhow::anyhow;
 use port_check::is_local_ipv4_port_free;
 use serde::{Deserialize, Serialize};
@@ -36,6 +35,9 @@ use starlane_primitive_macros::{logger, push_loc};
 use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
+use crate::hyperspace::driver::space::SpaceDriverFactory;
+use crate::hyperspace::foundation::StandAloneFoundation;
+use crate::hyperspace::machine::MachineTemplate;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {

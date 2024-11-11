@@ -7,12 +7,12 @@ use tokio::io;
 use tokio::sync::oneshot::error::RecvError;
 
 use crate::hyperspace::registry::err::RegErr;
-use starlane::space::err::{CoreReflector, HyperSpatialError, SpaceErr, SpatialError};
-use starlane::space::kind::Kind;
-use starlane::space::point::Point;
-use starlane::space::substance::{Substance, SubstanceKind};
-use starlane::space::wave::core::http2::StatusCode;
-use starlane::space::wave::core::ReflectedCore;
+use crate::space::err::{CoreReflector, HyperSpatialError, SpaceErr, SpatialError};
+use crate::space::kind::Kind;
+use crate::space::point::Point;
+use crate::space::substance::{Substance, SubstanceKind};
+use crate::space::wave::core::http2::StatusCode;
+use crate::space::wave::core::ReflectedCore;
 
 pub type HyperErr2 = anyhow::Error;
 use crate::hyperspace::star::StarErr;
@@ -100,7 +100,7 @@ impl From<ThisErr> for OldStarErr {
 
 /*
 pub mod convert {
-    use starlane::space as starlane;
+    use crate::space as starlane;
     use crate::hyperspace::err::OldStarErr;
     use crate::hyperspace::hyperspace::err::{ErrKind, HyperErr};
     use ascii::FromAsciiError;
@@ -110,7 +110,7 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-    use starlane::space::err::SpaceErr;
+    use crate::space::err::SpaceErr;
 
     impl From<strum::ParseError> for OldStarErr {
         fn from(e: strum::ParseError) -> Self {

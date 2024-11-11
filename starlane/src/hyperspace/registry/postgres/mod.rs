@@ -11,36 +11,36 @@ use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
 use starlane_primitive_macros::push_loc;
-use starlane::space::command::common::{PropertyMod, SetProperties};
-use starlane::space::command::direct::create::Strategy;
-use starlane::space::command::direct::delete::Delete;
-use starlane::space::command::direct::get::{Get, GetOp};
-use starlane::space::command::direct::query::{Query, QueryResult};
-use starlane::space::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
-use starlane::space::command::direct::set::Set;
-use starlane::space::err::SpaceErr;
-use starlane::space::hyper::{ParticleLocation, ParticleRecord};
-use starlane::space::kind::{BaseKind, Kind, KindParts, Specific};
-use starlane::space::loc::{StarKey, ToBaseKind, Version};
-use starlane::space::log::Logger;
-use starlane::space::parse::util::{parse_errs, result};
-use starlane::space::parse::{CamelCase, Domain, SkewerCase};
-use starlane::space::particle::{Details, Properties, Property, Status, Stub};
-use starlane::space::point::Point;
-use starlane::space::security::{
+use crate::space::command::common::{PropertyMod, SetProperties};
+use crate::space::command::direct::create::Strategy;
+use crate::space::command::direct::delete::Delete;
+use crate::space::command::direct::get::{Get, GetOp};
+use crate::space::command::direct::query::{Query, QueryResult};
+use crate::space::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
+use crate::space::command::direct::set::Set;
+use crate::space::err::SpaceErr;
+use crate::space::hyper::{ParticleLocation, ParticleRecord};
+use crate::space::kind::{BaseKind, Kind, KindParts, Specific};
+use crate::space::loc::{StarKey, ToBaseKind, Version};
+use crate::space::log::Logger;
+use crate::space::parse::util::{parse_errs, result};
+use crate::space::parse::{CamelCase, Domain, SkewerCase};
+use crate::space::particle::{Details, Properties, Property, Status, Stub};
+use crate::space::point::Point;
+use crate::space::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions,
     PermissionsMask, PermissionsMaskKind, Privilege, Privileges,
 };
-use starlane::space::selector::specific::{
+use crate::space::selector::specific::{
     ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
 };
-use starlane::space::selector::{
+use crate::space::selector::{
     ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector,
     SubKindSelector,
 };
-use starlane::space::substance::{Substance, SubstanceList, SubstanceMap};
-use starlane::space::util::ValuePattern;
-use starlane::space::HYPERUSER;
+use crate::space::substance::{Substance, SubstanceList, SubstanceMap};
+use crate::space::util::ValuePattern;
+use crate::space::HYPERUSER;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
@@ -1485,19 +1485,19 @@ pub mod test {
         PostgresRegistryContextHandle,
     };
     use crate::hyperspace::StarlanePostgres;
-    use starlane::space::artifact::asynch::Artifacts;
-    use starlane::space::command::direct::create::Strategy;
-    use starlane::space::command::direct::query::Query;
-    use starlane::space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
-    use starlane::space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
-    use starlane::space::loc::{MachineName, StarKey, ToPoint};
-    use starlane::space::log::RootLogger;
-    use starlane::space::particle::property::PropertiesConfig;
-    use starlane::space::particle::Status;
-    use starlane::space::point::Point;
-    use starlane::space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
-    use starlane::space::selector::{PointHierarchy, Selector};
-    use starlane::space::HYPERUSER;
+    use crate::space::artifact::asynch::Artifacts;
+    use crate::space::command::direct::create::Strategy;
+    use crate::space::command::direct::query::Query;
+    use crate::space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
+    use crate::space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
+    use crate::space::loc::{MachineName, StarKey, ToPoint};
+    use crate::space::log::RootLogger;
+    use crate::space::particle::property::PropertiesConfig;
+    use crate::space::particle::Status;
+    use crate::space::point::Point;
+    use crate::space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
+    use crate::space::selector::{PointHierarchy, Selector};
+    use crate::space::HYPERUSER;
 
     #[derive(Clone)]
     pub struct TestPlatform {

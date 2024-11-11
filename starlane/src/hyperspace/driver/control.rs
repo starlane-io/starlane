@@ -14,31 +14,30 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use starlane_macros::DirectedHandler;
 use starlane_primitive_macros::logger;
-pub use starlane::space as starlane;
-use starlane::space::artifact::ArtRef;
-use starlane::space::command::common::StateSrc;
-use starlane::space::command::direct::create::{
+use crate::space::artifact::ArtRef;
+use crate::space::command::common::StateSrc;
+use crate::space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use starlane::space::command::RawCommand;
-use starlane::space::config::bind::BindConfig;
-use starlane::space::err::{CoreReflector, SpaceErr};
-use starlane::space::hyper::{ControlPattern, Greet, InterchangeKind};
-use starlane::space::kind::{BaseKind, Kind, StarSub};
-use starlane::space::loc::{Layer, PointFactory, Surface, ToSurface};
-use starlane::space::log::{Logger, Tracker};
-use starlane::space::particle::traversal::Traversal;
-use starlane::space::point::Point;
-use starlane::space::selector::KindSelector;
-use starlane::space::settings::Timeouts;
-use starlane::space::substance::{Substance, SubstanceErr};
-use starlane::space::wave::core::ext::ExtMethod;
-use starlane::space::wave::core::ReflectedCore;
-use starlane::space::wave::exchange::asynch::{
+use crate::space::command::RawCommand;
+use crate::space::config::bind::BindConfig;
+use crate::space::err::{CoreReflector, SpaceErr};
+use crate::space::hyper::{ControlPattern, Greet, InterchangeKind};
+use crate::space::kind::{BaseKind, Kind, StarSub};
+use crate::space::loc::{Layer, PointFactory, Surface, ToSurface};
+use crate::space::log::{Logger, Tracker};
+use crate::space::particle::traversal::Traversal;
+use crate::space::point::Point;
+use crate::space::selector::KindSelector;
+use crate::space::settings::Timeouts;
+use crate::space::substance::{Substance, SubstanceErr};
+use crate::space::wave::core::ext::ExtMethod;
+use crate::space::wave::core::ReflectedCore;
+use crate::space::wave::exchange::asynch::{
     Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TraversalRouter,
 };
-use starlane::space::wave::exchange::SetStrategy;
-use starlane::space::wave::{Agent, DirectedProto, PongCore, ToRecipients, Wave, WaveVariantDef};
+use crate::space::wave::exchange::SetStrategy;
+use crate::space::wave::{Agent, DirectedProto, PongCore, ToRecipients, Wave, WaveVariantDef};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;

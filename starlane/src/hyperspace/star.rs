@@ -18,33 +18,33 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use itertools::Itertools;
 use starlane_primitive_macros::{log_span, push_loc, push_mark};
-use starlane::space::command::common::StateSrc;
-use starlane::space::command::direct::create::{Create, Strategy};
-use starlane::space::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError};
-use starlane::space::hyper::{Assign, AssignmentKind, HyperSubstance, Provision, Search};
-use starlane::space::hyper::{MountKind, ParticleLocation};
-use starlane::space::kind::{Kind, StarStub, StarSub};
-use starlane::space::loc::{
+use crate::space::command::common::StateSrc;
+use crate::space::command::direct::create::{Create, Strategy};
+use crate::space::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError};
+use crate::space::hyper::{Assign, AssignmentKind, HyperSubstance, Provision, Search};
+use crate::space::hyper::{MountKind, ParticleLocation};
+use crate::space::kind::{Kind, StarStub, StarSub};
+use crate::space::loc::{
     Layer, StarKey, Surface, SurfaceSelector, ToPoint, ToSurface, GLOBAL_EXEC,
 };
-use starlane::space::log::{Logger, Trackable, Tracker};
-use starlane::space::particle::traversal::{
+use crate::space::log::{Logger, Trackable, Tracker};
+use crate::space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
-use starlane::space::particle::{Details, Status};
-use starlane::space::point::Point;
-use starlane::space::substance::{Substance, SubstanceErr, SubstanceKind};
-use starlane::space::util::ValueMatcher;
-use starlane::space::wave::core::cmd::CmdMethod;
-use starlane::space::wave::core::hyper::HypMethod;
-use starlane::space::wave::core::ReflectedCore;
-use starlane::space::wave::exchange::asynch::{
+use crate::space::particle::{Details, Status};
+use crate::space::point::Point;
+use crate::space::substance::{Substance, SubstanceErr, SubstanceKind};
+use crate::space::util::ValueMatcher;
+use crate::space::wave::core::cmd::CmdMethod;
+use crate::space::wave::core::hyper::HypMethod;
+use crate::space::wave::core::ReflectedCore;
+use crate::space::wave::exchange::asynch::{
     DirectedHandler, DirectedHandlerShell, Exchanger, ProtoTransmitter, ProtoTransmitterBuilder,
     Router, TraversalRouter, TxRouter,
 };
-use starlane::space::wave::exchange::SetStrategy;
-use starlane::space::wave::Wave;
-use starlane::space::wave::{
+use crate::space::wave::exchange::SetStrategy;
+use crate::space::wave::Wave;
+use crate::space::wave::{
     Agent, DirectedProto, Handling, HandlingKind, PongCore, Priority, Recipients, Reflectable,
     ReflectedWave, Retries, Ripple, Scope, SignalCore, SingularRipple, ToReflected, WaitTime,
     WaveId, WaveKind, WaveVariantDef,

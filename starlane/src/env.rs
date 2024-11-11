@@ -282,6 +282,7 @@ pub extern "C" fn starlane_timestamp() -> Timestamp {
 
  */
 
+/*
 #[no_mangle]
 extern "C" fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>, SpaceErr> {
     let append_to_file = match &STARLANE_WRITE_LOGS.deref() {
@@ -298,3 +299,5 @@ extern "C" fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>, Space
         Ok(Arc::new(StdOutAppender()))
     }
 }
+
+ */

@@ -7,23 +7,23 @@ use url::Url;
 use crate::hyperspace::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, TraverseToNextRouter};
 use starlane_primitive_macros::push_loc;
-use starlane::space::artifact::asynch::ArtErr;
-use starlane::space::artifact::ArtRef;
-use starlane::space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
-use starlane::space::err::{CoreReflector, SpaceErr, StatusErr};
-use starlane::space::loc::{Layer, Surface, ToSurface};
-use starlane::space::log::{Logger, Trackable};
-use starlane::space::parse::model::{PipelineSegmentVar, PipelineVar};
-use starlane::space::parse::{Env, RegexCapturesResolver};
-use starlane::space::particle::traversal::{Traversal, TraversalLayer};
-use starlane::space::point::Point;
-use starlane::space::selector::PayloadBlock;
-use starlane::space::substance::Substance;
-use starlane::space::util::{log, ToResolved};
-use starlane::space::wave::core::{Method, ReflectedCore};
-use starlane::space::wave::exchange::asynch::ProtoTransmitter;
-use starlane::space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
-use starlane::space::wave::{
+use crate::space::artifact::asynch::ArtErr;
+use crate::space::artifact::ArtRef;
+use crate::space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
+use crate::space::err::{CoreReflector, SpaceErr, StatusErr};
+use crate::space::loc::{Layer, Surface, ToSurface};
+use crate::space::log::{Logger, Trackable};
+use crate::space::parse::model::{PipelineSegmentVar, PipelineVar};
+use crate::space::parse::{Env, RegexCapturesResolver};
+use crate::space::particle::traversal::{Traversal, TraversalLayer};
+use crate::space::point::Point;
+use crate::space::selector::PayloadBlock;
+use crate::space::substance::Substance;
+use crate::space::util::{log, ToResolved};
+use crate::space::wave::core::{Method, ReflectedCore};
+use crate::space::wave::exchange::asynch::ProtoTransmitter;
+use crate::space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
+use crate::space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, PongCore, Reflection, Wave,
     WaveVariantDef,
 };

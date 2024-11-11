@@ -7,17 +7,17 @@ use crate::hyperspace::reg::Registry;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use starlane_primitive_macros::logger;
-use starlane::space::artifact::asynch::Artifacts;
-use starlane::space::command::direct::create::KindTemplate;
-use starlane::space::err::SpaceErr;
-use starlane::space::kind::{
+use crate::space::artifact::asynch::Artifacts;
+use crate::space::command::direct::create::KindTemplate;
+use crate::space::err::SpaceErr;
+use crate::space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind,
     UserBaseSubKindBase,
 };
-use starlane::space::loc::{MachineName, StarKey, ToBaseKind};
-use starlane::space::log::Logger;
-use starlane::space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
-use starlane::space::settings::Timeouts;
+use crate::space::loc::{MachineName, StarKey, ToBaseKind};
+use crate::space::log::Logger;
+use crate::space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
+use crate::space::settings::Timeouts;
 use std::str::FromStr;
 use std::sync::Arc;
 

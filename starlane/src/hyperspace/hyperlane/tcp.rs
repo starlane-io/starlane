@@ -6,12 +6,12 @@ use async_trait::async_trait;
 use rcgen::{generate_simple_self_signed, RcgenError};
 use rustls::pki_types::ServerName;
 use rustls::{RootCertStore, ServerConfig};
-use starlane::space::err::SpaceErr;
-use starlane::space::hyper::Knock;
-use starlane::space::log::Logger;
-use starlane::space::substance::Substance;
-use starlane::space::wave::{PingCore, Wave, WaveVariantDef};
-use starlane::space::VERSION;
+use crate::space::err::SpaceErr;
+use crate::space::hyper::Knock;
+use crate::space::log::Logger;
+use crate::space::substance::Substance;
+use crate::space::wave::{PingCore, Wave, WaveVariantDef};
+use crate::space::VERSION;
 use std::io;
 use std::io::{BufReader, Read};
 use std::str::FromStr;
@@ -583,14 +583,15 @@ mod tests {
     use anyhow::anyhow;
     use chrono::{DateTime, Utc};
     use starlane_primitive_macros::{logger, push_loc};
-    use starlane::space::log::{LogAppender, StdOutAppender};
-    use starlane::space::point::Point;
+    use crate::space::log::{LogAppender, StdOutAppender};
+    use crate::space::point::Point;
     use std::str::FromStr;
     use std::sync::Arc;
     use crate::space::err::SpaceErr;
     use crate::space::loc::ToSurface;
     use crate::space::log::{LogAppender, StdOutAppender};
 
+    /*
     #[no_mangle]
     pub extern "C" fn starlane_uuid() -> String {
         uuid::Uuid::new_v4().to_string()
@@ -605,6 +606,8 @@ mod tests {
     extern "C" fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>, SpaceErr> {
         Ok(Arc::new(StdOutAppender()))
     }
+
+     */
 
     //#[tokio::test]
     async fn test_tcp() -> Result<(), Error> {

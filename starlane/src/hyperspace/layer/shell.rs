@@ -1,23 +1,23 @@
 use async_trait::async_trait;
 use dashmap::{DashMap, DashSet};
 use lazy_static::lazy_static;
-use starlane::space::command::common::StateSrc;
-use starlane::space::command::{Command, RawCommand};
-use starlane::space::err::SpaceErr;
-use starlane::space::loc::{Layer, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
-use starlane::space::log::Logger;
-use starlane::space::parse::util::new_span;
-use starlane::space::parse::{command_line, Env};
-use starlane::space::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
-use starlane::space::point::Point;
-use starlane::space::substance::Substance;
-use starlane::space::util::ToResolved;
-use starlane::space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
-use starlane::space::wave::exchange::asynch::{
+use crate::space::command::common::StateSrc;
+use crate::space::command::{Command, RawCommand};
+use crate::space::err::SpaceErr;
+use crate::space::loc::{Layer, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
+use crate::space::log::Logger;
+use crate::space::parse::util::new_span;
+use crate::space::parse::{command_line, Env};
+use crate::space::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
+use crate::space::point::Point;
+use crate::space::substance::Substance;
+use crate::space::util::ToResolved;
+use crate::space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
+use crate::space::wave::exchange::asynch::{
     DirectedHandler, Exchanger, InCtx, ProtoTransmitterBuilder, RootInCtx,
 };
-use starlane::space::wave::exchange::SetStrategy;
-use starlane::space::wave::{DirectedProto, DirectedWave, PongCore, Wave, WaveId, WaveVariantDef};
+use crate::space::wave::exchange::SetStrategy;
+use crate::space::wave::{DirectedProto, DirectedWave, PongCore, Wave, WaveId, WaveVariantDef};
 use std::sync::atomic::AtomicU16;
 use std::sync::Arc;
 
@@ -25,7 +25,7 @@ use crate::hyperspace::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 use starlane_macros::{handler, route, DirectedHandler};
 use starlane_primitive_macros::push_loc;
-use starlane::space::parse::util::result;
+use crate::space::parse::util::result;
 
 #[derive(DirectedHandler)]
 pub struct Shell {

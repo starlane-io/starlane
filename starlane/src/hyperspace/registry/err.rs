@@ -1,7 +1,7 @@
 use sqlx::Error;
 
-use starlane::space::err::{HyperSpatialError, ParseErrs, SpaceErr, SpatialError};
-use starlane::space::point::Point;
+use crate::space::err::{HyperSpatialError, ParseErrs, SpaceErr, SpatialError};
+use crate::space::point::Point;
 use std::sync::Arc;
 use thiserror::Error;
 

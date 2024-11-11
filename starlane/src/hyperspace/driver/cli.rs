@@ -5,15 +5,15 @@ use crate::hyperspace::driver::{
 use crate::hyperspace::hyperspace::platform::Platform;
 use crate::hyperspace::hyperspace::star::HyperStarSkel;
 use once_cell::sync::Lazy;
-use starlane::space::artifact::ArtRef;
-use starlane::space::config::bind::BindConfig;
-use starlane::space::kind::{BaseKind, Kind};
-use starlane::space::parse::bind_config;
-use starlane::space::point::Point;
-use starlane::space::selector::KindSelector;
-use starlane::space::util::log;
-use starlane::space::wave::core::CoreBounce;
-use starlane::space::wave::exchange::asynch::{DirectedHandler, RootInCtx};
+use crate::space::artifact::ArtRef;
+use crate::space::config::bind::BindConfig;
+use crate::space::kind::{BaseKind, Kind};
+use crate::space::parse::bind_config;
+use crate::space::point::Point;
+use crate::space::selector::KindSelector;
+use crate::space::util::log;
+use crate::space::wave::core::CoreBounce;
+use crate::space::wave::exchange::asynch::{DirectedHandler, RootInCtx};
 use std::str::FromStr;
 use std::sync::Arc;
 

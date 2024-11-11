@@ -2,7 +2,7 @@ use crate::hyperspace::err::StarErr;
 use crate::hyperspace::hyperspace::err::HyperErr;
 use crate::hyperspace::hyperspace::platform::Platform;
 use itertools::Itertools;
-use starlane::space::substance::Substance;
+use crate::space::substance::Substance;
 use std::path::PathBuf;
 
 #[async_trait]
