@@ -24,12 +24,10 @@ version:
 
 release: check
 	echo ${COMMITED}
-	exit 0
-	git rev-parse --verify release/${VERSION} || exit 0
+	git rev-parse --verify v${VERSION} || exit 0
 	git flow release start ${VERSION}
 	git push --set-upstream origin release/${VERSION}
 	gh release create v${VERSION}
-
 
 
 publish-dry-run-impl: 
