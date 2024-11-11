@@ -36,7 +36,7 @@ use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
 use crate::hyperspace::driver::space::SpaceDriverFactory;
-use crate::hyperspace::foundation::StandAloneFoundation;
+use crate::hyperspace::foundation::{Foundation, StandAloneFoundation};
 use crate::hyperspace::machine::MachineTemplate;
 
 #[derive(Clone, Serialize, Deserialize)]

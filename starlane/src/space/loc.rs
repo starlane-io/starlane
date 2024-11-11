@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
 use convert_case::Casing;
+use enum_ordinalize::Ordinalize;
 use nom::combinator::all_consuming;
 use once_cell::sync::Lazy;
 use serde::de::{Error, Visitor};

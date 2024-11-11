@@ -107,9 +107,9 @@ where
     if STACK.try_with(|v| {}).is_ok() {}
 
     let root = root_logger();
-    let logger = root.push_mark(mark);
+    let logx= root.push_mark(mark);
     STACK
-        .scope(logger, async move {
+        .scope(logx, async move {
             logger().result(match f().await {
                 Ok(rtn) => Ok(rtn),
                 Err(err) => Err(anyhow!(err)),

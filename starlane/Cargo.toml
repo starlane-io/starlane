@@ -85,7 +85,8 @@ sqlx = { workspace = true, features = [ "runtime-tokio","runtime-tokio-rustls", 
 serde = { workspace = true, features=['derive','rc'], optional=true }
 async-recursion = { workspace = true, optional=true }
 
-md5 = {workspace = true}
+md-5 = {workspace = true}
+
 
 rcgen = { workspace = true, optional = true, features=["pem", "x509-parser" ]}
 rustls = { workspace = true, optional = true, features=["aws_lc_rs"]}

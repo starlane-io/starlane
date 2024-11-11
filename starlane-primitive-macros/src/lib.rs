@@ -7,6 +7,7 @@ extern crate quote;
 
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
+use proc_macro_crate::{crate_name, FoundCrate};
 use quote::quote;
 use quote::ToTokens;
 use syn::__private::TokenStream2;
@@ -407,6 +408,7 @@ pub fn loggerhead(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn push_loc(tokens: TokenStream) -> TokenStream {
+    let crt = crt_name();
     let tuple = parse_macro_input!(tokens as ExprTuple);
     let mut iter = tuple.elems.into_iter();
     let logger = iter.next().unwrap();
@@ -414,7 +416,7 @@ pub fn push_loc(tokens: TokenStream) -> TokenStream {
 
     let rtn = quote! {
         {
-    let mut builder = starlane::space::log::LogMarkBuilder::default();
+    let mut builder = #crt::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -428,10 +430,11 @@ pub fn push_loc(tokens: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn log_span(tokens: TokenStream) -> TokenStream {
+    let crt = crt_name();
     let input = parse_macro_input!(tokens as Expr);
     let rtn = quote! {
         {
-    let mut builder = starlane::space::log::LogMarkBuilder::default();
+    let mut builder = #crt::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -445,7 +448,8 @@ pub fn log_span(tokens: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn logger(item: TokenStream) -> TokenStream {
-    let log_pack = quote!(starlane::space::log);
+    let crt = crt_name();
+    let log_pack = quote!(#crt::space::log);
 
     let loc = if !item.is_empty() {
         let expr = parse_macro_input!(item as Expr);
@@ -471,10 +475,11 @@ pub fn logger(item: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn push_mark(_item: TokenStream) -> TokenStream {
+    let crt = crt_name();
     let logger = parse_macro_input!(_item as Expr);
     let rtn = quote! {
         {
-    let mut builder = starlane::space::log::LogMarkBuilder::default();
+    let mut builder = #crt::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -490,10 +495,11 @@ pub fn push_mark(_item: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn create_mark(_item: TokenStream) -> TokenStream {
+    let crt = crt_name();
     let rtn = quote! {
         {
 println!("CARGO_PKG_NAME: {}", env!("CARGO_PKG_NAME"));
-    let mut builder = starlane::space::log::LogMarkBuilder::default();
+    let mut builder = #crt::space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -506,6 +512,7 @@ println!("CARGO_PKG_NAME: {}", env!("CARGO_PKG_NAME"));
 
 #[proc_macro]
 pub fn warn(_item: TokenStream) -> TokenStream {
+    let crt = crt_name();
     let input = parse_macro_input!(_item as LitStr);
     let rtn = quote! {
 
@@ -514,9 +521,9 @@ pub fn warn(_item: TokenStream) -> TokenStream {
     {
         use starlane_primitive_macros::mark;
         use starlane_primitive_macros::create_mark;
-        use starlane::space::log::Log;
-        use starlane::space::log::LOGGER;
-        use starlane::space::log::root_logger;
+        use #crt::space::log::Log;
+        use #crt::space::log::LOGGER;
+        use #crt::space::log::root_logger;
 
         // need to push_mark somewhere around here...
         LOGGER.try_with(|logger| {
@@ -651,3 +658,19 @@ fn find_log_attr(attrs: &Vec<Attribute>) -> TokenStream {
     let rtn = quote!(logger);
     rtn.into()
 }
+
+
+
+
+fn crt_name () -> TokenStream2{
+    let found_crate = crate_name("starlane").expect("my-crate is present in `Cargo.toml`");
+
+    let crt = match found_crate {
+        FoundCrate::Itself => quote!( crate ),
+        FoundCrate::Name(name) => {
+            quote!( starlane )
+        }
+    };
+    crt
+}
+

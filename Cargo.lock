@@ -2472,12 +2472,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "md5"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
-
-[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4538,7 +4532,7 @@ dependencies = [
  "itertools 0.13.0",
  "lazy_static",
  "lerp",
- "md5",
+ "md-5",
  "nom",
  "nom-supreme",
  "nom_locate",
@@ -4615,6 +4609,7 @@ name = "starlane-primitive-macros"
 version = "0.3.20"
 dependencies = [
  "prettyplease",
+ "proc-macro-crate 3.2.0",
  "proc-macro2",
  "quote",
  "syn 1.0.109",

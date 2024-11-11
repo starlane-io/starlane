@@ -15,7 +15,7 @@ use crate::space::util::ToResolved;
 use crate::space::wave::{Agent, Recipients, ToRecipients};
 use crate::space::{ANONYMOUS, HYPERUSER};
 use core::str::FromStr;
-use md5::{Digest};
+use md5::{Digest, Md5};
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

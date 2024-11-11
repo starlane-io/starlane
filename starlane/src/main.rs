@@ -28,10 +28,6 @@ pub mod space;
 pub mod hyperspace;
 
 
-pub(crate) mod starlane {
-    pub use crate::*;
-}
-
 
 use crate::hyperspace::foundation::Foundation;
 use crate::hyperspace::foundation::StandAloneFoundation;
