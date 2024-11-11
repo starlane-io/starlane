@@ -1,6 +1,0 @@
-Bind(version=1.0.0)
-{
-  Route -> {
-    Http<Get>/users/(?P<user>.*$) -> profiles:${user} => &;
-  }
-}
