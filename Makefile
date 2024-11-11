@@ -10,9 +10,9 @@ check:
 	@echo ${BRANCH}
 	@git diff --exit-code
 	@echo $$?
+	@git diff --exit-code 1> /dev/null 2> /dev/null || $(error local changes in '${BRANCH}' not commited to git) && exit 1
 	
 blah:
-	@git diff --exit-code 1> /dev/null 2> /dev/null || $(error local changes in '${BRANCH}' not commited to git) && exit 1
 	@git merge-base --is-ancestor HEAD @{u}  1> /dev/null 2> /dev/null || $(error local commit for branch: '${BRANCH}' must be pushed to origin) && exit 1
 
 	@echo $$?
