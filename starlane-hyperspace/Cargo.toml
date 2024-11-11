@@ -117,4 +117,4 @@ tracing-core= { workspace = true,  features = ["valuable","default"] }
 
 [lib]
 name = "starlane"
-path= "src/lib.rs"
+path= "../starlane/src/hyperspace/lib.rs"

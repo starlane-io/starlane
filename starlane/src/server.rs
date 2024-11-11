@@ -1,18 +1,18 @@
 #[cfg(feature = "postgres")]
-use starlane_hyperspace::registry::postgres::{
+use crate::hyperspace::registry::postgres::{
     PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
 
-use starlane_hyperspace::driver::SpaceDriverFactory;
-use starlane_hyperspace::driver::{DriverAvail, DriversBuilder};
-use starlane_hyperspace::driverbase::BaseDriverFactory;
-use starlane_hyperspace::drivercontrol::ControlDriverFactory;
-use starlane_hyperspace::driverroot::RootDriverFactory;
-use starlane_space::artifact::asynch::Artifacts;
-use starlane_space::kind::StarSub;
-use starlane_space::loc::{MachineName, StarKey};
-use starlane_space::point::Point;
+use crate::hyperspace::driver::SpaceDriverFactory;
+use crate::hyperspace::driver::{DriverAvail, DriversBuilder};
+use crate::hyperspace::driverbase::BaseDriverFactory;
+use crate::hyperspace::drivercontrol::ControlDriverFactory;
+use crate::hyperspace::driverroot::RootDriverFactory;
+use crate::space::artifact::asynch::Artifacts;
+use crate::space::kind::StarSub;
+use crate::space::loc::{MachineName, StarKey};
+use crate::space::point::Point;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;

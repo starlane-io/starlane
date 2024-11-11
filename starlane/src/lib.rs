@@ -12,10 +12,11 @@ extern crate core;
 use once_cell::sync::Lazy;
 use std::str::FromStr;
 
+/*
 pub mod space {
     use chrono::Utc;
-    use starlane_space::wasm::Timestamp;
-    pub use starlane_space::*;
+    use crate::space::wasm::Timestamp;
+    pub use crate::space::*;
 
     #[no_mangle]
     extern "C" fn starlane_uuid() -> loc::Uuid {
@@ -27,6 +28,13 @@ pub mod space {
         Timestamp::new(Utc::now().timestamp_millis())
     }
 }
+
+
+ */
+
+pub mod space;
+
+pub mod hyperspace;
 
 pub use singularity::*;
 

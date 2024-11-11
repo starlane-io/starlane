@@ -45,11 +45,8 @@ space=[]
 wasm=[]
 
 [dependencies]
-starlane-space = { workspace = true  }
-starlane-hyperspace = { workspace = true  }
 starlane-macros = { workspace = true  }
 starlane-primitive-macros = { workspace = true}
-singularity = { workspace = true}
 
 thiserror = { workspace = true}
 lazy_static = {  workspace=true  }

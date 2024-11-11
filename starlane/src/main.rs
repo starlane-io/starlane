@@ -16,9 +16,9 @@ pub mod test;
 
 pub mod install;
 //#[cfg(feature="space")]
-//pub extern crate starlane_space as starlane;
+//pub extern crate crate::space as starlane;
 
-//pub extern crate starlane_space as starlane;
+//pub extern crate crate::space as starlane;
 //pub mod space {}
 
 #[cfg(feature = "cli")]
@@ -27,12 +27,13 @@ pub mod cli;
 pub mod env;
 #[cfg(feature = "server")]
 pub mod server;
+pub mod space;
+pub mod hyperspace;
 
-
-use starlane_hyperspace::foundation::Foundation;
-use starlane_hyperspace::foundation::StandAloneFoundation;
-pub use starlane_hyperspace::platform::Platform;
-use starlane_hyperspace::shutdown::shutdown;
+use crate::hyperspace::foundation::Foundation;
+use crate::hyperspace::foundation::StandAloneFoundation;
+pub use crate::hyperspace::platform::Platform;
+use crate::hyperspace::shutdown::shutdown;
 use crate::cli::{Cli, Commands, ContextCmd};
 use crate::env::{
     config_exists, context, context_dir, ensure_global_settings, save_global_settings, set_context,
@@ -51,11 +52,11 @@ use lerp::Lerp;
 use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
 use starlane_primitive_macros::{create_mark, ToBase};
-use starlane_space::loc::ToBaseKind;
-use starlane_space::err::PrintErr;
-use starlane_space::log::push_scope;
-use starlane_space::parse::SkewerCase;
-use starlane_space::particle::Status;
+use crate::space::loc::ToBaseKind;
+use crate::space::err::PrintErr;
+use crate::space::log::push_scope;
+use crate::space::parse::SkewerCase;
+use crate::space::particle::Status;
 use std::any::Any;
 use std::fmt::Display;
 use std::fs::File;
