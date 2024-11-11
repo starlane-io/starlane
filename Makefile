@@ -43,7 +43,9 @@ publish-dry-run-impl:
   
 
 publish-impl:
-	$(MAKE) -C rust publish
+	publish.sh starlane-primitive-macros 10
+	publish.sh starlane-macros 10
+	publish.sh starlane 0
 
 publish-dry-run: version publish-dry-run-impl
 publish: version publish-impl
