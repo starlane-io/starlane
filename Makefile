@@ -7,10 +7,12 @@ GIT_SHA_FETCH := $(shell git rev-parse HEAD | cut -c 1-8)
 
 
 check: 
-	@$(shell test -z "$$(git status --porcelain)" )
+	num=$(shell git status --porcelain | wc -l)
+	echo "NUM: ${num}"
 	@echo "RESULT: $$?"
 
 check-old:	
+
 	#&& $(error local changes in '${BRANCH}' not commited to git) 
 	$(shell git merge-base --is-ancestor HEAD @{u}  1> /dev/null 2> /dev/null) || $(error local commit for branch: '${BRANCH}' must be pushed to origin) 
 	@echo $$?
