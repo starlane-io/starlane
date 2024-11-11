@@ -474,7 +474,7 @@ pub fn push_mark(_item: TokenStream) -> TokenStream {
     let logger = parse_macro_input!(_item as Expr);
     let rtn = quote! {
         {
-    let mut builder = starlane_space::log::LogMarkBuilder::default();
+    let mut builder = stringify!(env!("CARGO_PKG_NAME"))::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -491,6 +491,7 @@ pub fn push_mark(_item: TokenStream) -> TokenStream {
 pub fn create_mark(_item: TokenStream) -> TokenStream {
     let rtn = quote! {
         {
+println!("CARGO_PKG_NAME: {}", env!("CARGO_PKG_NAME"));
     let mut builder = starlane_space::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());

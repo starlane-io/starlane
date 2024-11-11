@@ -12,26 +12,6 @@ extern crate core;
 use once_cell::sync::Lazy;
 use std::str::FromStr;
 
-/*
-pub mod space {
-    use chrono::Utc;
-    use crate::space::wasm::Timestamp;
-    pub use crate::space::*;
-
-    #[no_mangle]
-    extern "C" fn starlane_uuid() -> loc::Uuid {
-        loc::Uuid::from(uuid::Uuid::new_v4().to_string()).unwrap()
-    }
-
-    #[no_mangle]
-    extern "C" fn starlane_timestamp() -> Timestamp {
-        Timestamp::new(Utc::now().timestamp_millis())
-    }
-}
-
-
- */
-
 pub mod space;
 
 pub mod hyperspace;
@@ -40,6 +20,10 @@ pub mod hyperspace;
 pub mod env;
 
 pub mod server;
+
+pub(crate) mod starlane {
+    pub use crate::*;
+}
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
