@@ -2,9 +2,9 @@ name: Rust
 
 on:
   push:
-    branches: [ "main", "stage" ]
+    branches: [ "main", "develop", "feature/github-actions2" ]
   pull_request:
-    branches: [ "main", "stage" ]
+    branches: [ "main", "develop", "feature/github-actions2" ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -22,4 +22,5 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Run tests
-      run: cargo test --no-fail-fast --workspace  
+      run: cargo test
+       working-directory: ./starlane-macros
