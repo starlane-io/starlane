@@ -4506,7 +4506,7 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "starlane"
-version = "0.3.20"
+version = "0.3.21"
 dependencies = [
  "anyhow",
  "ariadne",
@@ -4586,7 +4586,7 @@ dependencies = [
 
 [[package]]
 name = "starlane-macros"
-version = "0.3.20"
+version = "0.3.21"
 dependencies = [
  "chrono",
  "lazy_static",
@@ -4606,7 +4606,7 @@ dependencies = [
 
 [[package]]
 name = "starlane-primitive-macros"
-version = "0.3.20"
+version = "0.3.21"
 dependencies = [
  "prettyplease",
  "proc-macro-crate 3.2.0",
