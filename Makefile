@@ -43,9 +43,11 @@ publish-dry-run-impl:
   
 
 publish-impl:
-	publish.sh starlane-primitive-macros 10
-	publish.sh starlane-macros 10
-	publish.sh starlane 0
+	rustup default stable
+	./publish.sh starlane-primitive-macros 10
+	./publish.sh starlane-space  10
+	./publish.sh starlane-macros 10
+	./publish.sh starlane 0
 
 publish-dry-run: version publish-dry-run-impl
 publish: version publish-impl
