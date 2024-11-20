@@ -3,7 +3,7 @@ use atty::Stream;
 use chrono::Utc;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::{env, fs};
 use std::fs::File;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -60,6 +60,16 @@ pub static STARLANE_CONTROL_PORT: Lazy<u16> = Lazy::new(|| {
         .unwrap_or("4343".to_string())
         .parse::<u16>()
         .unwrap_or(4343)
+});
+
+pub static STARLANE_DATA: Lazy<String> = Lazy::new(|| {
+    std::env::var("STARLANE_DATA").unwrap_or_else(|e| {
+        let home_dir: String = match dirs::home_dir() {
+            None =>  format!("{}",env::current_dir().unwrap_or_default().display()).to_string(),
+            Some(dir) => dir.display().to_string(),
+        };
+        format!("{}/starlane/data", home_dir).to_string()
+    })
 });
 
 #[cfg(not(test))]

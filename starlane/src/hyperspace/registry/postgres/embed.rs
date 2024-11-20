@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::fs;
+use crate::env::STARLANE_DATA;
 
 pub struct Postgres {
     config: Database<PgEmbedSettings>,
@@ -40,13 +41,13 @@ impl Postgres {
                 let mut settings = Settings::default();
                 settings.data_dir = format!(
                     "{}/registry",
-                    pg_config.database_dir(config.home()).display()
+                    pg_config.database_dir.display()
                 )
                 .to_string()
                 .into();
                 settings.password_file = format!(
                     "{}/.password",
-                    pg_config.database_dir(&config.home()).display()
+                    pg_config.database_dir.display()
                 )
                 .to_string()
                 .into();
@@ -156,13 +157,13 @@ pub struct PgEmbedSettings {
     pub password: String,
     pub auth_method: PgEmbedAuthMethod,
     pub persistent: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub database_dir: Option<PathBuf>,
+    pub database_dir: PathBuf,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<Duration>,
 }
 
 impl PgEmbedSettings {
+    /*
     pub fn database_dir<S>(&self, context_dir: S) -> PathBuf
     where
         S: AsRef<str>,
@@ -182,6 +183,8 @@ impl PgEmbedSettings {
             }
         }
     }
+
+     */
 }
 
 impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
@@ -201,7 +204,7 @@ impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
 impl Default for PgEmbedSettings {
     fn default() -> Self {
         Self {
-            database_dir: None,
+            database_dir: format!("{}/default/postgres",STARLANE_DATA.to_string()).to_string().into(),
             port: 5432,
             username: "postgres".to_string(),
             password: "password".to_string(),

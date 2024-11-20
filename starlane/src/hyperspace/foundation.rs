@@ -43,9 +43,13 @@ impl Foundation for StandAloneFoundation {
         &self,
         config: &dyn PlatformConfig,
     ) -> Result<LiveDatabase, Self::Err> {
+println!("provision registry...");
         let db = Postgres::new(config).await?;
+println!("got DB...");
+
         let url = db.url();
         let handle = db.start().await?;
+println!("got db handle...");
         let mut database: Database<PostgresConnectInfo> = config.registry().clone().into();
         database.settings.url = url;
         Ok(LiveDatabase { database, handle })

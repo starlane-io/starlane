@@ -38,6 +38,7 @@ use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
 use crate::hyperspace::driver::space::SpaceDriverFactory;
 use crate::hyperspace::foundation::{Foundation, StandAloneFoundation};
 use crate::hyperspace::machine::MachineTemplate;
+use crate::space::log::Logger;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
@@ -111,35 +112,14 @@ impl Starlane {
         config: StarlaneConfig,
         foundation: StandAloneFoundation,
     ) -> Result<Starlane, HypErr> {
-        let artifacts = Artifacts::just_builtins();
-
-        let db = match config.clone().registry {
-            PgRegistryConfig::Embedded(db) => {
-                let rtn = foundation.provision_registry(&config).await?;
-                rtn
-            }
-            PgRegistryConfig::External(db) => {
-                let (handle, mut rx) = tokio::sync::mpsc::channel(1);
-                tokio::spawn(async move {
-                    while let Some(_) = rx.recv().await {
-                        // do nothing until sender goes out of scope
-                    }
-                });
-
-                LiveDatabase::new(db, handle)
-            }
-        };
-
-        let lookups = PostgresLookups::new(config.registry.clone());
-        let mut set = HashSet::new();
-        set.insert(db.database.clone());
-        let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookups.clone())).await?);
-        let handle = PostgresRegistryContextHandle::new(&db.database, ctx, db.handle);
 
         let logger = logger!(&Point::global_registry());
+
         let registry = Arc::new(RegistryWrapper::new(Arc::new(
-            PostgresRegistry::new(handle, Box::new(lookups), logger).await?,
+            PostgresRegistry::new2( config.registry.clone(), logger ).await?
         )));
+
+        let artifacts = Artifacts::just_builtins();
 
         Ok(Self {
             config,

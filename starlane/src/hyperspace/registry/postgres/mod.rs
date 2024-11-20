@@ -1,8 +1,8 @@
 pub mod embed;
 
-use crate::hyperspace::database::Database;
+use crate::hyperspace::database::{Database, LiveDatabase};
 use crate::hyperspace::platform::Platform;
-use crate::hyperspace::reg::{PgRegistryConfig, Registration, RegistryApi};
+use crate::hyperspace::reg::{PgRegistryConfig, Registration, RegistryApi, RegistryConfig, RegistryWrapper};
 use crate::hyperspace::registry::err::RegErr;
 use crate::hyperspace::registry::postgres::embed::PgEmbedSettings;
 use async_trait::async_trait;
@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
-use starlane_primitive_macros::push_loc;
+use starlane_primitive_macros::{logger, push_loc};
 use crate::space::command::common::{PropertyMod, SetProperties};
 use crate::space::command::direct::create::Strategy;
 use crate::space::command::direct::delete::Delete;
@@ -45,6 +45,7 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use crate::server::PostgresLookups;
 
 pub trait PostgresPlatform: Send + Sync {
     fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr>;
@@ -58,6 +59,25 @@ pub struct PostgresRegistry {
 }
 
 impl PostgresRegistry {
+
+    pub async fn new2( config: PgRegistryConfig, logger: Logger ) -> Result<Self,RegErr> {
+        let logger = push_loc!((logger, Point::global_registry()));
+        match &config {
+            PgRegistryConfig::Embedded(db) => {
+                let lookups = PostgresLookups::new(config.clone());
+                let mut set = HashSet::new();
+                let db : Database<PostgresConnectInfo> = db.clone().into();
+                set.insert(db.clone());
+                let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookups.clone())).await?);
+                let (keep_alive_tx,keep_alive_rx) = tokio::sync::mpsc::channel(128);
+                let handle = PostgresRegistryContextHandle::new(&db, ctx, keep_alive_tx);
+                PostgresRegistry::new(handle, Box::new(lookups), logger).await
+            }
+            PgRegistryConfig::External(db) => {
+                todo!("external database not available yet");
+            }
+        }
+    }
     pub async fn new(
         ctx: PostgresRegistryContextHandle,
         platform: Box<dyn PostgresPlatform>,
@@ -78,25 +98,20 @@ impl PostgresRegistry {
             logger: logger.clone(),
         };
 
-        match registry.setup().await {
-            Ok(_) => {}
-            Err(err) => {
-                let message = err.to_string();
-                logger.error(format!("database setup failed {} ", message));
-                return Err(err);
-            }
-        }
+
 
         Ok(registry)
     }
 
-    async fn setup(&self) -> Result<(), RegErr> {
+
+    pub async fn setup(&self) -> Result<(), RegErr> {
         //        let database= format!("CREATE DATABASE IF NOT EXISTS {}", REGISTRY_DATABASE );
 
         /// reset mode of 'none' will not let the db be deleted
+        let mode_type = r#"CREATE TYPE reset_mode_enum AS ENUM ('None', 'Scorch');"#;
         let mode = r#"CREATE TYPE reset_mode_enum AS ENUM ('None', 'Scorch');
-                            CREATE TABLE reset_mode (mode reset_mode_enum DEFAULT 'None' NOT NULL UNIQUE);
-                            INSERT INTO reset_mode VALUES ('None');"#;
+                            CREATE TABLE  IF NOT EXISTS reset_mode (mode reset_mode_enum DEFAULT 'None' NOT NULL UNIQUE);
+                            INSERT INTO reset_mode VALUES ('None') ON CONFLICT DO NOTHING;"#;
 
         let particles = r#"CREATE TABLE IF NOT EXISTS particles (
          id SERIAL PRIMARY KEY,
@@ -135,11 +150,11 @@ impl PostgresRegistry {
         let labels = r#"
        CREATE TABLE IF NOT EXISTS labels (
           id SERIAL PRIMARY KEY,
-	      resource_id INTEGER NOT NULL,
+	      particle_id INTEGER NOT NULL,
 	      key TEXT NOT NULL,
 	      value TEXT,
           UNIQUE(key,value),
-          FOREIGN KEY (resource_id) REFERENCES particles (id)
+          FOREIGN KEY (particle_id) REFERENCES particles (id)
         )"#;
 
         /// note that a tag may reference an point NOT in this database
@@ -155,17 +170,17 @@ impl PostgresRegistry {
 
         let properties = r#"CREATE TABLE IF NOT EXISTS properties (
          id SERIAL PRIMARY KEY,
-	     resource_id INTEGER NOT NULL,
+	     particle_id INTEGER NOT NULL,
          key TEXT NOT NULL,
          value TEXT NOT NULL,
          lock BOOLEAN NOT NULL,
-         FOREIGN KEY (resource_id) REFERENCES particles (id),
-         UNIQUE(resource_id,key)
+         FOREIGN KEY (particle_id) REFERENCES particles (id),
+         UNIQUE(particle_id,key)
         )"#;
 
         let point_index =
-            "CREATE UNIQUE INDEX IF NOT EXISTS resource_point_index ON particles(point)";
-        let point_segment_parent_index = "CREATE UNIQUE INDEX IF NOT EXISTS resource_point_segment_parent_index ON particles(parent,point_segment)";
+            "CREATE UNIQUE INDEX IF NOT EXISTS particle_point_index ON particles(point)";
+        let point_segment_parent_index = "CREATE UNIQUE INDEX IF NOT EXISTS particle_point_segment_parent_index ON particles(parent,point_segment)";
         let access_grants_index =
             "CREATE INDEX IF NOT EXISTS query_root_index ON access_grants(query_root)";
         let mut conn = self.ctx.acquire().await?;
@@ -176,6 +191,8 @@ impl PostgresRegistry {
         transaction.execute(labels).await?;
         transaction.execute(tags).await?;
          */
+        /// we don't send an error if type already exists...
+        transaction.execute(mode_type).await.unwrap_or_default();
         transaction.execute(mode).await?;
         transaction.execute(properties).await?;
         transaction.execute(point_index).await?;
@@ -223,9 +240,15 @@ impl RegistryApi for PostgresRegistry {
             Result::Err(RegErr::NoScorch)?;
         }
 
-        trans.execute("DROP TABLE particles CASCADE").await?;
-        trans.execute("DROP TABLE access_grants CASCADE").await?;
-        trans.execute("DROP TABLE properties CASCADE").await?;
+        /// postgres does not have a DROP TYPE IF EXISTS ... so we just ignore any errors
+        trans.execute("DROP TYPE reset_mode_enum").await.unwrap_or_default();
+        trans.execute("DROP TABLE IF EXISTS particles CASCADE").await?;
+        trans.execute("DROP TABLE IF EXISTS access_grants CASCADE").await?;
+        trans.execute("DROP TABLE IF EXISTS properties CASCADE").await?;
+        trans.execute("DROP INDEX IF EXISTS particle_point_index CASCADE").await?;
+        trans.execute("DROP INDEX IF EXISTS particle_point_segment_parent_index CASCADE").await?;
+        trans.execute("DROP INDEX IF EXISTS query_root_index CASCADE").await?;
+
         trans.commit().await?;
         self.setup().await?;
         Ok(())
@@ -286,11 +309,11 @@ impl RegistryApi for PostgresRegistry {
                         true => 1,
                         false => 0,
                     };
-                    let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM particles WHERE parent='{}' AND point_segment='{}'),'{}','{}',{})", params.parent, params.point_segment, key.to_string(), value.to_string(), lock);
+                    let statement = format!("INSERT INTO properties (particle_id,key,value,lock) VALUES ((SELECT id FROM particles WHERE parent='{}' AND point_segment='{}'),'{}','{}',{})", params.parent, params.point_segment, key.to_string(), value.to_string(), lock);
                     trans.execute(statement.as_str()).await?;
                 }
                 PropertyMod::UnSet(key) => {
-                    let statement = format!("DELETE FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent='{}' AND point_segment='{}') AND key='{}' AND lock=false", params.parent, params.point_segment, key.to_string());
+                    let statement = format!("DELETE FROM properties WHERE particle_id=(SELECT id FROM particles WHERE parent='{}' AND point_segment='{}') AND key='{}' AND lock=false", params.parent, params.point_segment, key.to_string());
                     trans.execute(statement.as_str()).await?;
                 }
             }
@@ -390,11 +413,11 @@ impl RegistryApi for PostgresRegistry {
                         false => 0,
                     };
 
-                    let statement = format!("INSERT INTO properties (resource_id,key,value,lock) VALUES ((SELECT id FROM particles WHERE parent='{}' AND point_segment='{}'),'{}' ,'{}','{}') ON CONFLICT(resource_id,key) DO UPDATE SET value='{}' WHERE lock=false", parent, point_segment, key.to_string(), value.to_string(), value.to_string(), lock);
+                    let statement = format!("INSERT INTO properties (particle_id,key,value,lock) VALUES ((SELECT id FROM particles WHERE parent='{}' AND point_segment='{}'),'{}' ,'{}','{}') ON CONFLICT(particle_id,key) DO UPDATE SET value='{}' WHERE lock=false", parent, point_segment, key.to_string(), value.to_string(), value.to_string(), lock);
                     trans.execute(statement.as_str()).await?;
                 }
                 PropertyMod::UnSet(key) => {
-                    let statement = format!("DELETE FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent='{}' AND point_segment='{}') AND key='{}' AND lock=false", parent, point_segment, key.to_string());
+                    let statement = format!("DELETE FROM properties WHERE particle_id=(SELECT id FROM particles WHERE parent='{}' AND point_segment='{}') AND key='{}' AND lock=false", parent, point_segment, key.to_string());
                     trans.execute(statement.as_str()).await?;
                 }
             }
@@ -448,7 +471,7 @@ impl RegistryApi for PostgresRegistry {
             .to_string();
 
         let mut conn = self.ctx.acquire().await?;
-        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut *conn).await?;
+        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE particle_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut *conn).await?;
         let mut map = HashMap::new();
         for p in properties {
             map.insert(p.key.clone(), p.into());
@@ -476,7 +499,7 @@ impl RegistryApi for PostgresRegistry {
         .fetch_one(&mut *conn)
         .await?;
         let mut record: ParticleRecord = record.into();
-        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut *conn).await?;
+        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE particle_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut *conn).await?;
         let mut map = HashMap::new();
         for p in properties {
             map.insert(p.key.clone(), p.into());
@@ -1474,8 +1497,6 @@ pub mod test {
     use std::sync::Arc;
 
     use crate::hyperspace::driver::DriversBuilder;
-    use crate::hyperspace::err::HyperErr;
-    use crate::hyperspace::err2::{HypErr, OldStarErr};
     use crate::hyperspace::hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
     use crate::hyperspace::machine::MachineTemplate;
     use crate::hyperspace::reg::{Registration, Registry};
@@ -1484,14 +1505,12 @@ pub mod test {
         PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
     };
-    use crate::hyperspace::StarlanePostgres;
     use crate::space::artifact::asynch::Artifacts;
     use crate::space::command::direct::create::Strategy;
     use crate::space::command::direct::query::Query;
     use crate::space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
     use crate::space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
     use crate::space::loc::{MachineName, StarKey, ToPoint};
-    use crate::space::log::RootLogger;
     use crate::space::particle::property::PropertiesConfig;
     use crate::space::particle::Status;
     use crate::space::point::Point;

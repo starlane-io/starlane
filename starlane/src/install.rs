@@ -7,7 +7,7 @@ use crate::env::{
 use crate::hyperspace::foundation::{Foundation, StandAloneFoundation};
 use crate::hyperspace::reg::PgRegistryConfig;
 use crate::hyperspace::registry::postgres::embed::PgEmbedSettings;
-use crate::server::StarlaneConfig;
+use crate::server::{Starlane, StarlaneConfig};
 use crate::hyperspace::shutdown::shutdown;
 use crate::{env, COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION};
 use anyhow::anyhow;
@@ -34,6 +34,9 @@ use std::time::Duration;
 use std::{io, thread};
 use text_to_ascii_art::to_art;
 use textwrap::Options;
+use starlane_primitive_macros::logger;
+use crate::hyperspace::registry::postgres::PostgresRegistry;
+use crate::space::point::Point;
 
 #[tokio::main]
 pub async fn install(edit: bool) -> Result<(), anyhow::Error> {
@@ -133,14 +136,17 @@ version: {version}
             .item(
                 InstallType::Standalone,
                 "Local Standalone",
-                self.console.wrap("recommended for local development"),
-            )
+                self.console.wrap("recommended for local development [it's presently your only choice!]"),
+            );
+            /*
             .item(
                 InstallType::ExistingPostgres,
                 "Local with Existing Postgres Cluster",
                 self.console
-                    .wrap("Choose if ou already have a Postgres instance up and running"),
+                    .wrap("Choose if you already have a Postgres cluster up and running"),
             );
+
+             */
 
         let selected = selector.interact()?;
 
@@ -177,7 +183,7 @@ impl StandaloneInstaller {
         spinner.stop("config saved");
         let foundation = StandAloneFoundation::new();
 
-        let mut spinner = self.console.spinner();
+
         match &config.registry {
             PgRegistryConfig::Embedded(db) => {
                 let configurator = DbConfigurator::new(self.console.clone(), db.clone());
@@ -186,14 +192,23 @@ impl StandaloneInstaller {
                 let mut config = config.clone();
                 config.registry = PgRegistryConfig::Embedded(db.clone());
                 config_save(config.clone())?;
+                let db_dir = db.settings.clone().database_dir;
                 spinner.next(
                     "registry configuration saved",
-                    "creating registry data directory",
+                    format!("creating registry data directory: {}", db_dir.display()),
                 );
-                tokio::fs::create_dir_all(db.settings.database_dir.unwrap_or_default()).await?;
-                spinner.stop("data directory created successfully");
+                tokio::fs::create_dir_all(db_dir.clone()).await?;
+                spinner.next(format!("data directory created successfully: '{}'", db_dir.display()), "initializing registry");
+                foundation.provision_registry( & config ).await?;
+
+                let logger = logger!(&Point::global_registry());
+                let registry = PostgresRegistry::new2( config.registry.clone(), logger ).await?;
+                registry.setup().await?;
+                spinner.stop("registry initialized");
             }
-            PgRegistryConfig::External(_) => {}
+            PgRegistryConfig::External(_) => {
+                panic!("not implemented yet")
+            }
         }
 
         let bar = self.console.progress_bar(100);
@@ -226,7 +241,7 @@ impl DbConfigurator {
 
         loop {
             let database = &cfg.database;
-            let database_dir = cfg.database_dir(context()).display().to_string();
+            let database_dir = &cfg.database_dir.display();
             let schema = &cfg.schema;
             let username = &cfg.settings.username;
             let password = &cfg.settings.password;
@@ -255,10 +270,7 @@ password: {password}
                 .console
                 .input("Database directory:")
                 .default_input(
-                    cfg.database_dir(&context_dir())
-                        .display()
-                        .to_string()
-                        .as_str(),
+                    format!("{}",cfg.database_dir.display()).as_str()
                 )
                 .validate(|s: &String| {
                     let span = new_span(s.as_str());
@@ -268,7 +280,7 @@ password: {password}
                     }
                 })
                 .interact()?;
-            cfg.settings.database_dir = Some(database_dir);
+            cfg.settings.database_dir = database_dir;
 
             let database: VarCase = self
                 .console

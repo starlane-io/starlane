@@ -34,7 +34,7 @@ pub enum RegErr {
     #[error("postgres registry db connection pool '{0}' not found")]
     PoolNotFound(String),
 
-    #[error("postgres embed error error: {0}")]
+    #[error("postgres embed error: {0}")]
     PgErr(#[from] postgresql_embedded::Error),
     #[error(transparent)]
     IoErr(Arc<std::io::Error>),
