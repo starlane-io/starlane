@@ -15,6 +15,8 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+use chrono::Utc;
+use crate::space::loc;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum HttpMethodPattern {
@@ -440,13 +442,18 @@ where
     fn convert_from(a: A) -> Result<Self, ParseErrs>;
 }
 
-pub fn uuid() -> Uuid {
-    todo!()
+
+
+
+pub fn uuid() -> loc::Uuid {
+    loc::Uuid::from(uuid::Uuid::new_v4()).unwrap()
 }
 
 pub fn timestamp() -> Timestamp {
-    todo!()
+    Timestamp { millis: Utc::now().timestamp_millis() }
 }
+
+
 
 
 

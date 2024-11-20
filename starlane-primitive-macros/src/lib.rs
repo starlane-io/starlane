@@ -377,11 +377,8 @@ pub fn to_log_mark(item: TokenStream) -> TokenStream {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
-    }
+
+
 }
 
 #[proc_macro_derive(EnumAsStr)]
@@ -503,6 +500,7 @@ println!("CARGO_PKG_NAME: {}", env!("CARGO_PKG_NAME"));
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
+    builder.loc(Default::default());
     builder.build().unwrap()
             }
         };

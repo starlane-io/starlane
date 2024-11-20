@@ -39,7 +39,6 @@ use crate::env::{
     STARLANE_HOME,
 };
 use crate::install::{Console, StarlaneTheme};
-use crate::server::Starlane;
 use anyhow::{anyhow, ensure};
 use clap::Parser;
 use cliclack::log::{error, success};
@@ -70,6 +69,7 @@ use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::FileOptions;
+use crate::server::Starlane;
 /*
 let config = Default::default();
 
@@ -272,6 +272,7 @@ async fn run() -> Result<(), anyhow::Error> {
                 e
             })
             .unwrap();
+
 
         spinner.next("registry status: [Ready]", "acquiring machine API");
 

@@ -1264,6 +1264,7 @@ pub struct LogMark {
     pub package: String,
     pub file: String,
     pub line: String,
+    #[builder(default)]
     pub loc: Loc,
     #[builder(default)]
     pub object: Option<String>,
