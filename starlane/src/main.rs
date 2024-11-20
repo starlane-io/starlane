@@ -101,14 +101,18 @@ pub fn main() -> Result<(), anyhow::Error> {
             Ok(())
         }
         Commands::Install { edit, nuke } => {
-            if nuke {
-                crate::nuke(false);
-            }
-            install::install(edit)
+            let runtime = Builder::new_current_thread().enable_all().build()?;
+            runtime.block_on(async move { push_scope(move || {
+                if nuke {
+                    crate::nuke(false);
+                }
+                install::install(edit )
+            }, create_mark!()).await })?;
+            Ok(())
         }
         Commands::Run => {
             let runtime = Builder::new_multi_thread().enable_all().build()?;
-            runtime.block_on(async move { push_scope(run, create_mark!()).await });
+            runtime.block_on(async move { push_scope(run, create_mark!()).await })?;
             Ok(())
         }
         Commands::Term(args) => {

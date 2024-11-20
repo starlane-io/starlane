@@ -38,7 +38,6 @@ use starlane_primitive_macros::logger;
 use crate::hyperspace::registry::postgres::PostgresRegistry;
 use crate::space::point::Point;
 
-#[tokio::main]
 pub async fn install(edit: bool) -> Result<(), anyhow::Error> {
     let installer = Installer::new(edit);
     installer.start().await
