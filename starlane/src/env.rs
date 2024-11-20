@@ -1,8 +1,12 @@
+use crate::hyperspace::err::HypErr;
+use crate::hyperspace::shutdown::panic_shutdown;
+use crate::server::StarlaneConfig;
 use anyhow::anyhow;
 use atty::Stream;
 use chrono::Utc;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use std::env::current_dir;
 use std::fs;
 use std::fs::File;
 use std::ops::Deref;
@@ -11,9 +15,6 @@ use std::str::FromStr;
 use std::string::ToString;
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::hyperspace::err::HypErr;
-use crate::hyperspace::shutdown::panic_shutdown;
-use crate::server::StarlaneConfig;
 
 pub fn context() -> String {
     fs::read_to_string(format!("{}/.context", STARLANE_HOME.as_str()).to_string())
@@ -88,8 +89,13 @@ pub static STARLANE_LOG_DIR: Lazy<String> = Lazy::new(|| {
 });
 
 pub static STARLANE_DATA_DIR: Lazy<String> = Lazy::new(|| {
-    std::env::var("STARLANE_DATA_DIR")
-        .unwrap_or(format!("{}/data", STARLANE_HOME.as_str()).to_string())
+    std::env::var("STARLANE_DATA_DIR").unwrap_or_else(|e| {
+        let dir: String = match dirs::home_dir() {
+            None => current_dir().to_string(),
+            Some(dir) => dir.display().to_string(),
+        };
+        format!("{}/starlane/data", dir).to_string()
+    })
 });
 
 pub static STARLANE_CACHE_DIR: Lazy<String> = Lazy::new(|| {

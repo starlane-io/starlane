@@ -41,7 +41,7 @@ driver=["hyperspace"]
 dialect=[]
 dialect-cli=["dialect","dep:clap"]
 service=[]
-space=["dep:regex", "dep:validator", "dep:convert_case", "dep:serde_json", "dep:enum-ordinalize", "dep:ariadne", "dep:serde_urlencoded"]
+space=["dep:regex", "dep:validator", "dep:convert_case", "dep:serde_json", "dep:serde_json_any_key ","dep:enum-ordinalize", "dep:ariadne", "dep:serde_urlencoded"]
 wasm=[]
 
 
@@ -104,13 +104,14 @@ nom-supreme = { workspace = true, optional = true }
 nom_locate = { workspace = true, optional = true }
 regex = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+serde_json_any_key = { workspace = true, optional = true }
 serde_urlencoded = { workspace = true, optional = true }
 enum-ordinalize = { workspace = true, optional = true }
 convert_case = { workspace = true, optional = true }
 validator = { workspace = true, optional = true }
 
 
-threadpool ={ workspace = true, optional = true }
+threadpool ={ workspace = true, opional = true }
 oneshot = { workspace = true, optional = true }
 
 

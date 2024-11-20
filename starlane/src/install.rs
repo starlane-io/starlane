@@ -4,7 +4,7 @@ use crate::env::{
     config, config_path, config_save, context, context_dir, Enviro, GlobalMode, StdEnviro,
     STARLANE_GLOBAL_SETTINGS, STARLANE_HOME,
 };
-use crate::hyperspace::foundation::{Foundation, StandAloneFoundation};
+use crate::hyperspace::foundation::Foundation;
 use crate::hyperspace::reg::PgRegistryConfig;
 <<<<<<< Updated upstream
 use crate::hyperspace::registry::postgres::embed::PgEmbedSettings;
@@ -39,6 +39,7 @@ use std::time::Duration;
 use std::{io, thread};
 use text_to_ascii_art::to_art;
 use textwrap::Options;
+use starlane::hyperspace::foundation::docker::DockerDesktopFoundation;
 
 #[tokio::main]
 pub async fn install(edit: bool) -> Result<(), anyhow::Error> {
@@ -180,7 +181,7 @@ impl StandaloneInstaller {
         spinner.next("config generated", "saving config");
         env::config_save(config.clone())?;
         spinner.stop("config saved");
-        let foundation = StandAloneFoundation::new();
+        let foundation = DockerDesktopFoundation::new();
 
         let mut spinner = self.console.spinner();
         match &config.registry {

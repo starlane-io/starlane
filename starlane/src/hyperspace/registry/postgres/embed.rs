@@ -1,4 +1,4 @@
-use crate::env::STARLANE_DATA;
+use crate::env::STARLANE_DATA_DIR;
 use crate::hyperspace::database::{Database, LiveDatabase};
 use crate::hyperspace::platform::PlatformConfig;
 use crate::hyperspace::reg::PgRegistryConfig;
@@ -150,8 +150,6 @@ impl Drop for Postgres {
         });
     }
 }
-=======
->>>>>>> Stashed changes
 
 #[derive(Builder, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct PostgresClusterConfig {
@@ -160,37 +158,13 @@ pub struct PostgresClusterConfig {
     pub password: String,
     pub auth_method: PgEmbedAuthMethod,
     pub persistent: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub database_dir: Option<PathBuf>,
+    pub database_dir: PathBuf,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<Duration>,
 }
 
-<<<<<<< Updated upstream
-impl PgEmbedSettings {
-=======
 impl PostgresClusterConfig {
-    /*
->>>>>>> Stashed changes
-    pub fn database_dir<S>(&self, context_dir: S) -> PathBuf
-    where
-        S: AsRef<str>,
-    {
-        match &self.database_dir {
-            None => format!("{}/data/postgres", context_dir.as_ref())
-                .to_string()
-                .into(),
-            Some(database_dir) => {
-                if database_dir.is_absolute() {
-                    format!("{}", database_dir.display()).to_string().into()
-                } else {
-                    format!("{}/{}", context_dir.as_ref(), database_dir.display())
-                        .to_string()
-                        .into()
-                }
-            }
-        }
-    }
+
 }
 
 impl Into<Database<PostgresConnectInfo>> for Database<PostgresClusterConfig> {
@@ -210,13 +184,10 @@ impl Into<Database<PostgresConnectInfo>> for Database<PostgresClusterConfig> {
 impl Default for PostgresClusterConfig {
     fn default() -> Self {
         Self {
-<<<<<<< Updated upstream
-            database_dir: None,
-=======
-            database_dir: format!("{}/default/postgres", STARLANE_DATA.to_string())
+
+            database_dir: format!("{}/postgres", STARLANE_DATA_DIR.to_string())
                 .to_string()
                 .into(),
->>>>>>> Stashed changes
             port: 5432,
             username: "postgres".to_string(),
             password: "password".to_string(),

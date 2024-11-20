@@ -36,7 +36,8 @@ use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
 use crate::hyperspace::driver::space::SpaceDriverFactory;
-use crate::hyperspace::foundation::{Foundation, StandAloneFoundation};
+use crate::hyperspace::foundation::Foundation;
+use crate::hyperspace::foundation::docker::DockerDesktopFoundation;
 use crate::hyperspace::machine::MachineTemplate;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -50,6 +51,8 @@ pub struct StarlaneConfig {
 }
 
 impl PlatformConfig for StarlaneConfig {
+    type RegistryConfig = ();
+
     fn can_scorch(&self) -> bool {
         self.can_scorch
     }
@@ -64,6 +67,10 @@ impl PlatformConfig for StarlaneConfig {
 
     fn home(&self) -> &String {
         &self.home
+    }
+
+    fn data_dir(&self) -> &String {
+        todo!()
     }
 }
 
@@ -85,7 +92,7 @@ pub struct Starlane {
     config: StarlaneConfig,
     artifacts: Artifacts,
     registry: Registry,
-    foundation: StandAloneFoundation,
+    foundation: DockerDesktopFoundation,
 }
 
 /*
@@ -109,7 +116,7 @@ impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
 impl Starlane {
     pub async fn new(
         config: StarlaneConfig,
-        foundation: StandAloneFoundation,
+        foundation: DockerDesktopFoundation,
     ) -> Result<Starlane, HypErr> {
         let artifacts = Artifacts::just_builtins();
 
@@ -175,7 +182,7 @@ where
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
 
-    type Foundation = StandAloneFoundation;
+    type Foundation = DockerDesktopFoundation;
 
     type Config = StarlaneConfig;
 
