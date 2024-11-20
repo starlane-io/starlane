@@ -1,7 +1,7 @@
 use crate::hyperspace::database::Database;
 use crate::hyperspace::platform::Platform;
 use crate::hyperspace::registry::err::RegErr;
-use crate::hyperspace::registry::postgres::embed::PgEmbedSettings;
+use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
 use crate::hyperspace::registry::postgres::PostgresConnectInfo;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -236,7 +236,7 @@ pub enum RegistryConfig {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum PgRegistryConfig {
-    Embedded(Database<PgEmbedSettings>),
+    Embedded(Database<PostgresClusterConfig>),
     External(Database<PostgresConnectInfo>),
 }
 
@@ -258,10 +258,10 @@ impl Into<Database<PostgresConnectInfo>> for PgRegistryConfig {
     }
 }
 
-impl TryInto<Database<PgEmbedSettings>> for PgRegistryConfig {
+impl TryInto<Database<PostgresClusterConfig>> for PgRegistryConfig {
     type Error = RegErr;
 
-    fn try_into(self) -> Result<Database<PgEmbedSettings>, Self::Error> {
+    fn try_into(self) -> Result<Database<PostgresClusterConfig>, Self::Error> {
         match self {
             PgRegistryConfig::Embedded(registry) => Ok(registry),
             _ => Err(RegErr::Msg(

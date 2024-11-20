@@ -4,7 +4,7 @@ use crate::hyperspace::database::Database;
 use crate::hyperspace::platform::Platform;
 use crate::hyperspace::reg::{PgRegistryConfig, Registration, RegistryApi};
 use crate::hyperspace::registry::err::RegErr;
-use crate::hyperspace::registry::postgres::embed::PgEmbedSettings;
+use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use sqlx::pool::PoolConnection;
@@ -58,6 +58,19 @@ pub struct PostgresRegistry {
 }
 
 impl PostgresRegistry {
+<<<<<<< Updated upstream
+=======
+
+    pub async fn new2(database: LiveDatabase, logger: Logger ) -> Result<Self,RegErr> {
+        let logger = push_loc!((logger, Point::global_registry()));
+        let lookups = PostgresLookups::new(database.clone());
+        let mut set = HashSet::new();
+        set.insert(database.clone());
+        let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookups.clone())).await?);
+        let handle = PostgresRegistryContextHandle::new(database, ctx );
+        PostgresRegistry::new(handle, Box::new(lookups), logger).await
+    }
+>>>>>>> Stashed changes
     pub async fn new(
         ctx: PostgresRegistryContextHandle,
         platform: Box<dyn PostgresPlatform>,
@@ -1346,25 +1359,17 @@ pub struct PostgresRegistryContextHandle {
     key: PostgresDbKey,
     pool: Arc<PostgresRegistryContext>,
     pub schema: String,
-
-    /// the receiver for this particular Sender may be an embedded database
-    /// which needs to remain alive OR it may be nothing. Either way
-    /// this handle will ensure that everything on the foundation that is needed
-    /// to support this registry will stay alive
-    keep_alive: tokio::sync::mpsc::Sender<()>,
 }
 
 impl PostgresRegistryContextHandle {
     pub fn new(
-        db: &Database<PostgresConnectInfo>,
+        db: LiveDatabase,
         pool: Arc<PostgresRegistryContext>,
-        keep_alive: tokio::sync::mpsc::Sender<()>,
     ) -> Self {
         Self {
-            key: db.to_key(),
-            schema: db.schema.clone(),
+            key: db.database.to_key(),
+            schema: db.database.schema.clone(),
             pool,
-            keep_alive,
         }
     }
 
@@ -1384,7 +1389,7 @@ pub struct PostgresRegistryContext {
 
 impl PostgresRegistryContext {
     pub async fn new(
-        dbs: HashSet<Database<PostgresConnectInfo>>,
+        dbs: HashSet<LiveDatabase>,
         platform: Box<dyn PostgresPlatform>,
     ) -> Result<Self, RegErr> {
         let mut pools = HashMap::new();
@@ -1392,9 +1397,9 @@ impl PostgresRegistryContext {
         for db in dbs {
             let pool = PgPoolOptions::new()
                 .max_connections(5)
-                .connect(db.to_uri().as_str())
+                .connect(db.database.to_uri().as_str())
                 .await?;
-            pools.insert(db.to_key(), pool);
+            pools.insert(db.database.to_key(), pool);
         }
         Ok(Self { pools, platform })
     }
@@ -1951,7 +1956,7 @@ impl Default for PgRegistryConfig {
         let database = Database::new(
             "starlane".to_string(),
             "public".to_string(),
-            PgEmbedSettings::default(),
+            PostgresClusterConfig::default(),
         );
         Self::Embedded(database)
     }

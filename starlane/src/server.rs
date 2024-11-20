@@ -25,7 +25,7 @@ use crate::hyperspace::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, Lo
 use crate::hyperspace::platform::{Platform, PlatformConfig};
 use crate::hyperspace::reg::{PgRegistryConfig, Registry, RegistryWrapper};
 use crate::hyperspace::registry::err::RegErr;
-use crate::hyperspace::registry::postgres::embed::PgEmbedSettings;
+use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
 use crate::hyperspace::registry::postgres::PostgresDbKey;
 use crate::hyperspace::shutdown::panic_shutdown;
 use anyhow::anyhow;
@@ -137,6 +137,12 @@ impl Starlane {
         let handle = PostgresRegistryContextHandle::new(&db.database, ctx, db.handle);
 
         let logger = logger!(&Point::global_registry());
+<<<<<<< Updated upstream
+=======
+
+        let = foundation.provision_postgres_cluster().await;
+
+>>>>>>> Stashed changes
         let registry = Arc::new(RegistryWrapper::new(Arc::new(
             PostgresRegistry::new(handle, Box::new(lookups), logger).await?,
         )));
@@ -304,12 +310,12 @@ where
 
 #[cfg(feature = "postgres")]
 #[derive(Clone)]
-pub struct PostgresLookups(PgRegistryConfig);
+pub struct PostgresLookups(LiveDatabase);
 
 #[cfg(feature = "postgres")]
 impl PostgresLookups {
-    pub fn new(config: PgRegistryConfig) -> Self {
-        Self(config)
+    pub fn new(database: LiveDatabase) -> Self {
+        Self(database)
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::hyperspace::registry::postgres::embed::PgEmbedSettings;
+use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
 use crate::hyperspace::registry::postgres::{PostgresConnectInfo, PostgresDbKey};
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
@@ -26,17 +26,19 @@ impl<Info> Database<Info> {
     }
 }
 
+#[derive(Clone)]
 pub struct LiveDatabase {
     pub database: Database<PostgresConnectInfo>,
-    pub(crate) handle: tokio::sync::mpsc::Sender<()>,
+    tx: tokio::sync::mpsc::Sender<()>
 }
 
 impl LiveDatabase {
     pub fn new(
         database: Database<PostgresConnectInfo>,
-        handle: tokio::sync::mpsc::Sender<()>,
+        tx: tokio::sync::mpsc::Sender<()>
+
     ) -> Self {
-        Self { database, handle }
+        Self { database, tx }
     }
 }
 
@@ -73,12 +75,12 @@ impl Database<PostgresConnectInfo> {
     }
 }
 
-impl Database<PgEmbedSettings> {
+impl Database<PostgresClusterConfig> {
     pub fn from_embed<D, S>(
         database: D,
         schema: S,
-        settings: PgEmbedSettings,
-    ) -> Database<PgEmbedSettings>
+        settings: PostgresClusterConfig,
+    ) -> Database<PostgresClusterConfig>
     where
         D: ToString,
         S: ToString,

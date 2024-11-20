@@ -1,12 +1,11 @@
 use crate::hyperspace::driver::DriversBuilder;
 use crate::hyperspace::foundation::Foundation;
-use crate::hyperspace::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
+use crate::hyperspace::hyperlane::{
+    HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory,
+};
 use crate::hyperspace::machine::{Machine, MachineApi, MachineTemplate};
 use crate::hyperspace::reg::PgRegistryConfig;
 use crate::hyperspace::reg::Registry;
-use anyhow::anyhow;
-use async_trait::async_trait;
-use starlane_primitive_macros::logger;
 use crate::space::artifact::asynch::Artifacts;
 use crate::space::command::direct::create::KindTemplate;
 use crate::space::err::SpaceErr;
@@ -18,6 +17,9 @@ use crate::space::loc::{MachineName, StarKey, ToBaseKind};
 use crate::space::log::Logger;
 use crate::space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
 use crate::space::settings::Timeouts;
+use anyhow::anyhow;
+use async_trait::async_trait;
+use starlane_primitive_macros::logger;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -212,10 +214,18 @@ impl Default for Settings {
     }
 }
 
-pub trait PlatformConfig: Send + Sync {
+pub trait PlatformConfig: Clone + Send + Sync
+where
+    Self::RegistryConfig: Clone + Sized + Send + Sync + 'static,
+{
+    type RegistryConfig;
+
     fn can_scorch(&self) -> bool;
     fn can_nuke(&self) -> bool;
-    fn registry(&self) -> &PgRegistryConfig;
+
+    fn registry(&self) -> &Self::RegistryConfig;
 
     fn home(&self) -> &String;
+
+    fn data_dir(&self) -> &String;
 }

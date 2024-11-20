@@ -6,8 +6,13 @@ use crate::env::{
 };
 use crate::hyperspace::foundation::{Foundation, StandAloneFoundation};
 use crate::hyperspace::reg::PgRegistryConfig;
+<<<<<<< Updated upstream
 use crate::hyperspace::registry::postgres::embed::PgEmbedSettings;
 use crate::server::StarlaneConfig;
+=======
+use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
+use crate::server::{Starlane, StarlaneConfig};
+>>>>>>> Stashed changes
 use crate::hyperspace::shutdown::shutdown;
 use crate::{env, COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION};
 use anyhow::anyhow;
@@ -190,8 +195,22 @@ impl StandaloneInstaller {
                     "registry configuration saved",
                     "creating registry data directory",
                 );
+<<<<<<< Updated upstream
                 tokio::fs::create_dir_all(db.settings.database_dir.unwrap_or_default()).await?;
                 spinner.stop("data directory created successfully");
+=======
+                tokio::fs::create_dir_all(db_dir.clone()).await?;
+                spinner.next(format!("data directory created successfully: '{}'", db_dir.display()), "initializing registry");
+                let db = foundation.provision_postgres_cluster( & config ).await?;
+
+                let logger = logger!(&Point::global_registry());
+                let registry = PostgresRegistry::new2( config.registry.clone(), logger ).await?;
+                registry.setup().await?;
+                spinner.stop("registry initialized");
+            }
+            PgRegistryConfig::External(_) => {
+                panic!("not implemented yet")
+>>>>>>> Stashed changes
             }
             PgRegistryConfig::External(_) => {}
         }
@@ -199,7 +218,7 @@ impl StandaloneInstaller {
         let bar = self.console.progress_bar(100);
         bar.start("downloading postgres...");
 
-        foundation.install(&config).await?;
+        foundation.install_postgres(&config).await?;
         bar.stop("postgres download complete");
         spinner.stop("local postgres registry created.");
         Ok(())
@@ -208,15 +227,15 @@ impl StandaloneInstaller {
 
 pub struct DbConfigurator {
     pub console: Console,
-    pub config: Database<PgEmbedSettings>,
+    pub config: Database<PostgresClusterConfig>,
 }
 
 impl DbConfigurator {
-    pub fn new(console: Console, config: Database<PgEmbedSettings>) -> Self {
+    pub fn new(console: Console, config: Database<PostgresClusterConfig>) -> Self {
         Self { config, console }
     }
 
-    pub async fn start(self) -> Result<Database<PgEmbedSettings>, anyhow::Error> {
+    pub async fn start(self) -> Result<Database<PostgresClusterConfig>, anyhow::Error> {
         self.console.section_intro(
             "POSTGRES REGISTRY CONFIGURATION",
             "customize standalone postgres registry",

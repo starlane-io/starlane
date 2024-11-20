@@ -1,4 +1,5 @@
-use crate::hyperspace::database::Database;
+use crate::env::STARLANE_DATA;
+use crate::hyperspace::database::{Database, LiveDatabase};
 use crate::hyperspace::platform::PlatformConfig;
 use crate::hyperspace::reg::PgRegistryConfig;
 use crate::hyperspace::registry::err::RegErr;
@@ -12,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::fs;
+<<<<<<< Updated upstream
 
 pub struct Postgres {
     config: Database<PgEmbedSettings>,
@@ -148,9 +150,11 @@ impl Drop for Postgres {
         });
     }
 }
+=======
+>>>>>>> Stashed changes
 
 #[derive(Builder, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct PgEmbedSettings {
+pub struct PostgresClusterConfig {
     pub port: u16,
     pub username: String,
     pub password: String,
@@ -162,7 +166,12 @@ pub struct PgEmbedSettings {
     pub timeout: Option<Duration>,
 }
 
+<<<<<<< Updated upstream
 impl PgEmbedSettings {
+=======
+impl PostgresClusterConfig {
+    /*
+>>>>>>> Stashed changes
     pub fn database_dir<S>(&self, context_dir: S) -> PathBuf
     where
         S: AsRef<str>,
@@ -184,7 +193,7 @@ impl PgEmbedSettings {
     }
 }
 
-impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
+impl Into<Database<PostgresConnectInfo>> for Database<PostgresClusterConfig> {
     fn into(self) -> Database<PostgresConnectInfo> {
         Database {
             database: self.database.clone(),
@@ -198,10 +207,16 @@ impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
     }
 }
 
-impl Default for PgEmbedSettings {
+impl Default for PostgresClusterConfig {
     fn default() -> Self {
         Self {
+<<<<<<< Updated upstream
             database_dir: None,
+=======
+            database_dir: format!("{}/default/postgres", STARLANE_DATA.to_string())
+                .to_string()
+                .into(),
+>>>>>>> Stashed changes
             port: 5432,
             username: "postgres".to_string(),
             password: "password".to_string(),
