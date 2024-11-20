@@ -685,6 +685,7 @@ impl Default for MachineTemplate {
         stars.push(jump);
         stars.push(fold);
 
+        /*
         let config = service_conf();
         let filestore = ServiceTemplate {
             name: "repo-filestore".to_string(),
@@ -692,7 +693,10 @@ impl Default for MachineTemplate {
             driver: OptSelector::Selector(KindSelector::from_base(BaseKind::Repo)),
             config,
         };
+
         let services = Templates::new(vec![filestore]);
+         */
+        let services = Templates::new(vec![]);
 
         Self { stars, services }
     }
