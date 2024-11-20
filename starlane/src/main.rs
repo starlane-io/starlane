@@ -240,7 +240,7 @@ async fn run() -> Result<(), anyhow::Error> {
                 outro("Good Luck!")?;
                 console.newlines(3);
                 shutdown(1);
-                panic!();
+                process::exit(0);
             }
             Err(err) => {
                 spinner.error("invalid configuration");

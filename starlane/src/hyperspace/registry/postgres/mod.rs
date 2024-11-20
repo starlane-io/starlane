@@ -95,8 +95,8 @@ impl PostgresRegistry {
 
         /// reset mode of 'none' will not let the db be deleted
         let mode = r#"CREATE TYPE reset_mode_enum AS ENUM ('None', 'Scorch');
-                            CREATE TABLE reset_mode (mode reset_mode_enum DEFAULT 'none' NOT NULL UNIQUE);
-w                           INSERT INTO reset_mode VALUES ('None');"#;
+                            CREATE TABLE reset_mode (mode reset_mode_enum DEFAULT 'None' NOT NULL UNIQUE);
+                            INSERT INTO reset_mode VALUES ('None');"#;
 
         let particles = r#"CREATE TABLE IF NOT EXISTS particles (
          id SERIAL PRIMARY KEY,
