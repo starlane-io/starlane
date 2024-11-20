@@ -13,10 +13,9 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::fs;
-<<<<<<< Updated upstream
 
 pub struct Postgres {
-    config: Database<PgEmbedSettings>,
+    config: Database<PostgresClusterConfig>,
     postgres: PostgreSQL,
 }
 
@@ -36,6 +35,7 @@ impl Postgres {
 
      */
 
+    /*
     fn embedded_postgresql(config: &dyn PlatformConfig) -> Result<Settings, RegErr> {
         match config.registry() {
             PgRegistryConfig::Embedded(pg_config) => {
@@ -53,7 +53,7 @@ impl Postgres {
                 .to_string()
                 .into();
                 settings.port = pg_config.port;
-                settings.temporary = !pg_config.persistent;
+                settings.temporary = false;
                 settings.username = pg_config.username.clone();
                 settings.password = pg_config.password.clone();
                 Ok(settings)
@@ -61,6 +61,8 @@ impl Postgres {
             PgRegistryConfig::External(_) => Err(RegErr::ExpectedEmbeddedRegistry),
         }
     }
+
+     */
 
     pub async fn install(config: &dyn PlatformConfig) -> Result<(), RegErr> {
         let database = match config.registry() {
@@ -156,8 +158,6 @@ pub struct PostgresClusterConfig {
     pub port: u16,
     pub username: String,
     pub password: String,
-    pub auth_method: PgEmbedAuthMethod,
-    pub persistent: bool,
     pub database_dir: PathBuf,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<Duration>,
@@ -191,8 +191,6 @@ impl Default for PostgresClusterConfig {
             port: 5432,
             username: "postgres".to_string(),
             password: "password".to_string(),
-            auth_method: Default::default(),
-            persistent: true,
             timeout: Some(Duration::from_secs(5)),
         }
     }

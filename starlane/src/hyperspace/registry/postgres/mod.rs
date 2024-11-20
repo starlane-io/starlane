@@ -1,6 +1,6 @@
 pub mod embed;
 
-use crate::hyperspace::database::Database;
+use crate::hyperspace::database::{Database, LiveDatabase};
 use crate::hyperspace::platform::Platform;
 use crate::hyperspace::reg::{PgRegistryConfig, Registration, RegistryApi};
 use crate::hyperspace::registry::err::RegErr;
@@ -45,6 +45,7 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use crate::server::PostgresLookups;
 
 pub trait PostgresPlatform: Send + Sync {
     fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr>;
@@ -58,8 +59,6 @@ pub struct PostgresRegistry {
 }
 
 impl PostgresRegistry {
-<<<<<<< Updated upstream
-=======
 
     pub async fn new2(database: LiveDatabase, logger: Logger ) -> Result<Self,RegErr> {
         let logger = push_loc!((logger, Point::global_registry()));
@@ -70,7 +69,6 @@ impl PostgresRegistry {
         let handle = PostgresRegistryContextHandle::new(database, ctx );
         PostgresRegistry::new(handle, Box::new(lookups), logger).await
     }
->>>>>>> Stashed changes
     pub async fn new(
         ctx: PostgresRegistryContextHandle,
         platform: Box<dyn PostgresPlatform>,

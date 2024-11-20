@@ -1,60 +1,91 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
+use std::path::PathBuf;
 use std::pin::Pin;
+use std::time::Duration;
+use bollard::Docker;
+use derive_builder::Builder;
 use once_cell::sync::Lazy;
 use tokio::fs;
 use port_check::is_local_ipv4_port_free;
 use postgresql_embedded::{PostgreSQL, Settings};
+use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde_yaml::Value;
 use crate::env::StarlaneWriteLogs;
-use crate::hyperspace::database::LiveDatabase;
-use crate::hyperspace::foundation::{Dependency, DependencyFoundation, DependencyKey, Foundation, FoundationErr, PostgresRegistryFoundation, Provider, ProviderKey};
-use crate::hyperspace::registry::err::FoundationErr;
+use crate::hyperspace::database::{Database, LiveDatabase};
+use crate::hyperspace::foundation::{Dependency, DependencyKind, Foundation, FoundationErr, FoundationKind, CreateDep, RegistryProvider, DependencyConfig};
 use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
+use crate::hyperspace::registry::postgres::{PostgresConnectInfo, PostgresRegistry};
 use crate::hyperspace::shutdown::{add_shutdown_hook, panic_shutdown};
 use crate::space::parse::VarCase;
 
 
 
-type GetDep =  dyn FnMut(HashMap<VarCase,String>) -> dyn Future<Output=Result<impl Dependency,FoundationErr>> + Sync + Send+ 'static;
-
-static DOCKER_DEPS: Lazy<HashMap<DependencyKey, GetDep>> =
-    Lazy::new(|| {
-        let mut deps = HashMap::new();
-        deps.insert( DependencyKey::Postgres, PostgresDependency::create );
-        deps
-    });
+#[derive(Builder, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct DockerDesktopFoundationConfig{
+    pub postgres: PostgresClusterConfig,
+    pub dependencies: HashMap<DependencyKind, Value>
+}
 
 
 #[derive(Clone)]
 pub struct DockerDesktopFoundation {
-    registry: PostgresRegistryFoundation,
-    dependencies: HashMap<String,Box<dyn Dependency>>
+    config: DockerDesktopFoundationConfig,
+    docker: Docker,
+    dependencies: HashMap<DependencyKind, dyn Dependency>
 }
 
+
+#[derive(Builder, Clone, Serialize, Deserialize)]
+pub struct DockerConfig<C> where C: Clone+Serialize+Deserialize{
+  image: String,
+  config: C
+}
+
+
 impl DockerDesktopFoundation {
-    pub fn new(registry: PostgresRegistryFoundation) -> Self {
-        Self {registry}
+    pub fn new(docker: Docker, config: DockerDesktopFoundationConfig) -> Self {
+        Self {
+            docker,
+            config
+        }
     }
 }
 
 #[async_trait]
 impl Foundation for DockerDesktopFoundation {
-    type RegistryFoundation = PostgresRegistryFoundation;
+
+    fn kind() -> FoundationKind {
+        FoundationKind::DockerDesktop
+    }
+    fn create(config: Value) -> Result<impl Foundation,FoundationErr> {
+        let config = serde_yaml::from_value(config.clone()).map_err(|err| FoundationErr::foundation_conf_err(Self::kind(),err,config))?;
+        let docker = Docker::connect_with_local_defaults().map_err(|err| FoundationErr::panic("DockerDesktop", Self::kind().to_string(), format!("Could not access local DockerDesktop caused by: '{}'", err.to_string() ) ))?;
+
+        Ok(DockerDesktopFoundation::new(docker,config))
+    }
+
+
+    fn dependency(&self, kind: &DependencyKind) -> Result<impl Dependency, FoundationErr> {
+        DOCKER_DEPS.get(kind).ok_or(FoundationErr::dep_not_available(kind.clone()))()
+    }
 
     async fn install_foundation_required_dependencies(&self) -> Result<(), FoundationErr> {
         todo!()
     }
 
-    async fn install_dependency(&self, key: &DependencyKey, args: Vec<String>) -> Result<impl Dependency, FoundationErr> {
+    async fn install_dependency(&mut self, key: &DependencyKind, args: Vec<String>) -> Result<impl Dependency, FoundationErr> {
         todo!()
     }
 
-    fn registry(&self) -> &Self::RegistryFoundation {
-        & self.registry
+    fn registry(&self) -> &mut impl RegistryProvider {
+        todo!()
     }
 }
 
-impl DependencyFoundation for PostgresDependency {
+/*
+impl DependencyFoundation for DockerPostgresDependency {
     type Config = PostgresClusterConfig;
 
     fn name() -> String {
@@ -100,14 +131,16 @@ impl DependencyFoundation for PostgresDependency {
     }
 }
 
+ */
 
 
-pub struct PostgresDependency {
+
+pub struct DockerPostgresDependency {
     config: PostgresClusterConfig,
     postgres: PostgreSQL,
 }
 
-impl PostgresDependency {
+impl DockerPostgresDependency {
     pub fn new(config: PostgresClusterConfig) -> Result<Self, FoundationErr> {
         let mut settings = Settings::default();
         settings.data_dir = format!("{}", config.database_dir.display())
@@ -183,36 +216,48 @@ impl PostgresDependency {
     }
 }
 
-impl Dependency for PostgresDependency {
-    fn key() -> DependencyKey {
-       DependencyKey::Postgres
+impl Dependency for DockerPostgresDependency {
+    fn key() -> DependencyKind {
+       DependencyKind::Postgres
     }
 
-    fn create(args: HashMap<String, String>) -> Result<impl Dependency,FoundationErr> {
-        let map = args.to_js;
-        let config: PostgresClusterConfig = serde_json::from(&args).unwrap(); //.map_err(|err| FoundationErr::dep_conf_err(Self::key(), err,args))?;
-        Ok(Self::new(config))
+    fn create(args: HashMap<VarCase, String>) -> Result<impl Dependency,FoundationErr> {
+        let config = Self::into_config(args)?;
+        Self::new(config)
     }
 
     async fn install(&mut self) -> Result<(), FoundationErr> {
-        todo!()
+        self.postgres.setup().await.map_err(|err| FoundationErr::dep_err(Self::key(), err.to_string()))
     }
 
-    async fn start(&mut self) -> Result<LiveDatabase, FoundationErr> {
-        todo!()
-    }
+    async fn provision(&mut self, kind: &ProviderKind, args: &HashMap<VarCase,String> ) -> Result<impl Provider,FoundationErr> {
+       match kind {
+           ProviderKind::Any => {},
+           ProviderKind::Database => {},
+           ProviderKind::Ext(ext) if ext.as_str() != "Database" => {
+               let key = ProviderKey::new(Self::key(),kind.clone());
+               Err(FoundationErr::prov_err(key,format!("ProviderKind '{}' not available",ext).to_string()))?
+           }
+           _ => {}
+       };
 
-    async fn provider(&mut self, key: &ProviderKey, args: &HashMap<VarCase,String> ) -> Result<impl Provider,FoundationErr> {
-        todo!()
+        let config = Self::into_config(args)?;
+
+        Ok(PostgresDatabaseProvider::new(config))
     }
 }
 
-impl Drop for PostgresDependency {
-    fn drop(&mut self) {
-        let handler = tokio::runtime::Handle::current();
-        let mut postgres = self.postgres.clone();
-        handler.spawn(async move {
-            postgres.stop().await.unwrap_or_default();
-        });
+
+struct PostgresDatabaseProvider {
+    config: Database<PostgresConnectInfo>
+}
+
+impl PostgresDatabaseProvider {
+
+    pub fn new( config: Database<PostgresConnectInfo> ) -> PostgresDatabaseProvider  {
+        Self {
+            config
+        }
     }
 }
+
