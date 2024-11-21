@@ -1,4 +1,8 @@
 #![allow(warnings)]
+
+
+shadow!(build);
+
 //#![feature(hasher_prefixfree_extras)]
 #[macro_use]
 extern crate async_trait;
@@ -11,14 +15,17 @@ extern crate core;
 
 use once_cell::sync::Lazy;
 use std::str::FromStr;
+use shadow_rs::shadow;
 
 pub mod space;
 
 pub mod hyperspace;
 
 
+#[cfg(feature="server")]
 pub mod env;
 
+#[cfg(feature="server")]
 pub mod server;
 
 

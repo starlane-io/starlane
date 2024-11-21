@@ -1,176 +1,45 @@
-pub mod docker;
+//pub mod docker;
 pub mod config;
+pub struct Call;
 
-use crate::hyperspace::foundation::docker::DockerDesktopFoundation;
+#[derive(Clone, Serialize, Deserialize)]
+pub struct StarlaneConfig {
+    pub context: String,
+    pub home: String,
+    pub can_nuke: bool,
+    pub can_scorch: bool,
+    pub control_port: u16,
+}
+/*
+pub mod traits;
+pub mod factory;
+pub mod runner;
+
+ */
+use std::fmt::Display;
 use crate::hyperspace::platform::PlatformConfig;
 use crate::hyperspace::reg::Registry;
-use async_trait::async_trait;
 use derive_builder::Builder;
 use futures::TryFutureExt;
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_yaml::Value;
-use std::collections::{HashMap, HashSet};
 use std::future::Future;
+use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
-use std::process;
 use std::rc::Rc;
 use std::str::FromStr;
-use std::sync::Arc;
-use ascii::AsciiChar::K;
 use thiserror::Error;
 
 
-/// # FOUNDATION
-/// A ['Foundation'] provides abstracted control over the services and dependencies that drive Starlane.
-/// Presently there is only the ['DockerDesktopFoundation'] which uses a local Docker Service
-/// to pull dependent Docker Images, run docker instances and in general enables the Starlane [`Platform`]
-/// manage the lifecycle of arbitrary services.
-///
-/// There are two sub concepts that ['Foundation'] provides: ['Dependency'] and  ['Provider'].
-/// The [`FoundationConfig`] enumerates dependencies which are typically things that don't ship
-/// with the Starlane binary.  Common examples are: Postgres, Keycloak, Docker.  Each foundation
-/// implementation must know how to ready that Dependency and potentially even launch an
-/// instance of that Dependency.  For Example: Postgres Database is a common dependency especially
-/// because the default Starlane [`Registry`] (and at the time of this writing the only Registry support).
-/// The Postgres [`Dependency`] ensures that Postgres is accessible and properly configured for the
-/// Starlane Platform.
-///
-/// ## ADDING DEPENDENCIES
-/// Additional Dependencies can be added via [`Foundation::add_dependency`]  The Foundation
-/// implementation must understand how to get the given [`DependencyKind`] and it's entirely possible
-/// that the supported Dependencies differ from Foundation to Foundation.
-///
-/// ## PROVIDER
-/// A [`Dependency`] has a one to many child concept called a [`Provider`] (poorly named!)  Not all Dependencies
-/// have a Provider.  A Provider is something of an instance of a given Dependency.... For example:
-/// The Postgres Cluster [`DependencyKind::Postgres`]  (talking the actual postgresql software which can serve multiple databases)
-/// The Postgres Dependency may have multiple Databases ([`ProviderKind::Database`]).  The provider
-/// utilizes a common Dependency to provide a specific service etc.
-///
-/// ## THE REGISTRY
-/// There is one special dependency that the Foundation must manage which is the [`Foundation::registry`]
-/// the Starlane Registry is the only required dependency from the vanilla Starlane installation
-///
-type CreateFoundation =  dyn FnMut(Value) -> Result<dyn Foundation,FoundationErr> + Sync + Send+ 'static;
-type CreateDep =  dyn FnMut(Value) -> Result<dyn Dependency,FoundationErr> + Sync + Send+ 'static;
-type CreateProvider =  dyn FnMut(Value) -> Result<dyn Provider,FoundationErr> + Sync + Send+ 'static;
-
-
-static FOUNDATIONS: Lazy<HashMap<FoundationKind, CreateFoundation>> =
-    Lazy::new(|| {
-        let mut foundations = HashMap::new();
-        foundations.insert(FoundationKind::DockerDesktop, DockerDesktopFoundation::create );
-        foundations
-    });
-
-
-
-static FOUNDATION: Lazy<impl Foundation> =
-    Lazy::new(|| {
-        let foundation_config = STARLANE_CONFIG.foundation.clone();
-        let foundation = match create_foundation(foundation_config) {
-            Ok(foundation) => foundation,
-            Err(err) => {
-                let msg = format!("[PANIC] Starlane instance cannot create Foundation.  Caused by: '{}'", err.is_fatal()).to_string();
-                let logger = logger!(Point::global_foundation());
-                logger.error(msg);
-                process::exit(1);
-            }
-        };
-       foundation
-    });
-
-fn create_foundation(config: ProtoFoundationConfig) -> Result<impl Foundation,FoundationErr> {
-
-    Ok(foundation)
-}
-
-/// should be called and retained by [`Platform`]
-pub(crate) fn foundation(config: ProtoFoundationConfig) -> Result<impl Foundation,FoundationErr>  {
-    let foundation = FOUNDATIONS.get(&config.kind).ok_or(FoundationErr::foundation_not_available(config.kind))?(config);
-    let foundation = Runner::new(foundation);
-
-    foundation
-}
-
-
-
-
-
-
-
-
-
-
-
-trait Kind where Self: ToString {
+trait Kind where Self: Clone+Eq+PartialEq+Display+Hash {
   fn identifier() -> &'static str;
 
-  fn create(kind: &str) -> Result<impl Self,FoundationErr>;
+//  fn create(kind: &str) -> Result<impl Self,FoundationErr>;
 }
-
-
-#[async_trait]
-pub trait Foundation: Send + Sync + Sized
-where
-    Self: Sized {
-
-    fn kind(&self) -> FoundationKind;
-
-    fn dependency(&self, kind: &DependencyKind ) -> Result<impl Dependency,FoundationErr>;
-
-    /// install any 3rd party dependencies this foundation requires to be minimally operable
-    async fn install_foundation_required_dependencies(& mut self) -> Result<(), FoundationErr>;
-
-    /// install a named dependency.  For example the dependency might be "Postgres." The implementing Foundation must
-    /// be capable of installing that dependency.  The foundation will make the dependency available after installation
-    /// although the method of installing the dependency is under the complete control of the Foundation.  For example:
-    /// a LocalDevelopmentFoundation might have an embedded Postgres Database and perhaps another foundation: DockerDesktopFoundation
-    /// may actually launch a Postgres Docker image and maybe a KubernetesFoundation may actually install a Postgres Operator ...
-    async fn add_dependency(&mut self, config: ProtoDependencyConfig ) -> Result<impl Dependency, FoundationErr>;
-
-    /// return the RegistryFoundation
-    fn registry(&self) -> &mut impl RegistryProvider;
-}
-
-
-
-
-#[derive(Builder, Clone, Serialize, Deserialize)]
-pub struct FoundationConfig<C> where C: Deserialize+Serialize{
-    pub foundation: FoundationKind,
-    pub config: C
-}
-
-#[derive(Builder, Clone, Serialize, Deserialize)]
-pub struct DependencyConfig<C> where C: Deserialize+Serialize{
-    pub dependency: DependencyKind,
-    pub config: C
-}
-
-#[derive(Builder, Clone, Serialize, Deserialize)]
-pub struct ProviderConfig<C> where C: Deserialize+Serialize{
-    pub provider: ProviderKind,
-    pub config: C
-}
-
-
-
-
-
-
 
 
 use serde::de::{MapAccess, Visitor};
-use docker::DependencyRunner;
-use starlane_primitive_macros::logger;
-use crate::env::STARLANE_CONFIG;
-use crate::hyperspace::foundation::config::{ProtoDependencyConfig, ProtoFoundationConfig, ProtoProviderConfig};
-use crate::hyperspace::foundation::runner::{Call, DepCall, DepCallWrapper, Runner};
-use crate::space::point::Point;
-
 #[derive(Builder, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 struct DependencyConfigProto{
     pub dependency: Value,
@@ -200,7 +69,7 @@ pub struct RegistryConfig2 {
 }
 
 
-#[derive(Clone,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString)]
+#[derive(Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString)]
 pub enum FoundationKind {
     DockerDesktop
 }
@@ -209,60 +78,7 @@ impl Kind for FoundationKind {
     fn identifier() -> &'static str {
         "foundation"
     }
-
-    fn create(kind: &str) -> Result<impl Kind, FoundationErr> {
-        match kind {
-            "DockerDesktop" => Ok(Self::DockerDesktop),
-            kind => Err(FoundationErr::foundation_not_found(kind))
-        }
-    }
 }
-
-
-
-pub trait Dependency {
-
-    fn kind(&self) -> &DependencyKind;
-
-
-    async fn install(&self) -> Result<(), FoundationErr> {
-        Ok(())
-    }
-
-    async fn provision(&self, config: ProtoProviderConfig ) -> Result<impl Provider,FoundationErr> {
-        Err(FoundationErr::provider_not_available( config.kind.clone() ))
-    }
-
-
-    /// implementers of this Trait should provide a vec of valid provider kinds
-    fn provider_kinds(&self) -> HashSet<&'static str> {
-        HashSet::new()
-    }
-
-
-    fn has_provisioner(&self, kind: &ProviderKind) -> Result<(),FoundationErr> {
-        let providers = self.provider_kinds();
-        match kind {
-            kind => {
-                let ext = kind.to_string();
-                if providers.contains(ext.as_str()) {
-                    Ok(())
-                } else {
-                    let key = ProviderKey::new(self.kind().clone(), kind.clone());
-                    Err(FoundationErr::prov_err(key, format!("provider kind '{}' is not available for dependency: '{}'", ext.to_string(), Self::kind().to_string()).to_string()))
-                }
-            }
-        }
-    }
-
-
-
-}
-
-pub trait Provider {
-    async fn initialize(&mut self) -> Result<(), FoundationErr>;
-}
-
 
 
 pub type RawConfig = Value;
@@ -271,7 +87,7 @@ pub type RawConfig = Value;
 
 
 
-#[derive(Clone,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString, Serialize, Deserialize)]
+#[derive(Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString, Serialize, Deserialize)]
 pub enum DependencyKind {
     Postgres,
     Docker
@@ -282,20 +98,20 @@ impl Kind for DependencyKind{
     fn identifier() -> &'static str {
         "dependency"
     }
-
-    fn create(kind: &str) -> Result<impl Kind, FoundationErr> {
-        match kind {
-            "Postgres" => Ok(Self::Postgres),
-            kind => Err(FoundationErr::dep_not_found(kind))
-        }
-    }
 }
 
-#[derive(Clone,Eq,PartialEq,Hash)]
+#[derive(Clone,Debug,Eq,PartialEq,Hash)]
 pub struct ProviderKey{
     dep: DependencyKind,
     kind: ProviderKind
 }
+
+impl Display for ProviderKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", format!("{}:{}", self.dep, self.kind))
+    }
+}
+
 
 impl ProviderKey {
     pub fn new(dep: DependencyKind, kind: ProviderKind) -> Self {
@@ -306,13 +122,7 @@ impl ProviderKey {
     }
 }
 
-impl ToString for ProviderKey {
-    fn to_string(&self) -> String {
-        format!("<{}:{}>", self.dep, self.kind)
-    }
-}
-
-#[derive(Clone,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString)]
+#[derive(Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString)]
 pub enum ProviderKind {
     /// this means that the Dependency has one and only one Provider
     Database,
@@ -324,12 +134,7 @@ impl Kind for ProviderKind{
         "provider"
     }
 
-    fn create(kind: &str) -> Result<impl Kind, FoundationErr> {
-        match kind {
-            "Database" => Ok(Self::Database),
-            kind => Err(FoundationErr::provider_not_found(kind))
-        }
-    }
+
 }
 
 
@@ -339,7 +144,7 @@ pub struct LiveService<S> where S: Clone{
     tx: tokio::sync::mpsc::Sender<()>
 }
 
-impl <S> Deref for LiveService<S> {
+impl <S> Deref for LiveService<S> where S: Clone{
     type Target = S;
 
     fn deref(&self) -> &Self::Target {
@@ -347,14 +152,14 @@ impl <S> Deref for LiveService<S> {
     }
 }
 
-impl <S> DerefMut for LiveService<S> {
+impl <S> DerefMut for LiveService<S> where S: Clone{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.service
     }
 }
 
 
-#[derive(Error,Clone)]
+#[derive(Error,Clone,Debug)]
 pub enum FoundationErr {
     #[error("[{id}] -> PANIC! <{kind}> error message: '{msg}'")]
     Panic {id: String, kind: String, msg: String},
@@ -371,7 +176,7 @@ pub enum FoundationErr {
     #[error("provider: '{0}' is recognized but is not available on this build of Starlane")]
     ProviderNotAvailable(String),
     #[error("error converting foundation config for '{kind}' serialization err: '{err}' config: {config}")]
-    FoundationConfigErr { kind: FoundationKind,err: Rc<serde_yaml::Error>, config: Rc<Value> },
+    FoundationConfigErr { kind: FoundationKind,err: String, config: String },
     #[error("[{kind}] Foundation Error: '{msg}'")]
     FoundationErr{ kind: FoundationKind, msg: String },
     #[error("[{kind}] Error: '{msg}'")]
@@ -381,7 +186,7 @@ pub enum FoundationErr {
     #[error("[{key}] Error: '{msg}'")]
     ProviderErr{ key: ProviderKey, msg: String},
     #[error("error converting foundation args for dependency: '{kind}' serialization err: '{err}' from config: '{config}'")]
-    DepConfErr { kind: DependencyKind,err: Rc<serde_yaml::Error>, config: String},
+    DepConfErr { kind: DependencyKind,err: String, config: String},
     #[error("error converting foundation args for provider: '{kind}' serialization err: '{err}' from config: '{config}'")]
     ProvConfErr { kind: ProviderKind, err: Rc<serde_yaml::Error>, config: String},
     #[error("illegal attempt to change foundation after it has already been initialized.  Foundation can only be initialized once")]
@@ -410,6 +215,7 @@ impl From<tokio::sync::mpsc::error::TrySendError<Call>> for FoundationErr {
         Self::FoundationRunnerMpscTrySendErr(Rc::new(err))
     }
 }
+
 
 
 impl From<tokio::sync::oneshot::error::RecvError> for FoundationErr {
@@ -497,360 +303,30 @@ impl FoundationErr {
     }
 
     pub fn foundation_conf_err(kind: FoundationKind, err: serde_yaml::Error, config: Value) -> Self {
-        let err =Rc::new(err);
-        let config =Rc::new(config);
+        let err = err.to_string();
+        let config =config.as_str().unwrap_or("?").to_string();
         Self::FoundationConfigErr {kind,err,config}
     }
 
 
     pub fn dep_conf_err(kind: DependencyKind, err: serde_yaml::Error, config: Value) -> Self {
-        let err =Rc::new(err);
-        let config = config.to_string();
+        let err = err.to_string();
+        let config =config.as_str().unwrap_or("?").to_string();
         Self::DepConfErr {kind,err,config}
     }
 
     pub fn prov_conf_err( kind: ProviderKind, err: serde_yaml::Error, config: Value) -> Self {
         let err =Rc::new(err);
-        let config = config.to_string();
+
+        let config =config.as_str().unwrap_or("?").to_string();
         Self::ProvConfErr {kind,err,config}
     }
 }
 
 
-pub trait RegistryProvider: Provider{
-    fn registry(& mut self) -> Result<LiveService<Registry>,FoundationErr>;
-}
 
 
 
 
 
-mod runner {
-    use std::collections::{HashMap, HashSet};
-    use nom_supreme::final_parser::ExtractContext;
-    use once_cell::sync::Lazy;
-    use serde_yaml::Value;
-    use starlane_primitive_macros::logger;
-    use crate::hyperspace::foundation::{Dependency, DependencyKind, Foundation, FoundationErr, FoundationKind, Kind, Provider, ProviderKey, ProviderKind, RegistryProvider, FOUNDATIONS};
-    use crate::hyperspace::foundation::config::{ProtoDependencyConfig, ProtoFoundationConfig, ProtoProviderConfig};
-    use crate::hyperspace::foundation::runner::DepCall::Provision;
-    use crate::hyperspace::shutdown::add_shutdown_hook;
-    use crate::space::kind::Kind::Dependency;
-    use crate::space::point::Point;
-
-
-   pub(super) enum Call {
-        Kind(tokio::sync::oneshot::Sender<FoundationKind>),
-        Dependency{ kind: DependencyKind, rtn: tokio::sync::oneshot::Sender<Result<dyn Dependency,FoundationErr>>},
-        InstallFoundationRequiredDependencies(tokio::sync::oneshot::Sender<Result<(),FoundationErr>>),
-        AddDependency{ config: ProtoDependencyConfig, rtn: tokio::sync::oneshot::Sender<Result<dyn Dependency,FoundationErr>>},
-        DepCall(DepCallWrapper),
-    }
-
-    struct FoundationProxy {
-        call_tx: tokio::sync::mpsc::Sender<Call>,
-    }
-
-    impl FoundationProxy {
-        fn new(call_tx:tokio::sync::mpsc::Sender<Call>) -> Self {
-            Self {
-                call_tx
-            }
-        }
-
-    }
-
-
-    impl Foundation for FoundationProxy {
-
-        fn kind(&self) -> FoundationKind {
-            let (rtn_tx, mut rtn_rx) = tokio::sync::oneshot::channel();
-            let call = Call::Kind(rtn_tx);
-            self.call_tx.try_send(call).unwrap_or_default();
-            rtn_rx.try_recv().unwrap()
-        }
-
-        fn dependency(&self, kind: &DependencyKind) -> Result<impl Dependency, FoundationErr> {
-            let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-            let kind = kind.clone();
-            let call = Call::Dependency { kind, rtn };
-            self.call_tx.try_send(call)?;
-            Ok(rtn_rx.try_recv()?)
-        }
-
-        async fn install_foundation_required_dependencies(&mut self) -> Result<(), FoundationErr> {
-            let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-            let call = Call::InstallFoundationRequiredDependencies(rtn);
-            self.call_tx.send(call).await?;
-            rtn_rx.await?
-        }
-
-        async fn add_dependency(&mut self, config: ProtoDependencyConfig) -> Result<impl Dependency, FoundationErr> {
-            let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-            let call = Call::AddDependency{ config, rtn };
-            self.call_tx.send(call).await?;
-            rtn_rx.await?
-        }
-
-        fn registry(&self) -> &mut impl RegistryProvider {
-            todo!()
-        }
-    }
-
-
-   pub(super) struct DepCallWrapper {
-       kind: DependencyKind,
-       command: DepCall
-   }
-
-    impl DepCallWrapper {
-        fn new(kind: DependencyKind, command: DepCall) -> Self {
-            Self {
-                kind,
-                command,
-            }
-        }
-    }
-
-    pub(super) enum DepCall {
-        Kind(tokio::sync::oneshot::Sender<DependencyKind>),
-        Install(tokio::sync::oneshot::Sender<Result<(),FoundationErr>>),
-        Provision{ config: ProtoProviderConfig, rtn: tokio::sync::oneshot::Sender<Result<dyn Provider,FoundationErr>>},
-        ProviderKinds(tokio::sync::oneshot::Sender<HashSet<&'static str>>),
-        ProviderCall(ProviderCallWrapper)
-    }
-
-    struct DependencyProxy {
-        kind: DependencyKind,
-        call_tx: tokio::sync::mpsc::Sender<DepCall>,
-    }
-
-    impl DependencyProxy {
-        fn new(kind: &DependencyKind, foundation_call_tx: tokio::sync::mpsc::Sender<Call>) -> impl Dependency{
-            let (call_tx,mut call_rx) = tokio::sync::mpsc::channel(16);
-
-            tokio::spawn( async move {
-               while let Some(call) = call_rx.recv().await {
-                   let call = DepCallWrapper::new(kind.clone(), call);
-                   let call = Call::DepCall(call);
-                   foundation_call_tx.send(call).await.unwrap_or_default();
-               }
-            });
-
-            let kind = kind.clone();
-
-            Self {
-                kind,
-                call_tx
-            }
-        }
-    }
-
-    impl Dependency for DependencyProxy {
-        fn kind(&self) -> &DependencyKind {
-            &self.kind
-        }
-
-
-        async fn install(&self) -> Result<(), FoundationErr> {
-            let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-            let call = DepCall::Install(rtn);
-            self.call_tx.send(call).await.unwrap();
-            rtn_rx.await?
-        }
-
-        async fn provision(&self, kind: &ProviderKind, config: Value ) -> Result<impl Provider,FoundationErr> {
-            let kind = kind.clone();
-            let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-            let call = DepCall::Provision{ kind, rtn };
-            self.call_tx.send(call).await.unwrap();
-            rtn_rx.await?
-        }
-
-        /// implementers of this Trait should provide a vec of valid provider kinds
-        fn provider_kinds(&self) -> HashSet<&'static str> {
-            let (rtn_tx, mut rtn_rx) = tokio::sync::oneshot::channel();
-            let call = DepCall::ProviderKinds(rtn_tx);
-            self.call_tx.try_send(call).unwrap_or_default();
-            rtn_rx.try_recv().unwrap()
-        }
-    }
-
-    struct ProviderCallWrapper {
-        kind: ProviderKind,
-        call: ProviderCall
-    }
-
-    impl ProviderCallWrapper {
-        fn new(kind: ProviderKind, command: ProviderCall) -> Self {
-            Self {
-                kind,
-                call: command,
-            }
-        }
-    }
-
-    pub(super) enum ProviderCall {
-        Initialize(tokio::sync::oneshot::Sender<Result<(),FoundationErr>>),
-    }
-
-
-
-    struct ProviderProxy {
-        dependency: DependencyKind,
-        kind: ProviderKind,
-        call_tx: tokio::sync::mpsc::Sender<ProviderCall>,
-    }
-
-    impl ProviderProxy {
-        fn new(kind: &ProviderKind, dependency: &DependencyKind, foundation_call_tx: tokio::sync::mpsc::Sender<Call>) -> impl Provider{
-            let (call_tx,mut call_rx) = tokio::sync::mpsc::channel(16);
-
-            let dep_kind = dependency.clone();
-            tokio::spawn( async move {
-                while let Some(call) = call_rx.recv().await {
-                    let call = ProviderCallWrapper::new(kind.clone(), call);
-                    let call = DepCall::ProviderCall(call);
-                    let call = DepCallWrapper::new(dep_kind.clone(), call);
-                    let call = Call::DepCall(call);
-                    foundation_call_tx.send(call).await.unwrap_or_default();
-                }
-            });
-
-            let kind = kind.clone();
-            let dependency = dependency.clone();
-
-            Self {
-                kind,
-                dependency,
-                call_tx
-            }
-        }
-    }
-
-
-    impl Provider for ProviderProxy {
-        async fn initialize(&mut self) -> Result<(), FoundationErr> {
-            let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-            let call = ProviderCall::Initialize(rtn);
-            self.call_tx.send(call).await.unwrap();
-            rtn_rx.await?
-        }
-    }
-
-
-
-    pub(super) struct Runner {
-        call_rx: tokio::sync::mpsc::Receiver<Call>,
-        foundation: dyn Foundation
-    }
-
-    impl Runner {
-
-        pub(super) fn new( foundation: impl Foundation ) -> impl Foundation {
-            let (call_tx, call_rx) = tokio::sync::mpsc::channel(64);
-            let proxy = FoundationProxy::new(call_tx);
-            let runner = Self {
-                foundation,
-                call_rx
-            };
-            runner.start();
-            proxy
-        }
-
-        pub(super) fn start(self) {
-            tokio::spawn( async move {
-                self.run().await;
-            });
-        }
-
-        async fn run(mut self) -> Result<(),FoundationErr> {
-            let logger = logger!(Point::global_foundation());
-            while let Some(call) = self.call_rx.recv().await {
-                match call {
-                    Call::Kind(rtn) => {
-                        rtn.send(self.foundation.kind()).unwrap_or_default();
-                    }
-                    Call::Dependency { kind, rtn } => {}
-                    Call::InstallFoundationRequiredDependencies(_) => {}
-                    Call::AddDependency { .. } => {}
-                    Call::DepCall(_) => {}
-                }
-            }
-            Ok(())
-        }
-
-    }
-
-
-
-    struct DependencyRunner {
-        dependency: Box<dyn Dependency>,
-    }
-
-    impl DependencyRunner {
-
-        fn new( dependency: impl Dependency ) -> Self {
-            let dependency = Box::new(dependency);
-            Self {
-                dependency
-            }
-        }
-
-        fn kind(&self) -> &DependencyKind {
-            self.dependency.kind()
-        }
-
-        async fn handle(&mut self, call: DepCall) -> anyhow::Result<()> {
-            match call {
-                DepCall::Kind(rtn) => rtn.send(self.dependency.kind().clone()).unwrap_or_default(),
-                DepCall::Install(rtn) => {
-                    rtn.send(self.dependency.install().await).unwrap_or_default();
-                },
-                DepCall::Provision { config, rtn } => {
-                    match self.dependency.provision(config).await {
-                        Ok(provider) => {
-                        }
-                        Err(err) => rtn.send(Err(err)).unwrap_or_default()
-                    }
-                }
-                DepCall::ProviderKinds(rtn) => {
-                    let mut set = HashSet::new();
-                    set.insert(ProviderKind::DockerDaemon.to_string().as_str());
-                    rtn.send(set).unwrap_or_default();
-                }
-                DepCall::ProviderCall(call) => {
-
-                }
-            }
-            Ok(())
-        }
-    }
-
-
-    struct ProviderRunner {
-        provider: dyn Provider,
-    }
-
-    impl ProviderRunner {
-        fn kind(&self) -> &ProviderKind {
-            self.provider.kind()
-        }
-
-        async fn handle(&mut self, call: ProviderCall) -> anyhow::Result<()> {
-            match call {
-                ProviderCall::Initialize(rtn) => {
-                    rtn.send(self.provider.initialize()).unwrap_or_default();
-                }
-            }
-            Ok(())
-        }
-    }
-
-
-
-
-
-
-}
 

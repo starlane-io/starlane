@@ -17,16 +17,12 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::hyperspace::database::{Database, LiveDatabase};
 use crate::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
 use crate::hyperspace::err::HypErr;
 use crate::hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
 use crate::hyperspace::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
 use crate::hyperspace::platform::{Platform, PlatformConfig};
-use crate::hyperspace::reg::{PgRegistryConfig, Registry, RegistryWrapper};
 use crate::hyperspace::registry::err::RegErr;
-use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
-use crate::hyperspace::registry::postgres::PostgresDbKey;
 use crate::hyperspace::shutdown::panic_shutdown;
 use anyhow::anyhow;
 use port_check::is_local_ipv4_port_free;
@@ -37,8 +33,8 @@ use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
 use crate::hyperspace::driver::space::SpaceDriverFactory;
 use crate::hyperspace::foundation::config::ProtoFoundationConfig;
-use crate::hyperspace::foundation::Foundation;
-use crate::hyperspace::foundation::docker::DockerDesktopFoundation;
+use crate::hyperspace::foundation::traits::Foundation;
+//use crate::hyperspace::foundation::docker::DockerDesktopFoundation;
 use crate::hyperspace::machine::MachineTemplate;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -48,8 +44,8 @@ pub struct StarlaneConfig {
     pub can_nuke: bool,
     pub can_scorch: bool,
     pub control_port: u16,
-    pub foundation: ProtoFoundationConfig,
-    pub registry: PgRegistryConfig,
+//    pub foundation: ProtoFoundationConfig,
+    pub registry: ()
 }
 
 impl PlatformConfig for StarlaneConfig {
@@ -63,7 +59,7 @@ impl PlatformConfig for StarlaneConfig {
         self.can_nuke
     }
 
-    fn registry(&self) -> &PgRegistryConfig {
+    fn registry(&self) -> &Self::RegistryConfig{
         &self.registry
     }
 
@@ -78,6 +74,8 @@ impl PlatformConfig for StarlaneConfig {
 
 impl Default for StarlaneConfig {
     fn default() -> StarlaneConfig {
+        todo!()
+        /*
         Self {
             context: "default".to_string(),
             home: STARLANE_HOME.to_string(),
@@ -86,6 +84,8 @@ impl Default for StarlaneConfig {
             control_port: 4343u16,
             registry: PgRegistryConfig::default(),
         }
+
+         */
     }
 }
 
@@ -94,7 +94,7 @@ pub struct Starlane {
     config: StarlaneConfig,
     artifacts: Artifacts,
     registry: Registry,
-    foundation: DockerDesktopFoundation,
+//    foundation: DockerDesktopFoundation,
 }
 
 /*
@@ -115,11 +115,14 @@ impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
  */
 
 #[cfg(feature = "postgres")]
+#[cfg(feature="blah")]
 impl Starlane {
     pub async fn new(
         config: StarlaneConfig,
         foundation: DockerDesktopFoundation,
     ) -> Result<Starlane, HypErr> {
+        todo!();
+        /*
         let artifacts = Artifacts::just_builtins();
 
         let db = match config.clone().registry {
@@ -146,12 +149,7 @@ impl Starlane {
         let handle = PostgresRegistryContextHandle::new(&db.database, ctx, db.handle);
 
         let logger = logger!(&Point::global_registry());
-<<<<<<< Updated upstream
-=======
 
-        let = foundation.provision_postgres_cluster().await;
-
->>>>>>> Stashed changes
         let registry = Arc::new(RegistryWrapper::new(Arc::new(
             PostgresRegistry::new(handle, Box::new(lookups), logger).await?,
         )));
@@ -162,6 +160,8 @@ impl Starlane {
             artifacts,
             foundation,
         })
+
+         */
     }
 }
 
@@ -184,7 +184,7 @@ where
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
 
-    type Foundation = DockerDesktopFoundation;
+    type Foundation = ();
 
     type Config = StarlaneConfig;
 

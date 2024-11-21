@@ -1,16 +1,10 @@
 use std::convert::Infallible;
 use std::io::Error;
 use std::sync::Arc;
-use strum_macros::Display;
 use thiserror::Error;
-use tokio::io;
-use tokio::sync::oneshot::error::RecvError;
 
 use crate::hyperspace::registry::err::RegErr;
 use crate::space::err::{CoreReflector, HyperSpatialError, SpaceErr, SpatialError};
-use crate::space::kind::Kind;
-use crate::space::point::Point;
-use crate::space::substance::{Substance, SubstanceKind};
 use crate::space::wave::core::http2::StatusCode;
 use crate::space::wave::core::ReflectedCore;
 
@@ -34,8 +28,8 @@ pub enum HypErr {
     Iniff(#[from] Infallible),
     #[error("{0}")]
     StripPrefix(#[from] std::path::StripPrefixError),
-    #[error("{0}")]
-    OneshotRecvErr(#[from] oneshot::RecvError),
+//    #[error("{0}")]
+//    OneshotRecvErr(#[from] tokio::sync::oneshot::RecvError),
     #[error("{0}")]
     Io(#[from] Arc<tokio::io::Error>),
 }

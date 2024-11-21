@@ -1,8 +1,5 @@
-use crate::hyperspace::database::Database;
 use crate::hyperspace::platform::Platform;
 use crate::hyperspace::registry::err::RegErr;
-use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
-use crate::hyperspace::registry::postgres::PostgresConnectInfo;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use crate::space::command::common::{SetProperties, SetRegistry};
@@ -230,43 +227,7 @@ pub struct Registration {
     pub status: Status,
 }
 
-pub enum RegistryConfig {
-    Postgres(PgRegistryConfig),
-}
 
-#[derive(Clone, Serialize, Deserialize)]
-pub enum PgRegistryConfig {
-    Embedded(Database<PostgresClusterConfig>),
-    External(Database<PostgresConnectInfo>),
-}
 
-impl PgRegistryConfig {
-    pub fn database(&self) -> String {
-        match self {
-            PgRegistryConfig::Embedded(d) => d.database.clone(),
-            PgRegistryConfig::External(d) => d.database.clone(),
-        }
-    }
-}
 
-impl Into<Database<PostgresConnectInfo>> for PgRegistryConfig {
-    fn into(self) -> Database<PostgresConnectInfo> {
-        match self {
-            PgRegistryConfig::Embedded(p) => p.into(),
-            PgRegistryConfig::External(p) => p,
-        }
-    }
-}
 
-impl TryInto<Database<PostgresClusterConfig>> for PgRegistryConfig {
-    type Error = RegErr;
-
-    fn try_into(self) -> Result<Database<PostgresClusterConfig>, Self::Error> {
-        match self {
-            PgRegistryConfig::Embedded(registry) => Ok(registry),
-            _ => Err(RegErr::Msg(
-                "cannot get PgEmbedSettings from None Embedded Registry config".to_string(),
-            )),
-        }
-    }
-}

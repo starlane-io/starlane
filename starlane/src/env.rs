@@ -1,6 +1,6 @@
 use crate::hyperspace::err::HypErr;
 use crate::hyperspace::shutdown::panic_shutdown;
-use crate::server::StarlaneConfig;
+
 use anyhow::anyhow;
 use atty::Stream;
 use chrono::Utc;
@@ -38,6 +38,7 @@ pub fn context_dir() -> String {
     format!("{}/{}", STARLANE_HOME.as_str(), context()).to_string()
 }
 
+#[cfg(feature = "server")]
 pub static STARLANE_CONFIG: Lazy<StarlaneConfig> = Lazy::new(|| match config() {
     Ok(Some(config)) => config,
     Ok(None) => StarlaneConfig::default(),
@@ -91,7 +92,7 @@ pub static STARLANE_LOG_DIR: Lazy<String> = Lazy::new(|| {
 pub static STARLANE_DATA_DIR: Lazy<String> = Lazy::new(|| {
     std::env::var("STARLANE_DATA_DIR").unwrap_or_else(|e| {
         let dir: String = match dirs::home_dir() {
-            None => current_dir().to_string(),
+            None => current_dir().unwrap().display().to_string(),
             Some(dir) => dir.display().to_string(),
         };
         format!("{}/starlane/data", dir).to_string()

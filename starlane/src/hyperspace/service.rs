@@ -41,7 +41,7 @@ impl FileStoreService {
 
 pub struct ServiceCall<I, O> {
     pub input: I,
-    pub output: oneshot::Sender<Result<O, ServiceErr>>,
+    pub output: tokio::sync::oneshot::Sender<Result<O, ServiceErr>>,
 }
 
 #[derive(Clone)]

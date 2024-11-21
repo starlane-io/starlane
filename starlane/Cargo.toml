@@ -24,24 +24,24 @@ repository.workspace = true
 
 [features]
 full=["server"]
-default=["server"]
+default=["hyperspace"]
 #server=["space","service","hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow", "dep:virtual-fs"]
-server=["space","service","hyperspace", "hyperlane","postgres", "postgres-embedded","hyperlane-tcp", "cli", "dep:oneshot", "dep:anyhow", "dep:bollard"]
+server=["space","service","hyperspace", "hyperlane","hyperlane-tcp", "cli", "dep:oneshot", "dep:anyhow", "dep:bollard"]
 cli=["dep:text_io","dep:clap", "dep:walkdir", "parse"]
 hypererr=[]
-hyperspace=["dep:futures","dep:dashmap","dep:semver", "parse", "dep:zip","hypererr"]
+hyperspace=["dep:futures","dep:dashmap","dep:semver", "parse", "dep:zip","hypererr", "dep:serde", "space", "dep:async-recursion", "dep:clap", "rustls"]
 hyperlane=["hypererr"]
 hyperlane-tcp =  ["hyperlane","dep:rcgen","rustls","dep:tokio-rustls","dep:tls-api-rustls"]
 hyperlane-quic =  ["hyperlane","dep:rcgen","rustls", "dep:quinn"]
-postgres=[ "dep:sqlx","dep:serde","dep:async-recursion" ]
-postgres-embedded=[ "postgres", "dep:postgresql_embedded" ]
+#postgres=[ "dep:sqlx","dep:serde","dep:async-recursion" ]
+#postgres-embedded=[ "postgres", "dep:postgresql_embedded" ]
 parse=["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
-rustls=["dep:rustls","dep:rcgen","rustls-pemfile"]
+rustls=["dep:rustls","dep:rcgen","rustls-pemfile", "dep:tokio-rustls"]
 driver=["hyperspace"]
 dialect=[]
 dialect-cli=["dialect","dep:clap"]
 service=[]
-space=["dep:regex", "dep:validator", "dep:convert_case", "dep:serde_json", "dep:enum-ordinalize", "dep:ariadne", "dep:serde_urlencoded"]
+space=["parse", "dep:regex", "dep:validator", "dep:convert_case", "dep:serde", "dep:serde_yaml", "dep:serde_json", "dep:enum-ordinalize", "dep:ariadne", "dep:serde_urlencoded", "dep:anyhow", "dep:dashmap"]
 wasm=[]
 
 
@@ -66,7 +66,7 @@ wasmer-wasix = {workspace = true}
 itertools = {workspace = true}
 #acid-store = {git="https://github.com/uberscott/acid-store.git" , version="0.14.2" }
 tempdir = { workspace=true }
-
+shadow-rs = { workspace = true, features = ["metadata"] }
 once_cell = { workspace=true }
 zip = { workspace=true, optional = true }
 dirs ={ workspace=true}
@@ -125,7 +125,7 @@ thiserror-context = { workspace = true }
 rustyline = { workspace = true, features=["with-file-history", "with-dirs"]}
 cliclack = { workspace = true }
 
-serde_yaml = { workspace = true }
+serde_yaml = { workspace = true, optional = true }
 derive_builder = { workspace=true }
 postgresql_embedded = { workspace=true, optional = true }
 text-to-ascii-art = { workspace = true}
@@ -147,6 +147,9 @@ tracing = { workspace = true, features=["std","log","attributes","tracing-attrib
 tracing-subscriber = { workspace = true, features = ["default"]}
 tracing-attributes= { workspace = true,  features=["async-await"]}
 tracing-core= { workspace = true,  features = ["valuable","default"] }
+
+[build-dependencies]
+shadow-rs = { workspace = true }
 
 
 [lib]

@@ -1,3 +1,6 @@
+
+#[cfg(features="postgres")]
+#[cfg(features="postgres-embed")]
 pub mod embed;
 
 use crate::hyperspace::database::{Database, LiveDatabase};
@@ -1468,8 +1471,7 @@ impl PostgresConnectInfo {
     }
 }
 
-#[cfg(test)]
-
+#[cfg(all(test, feature = "postgres-tests"))]
 pub mod test {
     use std::collections::HashSet;
     use std::convert::TryInto;
@@ -1477,24 +1479,21 @@ pub mod test {
     use std::sync::Arc;
 
     use crate::hyperspace::driver::DriversBuilder;
-    use crate::hyperspace::err::HyperErr;
-    use crate::hyperspace::err2::{HypErr, OldStarErr};
     use crate::hyperspace::hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
     use crate::hyperspace::machine::MachineTemplate;
+    use crate::hyperspace::platform::Platform;
     use crate::hyperspace::reg::{Registration, Registry};
     use crate::hyperspace::registry::err::RegErr;
     use crate::hyperspace::registry::postgres::{
         PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
     };
-    use crate::hyperspace::StarlanePostgres;
     use crate::space::artifact::asynch::Artifacts;
     use crate::space::command::direct::create::Strategy;
     use crate::space::command::direct::query::Query;
     use crate::space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
     use crate::space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
     use crate::space::loc::{MachineName, StarKey, ToPoint};
-    use crate::space::log::RootLogger;
     use crate::space::particle::property::PropertiesConfig;
     use crate::space::particle::Status;
     use crate::space::point::Point;
@@ -1538,7 +1537,7 @@ pub mod test {
 
     #[async_trait]
     impl Platform for TestPlatform {
-        type Err = HypErr;
+        type Err = RegErr;
         type RegistryContext = PostgresRegistryContextHandle;
         type StarAuth = AnonHyperAuthenticator;
         type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
@@ -1587,7 +1586,7 @@ pub mod test {
         }
     }
 
-    pub async fn registry() -> Result<Registry<TestPlatform>, OldStarErr> {
+    pub async fn registry() -> Result<Registry<TestPlatform>, RegErr> {
         TestPlatform::new().await?.global_registry().await
     }
 
@@ -1595,14 +1594,14 @@ pub mod test {
     pub fn test_compile_postgres() {}
 
     #[tokio::test]
-    pub async fn test_nuke() -> Result<(), OldStarErr> {
+    pub async fn test_nuke() -> Result<(), RegErr> {
         let registry = registry().await?;
         registry.scorch().await?;
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn test_create() -> Result<(), OldStarErr> {
+    pub async fn test_create() -> Result<(), RegErr> {
         let registry = registry().await?;
         registry.scorch().await?;
 
@@ -1662,7 +1661,7 @@ pub mod test {
     }
 
     #[tokio::test]
-    pub async fn test_access() -> Result<(), HypErr> {
+    pub async fn test_access() -> Result<(), RegErr> {
         let registry = registry().await?;
         registry.scorch().await?;
 
@@ -1806,7 +1805,7 @@ pub mod test {
             to_point: superuser
                 .clone()
                 .try_into()
-                .map_err(|e| OldStarErr::new("infallible"))?,
+                .map_err(|e| RegErr::msg("infallible"))?,
             by_particle: hyperuser.clone(),
         };
         println!("granting...");
@@ -1832,7 +1831,7 @@ pub mod test {
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+CSD-RWX")?),
             on_point: Selector::from_str("localhost:users:superuser")?,
-            to_point: scott.clone().try_into().map_err(|e| OldStarErr::new(e))?,
+            to_point: scott.clone().try_into().map_err(|err| RegErr::new(e))?,
             by_particle: app.clone(),
         };
         registry.grant(&grant).await?;

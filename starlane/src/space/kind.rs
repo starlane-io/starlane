@@ -3,7 +3,6 @@ use core::str::FromStr;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use crate::hyperspace::foundation::Foundation;
 use crate::space::parse::util::new_span;
 
 use crate::space::err::{ParseErrs, PrintErr, SpaceErr};

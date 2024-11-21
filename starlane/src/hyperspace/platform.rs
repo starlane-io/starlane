@@ -1,10 +1,8 @@
 use crate::hyperspace::driver::DriversBuilder;
-use crate::hyperspace::foundation::Foundation;
 use crate::hyperspace::hyperlane::{
     HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory,
 };
 use crate::hyperspace::machine::{Machine, MachineApi, MachineTemplate};
-use crate::hyperspace::reg::PgRegistryConfig;
 use crate::hyperspace::reg::Registry;
 use crate::space::artifact::asynch::Artifacts;
 use crate::space::command::direct::create::KindTemplate;
@@ -30,7 +28,7 @@ where
     Self: 'static,
     Self::StarAuth: HyperAuthenticator,
     Self::RemoteStarConnectionFactory: HyperwayEndpointFactory,
-    Self::Foundation: Foundation + Clone + Send + Sync,
+//    Self::Foundation: Foundation + Clone + Send + Sync,
     Self::Config: PlatformConfig,
 {
     type Err;
@@ -164,6 +162,9 @@ where
             BaseKind::Guest => Kind::Guest,
             BaseKind::Registry => Kind::Registry,
             BaseKind::WebServer => Kind::WebServer,
+            BaseKind::Foundation => Kind::Foundation,
+            BaseKind::Dependency => Kind::Dependency,
+            BaseKind::Provider => Kind::Provider,
         })
     }
 
@@ -215,8 +216,8 @@ impl Default for Settings {
 }
 
 pub trait PlatformConfig: Clone + Send + Sync
-where
-    Self::RegistryConfig: Clone + Sized + Send + Sync + 'static,
+/*where
+    Self::RegistryConfig: Clone + Sized + Send + Sync + 'static,*/
 {
     type RegistryConfig;
 

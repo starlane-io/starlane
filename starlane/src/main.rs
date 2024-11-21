@@ -1,4 +1,9 @@
 #![allow(warnings)]
+
+
+shadow!(build);
+
+
 #[macro_use]
 extern crate async_trait;
 #[macro_use]
@@ -21,6 +26,7 @@ pub mod install;
 #[cfg(feature = "cli")]
 pub mod cli;
 
+#[cfg(feature="server")]
 pub mod env;
 #[cfg(feature = "server")]
 pub mod server;
@@ -29,7 +35,7 @@ pub mod hyperspace;
 
 
 
-use crate::hyperspace::foundation::Foundation;
+use starlane::hyperspace::foundation::traits::Foundation;
 use starlane::hyperspace::foundation::docker::DockerDesktopFoundation;
 pub use crate::hyperspace::platform::Platform;
 use crate::hyperspace::shutdown::shutdown;
@@ -64,6 +70,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
 use std::{io, process};
+use shadow_rs::shadow;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;

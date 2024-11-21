@@ -20,6 +20,7 @@ pub mod registry;
 pub mod shutdown;
 pub mod tests;
 
+#[cfg(feature="postgres")]
 pub mod database;
 pub mod service;
 pub mod template;
@@ -27,14 +28,4 @@ pub mod template;
 
 
 
-#[cfg(test)]
-pub mod tests {
-    #[test]
-    pub fn test() {}
 
-
-
-
-
-
-}

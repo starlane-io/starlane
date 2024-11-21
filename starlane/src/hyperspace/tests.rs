@@ -1,4 +1,4 @@
-#![cfg(test)]
+#![cfg(all(test, feature = "postgres-tests"))]
 
 use once_cell::sync::Lazy;
 use serde::Serialize;
@@ -9,7 +9,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::hyperspace::driver::control::ControlClient;
-use crate::hyperspace::err2::OldStarErr;
 use crate::hyperspace::hyperlane::HyperClient;
 use crate::hyperspace::machine::MachineApiExtFactory;
 use crate::hyperspace::platform::Platform;
@@ -24,7 +23,6 @@ use crate::space::hyper::{
 };
 use crate::space::kind::Kind;
 use crate::space::loc::{Layer, StarHandle, StarKey, ToSurface};
-use crate::space::log::{LogSource, RootLogger, StdOutAppender};
 use crate::space::particle::{Details, Properties, Status, Stub};
 use crate::space::point::Point;
 use crate::space::settings::Timeouts;

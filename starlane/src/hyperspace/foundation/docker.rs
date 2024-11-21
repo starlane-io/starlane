@@ -1,5 +1,5 @@
 use crate::hyperspace::database::{Database, LiveDatabase};
-use crate::hyperspace::foundation::config::{Config, FoundationSubConfig, ProtoConfig, ProtoDependencyConfig};
+use crate::hyperspace::foundation::config::{Config, FoundationSubConfig, ProtoConfig, ProtoDependencyConfig, ProtoProviderConfig};
 use crate::hyperspace::foundation::{CreateDep, CreateFoundation, Dependency, DependencyKind, Foundation, FoundationErr, FoundationKind, Provider, ProviderKind, RegistryProvider};
 use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
 use crate::hyperspace::registry::postgres::PostgresConnectInfo;
@@ -23,8 +23,6 @@ static DEPENDENCIES: Lazy<HashMap<DependencyKind, CreateDep>> =
 
 pub type ProtoDockerDesktopFoundationConfig = Config<FoundationKind,Value>;
 
-pub type DockerDependencyConfig = Config<FoundationKind,DockerDependencySubConfig>;
-pub type ProtoDockerDependencyConfig = Config<DependencyKind,Value>;
 
 
 
@@ -78,7 +76,7 @@ impl Foundation for DockerDesktopFoundation {
         &mut self,
         config: ProtoDependencyConfig,
     ) -> Result<impl Dependency, FoundationErr> {
-        self.dependencies.insert( config.kind )
+        todo!()
     }
 
     fn registry(&self) -> &mut impl RegistryProvider {
@@ -172,16 +170,16 @@ impl Dependency for DockerDependency {
                 Ok(())
             }
             Err(err) => {
-                Err(FoundationErr::user_action_required("Dependency", self.kind().to_string(), "make sure Docker is installed and running on this machine", format!("Starlane foundation '{}' needs Docker to facilitate the underlying infrastructure.  Please follow these instructions to install and run Docker: `https://www.docker.com/` then rerun the Starlane installation process", FoundationKind::DockerDesktop ))
+                Err(FoundationErr::user_action_required("Dependency", self.kind().to_string(), "make sure Docker is installed and running on this machine", format!("Starlane foundation '{}' needs Docker to facilitate the underlying infrastructure.  Please follow these instructions to install and run Docker: `https://www.docker.com/` then rerun the Starlane installation process", FoundationKind::DockerDesktop )))
             }
         }
     }
 
-    async fn provision(&self, kind: &ProviderKind, _config: Value ) -> Result<impl Provider,FoundationErr> {
-        if ProviderKind::DockerDaemon == *kind  {
-            Ok()
+    async fn provision(&self, config: ProtoProviderConfig) -> Result<impl Provider,FoundationErr> {
+        if ProviderKind::DockerDaemon == config.kind  {
+            todo!()
         } else {
-            Err(FoundationErr::provider_not_available( kind.clone() ))
+            Err(FoundationErr::provider_not_available( config.kind.clone() ))
         }
     }
 
@@ -230,6 +228,8 @@ pub struct DockerPostgresDependency {
 
 impl DockerPostgresDependency {
     pub fn new(config: PostgresClusterConfig) -> Result<Self, FoundationErr> {
+        todo!();
+        /*
         let mut settings = Settings::default();
         settings.data_dir = format!("{}", config.database_dir.display())
             .to_string()
@@ -238,12 +238,14 @@ impl DockerPostgresDependency {
             .to_string()
             .into();
         settings.port = config.port.clone();
-        settings.temporary = !config.persistent;
+        settings.temporary = false;
         settings.username = config.username.clone();
         settings.password = config.password.clone();
 
         let postgres = PostgreSQL::new(settings);
         Ok(Self { postgres, config })
+
+         */
     }
 
     pub fn url(&self) -> String {
@@ -281,6 +283,8 @@ impl DockerPostgresDependency {
 
     /// as long as the Sender is alive
     pub async fn start(mut self) -> Result<LiveDatabase, FoundationErr> {
+        todo!();
+        /*
         if !is_local_ipv4_port_free(self.postgres.settings().port) {
             panic_shutdown(format!(
                 "embedded postgres registry port '{}' is already in use",
@@ -300,6 +304,8 @@ impl DockerPostgresDependency {
         let live = LiveDatabase::new();
 
         Ok(tx)
+
+         */
     }
 }
 

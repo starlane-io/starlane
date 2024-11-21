@@ -589,7 +589,6 @@ mod tests {
     use std::sync::Arc;
     use crate::space::err::SpaceErr;
     use crate::space::loc::ToSurface;
-    use crate::space::log::{LogAppender, StdOutAppender};
 
     /*
     #[no_mangle]
