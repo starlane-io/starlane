@@ -3,7 +3,7 @@ use core::str::FromStr;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-
+use crate::hyperspace::foundation::Foundation;
 use crate::space::parse::util::new_span;
 
 use crate::space::err::{ParseErrs, PrintErr, SpaceErr};
@@ -140,6 +140,9 @@ pub enum BaseKind {
     Guest,
     Registry,
     WebServer,
+    Foundation,
+    Dependency,
+    Provider
 }
 
 impl BaseKind {
@@ -313,6 +316,9 @@ pub enum Kind {
     Guest,
     Registry,
     WebServer,
+    Foundation,
+    Dependency,
+    Provider
 }
 
 impl ToBaseKind for Kind {
@@ -341,6 +347,9 @@ impl ToBaseKind for Kind {
             Kind::Guest => BaseKind::Guest,
             Kind::Registry => BaseKind::Registry,
             Kind::WebServer => BaseKind::WebServer,
+            Kind::Foundation => BaseKind::Foundation,
+            Kind::Dependency => BaseKind::Dependency,
+            Kind::Provider => BaseKind::Provider,
         }
     }
 }
@@ -498,6 +507,9 @@ impl TryFrom<KindParts> for Kind {
             BaseKind::Guest => Kind::Guest,
             BaseKind::Registry => Kind::Registry,
             BaseKind::WebServer => Kind::WebServer,
+            BaseKind::Foundation => Kind::Foundation,
+            BaseKind::Dependency => Kind::Dependency,
+            BaseKind::Provider => Kind::Provider
         })
     }
 }

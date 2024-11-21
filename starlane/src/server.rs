@@ -36,6 +36,7 @@ use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
 use crate::hyperspace::driver::space::SpaceDriverFactory;
+use crate::hyperspace::foundation::config::ProtoFoundationConfig;
 use crate::hyperspace::foundation::Foundation;
 use crate::hyperspace::foundation::docker::DockerDesktopFoundation;
 use crate::hyperspace::machine::MachineTemplate;
@@ -47,6 +48,7 @@ pub struct StarlaneConfig {
     pub can_nuke: bool,
     pub can_scorch: bool,
     pub control_port: u16,
+    pub foundation: ProtoFoundationConfig,
     pub registry: PgRegistryConfig,
 }
 

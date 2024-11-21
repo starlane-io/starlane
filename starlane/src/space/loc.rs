@@ -26,6 +26,10 @@ pub static GLOBAL_LOGGER: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::lo
 pub static GLOBAL_REGISTRY: Lazy<Point> =
     Lazy::new(|| Point::from_str("GLOBAL::registry").unwrap());
 pub static GLOBAL_EXEC: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::executor").unwrap());
+
+pub static GLOBAL_FOUNDATION: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::foundation").unwrap());
+pub static GLOBAL_DEPENDENCIES: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::foundation:deps").unwrap());
+
 pub static LOCAL_STAR: Lazy<Point> = Lazy::new(|| Point::from_str("LOCAL::star").unwrap());
 pub static LOCAL_PORTAL: Lazy<Point> = Lazy::new(|| Point::from_str("LOCAL::portal").unwrap());
 pub static LOCAL_HYPERGATE: Lazy<Point> =
@@ -33,6 +37,9 @@ pub static LOCAL_HYPERGATE: Lazy<Point> =
 pub static LOCAL_ENDPOINT: Lazy<Point> = Lazy::new(|| Point::from_str("LOCAL::endpoint").unwrap());
 pub static REMOTE_ENDPOINT: Lazy<Point> =
     Lazy::new(|| Point::from_str("REMOTE::endpoint").unwrap());
+
+
+
 pub static STD_WAVE_TRAVERSAL_PLAN: Lazy<TraversalPlan> =
     Lazy::new(|| TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]));
 pub static MECHTRON_WAVE_TRAVERSAL_PLAN: Lazy<TraversalPlan> = Lazy::new(|| {

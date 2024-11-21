@@ -1,28 +1,19 @@
-use std::collections::{HashMap, HashSet};
-use std::future::Future;
-use std::path::PathBuf;
-use std::pin::Pin;
-use std::time::Duration;
+use crate::hyperspace::database::{Database, LiveDatabase};
+use crate::hyperspace::foundation::{Dependency, DependencyKind, Foundation, FoundationErr, FoundationKind, RegistryProvider};
+use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
+use crate::hyperspace::registry::postgres::PostgresConnectInfo;
+use crate::hyperspace::shutdown::{add_shutdown_hook, panic_shutdown};
+use crate::space::parse::VarCase;
 use bollard::Docker;
 use derive_builder::Builder;
-use once_cell::sync::Lazy;
-use tokio::fs;
 use port_check::is_local_ipv4_port_free;
 use postgresql_embedded::{PostgreSQL, Settings};
 use serde::{Deserialize, Serialize};
-use serde::de::DeserializeOwned;
 use serde_yaml::Value;
-use crate::env::StarlaneWriteLogs;
-use crate::hyperspace::database::{Database, LiveDatabase};
-use crate::hyperspace::foundation::{Dependency, DependencyKind, Foundation, FoundationErr, FoundationKind, CreateDep, RegistryProvider, DependencyConfig};
-use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
-use crate::hyperspace::registry::postgres::{PostgresConnectInfo, PostgresRegistry};
-use crate::hyperspace::shutdown::{add_shutdown_hook, panic_shutdown};
-use crate::space::parse::VarCase;
+use std::collections::HashMap;
+use crate::hyperspace::foundation::config::ProtoDependencyConfig;
 
-
-
-#[derive(Builder, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Builder, Clone, Serialize, Deserialize)]
 pub struct DockerDesktopFoundationConfig{
     pub postgres: PostgresClusterConfig,
     pub dependencies: HashMap<DependencyKind, Value>
@@ -55,27 +46,19 @@ impl DockerDesktopFoundation {
 
 #[async_trait]
 impl Foundation for DockerDesktopFoundation {
-
-    fn kind() -> FoundationKind {
+    fn kind(&self) -> FoundationKind {
         FoundationKind::DockerDesktop
     }
-    fn create(config: Value) -> Result<impl Foundation,FoundationErr> {
-        let config = serde_yaml::from_value(config.clone()).map_err(|err| FoundationErr::foundation_conf_err(Self::kind(),err,config))?;
-        let docker = Docker::connect_with_local_defaults().map_err(|err| FoundationErr::panic("DockerDesktop", Self::kind().to_string(), format!("Could not access local DockerDesktop caused by: '{}'", err.to_string() ) ))?;
-
-        Ok(DockerDesktopFoundation::new(docker,config))
-    }
-
 
     fn dependency(&self, kind: &DependencyKind) -> Result<impl Dependency, FoundationErr> {
-        DOCKER_DEPS.get(kind).ok_or(FoundationErr::dep_not_available(kind.clone()))()
-    }
-
-    async fn install_foundation_required_dependencies(&self) -> Result<(), FoundationErr> {
         todo!()
     }
 
-    async fn install_dependency(&mut self, key: &DependencyKind, args: Vec<String>) -> Result<impl Dependency, FoundationErr> {
+    async fn install_foundation_required_dependencies(&mut self) -> Result<(), FoundationErr> {
+        todo!()
+    }
+
+    async fn add_dependency(&mut self, config: ProtoDependencyConfig) -> Result<impl Dependency, FoundationErr> {
         todo!()
     }
 
@@ -217,7 +200,7 @@ impl DockerPostgresDependency {
 }
 
 impl Dependency for DockerPostgresDependency {
-    fn key() -> DependencyKind {
+    fn kind() -> DependencyKind {
        DependencyKind::Postgres
     }
 
@@ -227,7 +210,7 @@ impl Dependency for DockerPostgresDependency {
     }
 
     async fn install(&mut self) -> Result<(), FoundationErr> {
-        self.postgres.setup().await.map_err(|err| FoundationErr::dep_err(Self::key(), err.to_string()))
+        self.postgres.setup().await.map_err(|err| FoundationErr::dep_err(Self::kind(), err.to_string()))
     }
 
     async fn provision(&mut self, kind: &ProviderKind, args: &HashMap<VarCase,String> ) -> Result<impl Provider,FoundationErr> {
@@ -235,7 +218,7 @@ impl Dependency for DockerPostgresDependency {
            ProviderKind::Any => {},
            ProviderKind::Database => {},
            ProviderKind::Ext(ext) if ext.as_str() != "Database" => {
-               let key = ProviderKey::new(Self::key(),kind.clone());
+               let key = ProviderKey::new(Self::kind(), kind.clone());
                Err(FoundationErr::prov_err(key,format!("ProviderKind '{}' not available",ext).to_string()))?
            }
            _ => {}

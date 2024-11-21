@@ -1,8 +1,8 @@
 use crate::space::err::ParseErrs;
 use crate::space::loc::{
     Layer, PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Topic, VarVal,
-    Variable, Version, CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT,
-    LOCAL_HYPERGATE, LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT,
+    Variable, Version, CENTRAL, GLOBAL_DEPENDENCIES, GLOBAL_EXEC, GLOBAL_FOUNDATION, GLOBAL_LOGGER,
+    GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT,
 };
 use crate::space::parse::util::result;
 use crate::space::parse::util::{new_span, Trace};
@@ -10,7 +10,9 @@ use crate::space::parse::{
     consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, Env,
     ResolverErr,
 };
-use crate::space::selector::{PointHierarchy, PointHierarchyOpt, PointKindSeg, PointKindSegOpt, Selector};
+use crate::space::selector::{
+    PointHierarchy, PointHierarchyOpt, PointKindSeg, PointKindSegOpt, Selector,
+};
 use crate::space::util::ToResolved;
 use crate::space::wave::{Agent, Recipients, ToRecipients};
 use crate::space::{ANONYMOUS, HYPERUSER};
@@ -1091,6 +1093,14 @@ impl Point {
 
     pub fn global_logger() -> Self {
         GLOBAL_LOGGER.clone()
+    }
+
+    pub fn global_foundation() -> Self {
+        GLOBAL_FOUNDATION.clone()
+    }
+
+    pub fn global_depedencies() -> Self {
+        GLOBAL_DEPENDENCIES.clone()
     }
 
     pub fn global_registry() -> Self {
