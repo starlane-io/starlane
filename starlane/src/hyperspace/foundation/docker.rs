@@ -1,46 +1,61 @@
 use crate::hyperspace::database::{Database, LiveDatabase};
-use crate::hyperspace::foundation::{Dependency, DependencyKind, Foundation, FoundationErr, FoundationKind, RegistryProvider};
+use crate::hyperspace::foundation::config::{Config, FoundationSubConfig, ProtoConfig, ProtoDependencyConfig};
+use crate::hyperspace::foundation::{CreateDep, CreateFoundation, Dependency, DependencyKind, Foundation, FoundationErr, FoundationKind, Provider, ProviderKind, RegistryProvider};
 use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
 use crate::hyperspace::registry::postgres::PostgresConnectInfo;
 use crate::hyperspace::shutdown::{add_shutdown_hook, panic_shutdown};
-use crate::space::parse::VarCase;
 use bollard::Docker;
 use derive_builder::Builder;
 use port_check::is_local_ipv4_port_free;
 use postgresql_embedded::{PostgreSQL, Settings};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
-use std::collections::HashMap;
-use crate::hyperspace::foundation::config::ProtoDependencyConfig;
+use std::collections::{HashMap, HashSet};
+use once_cell::sync::Lazy;
+
+static DEPENDENCIES: Lazy<HashMap<DependencyKind, CreateDep>> =
+    Lazy::new(|| {
+        let mut dependencies = HashMap::new();
+        dependencies.insert(DependencyKind::Docker, DockerDependency::create );
+        dependencies
+    });
+
+
+pub type ProtoDockerDesktopFoundationConfig = Config<FoundationKind,Value>;
+
+pub type DockerDependencyConfig = Config<FoundationKind,DockerDependencySubConfig>;
+pub type ProtoDockerDependencyConfig = Config<DependencyKind,Value>;
+
+
+
 
 #[derive(Builder, Clone, Serialize, Deserialize)]
-pub struct DockerDesktopFoundationConfig{
-    pub postgres: PostgresClusterConfig,
-    pub dependencies: HashMap<DependencyKind, Value>
+pub struct DockerConfig<C>
+where
+    C: Clone + Serialize + Deserialize,
+{
+    image: String,
+    config: C,
 }
 
-
-#[derive(Clone)]
+#[derive(Builder,Clone, Serialize, Deserialize)]
+pub struct DockerDesktopFoundationSubConfig {
+    pub registry: Database<PostgresClusterConfig>,
+    pub dependencies: HashMap<DependencyKind, Value>,
+}
 pub struct DockerDesktopFoundation {
-    config: DockerDesktopFoundationConfig,
-    docker: Docker,
-    dependencies: HashMap<DependencyKind, dyn Dependency>
-}
-
-
-#[derive(Builder, Clone, Serialize, Deserialize)]
-pub struct DockerConfig<C> where C: Clone+Serialize+Deserialize{
-  image: String,
-  config: C
+    config: Config<FoundationKind,DockerDesktopFoundationSubConfig>,
+    dependencies: HashMap<DependencyKind, dyn Dependency>,
 }
 
 
 impl DockerDesktopFoundation {
-    pub fn new(docker: Docker, config: DockerDesktopFoundationConfig) -> Self {
-        Self {
-            docker,
-            config
-        }
+    pub(super) fn create(config: impl ProtoConfig) -> Result<impl Foundation, FoundationErr> {
+        let config = config.parse(FoundationKind::DockerDesktop)?;
+        Ok(Self {
+            config,
+            ..Default::default()
+        })
     }
 }
 
@@ -50,16 +65,20 @@ impl Foundation for DockerDesktopFoundation {
         FoundationKind::DockerDesktop
     }
 
-    fn dependency(&self, kind: &DependencyKind) -> Result<impl Dependency, FoundationErr> {
-        todo!()
+    fn dependency(&self, kind: &DependencyKind) -> Result<&impl Dependency, FoundationErr> {
+       self.dependencies.get(kind).ok_or_else(|| FoundationErr::dep_not_available(kind.clone()))
     }
 
     async fn install_foundation_required_dependencies(&mut self) -> Result<(), FoundationErr> {
-        todo!()
+        ///...
+        Ok(())
     }
 
-    async fn add_dependency(&mut self, config: ProtoDependencyConfig) -> Result<impl Dependency, FoundationErr> {
-        todo!()
+    async fn add_dependency(
+        &mut self,
+        config: ProtoDependencyConfig,
+    ) -> Result<impl Dependency, FoundationErr> {
+        self.dependencies.insert( config.kind )
     }
 
     fn registry(&self) -> &mut impl RegistryProvider {
@@ -115,6 +134,92 @@ impl DependencyFoundation for DockerPostgresDependency {
 }
 
  */
+
+
+#[derive(Builder,Clone, Serialize, Deserialize)]
+pub struct DockerDependencySubConfig {
+}
+
+struct DockerDependency {
+  config: Config<DependencyKind,DockerDependencySubConfig>
+}
+
+impl DockerDependency {
+    pub(super) fn create(config: impl ProtoConfig) -> Result<impl Dependency, FoundationErr> {
+            let config = config.parse(DependencyKind::Docker)?;
+            Ok(Self {
+                config,
+                ..Default::default()
+            })
+
+    }
+}
+
+
+impl Dependency for DockerDependency {
+
+
+    fn kind(&self) -> &DependencyKind {
+        & DependencyKind::Docker
+    }
+
+
+
+    async fn install(&self) -> Result<(), FoundationErr> {
+        match Docker::connect_with_defaults() {
+            Ok(_) => {
+                // Docker was accessed normally and is therefor both installed and service is running...
+                Ok(())
+            }
+            Err(err) => {
+                Err(FoundationErr::user_action_required("Dependency", self.kind().to_string(), "make sure Docker is installed and running on this machine", format!("Starlane foundation '{}' needs Docker to facilitate the underlying infrastructure.  Please follow these instructions to install and run Docker: `https://www.docker.com/` then rerun the Starlane installation process", FoundationKind::DockerDesktop ))
+            }
+        }
+    }
+
+    async fn provision(&self, kind: &ProviderKind, _config: Value ) -> Result<impl Provider,FoundationErr> {
+        if ProviderKind::DockerDaemon == *kind  {
+            Ok()
+        } else {
+            Err(FoundationErr::provider_not_available( kind.clone() ))
+        }
+    }
+
+
+    /// implementers of this Trait should provide a vec of valid provider kinds
+    fn provider_kinds(&self) -> HashSet<&'static str> {
+        HashSet::new()
+    }
+
+}
+
+#[derive(Builder,Clone, Serialize, Deserialize)]
+pub struct DockerProviderSubConfig {
+}
+
+struct DockerProvider {
+    config: Config<ProviderKind,DockerProviderSubConfig>
+}
+
+impl DockerProvider {
+
+    pub(super) fn create(config: impl ProtoConfig) -> Result<impl Provider, FoundationErr> {
+        let config = config.parse(ProviderKind::DockerDaemon)?;
+        Ok(Self {
+            config,
+            ..Default::default()
+        })
+
+    }
+}
+
+impl Provider for DockerProvider {
+    async fn initialize(&mut self) -> Result<(), FoundationErr> {
+        todo!()
+    }
+}
+
+
 
 
 
@@ -176,7 +281,6 @@ impl DockerPostgresDependency {
 
     /// as long as the Sender is alive
     pub async fn start(mut self) -> Result<LiveDatabase, FoundationErr> {
-
         if !is_local_ipv4_port_free(self.postgres.settings().port) {
             panic_shutdown(format!(
                 "embedded postgres registry port '{}' is already in use",
@@ -193,54 +297,20 @@ impl DockerPostgresDependency {
 
         self.postgres.start().await?;
 
-        let live = LiveDatabase::new( );
+        let live = LiveDatabase::new();
 
         Ok(tx)
     }
 }
 
-impl Dependency for DockerPostgresDependency {
-    fn kind() -> DependencyKind {
-       DependencyKind::Postgres
-    }
-
-    fn create(args: HashMap<VarCase, String>) -> Result<impl Dependency,FoundationErr> {
-        let config = Self::into_config(args)?;
-        Self::new(config)
-    }
-
-    async fn install(&mut self) -> Result<(), FoundationErr> {
-        self.postgres.setup().await.map_err(|err| FoundationErr::dep_err(Self::kind(), err.to_string()))
-    }
-
-    async fn provision(&mut self, kind: &ProviderKind, args: &HashMap<VarCase,String> ) -> Result<impl Provider,FoundationErr> {
-       match kind {
-           ProviderKind::Any => {},
-           ProviderKind::Database => {},
-           ProviderKind::Ext(ext) if ext.as_str() != "Database" => {
-               let key = ProviderKey::new(Self::kind(), kind.clone());
-               Err(FoundationErr::prov_err(key,format!("ProviderKind '{}' not available",ext).to_string()))?
-           }
-           _ => {}
-       };
-
-        let config = Self::into_config(args)?;
-
-        Ok(PostgresDatabaseProvider::new(config))
-    }
-}
 
 
 struct PostgresDatabaseProvider {
-    config: Database<PostgresConnectInfo>
+    config: Database<PostgresConnectInfo>,
 }
 
 impl PostgresDatabaseProvider {
-
-    pub fn new( config: Database<PostgresConnectInfo> ) -> PostgresDatabaseProvider  {
-        Self {
-            config
-        }
+    pub fn new(config: Database<PostgresConnectInfo>) -> PostgresDatabaseProvider {
+        Self { config }
     }
 }
-

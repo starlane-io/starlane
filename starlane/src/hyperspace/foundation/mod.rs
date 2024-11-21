@@ -117,9 +117,7 @@ pub trait Foundation: Send + Sync + Sized
 where
     Self: Sized {
 
-
     fn kind(&self) -> FoundationKind;
-
 
     fn dependency(&self, kind: &DependencyKind ) -> Result<impl Dependency,FoundationErr>;
 
@@ -166,10 +164,11 @@ pub struct ProviderConfig<C> where C: Deserialize+Serialize{
 
 
 use serde::de::{MapAccess, Visitor};
+use docker::DependencyRunner;
 use starlane_primitive_macros::logger;
 use crate::env::STARLANE_CONFIG;
-use crate::hyperspace::foundation::config::{ProtoDependencyConfig, ProtoFoundationConfig};
-use crate::hyperspace::foundation::runner::{Call, DepCallWrapper, Runner};
+use crate::hyperspace::foundation::config::{ProtoDependencyConfig, ProtoFoundationConfig, ProtoProviderConfig};
+use crate::hyperspace::foundation::runner::{Call, DepCall, DepCallWrapper, Runner};
 use crate::space::point::Point;
 
 #[derive(Builder, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -230,29 +229,32 @@ pub trait Dependency {
         Ok(())
     }
 
-    async fn provision(&self, kind: &ProviderKind, _config: Value ) -> Result<impl Provider,FoundationErr> {
-        Err(FoundationErr::provider_not_available( kind.clone() ))
+    async fn provision(&self, config: ProtoProviderConfig ) -> Result<impl Provider,FoundationErr> {
+        Err(FoundationErr::provider_not_available( config.kind.clone() ))
     }
 
-    fn has_provisioner(kind: &ProviderKind) -> Result<(),FoundationErr> {
-        let providers = Self::provider_kinds();
+
+    /// implementers of this Trait should provide a vec of valid provider kinds
+    fn provider_kinds(&self) -> HashSet<&'static str> {
+        HashSet::new()
+    }
+
+
+    fn has_provisioner(&self, kind: &ProviderKind) -> Result<(),FoundationErr> {
+        let providers = self.provider_kinds();
         match kind {
             kind => {
                 let ext = kind.to_string();
                 if providers.contains(ext.as_str()) {
                     Ok(())
                 } else {
-                    let key = ProviderKey::new(Self::kind(), kind.clone());
+                    let key = ProviderKey::new(self.kind().clone(), kind.clone());
                     Err(FoundationErr::prov_err(key, format!("provider kind '{}' is not available for dependency: '{}'", ext.to_string(), Self::kind().to_string()).to_string()))
                 }
             }
         }
     }
 
-    /// implementers of this Trait should provide a vec of valid provider kinds
-    fn provider_kinds(&self) -> HashSet<&'static str> {
-        HashSet::new()
-    }
 
 
 }
@@ -272,6 +274,7 @@ pub type RawConfig = Value;
 #[derive(Clone,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString, Serialize, Deserialize)]
 pub enum DependencyKind {
     Postgres,
+    Docker
 }
 
 
@@ -313,6 +316,7 @@ impl ToString for ProviderKey {
 pub enum ProviderKind {
     /// this means that the Dependency has one and only one Provider
     Database,
+    DockerDaemon
 }
 
 impl Kind for ProviderKind{
@@ -372,6 +376,8 @@ pub enum FoundationErr {
     FoundationErr{ kind: FoundationKind, msg: String },
     #[error("[{kind}] Error: '{msg}'")]
     DepErr{ kind: DependencyKind, msg: String},
+    #[error("Action Required: {cat}: {kind} cannot {action} without user help.  Additional Info: '{summary}'")]
+    UserActionRequired{ cat: String, kind: String, action: String, summary: String, },
     #[error("[{key}] Error: '{msg}'")]
     ProviderErr{ key: ProviderKey, msg: String},
     #[error("error converting foundation args for dependency: '{kind}' serialization err: '{err}' from config: '{config}'")]
@@ -433,6 +439,15 @@ impl FoundationErr {
 }
 
 impl FoundationErr {
+
+    pub fn user_action_required<CAT,KIND,ACTION,SUMMARY>(cat: CAT, kind: KIND, action: ACTION, summary: SUMMARY ) -> Self where CAT: AsRef<str>, KIND: AsRef<str> , ACTION: AsRef<str>, SUMMARY: AsRef<str> {
+        let cat = cat.as_ref().to_string();
+        let kind = kind.as_ref().to_string();
+        let action = action.as_ref().to_string();
+        let summary= summary.as_ref().to_string();
+        FoundationErr::UserActionRequired {cat, kind, action, summary}
+    }
+
 
     pub fn panic<ID,KIND,MSG>(id: ID, kind: KIND, msg: MSG) -> Self where ID: AsRef<str>, KIND: AsRef<str> , MSG: AsRef<str> {
         let id = id.as_ref().to_string();
@@ -511,13 +526,16 @@ pub trait RegistryProvider: Provider{
 
 
 mod runner {
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
+    use nom_supreme::final_parser::ExtractContext;
     use once_cell::sync::Lazy;
     use serde_yaml::Value;
     use starlane_primitive_macros::logger;
     use crate::hyperspace::foundation::{Dependency, DependencyKind, Foundation, FoundationErr, FoundationKind, Kind, Provider, ProviderKey, ProviderKind, RegistryProvider, FOUNDATIONS};
-    use crate::hyperspace::foundation::config::{ProtoDependencyConfig, ProtoFoundationConfig};
+    use crate::hyperspace::foundation::config::{ProtoDependencyConfig, ProtoFoundationConfig, ProtoProviderConfig};
+    use crate::hyperspace::foundation::runner::DepCall::Provision;
     use crate::hyperspace::shutdown::add_shutdown_hook;
+    use crate::space::kind::Kind::Dependency;
     use crate::space::point::Point;
 
 
@@ -526,7 +544,7 @@ mod runner {
         Dependency{ kind: DependencyKind, rtn: tokio::sync::oneshot::Sender<Result<dyn Dependency,FoundationErr>>},
         InstallFoundationRequiredDependencies(tokio::sync::oneshot::Sender<Result<(),FoundationErr>>),
         AddDependency{ config: ProtoDependencyConfig, rtn: tokio::sync::oneshot::Sender<Result<dyn Dependency,FoundationErr>>},
-        DepCall(DepCallWrapper)
+        DepCall(DepCallWrapper),
     }
 
     struct FoundationProxy {
@@ -597,8 +615,9 @@ mod runner {
     pub(super) enum DepCall {
         Kind(tokio::sync::oneshot::Sender<DependencyKind>),
         Install(tokio::sync::oneshot::Sender<Result<(),FoundationErr>>),
-        Provision{ kind: ProviderKind, rtn: tokio::sync::oneshot::Sender<Result<dyn Provider,FoundationErr>>},
-        ProviderKinds(tokio::sync::oneshot::Sender<HashSet<&'static str>>)
+        Provision{ config: ProtoProviderConfig, rtn: tokio::sync::oneshot::Sender<Result<dyn Provider,FoundationErr>>},
+        ProviderKinds(tokio::sync::oneshot::Sender<HashSet<&'static str>>),
+        ProviderCall(ProviderCallWrapper)
     }
 
     struct DependencyProxy {
@@ -657,6 +676,67 @@ mod runner {
         }
     }
 
+    struct ProviderCallWrapper {
+        kind: ProviderKind,
+        call: ProviderCall
+    }
+
+    impl ProviderCallWrapper {
+        fn new(kind: ProviderKind, command: ProviderCall) -> Self {
+            Self {
+                kind,
+                call: command,
+            }
+        }
+    }
+
+    pub(super) enum ProviderCall {
+        Initialize(tokio::sync::oneshot::Sender<Result<(),FoundationErr>>),
+    }
+
+
+
+    struct ProviderProxy {
+        dependency: DependencyKind,
+        kind: ProviderKind,
+        call_tx: tokio::sync::mpsc::Sender<ProviderCall>,
+    }
+
+    impl ProviderProxy {
+        fn new(kind: &ProviderKind, dependency: &DependencyKind, foundation_call_tx: tokio::sync::mpsc::Sender<Call>) -> impl Provider{
+            let (call_tx,mut call_rx) = tokio::sync::mpsc::channel(16);
+
+            let dep_kind = dependency.clone();
+            tokio::spawn( async move {
+                while let Some(call) = call_rx.recv().await {
+                    let call = ProviderCallWrapper::new(kind.clone(), call);
+                    let call = DepCall::ProviderCall(call);
+                    let call = DepCallWrapper::new(dep_kind.clone(), call);
+                    let call = Call::DepCall(call);
+                    foundation_call_tx.send(call).await.unwrap_or_default();
+                }
+            });
+
+            let kind = kind.clone();
+            let dependency = dependency.clone();
+
+            Self {
+                kind,
+                dependency,
+                call_tx
+            }
+        }
+    }
+
+
+    impl Provider for ProviderProxy {
+        async fn initialize(&mut self) -> Result<(), FoundationErr> {
+            let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
+            let call = ProviderCall::Initialize(rtn);
+            self.call_tx.send(call).await.unwrap();
+            rtn_rx.await?
+        }
+    }
 
 
 
@@ -694,6 +774,7 @@ mod runner {
                     Call::Dependency { kind, rtn } => {}
                     Call::InstallFoundationRequiredDependencies(_) => {}
                     Call::AddDependency { .. } => {}
+                    Call::DepCall(_) => {}
                 }
             }
             Ok(())
@@ -701,4 +782,75 @@ mod runner {
 
     }
 
+
+
+    struct DependencyRunner {
+        dependency: Box<dyn Dependency>,
+    }
+
+    impl DependencyRunner {
+
+        fn new( dependency: impl Dependency ) -> Self {
+            let dependency = Box::new(dependency);
+            Self {
+                dependency
+            }
+        }
+
+        fn kind(&self) -> &DependencyKind {
+            self.dependency.kind()
+        }
+
+        async fn handle(&mut self, call: DepCall) -> anyhow::Result<()> {
+            match call {
+                DepCall::Kind(rtn) => rtn.send(self.dependency.kind().clone()).unwrap_or_default(),
+                DepCall::Install(rtn) => {
+                    rtn.send(self.dependency.install().await).unwrap_or_default();
+                },
+                DepCall::Provision { config, rtn } => {
+                    match self.dependency.provision(config).await {
+                        Ok(provider) => {
+                        }
+                        Err(err) => rtn.send(Err(err)).unwrap_or_default()
+                    }
+                }
+                DepCall::ProviderKinds(rtn) => {
+                    let mut set = HashSet::new();
+                    set.insert(ProviderKind::DockerDaemon.to_string().as_str());
+                    rtn.send(set).unwrap_or_default();
+                }
+                DepCall::ProviderCall(call) => {
+
+                }
+            }
+            Ok(())
+        }
+    }
+
+
+    struct ProviderRunner {
+        provider: dyn Provider,
+    }
+
+    impl ProviderRunner {
+        fn kind(&self) -> &ProviderKind {
+            self.provider.kind()
+        }
+
+        async fn handle(&mut self, call: ProviderCall) -> anyhow::Result<()> {
+            match call {
+                ProviderCall::Initialize(rtn) => {
+                    rtn.send(self.provider.initialize()).unwrap_or_default();
+                }
+            }
+            Ok(())
+        }
+    }
+
+
+
+
+
+
 }
+
