@@ -28,11 +28,15 @@ settings:
       password: postgres
       providers:
       - kind: Registry
-        name: registry
-        schema: public
-        scorch: false
-        name: database
-        scorch: false
-        seed: https://starlane.io
-
+        dbname: registry
       - kind: Database
+        dbname: my_database
+
+
+
+
+      providers:
+        - kind: Registry
+          dbname: registry
+        - kind: Database
+          dbname: my_database
