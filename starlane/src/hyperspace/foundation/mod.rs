@@ -110,7 +110,7 @@ impl <S> DerefMut for LiveService<S> where S: Clone{
 
 
 
-#[derive(Debug, Clone,Serialize,Deserialize,Eq,PartialEq)]
+#[derive(Debug, Clone,Eq,PartialEq,Serialize,Deserialize)]
 pub struct DockerDesktopFoundationSettings {
     name: String,
 }
@@ -123,18 +123,15 @@ impl DockerDesktopFoundationSettings {
    }
 }
 
-pub struct DockerDesktopFoundation {
+pub struct DockerDesktopFoundation  {
     config: FoundationConfig<DockerDesktopFoundationConfig>,
     settings: FoundationSettings<DockerDesktopFoundationSettings>
 }
 
-impl DockerDesktopFoundation {
 
-
-}
 
 impl Foundation for DockerDesktopFoundation {
-    fn create(builder : FoundationBuilder) -> Result<impl Foundation+Sized,FoundationErr>{
+    fn create(builder : ProtoFoundationBuilder) -> Result<impl Foundation+Sized,FoundationErr>{
         let settings = ProtoFoundationSettings::new(FoundationKind::DockerDesktop, builder.settings);
         let config = ProtoFoundationConfig::new(FoundationKind::DockerDesktop, builder.config);
 
@@ -167,13 +164,15 @@ impl Foundation for DockerDesktopFoundation {
 }
 
 
-pub struct FoundationBuilder {
+#[derive(Clone,Debug,Eq,PartialEq,Hash, Serialize, Deserialize)]
+pub struct ProtoFoundationBuilder {
     kind: FoundationKind,
     config: RawConfig,
     settings: RawSettings
 }
 
-impl FoundationBuilder {
+
+impl ProtoFoundationBuilder {
     pub fn create(self) -> Result<impl Foundation+Sized,FoundationErr> {
 
         match self.kind {
@@ -182,8 +181,6 @@ impl FoundationBuilder {
             }
         }
     }
-
-
 
 }
 
@@ -194,36 +191,25 @@ impl FoundationBuilder {
 #[cfg(test)]
 pub mod test {
     use derive_name::Named;
+    use crate::hyperspace::foundation::{DockerDesktopFoundationSettings, ProtoFoundationBuilder};
     use crate::hyperspace::foundation::settings::ProtoFoundationSettings;
     use crate::hyperspace::foundation::err::FoundationErr;
 
+
+
+
     #[test]
-    pub fn test() -> Result<(),FoundationErr>{
-       let settings = r#"
-foundation: DockerDesktop
-name: Hello
-settings:
-  name: "Filo Farnsworth"
+    pub fn test_builder() -> Result<(),FoundationErr>{
+        let builder = include_str!("../../../../foundation/docker-desktop.yaml");
 
-       "#;
+        let builder = serde_yaml::from_str::<ProtoFoundationBuilder>(builder).unwrap();
 
-       let settings: ProtoFoundationSettings = serde_yaml::from_str(settings).unwrap();
-        println!("{:?}", settings);
+        let foundation = builder.create()?;
 
-        let ser = serde_yaml::to_string(&settings).unwrap();
-        println!("{}", ser );
-       let foundation = settings.create()?;
+        assert!(true);
 
-
-        /*
-        println!("{} dependencies found in {}", foundation.dependencies().len(), foundation.kind() );
-        for dep in foundation.dependencies() {
-            println!("{}", dep );
-        }
-
-
-         */
         Ok(())
-
     }
+
+
 }

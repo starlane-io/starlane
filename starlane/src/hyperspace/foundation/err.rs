@@ -1,7 +1,10 @@
+use std::fmt::Display;
 use serde_yaml::Value;
 use std::rc::Rc;
+use serde::de;
 use thiserror::Error;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, ProviderKey, ProviderKind};
+use crate::space::err::ToSpaceErr;
 
 pub struct Call;
 
@@ -63,11 +66,21 @@ impl FoundationErr {
         Self::ProviderErr{key,msg}
     }
 
-    pub fn foundation_conf_err(kind: FoundationKind, err: serde_yaml::Error, config: Value) -> Self {
+    pub fn foundation_verbose_error<C>(kind: FoundationKind, err: serde_yaml::Error, config: C ) -> Self where C: ToString {
         let err = err.to_string();
-        let config =config.as_str().unwrap_or("?").to_string();
-        Self::FoundationConfigErr {kind,err,config}
+        let config =config.to_string();
+        Self::FoundationVerboseErr {kind,err,config}
     }
+
+    pub fn settings_err<E>(err: E ) -> Self  where E: ToString {
+        Self::FoundationSettingsErr(format!("{}",err.to_string()).to_string())
+    }
+
+    pub fn config_err<E>(err: E ) -> Self  where E: ToString {
+        Self::FoundationConfErr(format!("{}",err.to_string()).to_string())
+    }
+
+
 
 
     pub fn dep_conf_err(kind: DependencyKind, err: serde_yaml::Error, config: Value) -> Self {
@@ -114,7 +127,11 @@ pub enum FoundationErr {
     #[error("provider: '{0}' is recognized but is not available on this build of Starlane")]
     ProviderNotAvailable(String),
     #[error("error converting foundation config for '{kind}' serialization err: '{err}' config: {config}")]
-    FoundationConfigErr { kind: FoundationKind,err: String, config: String },
+    FoundationVerboseErr { kind: FoundationKind,err: String, config: String },
+    #[error("foundation settings err: {0}")]
+    FoundationSettingsErr(String),
+    #[error("foundation config err: {0}")]
+    FoundationConfErr(String),
     #[error("[{kind}] Foundation Error: '{msg}'")]
     FoundationErr{ kind: FoundationKind, msg: String },
     #[error("[{kind}] Error: '{msg}'")]

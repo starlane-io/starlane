@@ -1,6 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use std::str::FromStr;
 use serde_yaml::Value;
 use thiserror::__private::AsDisplay;
 use crate::hyperspace::foundation::settings::{ProtoFoundationSettings, RawSettings};
@@ -53,29 +54,10 @@ pub enum FoundationKind {
     DockerDesktop
 }
 
-//pub type FoundationConfigParser<'e,C: Deserialize<'e>+'e> = dyn FnMut(Value) -> Result<C,FoundationErr> + Sync + Send+ 'static;
 
-pub type FoundationParser = fn(&Value) -> Result<dyn Foundation, FoundationErr>;
+//pub type FoundationParser = fn(&Value) -> Result<dyn Foundation, FoundationErr>;
 
-/*
-pub fn config_parser(&self) -> fn(&Value) -> Result<Self, FoundationErr> {
-    |value| serde_yaml::from_value( value.clone() ).map_err(|err|FoundationErr::foundation_conf_err(FoundationKind::DockerDesktop,err,value.clone()))
-}
 
- */
-impl FoundationKind {
-   pub fn parse_settings(&self, settings: RawSettings) -> Result<impl Foundation+Sized, FoundationErr> {
-       match self {
-           FoundationKind::DockerDesktop => DockerDesktopFoundation::parse(settings)
-       }
-   }
-
-   pub fn parse_config(&self, config: RawConfig ) -> Result<impl Foundation+Sized, FoundationErr> {
-        match self {
-            FoundationKind::DockerDesktop => DockerDesktopFoundation::parse(config)
-        }
-    }
-}
 
 
 
@@ -218,5 +200,12 @@ impl DockerDesktopSettings {
             name
         }
     }
+}
 
+impl FromStr for DockerDesktopSettings {
+    type Err = FoundationErr;
+
+    fn from_str(settings: &str) -> Result<Self, Self::Err> {
+        serde_yaml::from_str(settings).map_err(|err|FoundationErr::foundation_verbose_error(FoundationKind::DockerDesktop, err, settings))
+    }
 }

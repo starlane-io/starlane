@@ -5,7 +5,12 @@ config:
         image: "postgres:17"
         provider:
         - Registry:
-          database: registry
+          name: registry
+          # if seed is specified in config space it
+          # cannot be overwritten # by Settings
+          seed: "$REPO/seeds/postgres/registry/registry.sql"
+          # just any old database...
+        - Database:
 settings:
   dependencies:
     - Postgres:
@@ -14,9 +19,9 @@ settings:
       password: postgres
       provider:
       - Registry:
-        database: registry
+        name: registry
         schema: public
-      - User:
-        database: user
-        schema: public
-        seed: "$REPO/seeds/postgres/user/user_db.sql"
+        scorch: false
+      - Database:
+        name: database
+        scorch: false

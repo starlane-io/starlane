@@ -24,16 +24,16 @@ impl ProtoFoundationConfig {
             config
         }
     }
-    pub fn create<C>(self) -> Result<FoundationConfig<C>,FoundationErr> {
+    pub fn create<C>(self) -> Result<FoundationConfig<C>,FoundationErr> where for<'z> C: Eq+PartialEq+Deserialize<'z>{
         Ok(FoundationConfig {
+            config: serde_yaml::from_value(self.config).map_err(FoundationErr::config_err)?,
             foundation: self.foundation,
-            config: serde_yaml::to_value(self.config).map_err(|e| e.into())?
         })
     }
 }
 
-#[derive(Debug, Clone, Serialize,Eq,PartialEq)]
-pub struct FoundationConfig<C> where C: Serialize+Eq+PartialEq {
+#[derive(Debug, Clone, Eq,PartialEq)]
+pub struct FoundationConfig<C> where C: Eq+PartialEq {
     foundation: FoundationKind,
     config: C
 }
