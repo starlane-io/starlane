@@ -143,10 +143,21 @@ impl FoundationErr {
         Self::FoundationSettingsErr(format!("{}",err.to_string()).to_string())
     }
 
-    pub fn config_err<E>(err: E ) -> Self  where E: ToString {
-        Self::FoundationConfErr(format!("{}",err.to_string()).to_string())
+    pub fn config_err(err: impl Display ) -> Self {
+        Self::FoundationConfErr(format!("{}",err).to_string())
     }
 
+
+    pub fn kind_not_found(category: impl Display, variant: impl Display) -> Self {
+        let variant = variant.to_string();
+        let category = category.to_string();
+        Self::KindNotFound {category,variant}
+    }
+
+    pub fn missing_kind_declaration(category: impl ToString) -> Self {
+        let category = category.to_string();
+        Self::MissingKind(category)
+    }
 
 
 
@@ -222,7 +233,11 @@ pub enum FoundationErr {
     #[error("Foundation Runner return sender err (this could be fatal) caused by: {0}")]
     FoundationRunnerOneshotTryRecvErr(Rc<tokio::sync::oneshot::error::TryRecvError>),
     #[error("{0}")]
-    Msg(String)
+    Msg(String),
+    #[error("{category} does not have a kind variant `{variant}`")]
+    KindNotFound{category:String,variant:String},
+    #[error("Missing `kind:` mapping for {0}")]
+    MissingKind(String)
 }
 
 impl From<tokio::sync::mpsc::error::SendError<Call>> for FoundationErr {

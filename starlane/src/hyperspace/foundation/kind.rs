@@ -2,8 +2,10 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::str::FromStr;
+use derive_name::Name;
 use thiserror::__private::AsDisplay;
 use crate::hyperspace::foundation::err::FoundationErr;
+use crate::hyperspace::foundation::kind::ProviderKind::DockerDaemon;
 use crate::hyperspace::foundation::traits::{Dependency, Foundation};
 
 pub const FOUNDATION : &'static str = "foundation";
@@ -11,7 +13,7 @@ pub const DEPENDENCY: &'static str = "implementation";
 pub const PROVIDER: &'static str = "provider";
 
 
-#[derive(Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display, Serialize, Deserialize)]
+#[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Kind {
    #[serde(alias="{0}")]
@@ -44,12 +46,16 @@ impl IKind for Kind {
 }
 
 
-#[derive(Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString,strum_macros::EnumIter, strum_macros::IntoStaticStr, Serialize, Deserialize)]
+#[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString,strum_macros::EnumIter, strum_macros::IntoStaticStr, Serialize, Deserialize)]
 pub enum FoundationKind {
-    #[serde(alias="DockerDesktop")]
     DockerDesktop
 }
 
+impl Default for FoundationKind {
+    fn default() -> Self {
+      Self::DockerDesktop
+    }
+}
 
 //pub type FoundationParser = fn(&Value) -> Result<dyn Foundation, FoundationErr>;
 
@@ -69,11 +75,17 @@ impl IKind for FoundationKind {
 
 }
 
-#[derive(Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString,strum_macros::IntoStaticStr,strum_macros::EnumIter, Serialize, Deserialize)]
+#[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString,strum_macros::IntoStaticStr,strum_macros::EnumIter, Serialize, Deserialize)]
 #[serde(tag="implementation")]
 pub enum DependencyKind {
     Postgres,
     Docker
+}
+
+impl Default for DependencyKind {
+    fn default() -> Self {
+        todo!()
+    }
 }
 
 impl IKind for DependencyKind{
@@ -108,7 +120,7 @@ impl ProviderKey {
     }
 }
 
-#[derive(Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display, strum_macros::IntoStaticStr, Serialize, Deserialize)]
+#[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display, strum_macros::IntoStaticStr, strum_macros::EnumString, Serialize, Deserialize)]
 #[serde(tag="provider")]
 pub enum ProviderKind {
     #[serde(alias="Postgres::{0}")]
@@ -117,11 +129,23 @@ pub enum ProviderKind {
     DockerDaemon
 }
 
-#[derive(Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString, strum_macros::IntoStaticStr,Serialize, Deserialize)]
+impl Default for ProviderKind {
+    fn default() -> Self {
+        Self::Postgres(Default::default())
+    }
+}
+
+#[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString, strum_macros::IntoStaticStr,Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PostgresKind{
     Registry,
     Database
+}
+
+impl Default for PostgresKind  {
+    fn default() -> Self {
+        Self::Registry
+    }
 }
 
 impl IKind for ProviderKind{
@@ -135,7 +159,7 @@ impl IKind for ProviderKind{
     }
 }
 
-pub trait IKind where for<'a> Self: Debug+Clone+Eq+PartialEq+Display+Hash+Serialize+Deserialize<'a> {
+pub trait IKind where for<'a> Self: FromStr+Name+Debug+Clone+Eq+PartialEq+Display+Hash+Serialize+Deserialize<'a> {
   fn category(&self) -> &'static str;
 
   fn as_str(&self) -> &'static str;

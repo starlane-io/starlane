@@ -31,12 +31,3 @@ settings:
         dbname: registry
       - kind: Database
         dbname: my_database
-
-
-
-
-      providers:
-        - kind: Registry
-          dbname: registry
-        - kind: Database
-          dbname: my_database

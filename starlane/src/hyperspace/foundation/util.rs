@@ -4,11 +4,15 @@ use std::fmt;
 use std::fmt::{Formatter, Write};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+use derive_name::{Name, Named};
 use rustls::pki_types::Der;
 use serde::__private::de::missing_field;
 use serde::de::{DeserializeOwned, MapAccess, Visitor};
 use serde::ser::SerializeMap;
+use serde_yaml::Value;
 use serde_yaml::Value::Tagged;
+use crate::hyperspace::foundation::err::FoundationErr;
+use crate::hyperspace::foundation::kind::{FoundationKind, IKind};
 /*
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AbstractMappings<'z,V> where V: Serialize+DeserializeOwned+'z{
@@ -18,37 +22,65 @@ pub struct AbstractMappings<'z,V> where V: Serialize+DeserializeOwned+'z{
 
  */
 
+pub trait SubText{
+
+}
 
 
 #[derive(Debug, Default,Clone, Eq, PartialEq, Serialize)]
-pub struct MyMap<V>(HashMap<String,V>);
+pub struct KindMap<K>(HashMap<String,Value>,
+                      #[serde(skip)]
+                      PhantomData<fn()-> Result<K,FoundationErr>>) where K: IKind;
 
 
-impl <V> Deref for MyMap<V> {
-    type Target = HashMap<String,V>;
+impl <K> KindMap<K> where K: IKind{
+    pub fn category() -> &'static str {
+        K::name()
+    }
+
+    pub fn kind(&self) -> Result<K,FoundationErr> {
+           let kind_as_value =self.0.get("kind").ok_or_else(|| FoundationErr::missing_kind_declaration(K::name()))?;
+           let result = serde_yaml::from_value(kind_as_value.clone());
+        match result {
+            Ok(kind) => {
+                Ok(kind)
+            },
+            Err(_) => {
+                /// now we have to convert kind into a string
+                let kind_str = serde_yaml::to_string(kind_as_value).map_err(|err|FoundationErr::config_err(format!("{:?}",err)))?;
+                Err(FoundationErr::kind_not_found(K::name(),kind_str))
+            }
+        }
+
+    }
+}
+
+
+impl <K> Deref for KindMap<K> where K:IKind{
+    type Target = HashMap<String,Value>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl <V> DerefMut for MyMap<V> {
+impl <K> DerefMut for KindMap<K> where K: IKind{
     fn deref_mut(&mut self) -> &mut Self::Target {
         & mut self.0
     }
 }
 
-impl <V> MyMap<V> {
-    fn new() -> MyMap<V> {
-        MyMap(Default::default())
+impl <K> KindMap<K> where K: IKind{
+    fn new() -> KindMap<K> {
+        KindMap(Default::default(),Default::default())
     }
 }
 
-struct MyMapVisitor<V> {
-    marker: PhantomData<fn() -> MyMap<V>>
+struct MyMapVisitor<K> where K: IKind   {
+    marker: PhantomData<fn() -> KindMap<K>>
 }
 
-impl<V> MyMapVisitor<V> {
+impl <K> MyMapVisitor<K> where K: IKind  {
     fn new() -> Self {
         MyMapVisitor {
             marker: Default::default()
@@ -57,11 +89,9 @@ impl<V> MyMapVisitor<V> {
 }
 
 
-impl<'de, V> Visitor<'de> for MyMapVisitor<V>
-where
-    V: Deserialize<'de>,
+impl<'de,K> Visitor<'de> for MyMapVisitor<K> where K: IKind
 {
-    type Value = MyMap<V>;
+    type Value = KindMap<K>;
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str("a very special map")
     }
@@ -71,7 +101,7 @@ where
     where
         M: MapAccess<'de>,
     {
-        let mut map = MyMap::new();
+        let mut map = KindMap::new();
 
         // While there are entries remaining in the input, add them
         // into our map.
@@ -87,9 +117,7 @@ where
 
 
 // This is the trait that informs Serde how to deserialize MyMap.
-impl<'de,V> Deserialize<'de> for MyMap<V>
-where
-    V: Deserialize<'de>,
+impl<'de,K> Deserialize<'de> for KindMap<K> where K:IKind
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -145,27 +173,6 @@ impl <'z,V> DerefMut for AbstractMappings<'z,V> where V: Serialize+Deserialize<'
 
 
 
-#[derive(Clone,Serialize,Deserialize)]
-#[serde(untagged)]
-pub enum Tag{
-  Tag(String),
-  Tuple(MyMap<String>)
-}
-
-impl Tag {
-    fn tag(string: impl ToString) -> Self {
-        Tag::Tag(string.to_string())
-    }
-
-    fn tuple(key: impl ToString,value: impl ToString) -> Self {
-        let mut map = MyMap::new();
-        map.insert(key.to_string(), value.to_string());
-        map.insert(value.to_string(), key.to_string());
-
-        Tag::Tuple(map)
-    }
-
-}
 
 
 
@@ -173,28 +180,20 @@ impl Tag {
 
 
 
-#[cfg(test)]
-pub mod test {
-    use chrono::serde::ts_microseconds::serialize;
-    use convert_case::Casing;
-    use serde::{Deserialize, Serialize, Serializer};
-    use serde::ser::{SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant};
-    use crate::hyperspace::foundation::util::{MyMap, Tag};
 
-    #[test]
-    pub fn tagz() {
-        let mut list = vec![];
-        list.push(Tag::tag("Registry"));
-        list.push(Tag::tuple("database", "registry"));
-        println!("{}", serde_yaml::to_string(&list).unwrap());
-    }
+
+
 
 
     #[test]
-    pub fn abstract_map() {
-        let mut map: MyMap<String> = MyMap::new();
-        map.insert("hello".to_string(), "doctor".to_string());
-        map.insert("yesterday".to_string(), "tomorrow".to_string());
+    pub fn kind_map() {
+        let mut map: KindMap<FoundationKind> = KindMap::new();
+        map.insert("kind".to_string(), serde_yaml::to_value("DockerDesktop").unwrap());
+        map.insert("hello".to_string(), serde_yaml::to_value("doctor").unwrap());
+        map.insert("yesterday".to_string(), serde_yaml::to_value("tomorow").unwrap());
+
+        let kind = map.kind().map_err(|err|{eprintln!("{}",err);assert!(false);}).unwrap();
+        println!("kind: `{}`\n\n", kind);
 
         let out = serde_yaml::to_string(&map).unwrap();
         println!("{}", out);
@@ -212,6 +211,7 @@ pub mod test {
         pub database: String,
         pub seed: String
     }
+/*
 
 
     pub struct StrVariant;
@@ -545,3 +545,6 @@ pub fn list_of_maps()  {
          */
 
 
+
+
+ */
