@@ -19,7 +19,7 @@ use crate::hyperspace::reg::Registry;
 /// The [`FoundationConfig`] enumerates dependencies which are typically things that don't ship
 /// with the Starlane binary.  Common examples are: Postgres, Keycloak, Docker.  Each foundation
 /// implementation must know how to ready that Dependency and potentially even launch an
-/// instance of that Dependency.  For Example: Postgres Database is a common dependency especially
+/// instance of that Dependency.  For Example: Postgres Database is a common implementation especially
 /// because the default Starlane [`Registry`] (and at the time of this writing the only Registry support).
 /// The Postgres [`Dependency`] ensures that Postgres is accessible and properly configured for the
 /// Starlane Platform.
@@ -37,8 +37,8 @@ use crate::hyperspace::reg::Registry;
 /// utilizes a common Dependency to provide a specific service etc.
 ///
 /// ## THE REGISTRY
-/// There is one special dependency that the Foundation must manage which is the [`Foundation::registry`]
-/// the Starlane Registry is the only required dependency from the vanilla Starlane installation
+/// There is one special implementation that the Foundation must manage which is the [`Foundation::registry`]
+/// the Starlane Registry is the only required implementation from the vanilla Starlane installation
 ///
 type CreateFoundation =  dyn FnMut(Value) -> Result<dyn Foundation,FoundationErr> + Sync + Send+ 'static;
 type CreateDep =  dyn FnMut(Value) -> Result<dyn Dependency,FoundationErr> + Sync + Send+ 'static;

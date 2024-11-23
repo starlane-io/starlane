@@ -2,16 +2,12 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::str::FromStr;
-use serde_yaml::Value;
 use thiserror::__private::AsDisplay;
-use crate::hyperspace::foundation::settings::{ProtoFoundationSettings, RawSettings};
-use crate::hyperspace::foundation::{DockerDesktopFoundation, DockerDesktopFoundationSettings};
-use crate::hyperspace::foundation::config::RawConfig;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::traits::{Dependency, Foundation};
 
 pub const FOUNDATION : &'static str = "foundation";
-pub const DEPENDENCY: &'static str = "dependency";
+pub const DEPENDENCY: &'static str = "implementation";
 pub const PROVIDER: &'static str = "provider";
 
 
@@ -74,7 +70,7 @@ impl IKind for FoundationKind {
 }
 
 #[derive(Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString,strum_macros::IntoStaticStr,strum_macros::EnumIter, Serialize, Deserialize)]
-#[serde(tag="dependency")]
+#[serde(tag="implementation")]
 pub enum DependencyKind {
     Postgres,
     Docker
@@ -150,8 +146,8 @@ pub trait IKind where for<'a> Self: Debug+Clone+Eq+PartialEq+Display+Hash+Serial
 
 #[cfg(test)]
 pub mod test {
-    use serde::{Deserialize, Serialize};
-    use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, Kind, PostgresKind, ProviderKind};
+    use serde::Serialize;
+    use crate::hyperspace::foundation::kind::{DependencyKind, IKind, Kind};
 
     #[test]
     pub fn test( )  {

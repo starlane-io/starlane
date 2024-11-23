@@ -14,23 +14,14 @@ pub trait Foundation: Send + Sync
 {
     fn create(builder: ProtoFoundationBuilder) -> Result<impl Foundation+Sized,FoundationErr>;
 
+    /// a convenience method for getting the FoundationKin before
+    /// and actual instance of this trait is created.
+    fn foundation_kind() -> FoundationKind;
+
     fn kind(&self) -> FoundationKind {
         Self::foundation_kind()
     }
 
-    fn foundation_kind() -> FoundationKind;
-
-
-    /*
-    fn dependency(&self, kind: &DependencyKind ) -> Result<impl Dependency,FoundationErr>;
-
-     */
-
-    /*
-    /// install any 3rd party dependencies this foundation requires to be minimally operable
-    async fn install_foundation_required_dependencies(& mut self) -> Result<(), FoundationErr>;
-
-     */
 
 
     fn dependencies(&self) -> HashSet<&'static str> {
@@ -41,27 +32,24 @@ pub trait Foundation: Send + Sync
         set
     }
 
-
-
 }
 
 
 pub trait Dependency {
 
-    fn kind(&self) -> &DependencyKind;
+    /// a convenience method for getting the DependencyKind before
+    /// and actual instance of this trait is created.
+    fn dependency_kind() -> DependencyKind;
+
+
+    fn kind(&self) -> DependencyKind {
+        Self::dependency_kind()
+    }
 
 
     async fn install(&self) -> Result<(), FoundationErr> {
         Ok(())
     }
-
-    /*
-    async fn provision(&self, config: ProtoProviderConfig ) -> Result<impl Provider,FoundationErr> {
-        Err(FoundationErr::provider_not_available( config.kind.clone() ))
-    }
-
-     */
-
 
     /// implementers of this Trait should provide a vec of valid provider kinds
     fn provider_kinds(&self) -> HashSet<&'static str> {
@@ -78,7 +66,7 @@ pub trait Dependency {
                     Ok(())
                 } else {
                     let key = ProviderKey::new(self.kind().clone(), kind.clone());
-                    Err(FoundationErr::prov_err(key, format!("provider kind '{}' is not available for dependency: '{}'", ext.to_string(), self.kind().to_string()).to_string()))
+                    Err(FoundationErr::prov_err(key, format!("provider kind '{}' is not available for implementation: '{}'", ext.to_string(), self.kind().to_string()).to_string()))
                 }
             }
         }
@@ -89,5 +77,13 @@ pub trait Dependency {
 }
 
 pub trait Provider {
+    /// a convenience method for getting the ProviderKind before
+    /// and actual instance of this trait is created.
+    fn provider_kind() -> ProviderKind;
+
+    fn kind(&self) -> ProviderKind{
+        Self::provider_kind()
+    }
+
     async fn initialize(&mut self) -> Result<(), FoundationErr>;
 }

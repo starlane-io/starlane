@@ -1,14 +1,83 @@
 use std::fmt::Display;
 use serde_yaml::Value;
 use std::rc::Rc;
+use ascii::AsciiChar::k;
 use serde::de;
 use thiserror::Error;
-use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, ProviderKey, ProviderKind};
+use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, ProviderKey, ProviderKind};
 use crate::space::err::ToSpaceErr;
 
 pub struct Call;
 
+
+pub struct FoundationErrBuilder<'z> {
+    pub kind: Option<(&'static str, &'static str)>,
+    pub config: Option<&'z (dyn Display+'z)>,
+    pub settings: Option<&'z (dyn Display+'z)>,
+}
+
+impl <'z> Default for FoundationErrBuilder<'z> {
+    fn default() -> Self {
+        Self {
+            kind: None,
+            config: None,
+            settings: None,
+        }
+    }
+}
+
+impl <'z> FoundationErrBuilder<'z> {
+    pub fn kind(&mut self, kind: impl IKind) -> & mut Self{
+        self.kind = Some((kind.category(),kind.as_str()));
+        self
+    }
+
+    pub fn config(&mut self, config: &'z (dyn Display+'z)) -> & mut Self{
+        self.config = Some(config);
+        self
+    }
+
+    pub fn settings(&mut self, settings: &'z (dyn Display+'z)) -> & mut Self{
+        self.settings = Some(settings);
+        self
+    }
+
+
+    pub fn err( mut self, err: impl Display+'z ) -> FoundationErr  {
+        let mut rtn = String::new();
+
+        if let Some((cat,kind)) = self.kind {
+            let fmt = format!("Foundation ERR {}::{} --> ",cat,kind);
+            rtn.push_str(fmt.as_str());
+        }
+        let (action,verbose) = if let Some(config) = self.config {
+            ("config".to_string(), config.to_string())
+        } else if let Some(settings) = self.settings {
+            ("settings".to_string(), settings.to_string())
+        } else {
+            ("<yaml>".to_string(), "<?>".to_string() )
+        };
+
+        let fmt = format!("{}: \n```{}```\n", action, verbose);
+        rtn.push_str(fmt.as_str());
+
+
+
+        let err= format!("serde err: '{}'",err );
+        rtn.push_str(err.as_str());
+        FoundationErr::Msg(rtn)
+    }
+
+}
+
 impl FoundationErr {
+
+    pub fn kind<'z>(kind: &impl IKind) -> FoundationErrBuilder<'z>{
+        FoundationErrBuilder {
+            kind: Some((kind.category(),kind.as_str())),
+            ..Default::default()
+        }
+    }
 
     pub fn user_action_required<CAT,KIND,ACTION,SUMMARY>(cat: CAT, kind: KIND, action: ACTION, summary: SUMMARY ) -> Self where CAT: AsRef<str>, KIND: AsRef<str> , ACTION: AsRef<str>, SUMMARY: AsRef<str> {
         let cat = cat.as_ref().to_string();
@@ -54,8 +123,6 @@ impl FoundationErr {
     pub fn provider_not_available(kind: ProviderKind) -> Self {
         FoundationErr::ProviderNotAvailable(kind.to_string())
     }
-
-
 
 
     pub fn dep_err(kind: DependencyKind, msg: String ) -> Self {
@@ -120,7 +187,7 @@ pub enum FoundationErr {
     FoundationNotAvailable(String),
     #[error("DependencyConfig.foundation is set to '{0}' which this Starlane build does not recognize")]
     DepNotFound(String),
-    #[error("dependency: '{0}' is recognized but is not available on this build of Starlane")]
+    #[error("implementation: '{0}' is recognized but is not available on this build of Starlane")]
     DepNotAvailable(String),
     #[error("ProviderConfig.provider is set to '{0}' which this Starlane build does not recognize")]
     ProviderNotFound(String),
@@ -140,7 +207,7 @@ pub enum FoundationErr {
     UserActionRequired{ cat: String, kind: String, action: String, summary: String, },
     #[error("[{key}] Error: '{msg}'")]
     ProviderErr{ key: ProviderKey, msg: String},
-    #[error("error converting foundation args for dependency: '{kind}' serialization err: '{err}' from config: '{config}'")]
+    #[error("error converting foundation args for implementation: '{kind}' serialization err: '{err}' from config: '{config}'")]
     DepConfErr { kind: DependencyKind,err: String, config: String},
     #[error("error converting foundation args for provider: '{kind}' serialization err: '{err}' from config: '{config}'")]
     ProvConfErr { kind: ProviderKind, err: Rc<serde_yaml::Error>, config: String},
@@ -154,6 +221,8 @@ pub enum FoundationErr {
     FoundationRunnerMpscTrySendErr(Rc<tokio::sync::mpsc::error::TrySendError<Call>>),
     #[error("Foundation Runner return sender err (this could be fatal) caused by: {0}")]
     FoundationRunnerOneshotTryRecvErr(Rc<tokio::sync::oneshot::error::TryRecvError>),
+    #[error("{0}")]
+    Msg(String)
 }
 
 impl From<tokio::sync::mpsc::error::SendError<Call>> for FoundationErr {

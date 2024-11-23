@@ -39,7 +39,7 @@ use std::time::Duration;
 use std::{io, thread};
 use text_to_ascii_art::to_art;
 use textwrap::Options;
-use starlane::hyperspace::foundation::docker::DockerDesktopFoundation;
+use starlane::hyperspace::foundation::implementation::docker_desktop_foundation::DockerDesktopFoundation;
 
 #[tokio::main]
 pub async fn install(edit: bool) -> Result<(), anyhow::Error> {

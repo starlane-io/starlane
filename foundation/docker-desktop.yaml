@@ -8,14 +8,18 @@ config:
         - database_dir: /etc/data
 
 
-        provider:
+        providers:
         - Registry:
           name: registry
           # if seed is specified in config space it
           # cannot be overwritten # by Settings
-          seed: "$REPO/seeds/postgres/registry/registry.sql"
+          seed: "${REPO}/seeds/postgres/registry/registry.sql"
           # just any old database...
         - Database:
+# this Settings configuration is not used to configure the Foundation
+# the end user for Starlane should configure the settings in the StarlaneConfig
+# which should have been written by the Starlane Installer.
+# The Settings configuration in this document does supply the default values for the installer
 settings:
   dependencies:
     - Postgres:
@@ -23,7 +27,7 @@ settings:
       - database_dir: "$HOME/starlane/data/postgres"
       username: postgres
       password: postgres
-      provider:
+      providers:
       - Registry:
         name: registry
         schema: public

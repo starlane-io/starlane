@@ -2,14 +2,17 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind};
+use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, ProviderKind};
 use crate::hyperspace::foundation::traits::{Dependency, Foundation};
-
-
 pub type RawConfig = Value;
 
 pub struct Metadata<K> where K: IKind {
     pub kind: K,
+    pub source: String
+}
+
+impl <K> Metadata<K> where K: IKind {
+
 }
 
 #[derive(Debug, Clone,Serialize,Deserialize,Eq,PartialEq)]
@@ -49,20 +52,18 @@ impl <C> FoundationConfig<C> where C: Eq+PartialEq {
 }
 
 
-#[derive(Debug,Clone,Eq,PartialEq)]
-pub struct DockerDesktopDependencyConfig {
 
-}
-
-
-pub type DockerCompose = serde_yaml::Value;
 
 #[derive(Debug, Clone,Serialize,Deserialize,Eq,PartialEq)]
-pub struct DockerDesktopFoundationConfig {
-   pub dependencies: HashMap<DependencyKind,DockerDesktopDependencyConfig>,
+pub struct ProtoDependencies<C>{
+    pub dependencies: HashMap<DependencyKind,C>,
+}
+
+#[derive(Debug, Clone,Serialize,Deserialize,Eq,PartialEq)]
+pub struct ProtoProviderConfig {
+    provider: ProviderKind,
+    config: Value,
 }
 
 
 
-impl DockerDesktopFoundationConfig {
-}

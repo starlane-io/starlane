@@ -35,10 +35,6 @@ pub struct FoundationSettings<S> where S: Eq+PartialEq,  {
    settings: S
 }
 
-//#[serde(deserialize_with = "deserialize_from_value")]
-
-
-
 
 fn deserialize_from_value<D, S>(deserializer: D) -> Result<S, <D as Deserializer<'static>>::Error>
 where
@@ -49,9 +45,6 @@ where
    let value = Deserialize::deserialize(deserializer)?;
    serde_yaml::from_value(value)
 }
-
-
-
 
 
 impl <C> FoundationSettings<C> where C: for<'z> Deserialize<'z>+Eq+PartialEq {
@@ -72,7 +65,7 @@ pub type RawSettings = serde_yaml::Value;
 #[cfg(test)]
 pub mod test {
    use serde_yaml::Value;
-   use crate::hyperspace::foundation::DockerDesktopFoundationSettings;
+   use crate::hyperspace::foundation::implementation::docker_desktop_foundation::DockerDesktopFoundationSettings;
    use crate::hyperspace::foundation::settings::{FoundationSettings, ProtoFoundationSettings};
    use crate::hyperspace::foundation::kind::{DockerDesktopSettings, FoundationKind};
 
