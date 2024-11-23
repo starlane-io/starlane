@@ -45,6 +45,7 @@ pub trait Foundation: Send + Sync
 
 }
 
+
 pub trait Dependency {
 
     fn kind(&self) -> &DependencyKind;

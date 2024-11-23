@@ -3,6 +3,11 @@ config:
   dependencies:
       - Postgres:
         image: "postgres:17"
+        # this is the data dir in the container image
+        volumes:
+        - database_dir: /etc/data
+
+
         provider:
         - Registry:
           name: registry
@@ -14,7 +19,8 @@ config:
 settings:
   dependencies:
     - Postgres:
-      database_dir: "$HOME/starlane/data/postgres"
+      volumes:
+      - database_dir: "$HOME/starlane/data/postgres"
       username: postgres
       password: postgres
       provider:
