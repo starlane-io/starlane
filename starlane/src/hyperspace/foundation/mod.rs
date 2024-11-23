@@ -4,6 +4,7 @@ pub mod err;
 
 pub mod kind;
 
+pub mod traits;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
@@ -19,6 +20,7 @@ pub mod factory;
 pub mod runner;
 
  */
+use std::collections::HashSet;
 use serde::de::{MapAccess, Visitor};
 use std::fmt::{Debug, Display};
 use crate::hyperspace::platform::PlatformConfig;
@@ -32,36 +34,10 @@ use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use serde;
-
-
-#[derive(Builder, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-struct DependencyConfigProto{
-    pub dependency: Value,
-    pub config: Value
-}
-
-
-
-impl DependencyConfigProto {
-
-
-}
-
-#[derive(Builder, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-struct ProviderConfigProto {
-    pub provider: Value,
-    pub config: Value
-}
-
-
-
-
-
-
-pub struct RegistryConfig2 {
-
-}
-
+use crate::hyperspace::foundation::config::{FoundationConfig, ProtoFoundationConfig, RawConfig};
+use crate::hyperspace::foundation::err::FoundationErr;
+use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind};
+use crate::hyperspace::foundation::traits::{Dependency, Foundation};
 
 #[derive(Clone)]
 pub struct LiveService<S> where S: Clone{
@@ -84,28 +60,92 @@ impl <S> DerefMut for LiveService<S> where S: Clone{
 }
 
 
-#[cfg(test)]
-mod test {
-    use serde_yaml;
-    use crate::hyperspace::foundation::kind::{FoundationKind, PostgresKind, ProviderKind};
-
-    #[test]
-    fn test_kind() {
-        assert_eq!("foundation: DockerDesktop",format!("{}",serde_yaml::to_string( &FoundationKind::DockerDesktop).unwrap().trim()));
-    }
 
 
-    #[test]
-    fn test_provider_kind() {
-        let k = ProviderKind::Postgres(PostgresKind::Database);
-        println!("{}", k);
-    }
 
-
+#[derive(Debug, Clone,Serialize,Deserialize)]
+pub struct DockerDesktopFoundationConfig {
+    name: String
 }
 
 
 
+pub struct DockerDesktopFoundation {
+    config: FoundationConfig<DockerDesktopFoundationConfig>
+}
+
+impl DockerDesktopFoundation {
+    pub fn new(config: DockerDesktopFoundationConfig) -> Self {
+        let config = FoundationConfig::new(FoundationKind::DockerDesktop, config);
+        Self {
+            config
+        }
+    }
+
+}
+
+impl Foundation for DockerDesktopFoundation {
+    fn kind(&self) -> FoundationKind {
+        Self::foundation_kind()
+    }
+
+    fn foundation_kind() -> FoundationKind {
+        FoundationKind::DockerDesktop
+    }
+
+    fn parse(config: RawConfig) -> Result<impl Foundation+Sized, FoundationErr>{
+        Ok(Self::new(serde_yaml::from_value(config.clone()).map_err(|err| FoundationErr::foundation_conf_err(Self::foundation_kind(), err, config.clone()))?))
+    }
 
 
 
+
+    /*
+    fn dependency(&self, kind: &DependencyKind) -> Result<impl Dependency, FoundationErr> {
+        todo!()
+    }
+
+    async fn install_foundation_required_dependencies(&mut self) -> Result<(), FoundationErr> {
+        todo!()
+    }
+
+     */
+}
+
+
+#[cfg(test)]
+pub mod test {
+    use crate::hyperspace::foundation;
+    use crate::hyperspace::foundation::config::ProtoFoundationConfig;
+    use crate::hyperspace::foundation::DockerDesktopFoundationConfig;
+    use crate::hyperspace::foundation::err::FoundationErr;
+    use crate::hyperspace::foundation::traits::Foundation;
+
+    #[test]
+    pub fn test() -> Result<(),FoundationErr>{
+       let config = r#"
+foundation: DockerDesktop
+config:
+  name: "Filo Farnsworth"
+
+       "#;
+
+       let config: ProtoFoundationConfig = serde_yaml::from_str(config).unwrap();
+        println!("{:?}", config );
+        let ser = serde_yaml::to_string(&config).unwrap();
+        println!("{}", ser );
+       let foundation = config.create()?;
+
+
+        /*
+        println!("{} dependencies found in {}", foundation.dependencies().len(), foundation.kind() );
+        for dep in foundation.dependencies() {
+            println!("{}", dep );
+        }
+
+
+         */
+        Ok(())
+
+    }
+}
