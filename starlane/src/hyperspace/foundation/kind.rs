@@ -3,8 +3,8 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use serde_yaml::Value;
 use thiserror::__private::AsDisplay;
-use crate::hyperspace::foundation::config::{ProtoFoundationConfig, RawConfig};
-use crate::hyperspace::foundation::{DockerDesktopFoundation, DockerDesktopFoundationConfig};
+use crate::hyperspace::foundation::settings::{ProtoFoundationSettings, RawSettings};
+use crate::hyperspace::foundation::{DockerDesktopFoundation, DockerDesktopFoundationSettings};
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::traits::{Dependency, Foundation};
 
@@ -63,7 +63,7 @@ pub fn config_parser(&self) -> fn(&Value) -> Result<Self, FoundationErr> {
 
  */
 impl FoundationKind {
-   pub fn parse( &self, config:  RawConfig ) -> Result<impl Foundation+Sized, FoundationErr> {
+   pub fn parse(&self, config: RawSettings) -> Result<impl Foundation+Sized, FoundationErr> {
        match self {
            FoundationKind::DockerDesktop => DockerDesktopFoundation::parse(config)
        }
@@ -199,17 +199,16 @@ println!("{}",kind_str);
     }
 
 }
-#[derive(Debug, Clone,Serialize, Deserialize)]
-pub struct DockerDesktopConfig {
-    name: String
+#[derive(Debug, Clone,Serialize, Deserialize,Eq,PartialEq)]
+pub struct DockerDesktopSettings {
+    pub name: String
 }
 
-impl DockerDesktopConfig {
+impl DockerDesktopSettings {
     pub fn new( name: String ) -> Self {
         Self {
             name
         }
     }
-
 
 }

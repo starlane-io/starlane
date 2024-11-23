@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use serde::Deserialize;
 use strum::IntoEnumIterator;
-use crate::hyperspace::foundation::config::{ProtoFoundationConfig, RawConfig};
+use crate::hyperspace::foundation::settings::{ProtoFoundationSettings, RawSettings};
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, ProviderKey, ProviderKind};
 
@@ -16,7 +16,7 @@ pub trait Foundation: Send + Sync
     fn foundation_kind() -> FoundationKind;
 
 
-    fn parse(config: RawConfig) -> Result<impl Foundation+Sized,FoundationErr>;
+    fn parse(config: RawSettings) -> Result<impl Foundation+Sized,FoundationErr>;
 
 
     /*

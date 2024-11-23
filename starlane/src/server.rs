@@ -32,7 +32,7 @@ use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
 use crate::hyperspace::driver::space::SpaceDriverFactory;
-use crate::hyperspace::foundation::config::ProtoFoundationConfig;
+use crate::hyperspace::foundation::settings::ProtoFoundationSettings;
 use crate::hyperspace::foundation::traits::Foundation;
 //use crate::hyperspace::foundation::docker::DockerDesktopFoundation;
 use crate::hyperspace::machine::MachineTemplate;
