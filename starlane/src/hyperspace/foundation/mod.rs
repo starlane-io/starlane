@@ -6,7 +6,7 @@ pub mod kind;
 
 pub mod traits;
 
-
+pub mod config;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneSettings {
@@ -19,9 +19,7 @@ pub struct StarlaneSettings {
 }
 
 impl StarlaneSettings {
-    pub fn create_foundation(&self) -> Result<impl Foundation,FoundationErr> {
-        self.foundation.clone().create()
-    }
+
 }
 
 /*
@@ -82,6 +80,7 @@ use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use serde;
+use crate::hyperspace::foundation::config::{DockerDesktopFoundationConfig, FoundationConfig, ProtoFoundationConfig, RawConfig};
 use crate::hyperspace::foundation::settings::{FoundationSettings, ProtoFoundationSettings, RawSettings};
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind};
@@ -113,44 +112,43 @@ impl <S> DerefMut for LiveService<S> where S: Clone{
 
 #[derive(Debug, Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub struct DockerDesktopFoundationSettings {
-    name: String
+    name: String,
 }
 
 impl DockerDesktopFoundationSettings {
    pub fn new(name: String) -> Self {
        Self {
-           name
+           name,
        }
    }
 }
 
-
-
 pub struct DockerDesktopFoundation {
+    config: FoundationConfig<DockerDesktopFoundationConfig>,
     settings: FoundationSettings<DockerDesktopFoundationSettings>
 }
 
 impl DockerDesktopFoundation {
-    pub fn new(config: DockerDesktopFoundationSettings) -> Self {
-        let config = FoundationSettings::new(FoundationKind::DockerDesktop, config);
-        Self {
-            settings: config
-        }
-    }
+
 
 }
 
 impl Foundation for DockerDesktopFoundation {
-    fn kind(&self) -> FoundationKind {
-        Self::foundation_kind()
+    fn create(builder : FoundationBuilder) -> Result<impl Foundation+Sized,FoundationErr>{
+        let settings = ProtoFoundationSettings::new(FoundationKind::DockerDesktop, builder.settings);
+        let config = ProtoFoundationConfig::new(FoundationKind::DockerDesktop, builder.config);
+
+        let config = config.create()?;
+        let settings = settings.create()?;
+
+        Ok(Self {
+            settings,
+            config,
+        })
     }
 
     fn foundation_kind() -> FoundationKind {
         FoundationKind::DockerDesktop
-    }
-
-    fn parse(config: RawSettings) -> Result<impl Foundation+Sized, FoundationErr>{
-        Ok(Self::new(serde_yaml::from_value(config.clone()).map_err(|err| FoundationErr::foundation_conf_err(Self::foundation_kind(), err, config.clone()))?))
     }
 
 
@@ -167,6 +165,30 @@ impl Foundation for DockerDesktopFoundation {
 
      */
 }
+
+
+pub struct FoundationBuilder {
+    kind: FoundationKind,
+    config: RawConfig,
+    settings: RawSettings
+}
+
+impl FoundationBuilder {
+    pub fn create(self) -> Result<impl Foundation+Sized,FoundationErr> {
+
+        match self.kind {
+            FoundationKind::DockerDesktop => {
+                DockerDesktopFoundation::create(self)
+            }
+        }
+    }
+
+
+
+}
+
+
+
 
 
 #[cfg(test)]

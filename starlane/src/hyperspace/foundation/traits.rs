@@ -4,6 +4,7 @@ use serde::Deserialize;
 use strum::IntoEnumIterator;
 use crate::hyperspace::foundation::settings::{ProtoFoundationSettings, RawSettings};
 use crate::hyperspace::foundation::err::FoundationErr;
+use crate::hyperspace::foundation::FoundationBuilder;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, ProviderKey, ProviderKind};
 
 
@@ -11,12 +12,13 @@ use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind,
 #[async_trait]
 pub trait Foundation: Send + Sync
 {
-    fn kind(&self) -> FoundationKind;
+    fn create(builder: FoundationBuilder) -> Result<impl Foundation+Sized,FoundationErr>;
+
+    fn kind(&self) -> FoundationKind {
+        Self::foundation_kind()
+    }
 
     fn foundation_kind() -> FoundationKind;
-
-
-    fn parse(config: RawSettings) -> Result<impl Foundation+Sized,FoundationErr>;
 
 
     /*

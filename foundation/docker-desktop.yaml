@@ -1,0 +1,22 @@
+foundation: DockerDesktop
+config:
+  dependencies:
+      - Postgres:
+        image: "postgres:17"
+        provider:
+        - Registry:
+          database: registry
+settings:
+  dependencies:
+    - Postgres:
+      database_dir: "$HOME/starlane/data/postgres"
+      username: postgres
+      password: postgres
+      provider:
+      - Registry:
+        database: registry
+        schema: public
+      - User:
+        database: user
+        schema: public
+        seed: "$REPO/seeds/postgres/user/user_db.sql"

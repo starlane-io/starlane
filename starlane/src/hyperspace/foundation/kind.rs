@@ -5,6 +5,7 @@ use serde_yaml::Value;
 use thiserror::__private::AsDisplay;
 use crate::hyperspace::foundation::settings::{ProtoFoundationSettings, RawSettings};
 use crate::hyperspace::foundation::{DockerDesktopFoundation, DockerDesktopFoundationSettings};
+use crate::hyperspace::foundation::config::RawConfig;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::traits::{Dependency, Foundation};
 
@@ -63,11 +64,17 @@ pub fn config_parser(&self) -> fn(&Value) -> Result<Self, FoundationErr> {
 
  */
 impl FoundationKind {
-   pub fn parse(&self, config: RawSettings) -> Result<impl Foundation+Sized, FoundationErr> {
+   pub fn parse_settings(&self, settings: RawSettings) -> Result<impl Foundation+Sized, FoundationErr> {
        match self {
-           FoundationKind::DockerDesktop => DockerDesktopFoundation::parse(config)
+           FoundationKind::DockerDesktop => DockerDesktopFoundation::parse(settings)
        }
    }
+
+   pub fn parse_config(&self, config: RawConfig ) -> Result<impl Foundation+Sized, FoundationErr> {
+        match self {
+            FoundationKind::DockerDesktop => DockerDesktopFoundation::parse(config)
+        }
+    }
 }
 
 
@@ -135,6 +142,7 @@ pub enum ProviderKind {
 #[derive(Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString, strum_macros::IntoStaticStr,Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PostgresKind{
+    Registry,
     Database
 }
 

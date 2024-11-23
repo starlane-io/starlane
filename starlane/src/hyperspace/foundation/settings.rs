@@ -6,6 +6,7 @@ use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{FoundationKind, IKind};
 use crate::hyperspace::foundation::traits::Foundation;
 
+/// Settings are provided by the User.
 
 
 #[derive(Debug, Clone,Serialize,Deserialize,Eq,PartialEq)]
@@ -15,8 +16,11 @@ pub struct ProtoFoundationSettings {
 }
 
 impl ProtoFoundationSettings {
-   pub fn create(self) -> Result<impl Foundation,FoundationErr> {
-      self.foundation.parse(self.settings)
+   pub fn new(foundation: FoundationKind, settings: Value ) -> Self {
+      Self { foundation, settings }
+   }
+   pub fn create<S>(self) -> Result<FoundationSettings<S>,FoundationErr> {
+      serde_yaml::from_value(self.settings.clone()).map_err(|err|FoundationErr::foundation_conf_err(self.foundation,err,self.settings))
    }
 }
 
