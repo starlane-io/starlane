@@ -5,7 +5,7 @@ use ascii::AsciiChar::k;
 use serde::de;
 use thiserror::Error;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, ProviderKey, ProviderKind};
-use crate::space::err::ToSpaceErr;
+use crate::space::err::{ParseErrs, ToSpaceErr};
 
 pub struct Call;
 
@@ -192,11 +192,11 @@ impl FoundationErr {
 pub enum FoundationErr {
     #[error("[{id}] -> PANIC! <{kind}> error message: '{msg}'")]
     Panic {id: String, kind: String, msg: String},
-    #[error("FoundationConfig.foundation is set to '{0}' which this Starlane build does not recognize")]
+    #[error("FoundationConfig.config is set to '{0}' which this Starlane build does not recognize")]
     FoundationNotFound(String),
-    #[error("foundation: '{0}' is recognized but is not available on this build of Starlane")]
+    #[error("config: '{0}' is recognized but is not available on this build of Starlane")]
     FoundationNotAvailable(String),
-    #[error("DependencyConfig.foundation is set to '{0}' which this Starlane build does not recognize")]
+    #[error("DependencyConfig.config is set to '{0}' which this Starlane build does not recognize")]
     DepNotFound(String),
     #[error("implementation: '{0}' is recognized but is not available on this build of Starlane")]
     DepNotAvailable(String),
@@ -204,11 +204,11 @@ pub enum FoundationErr {
     ProviderNotFound(String),
     #[error("provider: '{0}' is recognized but is not available on this build of Starlane")]
     ProviderNotAvailable(String),
-    #[error("error converting foundation config for '{kind}' serialization err: '{err}' config: {config}")]
+    #[error("error converting config config for '{kind}' serialization err: '{err}' config: {config}")]
     FoundationVerboseErr { kind: FoundationKind,err: String, config: String },
-    #[error("foundation settings err: {0}")]
+    #[error("config settings err: {0}")]
     FoundationSettingsErr(String),
-    #[error("foundation config err: {0}")]
+    #[error("config config err: {0}")]
     FoundationConfErr(String),
     #[error("[{kind}] Foundation Error: '{msg}'")]
     FoundationErr{ kind: FoundationKind, msg: String },
@@ -218,11 +218,11 @@ pub enum FoundationErr {
     UserActionRequired{ cat: String, kind: String, action: String, summary: String, },
     #[error("[{key}] Error: '{msg}'")]
     ProviderErr{ key: ProviderKey, msg: String},
-    #[error("error converting foundation args for implementation: '{kind}' serialization err: '{err}' from config: '{config}'")]
+    #[error("error converting config args for implementation: '{kind}' serialization err: '{err}' from config: '{config}'")]
     DepConfErr { kind: DependencyKind,err: String, config: String},
-    #[error("error converting foundation args for provider: '{kind}' serialization err: '{err}' from config: '{config}'")]
+    #[error("error converting config args for provider: '{kind}' serialization err: '{err}' from config: '{config}'")]
     ProvConfErr { kind: ProviderKind, err: Rc<serde_yaml::Error>, config: String},
-    #[error("illegal attempt to change foundation after it has already been initialized.  Foundation can only be initialized once")]
+    #[error("illegal attempt to change config after it has already been initialized.  Foundation can only be initialized once")]
     FoundationAlreadyCreated,
     #[error("Foundation Runner call sender err (this could be fatal) caused by: {0}")]
     FoundationRunnerMpscSendErr(Rc<tokio::sync::mpsc::error::SendError<Call>>),
@@ -237,7 +237,9 @@ pub enum FoundationErr {
     #[error("{category} does not have a kind variant `{variant}`")]
     KindNotFound{category:String,variant:String},
     #[error("Missing `kind:` mapping for {0}")]
-    MissingKind(String)
+    MissingKind(String),
+    #[error("{0}")]
+    ParseErrs(#[from] ParseErrs)
 }
 
 impl From<tokio::sync::mpsc::error::SendError<Call>> for FoundationErr {

@@ -1,57 +1,100 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::hyperspace::foundation::config::FoundationConfig;
+use ascii::AsciiChar::k;
+use serde_yaml::Value;
 use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind};
-use crate::hyperspace::foundation::ProtoFoundationBuilder;
+use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, ProviderKind};
 use crate::hyperspace::foundation::settings::FoundationSettings;
-use crate::hyperspace::foundation::traits::Foundation;
+use crate::hyperspace::foundation::config;use crate::hyperspace::foundation::config::{DependencyConfig};
+use crate::hyperspace::foundation::dependency::implementation::docker::DockerDaemonConfig;
+use crate::hyperspace::foundation::dependency::implementation::postgres::PostgresClusterConfig;
+use crate::hyperspace::foundation::traits;
+use crate::hyperspace::foundation::util::Map;
 
 pub mod dependency;
 
-#[derive(Debug,Clone,Eq,PartialEq,Serialize,Deserialize)]
-pub struct DockerDesktopDependencyConfig {
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    image: Option<String>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    compose: Option<String>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    volumes: HashMap<String,String>
+
+pub struct Foundation {
+    config: FoundationConfig
 }
 
-#[derive(Debug, Clone,Serialize,Deserialize,Eq,PartialEq)]
-pub struct DockerDesktopFoundationConfig {
-   pub dependencies: HashMap<DependencyKind,DockerDesktopDependencyConfig>,
-}
+impl traits::Foundation for Foundation {
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct DockerDesktopFoundationSettings {}
+    type Config = FoundationConfig;
 
-impl DockerDesktopFoundationSettings {
-    pub fn new(name: String) -> Self {
-        Self {}
+    fn create(config: Self::Config) -> Result<impl config::Foundation<Config=Self::Config>, FoundationErr> {
+        Ok(Self{
+            config
+        })
+    }
+
+    fn kind() -> FoundationKind {
+        FoundationKind::DockerDaemon
     }
 }
 
-pub struct DockerDesktopFoundation {
-    config: FoundationConfig<DockerDesktopFoundationConfig>,
-    settings: FoundationSettings<DockerDesktopFoundationSettings>,
+
+#[derive(Clone,Debug,Serialize, Deserialize)]
+pub struct FoundationConfig{
+    pub kind: FoundationKind,
+    pub registry: RegistryConfig,
+    pub dependencies: HashMap<DependencyKind,dyn DependencyConfig>,
 }
 
-impl Foundation for DockerDesktopFoundation {
-    fn create(builder: ProtoFoundationBuilder) -> Result<impl Foundation + Sized, FoundationErr> {
+impl FoundationConfig {
+   pub fn create( config: Map ) -> Result<FoundationConfig, FoundationErr> {
+           let kind = config.kind()?;
+           let registry = config.from_field("registry")?;
 
-        let config = FoundationConfig::new(FoundationKind::DockerDesktop, serde_yaml::from_value(builder.config).map_err(FoundationErr::config_err)?);
-        let settings = FoundationSettings::new(FoundationKind::DockerDesktop, serde_yaml::from_value(builder.settings).map_err(FoundationErr::settings_err)?);
+           let dependencies =  config.parse_kinds("dependencies", | map: Map | -> Result<Map,FoundationErr>{
+               let kind: DependencyKind = map.kind()?;
+               match kind {
+                   DependencyKind::PostgresCluster => PostgresClusterConfig::create(map)?,
+                   DependencyKind::DockerDaemon => DockerDaemonConfig::create(map)?,
+               }
+           })?;
 
-        Ok(Self { settings, config })
+           Ok(Self {
+               kind,
+               registry,
+               dependencies,
+           })
+       }
+   }
+
+
+
+
+impl config::FoundationConfig for FoundationConfig{
+    fn kind(&self) -> & FoundationKind {
+        & self.kind
     }
 
-    fn foundation_kind() -> FoundationKind {
-        FoundationKind::DockerDesktop
+    fn dependency_kinds(&self) -> Vec<&'static str> {
+        self.dependencies.keys().map(|kind| kind.clone()).collect()
     }
 
+    fn dependency(&self, kind: &DependencyKind) -> Option<&impl config::DependencyConfig> {
+        self.dependencies.get(kind)
+    }
+
+    fn create_dependencies(&self, deps: Vec<Value>) -> Result<impl config::DependencyConfig, FoundationErr> {
+        todo!()
+    }
 }
+
+
+
+#[derive(Clone,Debug,Serialize, Deserialize)]
+pub struct RegistryConfig {
+    provider: ProviderKind,
+}
+
+
+
+
+
+
+
+
+

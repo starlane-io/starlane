@@ -2,9 +2,10 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::process;
 use serde_yaml::Value;
-use crate::env::STARLANE_CONFIG;
-use crate::hyperspace::foundation::config::ProtoFoundationConfig;
-use crate::hyperspace::foundation::{DependencyKind, FoundationErr, FoundationKind, ProviderKind};
+use crate::hyperspace::foundation::config::{Config, ProtoFoundationConfig};
+use crate::hyperspace::foundation::err::FoundationErr;
+use crate::hyperspace::foundation::implementation::docker_desktop_foundation;
+use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind};
 use crate::hyperspace::foundation::runner::Runner;
 use crate::hyperspace::foundation::traits::{Dependency, Foundation, Provider};
 use crate::hyperspace::reg::Registry;
@@ -17,7 +18,7 @@ use crate::hyperspace::reg::Registry;
 ///
 /// There are two sub concepts that ['Foundation'] provides: ['Dependency'] and  ['Provider'].
 /// The [`FoundationConfig`] enumerates dependencies which are typically things that don't ship
-/// with the Starlane binary.  Common examples are: Postgres, Keycloak, Docker.  Each foundation
+/// with the Starlane binary.  Common examples are: Postgres, Keycloak, Docker.  Each config
 /// implementation must know how to ready that Dependency and potentially even launch an
 /// instance of that Dependency.  For Example: Postgres Database is a common implementation especially
 /// because the default Starlane [`Registry`] (and at the time of this writing the only Registry support).
@@ -32,7 +33,7 @@ use crate::hyperspace::reg::Registry;
 /// ## PROVIDER
 /// A [`Dependency`] has a one to many child concept called a [`Provider`] (poorly named!)  Not all Dependencies
 /// have a Provider.  A Provider is something of an instance of a given Dependency.... For example:
-/// The Postgres Cluster [`DependencyKind::Postgres`]  (talking the actual postgresql software which can serve multiple databases)
+/// The Postgres Cluster [`DependencyKind::PostgresCluster`]  (talking the actual postgresql software which can serve multiple databases)
 /// The Postgres Dependency may have multiple Databases ([`ProviderKind::Database`]).  The provider
 /// utilizes a common Dependency to provide a specific service etc.
 ///
@@ -40,16 +41,20 @@ use crate::hyperspace::reg::Registry;
 /// There is one special implementation that the Foundation must manage which is the [`Foundation::registry`]
 /// the Starlane Registry is the only required implementation from the vanilla Starlane installation
 ///
-type CreateFoundation =  dyn FnMut(Value) -> Result<dyn Foundation,FoundationErr> + Sync + Send+ 'static;
-type CreateDep =  dyn FnMut(Value) -> Result<dyn Dependency,FoundationErr> + Sync + Send+ 'static;
+type CreateFoundation<C:Config<FoundationKind>>  = dyn FnMut(Value) -> Result<dyn Foundation<Config=C>,FoundationErr> + Sync + Send+ 'static;
+
+type CreateDep<C:Config<DependencyKind>>  = dyn FnMut(Value) -> Result<dyn Dependency<Config=C>,FoundationErr> + Sync + Send+ 'static;
+
 type CreateProvider =  dyn FnMut(Value) -> Result<dyn Provider,FoundationErr> + Sync + Send+ 'static;
 
-pub static FOUNDATIONS: Lazy<HashMap<FoundationKind, CreateFoundation>> =
+pub static FOUNDATIONS: Lazy<HashMap<FoundationKind, CreateFoundation<impl Config<FoundationKind>>>> =
     Lazy::new(|| {
         let mut foundations = HashMap::new();
-//        foundations.insert(FoundationKind::DockerDesktop, DockerDesktopFoundation::create );
+        foundations.insert(FoundationKind::DockerDaemon, docker_desktop_foundation::Foundation::create );
         foundations
     });
+
+/*
 static FOUNDATION: Lazy<dyn Foundation> =
     Lazy::new(|| {
         let foundation_config = STARLANE_CONFIG.foundation.clone();
@@ -64,6 +69,8 @@ static FOUNDATION: Lazy<dyn Foundation> =
         };
        foundation
     });
+
+ */
 
 fn create_foundation(config: ProtoFoundationConfig) -> Result<impl Foundation,FoundationErr> {
 

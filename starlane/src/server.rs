@@ -34,7 +34,7 @@ use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
 use crate::hyperspace::driver::space::SpaceDriverFactory;
 use crate::hyperspace::foundation::settings::ProtoFoundationSettings;
 use crate::hyperspace::foundation::traits::Foundation;
-//use crate::hyperspace::foundation::docker::DockerDesktopFoundation;
+//use crate::hyperspace::config::docker::DockerDesktopFoundation;
 use crate::hyperspace::machine::MachineTemplate;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -44,7 +44,7 @@ pub struct StarlaneConfig {
     pub can_nuke: bool,
     pub can_scorch: bool,
     pub control_port: u16,
-//    pub foundation: ProtoFoundationConfig,
+//    pub config: ProtoFoundationConfig,
     pub registry: ()
 }
 
@@ -94,7 +94,7 @@ pub struct Starlane {
     config: StarlaneConfig,
     artifacts: Artifacts,
     registry: Registry,
-//    foundation: DockerDesktopFoundation,
+//    config: DockerDesktopFoundation,
 }
 
 /*
@@ -127,7 +127,7 @@ impl Starlane {
 
         let db = match config.clone().registry {
             PgRegistryConfig::Embedded(db) => {
-                let rtn = foundation.provision_registry(&config).await?;
+                let rtn = config.provision_registry(&config).await?;
                 rtn
             }
             PgRegistryConfig::External(db) => {
@@ -158,7 +158,7 @@ impl Starlane {
             config,
             registry,
             artifacts,
-            foundation,
+            config,
         })
 
          */

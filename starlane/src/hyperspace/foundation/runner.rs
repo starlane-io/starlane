@@ -1,13 +1,14 @@
 use std::collections::HashSet;
-use crate::hyperspace::foundation::{DependencyKind, FoundationErr, FoundationKind, ProviderKind, RegistryProvider};
-use crate::hyperspace::foundation::config::{ProtoDependencyConfig, ProtoProviderConfig};
+use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind};
 use crate::hyperspace::foundation::traits::{Dependency, Foundation, Provider};
+use crate::hyperspace::foundation::config;
+use crate::hyperspace::foundation::config::FoundationConfig;
+use crate::hyperspace::foundation::err::FoundationErr;
 
 pub(in crate::hyperspace::foundation) enum Call {
      Kind(tokio::sync::oneshot::Sender<FoundationKind>),
-     Dependency{ kind: DependencyKind, rtn: tokio::sync::oneshot::Sender<Result<dyn Dependency,FoundationErr>>},
+     Dependency{ kind: DependencyKind, rtn: tokio::sync::oneshot::Sender<Result<dyn Dependency<Config=()>,FoundationErr>>},
      InstallFoundationRequiredDependencies(tokio::sync::oneshot::Sender<Result<(),FoundationErr>>),
-     AddDependency{ config: ProtoDependencyConfig, rtn: tokio::sync::oneshot::Sender<Result<dyn Dependency,FoundationErr>>},
      DepCall(DepCallWrapper),
  }
 
@@ -21,11 +22,28 @@ impl FoundationProxy {
              call_tx
          }
      }
-
  }
+
+struct Config {
+    kind: FoundationKind
+}
+
+impl config::Config<FoundationConfig> for Config {
+    type PlatformConfig = ();
+    type FoundationConfig = ();
+
+    fn kind(&self) -> &FoundationKind {
+        & self.kind
+    }
+}
 
 impl Foundation for FoundationProxy {
 
+    type Config = ();
+
+    fn create(config: Self::Config) -> Result<impl Foundation<Config=Self::Config> + Sized, FoundationErr> {
+        todo!()
+    }
      fn kind(&self) -> FoundationKind {
          let (rtn_tx, mut rtn_rx) = tokio::sync::oneshot::channel();
          let call = Call::Kind(rtn_tx);
@@ -58,7 +76,9 @@ impl Foundation for FoundationProxy {
      fn registry(&self) -> &mut impl RegistryProvider {
          todo!()
      }
- }
+
+
+}
 
 pub(in crate::hyperspace::foundation) struct DepCallWrapper {
     kind: DependencyKind,

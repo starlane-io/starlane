@@ -74,7 +74,7 @@ pub mod test {
       let settings = DockerDesktopFoundationSettings::new("zophis".to_string());
 
       let original = FoundationSettings {
-         foundation: FoundationKind::DockerDesktop,
+         foundation: FoundationKind::DockerDaemon,
          settings
       };
 

@@ -39,7 +39,7 @@ use std::time::Duration;
 use std::{io, thread};
 use text_to_ascii_art::to_art;
 use textwrap::Options;
-use starlane::hyperspace::foundation::implementation::docker_desktop_foundation::DockerDesktopFoundation;
+use starlane::hyperspace::foundation::implementation::docker_desktop_foundation::Foundation;
 
 #[tokio::main]
 pub async fn install(edit: bool) -> Result<(), anyhow::Error> {
@@ -159,7 +159,7 @@ version: {version}
     fn foundation_more_info(&self) -> Result<(), anyhow::Error> {
         self.console.clear()?;
         self.console.intro("Foundation")?;
-        self.console.note("topic", "A foundation...")?;
+        self.console.note("topic", "A config...")?;
         Ok(())
     }
 }
@@ -181,7 +181,7 @@ impl StandaloneInstaller {
         spinner.next("config generated", "saving config");
         env::config_save(config.clone())?;
         spinner.stop("config saved");
-        let foundation = DockerDesktopFoundation::new();
+        let foundation = Foundation::new();
 
         let mut spinner = self.console.spinner();
         match &config.registry {

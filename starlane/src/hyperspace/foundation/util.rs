@@ -2,14 +2,16 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Formatter, Write};
+use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use derive_name::{Name, Named};
+use futures::StreamExt;
 use rustls::pki_types::Der;
 use serde::__private::de::missing_field;
 use serde::de::{DeserializeOwned, MapAccess, Visitor};
 use serde::ser::SerializeMap;
-use serde_yaml::Value;
+use serde_yaml::{Mapping, Value};
 use serde_yaml::Value::Tagged;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{FoundationKind, IKind};
@@ -27,18 +29,38 @@ pub trait SubText{
 }
 
 
-#[derive(Debug, Default,Clone, Eq, PartialEq, Serialize)]
-pub struct KindMap<K>(HashMap<String,Value>,
-                      #[serde(skip)]
-                      PhantomData<fn()-> Result<K,FoundationErr>>) where K: IKind;
 
 
-impl <K> KindMap<K> where K: IKind{
-    pub fn category() -> &'static str {
-        K::name()
+#[derive(Debug, Default,Clone, Eq, PartialEq, Serialize,Deserialize)]
+pub struct Map(Mapping);
+
+
+impl Map {
+
+    pub fn to_value(self) -> Value {
+        Value::Mapping(self.0)
     }
 
-    pub fn kind(&self) -> Result<K,FoundationErr> {
+    pub fn from_field<'z,M>( &self, field: &'static str  ) -> Result<M,FoundationErr> where M: Deserialize<'z> {
+        match self.get(field) {
+            Some(value) => {
+                Ok(serde_yaml::from_value(value.clone()).map_err(FoundationErr::config_err)?)
+            }
+            None => Err(FoundationErr::config_err("missing required attribute 'kind'"))
+        }
+    }
+
+    pub fn from_field_opt<'z,M>( &self, field: &'static str  ) -> Result<Option<M>,FoundationErr> where M: Deserialize<'z> {
+        match self.get(field) {
+            None => Ok(None),
+            Some(value) => {
+               Ok(Some(serde_yaml::from_value(value.clone()).map_err(FoundationErr::config_err)?))
+            }
+        }
+    }
+
+
+    pub fn kind<K>(&self) -> Result<K,FoundationErr> where K: IKind {
            let kind_as_value =self.0.get("kind").ok_or_else(|| FoundationErr::missing_kind_declaration(K::name()))?;
            let result = serde_yaml::from_value(kind_as_value.clone());
         match result {
@@ -51,33 +73,80 @@ impl <K> KindMap<K> where K: IKind{
                 Err(FoundationErr::kind_not_found(K::name(),kind_str))
             }
         }
+    }
 
+
+    pub fn parse_list<D>(&self,field: &'static str, f: impl Fn(Map) -> Result<D,FoundationErr> ) -> Result<Vec<D>,FoundationErr> where D: DeserializeOwned{
+        let items: Option<Vec<Map>>  = self.from_field_opt(field)?;
+        match items {
+            None => Ok(vec![]),
+            Some(items) => {
+                let mut rtn = vec![];
+                for item in items{
+                    rtn.push(f(item)?);
+                }
+                Ok(rtn)
+            }
+        }
+
+    }
+
+    pub fn parse_kinds<K,D>(&self,field: &'static str, f: impl Fn(Map) -> Result<D,FoundationErr> ) -> Result<HashMap<K,D>,FoundationErr> where D: DeserializeOwned, K: Eq+PartialEq+Hash+DeserializeOwned {
+        let items: Option<Vec<Map>>  = self.from_field_opt(field)?;
+
+        match items {
+            None => {
+                Ok(HashMap::new())
+            }
+            Some(items) => {
+                let mut rtn = HashMap::new();
+                for item in items {
+                    rtn.insert(item.from_field("kind")?, f(item)?);
+                }
+                Ok(rtn)
+            }
+        }
+
+
+    }
+
+    pub fn parse_same<K,D>(&self,field: &'static str ) -> Result<HashMap<K,D>,FoundationErr> where D: DeserializeOwned, K: Eq+PartialEq+Hash+DeserializeOwned {
+        let items: Vec<Map>  = self.from_field(field)?;
+        let mut rtn = HashMap::new();
+        for item in items {
+            let item = serde_yaml::from_value(item.to_value())?;
+            rtn.insert(item.from_field("kind")?, item);
+        }
+        Ok(rtn)
     }
 }
 
 
-impl <K> Deref for KindMap<K> where K:IKind{
-    type Target = HashMap<String,Value>;
+
+
+impl Deref for Map {
+    type Target = Mapping;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl <K> DerefMut for KindMap<K> where K: IKind{
+impl DerefMut for Map {
     fn deref_mut(&mut self) -> &mut Self::Target {
         & mut self.0
     }
 }
 
-impl <K> KindMap<K> where K: IKind{
-    fn new() -> KindMap<K> {
-        KindMap(Default::default(),Default::default())
+impl  Map {
+    fn new() -> Map {
+        Map(Default::default())
     }
 }
+/*
 
 struct MyMapVisitor<K> where K: IKind   {
-    marker: PhantomData<fn() -> KindMap<K>>
+    marker: PhantomData<fn() -> Map<K>>
 }
 
 impl <K> MyMapVisitor<K> where K: IKind  {
@@ -91,7 +160,7 @@ impl <K> MyMapVisitor<K> where K: IKind  {
 
 impl<'de,K> Visitor<'de> for MyMapVisitor<K> where K: IKind
 {
-    type Value = KindMap<K>;
+    type Value = Map<K>;
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter.write_str("a very special map")
     }
@@ -101,7 +170,7 @@ impl<'de,K> Visitor<'de> for MyMapVisitor<K> where K: IKind
     where
         M: MapAccess<'de>,
     {
-        let mut map = KindMap::new();
+        let mut map = Map::new();
 
         // While there are entries remaining in the input, add them
         // into our map.
@@ -117,7 +186,7 @@ impl<'de,K> Visitor<'de> for MyMapVisitor<K> where K: IKind
 
 
 // This is the trait that informs Serde how to deserialize MyMap.
-impl<'de,K> Deserialize<'de> for KindMap<K> where K:IKind
+impl<'de,K> Deserialize<'de> for Map<K> where K:IKind
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -136,6 +205,8 @@ impl <'de,V> Deserialize<'de> for AbstractMappings<'de,V> {
         todo!()
     }
 }
+
+ */
 
  */
 
@@ -187,13 +258,15 @@ impl <'z,V> DerefMut for AbstractMappings<'z,V> where V: Serialize+Deserialize<'
 
     #[test]
     pub fn kind_map() {
-        let mut map: KindMap<FoundationKind> = KindMap::new();
+//        let mut map: Map= Map::new();
+        let mut map = HashMap::new();
         map.insert("kind".to_string(), serde_yaml::to_value("DockerDesktop").unwrap());
         map.insert("hello".to_string(), serde_yaml::to_value("doctor").unwrap());
         map.insert("yesterday".to_string(), serde_yaml::to_value("tomorow").unwrap());
+        let yaml = serde_yaml::to_string(&map).unwrap();
+        let map: Map =  serde_yaml::from_str(&yaml).unwrap();
 
-        let kind = map.kind().map_err(|err|{eprintln!("{}",err);assert!(false);}).unwrap();
-        println!("kind: `{}`\n\n", kind);
+        println!("kind: `{}`\n\n", map.kind().unwrap());
 
         let out = serde_yaml::to_string(&map).unwrap();
         println!("{}", out);

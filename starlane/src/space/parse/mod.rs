@@ -98,6 +98,7 @@ use nom_supreme::final_parser::ExtractContext;
 use nom_supreme::ParserExt;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_with_macros::{DeserializeFromStr, SerializeDisplay};
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
 
@@ -1522,7 +1523,7 @@ pub fn consume_path<I: Span>(input: I) -> Res<I, I> {
     all_consuming(path)(input)
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash,SerializeDisplay,DeserializeFromStr)]
 pub struct CamelCase {
     string: String,
 }

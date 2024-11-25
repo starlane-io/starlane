@@ -36,7 +36,7 @@ pub mod hyperspace;
 
 
 use starlane::hyperspace::foundation::traits::Foundation;
-use starlane::hyperspace::foundation::implementation::docker_desktop_foundation::DockerDesktopFoundation;
+use starlane::hyperspace::foundation::implementation::docker_desktop_foundation::Foundation;
 pub use crate::hyperspace::platform::Platform;
 use crate::hyperspace::shutdown::shutdown;
 use crate::cli::{Cli, Commands, ContextCmd};

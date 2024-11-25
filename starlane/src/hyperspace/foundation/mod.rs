@@ -11,10 +11,14 @@ pub mod config;
 
 pub mod implementation;
 
-mod util;
+pub mod util;
+
+pub mod service;
+
+pub mod dependency;
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct StarlaneSettings {
+pub struct StarlaneConfig {
     pub context: String,
     pub home: String,
     pub can_nuke: bool,
@@ -23,38 +27,6 @@ pub struct StarlaneSettings {
     pub foundation: ProtoFoundationSettings,
 }
 
-impl StarlaneSettings {}
-
-/*
-impl ProtoStarlaneSettings {
-    pub fn parse<S>(self) -> Result<StarlaneSettings<S>,FoundationErr> where S: Serialize {
-        let rtn = StarlaneSettings {
-            context: self.context,
-            home: self.home,
-            can_nuke: self.can_nuke,
-            can_scorch: self.can_scorch,
-            control_port: self.control_port,
-            foundation: self.foundation.create()?
-        };
-
-        Ok(rtn)
-    }
-}
-
- */
-
-/*
-#[derive(Clone, Serialize, Deserialize)]
-pub struct StarlaneSettings<S> where S: Serialize{
-    pub context: String,
-    pub home: String,
-    pub can_nuke: bool,
-    pub can_scorch: bool,
-    pub control_port: u16,
-    #[serde(deserialize_with = "deserialize_from_value")]
-    pub foundation: FoundationSettings<S>
-}
- */
 
 fn deserialize_from_value<'de, D>(deserializer: D) -> Result<Value, D::Error>
 where
@@ -63,17 +35,10 @@ where
     let value = Deserialize::deserialize(deserializer)?;
     serde_yaml::from_value(value).map_err(de::Error::custom)
 }
-/*
 pub mod factory;
 pub mod runner;
-
- */
-use crate::hyperspace::foundation::config::RawConfig;
-use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::kind::{FoundationKind, IKind};
-use crate::hyperspace::foundation::settings::{
-    ProtoFoundationSettings, RawSettings,
-};
+use crate::hyperspace::foundation::kind::IKind;
+use crate::hyperspace::foundation::settings::ProtoFoundationSettings;
 use crate::hyperspace::foundation::traits::{Dependency, Foundation};
 use crate::hyperspace::platform::PlatformConfig;
 use futures::TryFutureExt;
@@ -87,8 +52,7 @@ use std::future::Future;
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
-use md5::digest::typenum::Abs;
-use implementation::docker_desktop_foundation::DockerDesktopFoundation;
+
 #[derive(Clone)]
 pub struct LiveService<S>
 where
@@ -119,35 +83,20 @@ where
 }
 
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct ProtoFoundationBuilder {
-    foundation: FoundationKind,
-    config: RawConfig,
-    settings: RawSettings,
-}
-
-impl ProtoFoundationBuilder {
-    pub fn create(self) -> Result<impl Foundation + Sized, FoundationErr> {
-        match self.foundation {
-            FoundationKind::DockerDesktop => DockerDesktopFoundation::create(self),
-        }
-    }
-}
 
 
 #[cfg(test)]
 pub mod test {
     use crate::hyperspace::foundation::err::FoundationErr;
-    use crate::hyperspace::foundation::ProtoFoundationBuilder;
 
     #[test]
     pub fn test_builder() {
         fn inner() -> Result<(), FoundationErr> {
-            let builder = include_str!("../../../../foundation/docker-desktop.yaml");
+            let builder = include_str!("../../../../config/foundation/docker-daemon.yaml");
 
             println!("{}", builder);
 
-            let builder = serde_yaml::from_str::<ProtoFoundationBuilder>(builder).unwrap();
+            let builder = serde_yaml::from_str::<>(builder).unwrap();
 
             let foundation = builder.create()?;
 

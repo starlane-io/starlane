@@ -3,12 +3,16 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::str::FromStr;
 use derive_name::Name;
+use nom::bytes::complete::tag;
+use nom::sequence::tuple;
+use serde_with_macros::DeserializeFromStr;
 use thiserror::__private::AsDisplay;
 use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::kind::ProviderKind::DockerDaemon;
 use crate::hyperspace::foundation::traits::{Dependency, Foundation};
+use crate::space::parse::{camel_case, CamelCase};
+use crate::space::parse::util::{new_span, result};
 
-pub const FOUNDATION : &'static str = "foundation";
+pub const FOUNDATION : &'static str = "config";
 pub const DEPENDENCY: &'static str = "implementation";
 pub const PROVIDER: &'static str = "provider";
 
@@ -46,22 +50,20 @@ impl IKind for Kind {
 }
 
 
+
+
 #[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString,strum_macros::EnumIter, strum_macros::IntoStaticStr, Serialize, Deserialize)]
 pub enum FoundationKind {
-    DockerDesktop
+    DockerDaemon
 }
 
 impl Default for FoundationKind {
     fn default() -> Self {
-      Self::DockerDesktop
+      Self::DockerDaemon
     }
 }
 
 //pub type FoundationParser = fn(&Value) -> Result<dyn Foundation, FoundationErr>;
-
-
-
-
 
 impl IKind for FoundationKind {
 
@@ -76,15 +78,14 @@ impl IKind for FoundationKind {
 }
 
 #[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString,strum_macros::IntoStaticStr,strum_macros::EnumIter, Serialize, Deserialize)]
-#[serde(tag="implementation")]
 pub enum DependencyKind {
-    Postgres,
-    Docker
+    PostgresCluster,
+    DockerDaemon
 }
 
-impl Default for DependencyKind {
-    fn default() -> Self {
-        todo!()
+impl DependencyKind {
+    fn provider( &self, provider: CamelCase ) -> ProviderKind {
+        ProviderKind::new(self.clone(),provider)
     }
 }
 
@@ -97,43 +98,51 @@ impl IKind for DependencyKind{
         self.into()
     }
 
+
 }
+
 
 #[derive(Clone,Debug,Eq,PartialEq,Hash)]
 pub struct ProviderKey{
     dep: DependencyKind,
-    kind: ProviderKind
+    kind: CamelCase
 }
 
-impl Display for ProviderKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", format!("{}:{}", self.dep, self.kind))
+
+
+impl FromStr for ProviderKind {
+    type Err = FoundationErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let i = new_span(s);
+        let (dep,_,provider) = result(tuple((camel_case,tag("::"),camel_case)))?;
+
+        let dep = DependencyKind::from_str(dep.to_string()).map_err(FoundationErr::config_err)?;
+
+        let key = Self {
+            dep,
+            provider
+        };
+
+        Ok(key)
     }
 }
 
-impl ProviderKey {
-    pub fn new(dep: DependencyKind, kind: ProviderKind) -> Self {
+impl ProviderKind {
+    pub fn new(dep: DependencyKind, provider: CamelCase) -> Self {
         Self {
             dep,
-            kind,
+            provider,
         }
     }
 }
 
-#[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display, strum_macros::IntoStaticStr, strum_macros::EnumString, Serialize, Deserialize)]
-#[serde(tag="provider")]
-pub enum ProviderKind {
-    #[serde(alias="Postgres::{0}")]
-    #[strum(to_string = "Postgres::{0}")]
-    Postgres(PostgresKind),
-    DockerDaemon
+#[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,DeserializeFromStr)]
+pub struct ProviderKind {
+    pub dep: DependencyKind,
+    pub provider: CamelCase
 }
 
-impl Default for ProviderKind {
-    fn default() -> Self {
-        Self::Postgres(Default::default())
-    }
-}
 
 #[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString, strum_macros::IntoStaticStr,Serialize, Deserialize)]
 #[serde(untagged)]
@@ -184,7 +193,7 @@ println!("{}",kind_str);
         }
 
         //ser(&Kind::Foundation(FoundationKind::DockerDesktop));
-        ser(&Kind::Dependency(DependencyKind::Postgres));
+        ser(&Kind::Dependency(DependencyKind::PostgresCluster));
         //ser(&Kind::Provider(ProviderKind::Postgres(PostgresKind::Database)));
 
         /*
@@ -207,8 +216,10 @@ println!("{}",kind_str);
 
          */
     }
-
 }
+
+
+
 #[derive(Debug, Clone,Serialize, Deserialize,Eq,PartialEq)]
 pub struct DockerDesktopSettings {
     pub name: String
@@ -226,6 +237,6 @@ impl FromStr for DockerDesktopSettings {
     type Err = FoundationErr;
 
     fn from_str(settings: &str) -> Result<Self, Self::Err> {
-        serde_yaml::from_str(settings).map_err(|err|FoundationErr::foundation_verbose_error(FoundationKind::DockerDesktop, err, settings))
+        serde_yaml::from_str(settings).map_err(|err|FoundationErr::foundation_verbose_error(FoundationKind::DockerDaemon, err, settings))
     }
 }

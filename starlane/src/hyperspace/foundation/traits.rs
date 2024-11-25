@@ -2,50 +2,32 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use serde::Deserialize;
 use strum::IntoEnumIterator;
+use crate::hyperspace::foundation::config::Config;
 use crate::hyperspace::foundation::settings::{ProtoFoundationSettings, RawSettings};
 use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::ProtoFoundationBuilder;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, ProviderKey, ProviderKind};
-
-
+use crate::hyperspace::foundation::util::Map;
 
 #[async_trait]
-pub trait Foundation: Send + Sync
+pub trait Foundation: Send + Sync where Self::Config: Config<FoundationKind>
 {
-    fn create(builder: ProtoFoundationBuilder) -> Result<impl Foundation+Sized,FoundationErr>;
+    type Config;
+
+    fn create(config: Self::Config) -> Result<impl Foundation<Config=Self::Config>+Sized,FoundationErr>;
 
     /// a convenience method for getting the FoundationKin before
     /// and actual instance of this trait is created.
-    fn foundation_kind() -> FoundationKind;
-
-    fn kind(&self) -> FoundationKind {
-        Self::foundation_kind()
-    }
-
-
-
-    fn dependencies(&self) -> HashSet<&'static str> {
-        let mut set: HashSet<&'static str> = HashSet::new();
-        for kind in  DependencyKind::iter() {
-            set.insert(kind.as_str());
-        }
-        set
-    }
-
+    fn kind() -> FoundationKind;
 }
 
+#[async_trait]
+pub trait Dependency: Send + Sync where Self::Config :Config<DependencyKind>
+{
+    type Config;
 
-pub trait Dependency {
+    fn create(config: Self::Config) -> Result<impl Dependency<Config=Self::Config>+Sized,FoundationErr>;
 
-    /// a convenience method for getting the DependencyKind before
-    /// and actual instance of this trait is created.
-    fn dependency_kind() -> DependencyKind;
-
-
-    fn kind(&self) -> DependencyKind {
-        Self::dependency_kind()
-    }
-
+    fn kind() -> DependencyKind;
 
     async fn install(&self) -> Result<(), FoundationErr> {
         Ok(())
@@ -55,7 +37,6 @@ pub trait Dependency {
     fn provider_kinds(&self) -> HashSet<&'static str> {
         HashSet::new()
     }
-
 
     fn has_provisioner(&self, kind: &ProviderKind) -> Result<(),FoundationErr> {
         let providers = self.provider_kinds();
@@ -71,10 +52,8 @@ pub trait Dependency {
             }
         }
     }
-
-
-
 }
+
 
 pub trait Provider {
     /// a convenience method for getting the ProviderKind before
