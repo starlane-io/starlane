@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use crate::hyperspace::foundation::config;
@@ -44,13 +45,13 @@ impl config::DependencyConfig for DockerDaemonCoreDependencyConfig {
         Default::default()
     }
 
-    fn require(&self) -> &Vec<Kind> {
-        &REQUIRED
+    fn require(&self) -> Vec<Kind> {
+        REQUIRED.clone()
     }
 
 
-    fn clone_me(&self) -> Box<dyn config::DependencyConfig> {
-       Box::new(self.clone())
+    fn clone_me(&self) -> Arc<dyn config::DependencyConfig> {
+       Arc::new(self.clone())
     }
 }
 
@@ -123,7 +124,7 @@ impl config::ProviderConfig for DockerProviderCoreConfig {
         &self.kind
     }
 
-    fn clone_me(&self) -> Box<dyn config::ProviderConfig> {
-        Box::new(self.clone())
+    fn clone_me(&self) -> Arc<dyn config::ProviderConfig> {
+        Arc::new(self.clone())
     }
 }

@@ -1,7 +1,8 @@
 use std::fmt::{Display, Formatter};
 use serde_yaml::Value;
-use std::rc::Rc;
+use std::sync::Arc;
 use ascii::AsciiChar::k;
+use derive_name::{Name, Named};
 use serde::{de, Deserialize, Serialize};
 use thiserror::Error;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind,  ProviderKind};
@@ -147,6 +148,24 @@ impl FoundationErr {
         Self::Msg(format!("{}",err).to_string())
     }
 
+    pub fn serde_err( err: impl Display ) -> Self {
+        let err = err.to_string();
+        Self::SerdeErr(err)
+    }
+
+
+    pub fn ser_err(name: impl Display, err: impl Display ) -> Self {
+        let name = name.to_string();
+        let err = err.to_string();
+        Self::SerializationErr{ name, err}
+    }
+
+    pub fn des_err(name: impl Display, err: impl Display ) -> Self {
+        let name = name.to_string();
+        let err = err.to_string();
+        Self::DeserializationErr{ name, err}
+    }
+
 
     pub fn config_err(err: impl Display ) -> Self {
         Self::FoundationConfErr(format!("{}",err).to_string())
@@ -173,7 +192,7 @@ impl FoundationErr {
     }
 
     pub fn prov_conf_err( kind: ProviderKind, err: serde_yaml::Error, config: Value) -> Self {
-        let err =Rc::new(err);
+        let err =Arc::new(err);
 
         let config =config.as_str().unwrap_or("?").to_string();
         Self::ProvConfErr {kind,err,config}
@@ -295,7 +314,7 @@ impl Display for ActionItem {
     }
 }
 
-#[derive(Error,Clone,Debug,Serialize,Deserialize)]
+#[derive(Error,Clone,Debug)]
 pub enum FoundationErr {
     #[error("{0}")]
     ActionRequired(ActionRequest),
@@ -332,17 +351,23 @@ pub enum FoundationErr {
     #[error("error converting config args for core: '{kind}' serialization err: '{err}' from config: '{config}'")]
     DepConfErr { kind: DependencyKind,err: String, config: String},
     #[error("error converting config args for provider: '{kind}' serialization err: '{err}' from config: '{config}'")]
-    ProvConfErr { kind: ProviderKind, err: Rc<serde_yaml::Error>, config: String},
+    ProvConfErr { kind: ProviderKind, err: Arc<serde_yaml::Error>, config: String},
     #[error("illegal attempt to change config after it has already been initialized.  Foundation can only be initialized once")]
     FoundationAlreadyCreated,
     #[error("Foundation Runner call sender err (this could be fatal) caused by: {0}")]
-    FoundationRunnerMpscSendErr(Rc<tokio::sync::mpsc::error::SendError<Call>>),
+    FoundationRunnerMpscSendErr(Arc<tokio::sync::mpsc::error::SendError<Call>>),
     #[error("Foundation Runner return sender err (this could be fatal) caused by: {0}")]
-    FoundationRunnerOneshotRecvErr(Rc<tokio::sync::oneshot::error::RecvError>),
+    FoundationRunnerOneshotRecvErr(Arc<tokio::sync::oneshot::error::RecvError>),
     #[error("Foundation Runner call sender err (this could be fatal) caused by: {0}")]
-    FoundationRunnerMpscTrySendErr(Rc<tokio::sync::mpsc::error::TrySendError<Call>>),
+    FoundationRunnerMpscTrySendErr(Arc<tokio::sync::mpsc::error::TrySendError<Call>>),
     #[error("Foundation Runner return sender err (this could be fatal) caused by: {0}")]
-    FoundationRunnerOneshotTryRecvErr(Rc<tokio::sync::oneshot::error::TryRecvError>),
+    FoundationRunnerOneshotTryRecvErr(Arc<tokio::sync::oneshot::error::TryRecvError>),
+    #[error("error encountered when serializing {name}: '{err}'" )]
+    SerializationErr{name:String, err: String},
+    #[error("serde error encountered: '{0}' " )]
+    SerdeErr(String),
+    #[error("error encountered when deserializing {name}: '{err}'" )]
+    DeserializationErr{name:String, err: String},
     #[error("{0}")]
     Msg(String),
     #[error("{category} does not have a kind variant `{variant}`")]
@@ -357,24 +382,24 @@ pub enum FoundationErr {
 
 impl From<tokio::sync::mpsc::error::SendError<Call>> for FoundationErr {
     fn from(err: tokio::sync::mpsc::error::SendError<Call>) -> Self {
-        Self::FoundationRunnerMpscSendErr(Rc::new(err))
+        Self::FoundationRunnerMpscSendErr(Arc::new(err))
     }
 }
 
 impl From<tokio::sync::mpsc::error::TrySendError<Call>> for FoundationErr {
     fn from(err: tokio::sync::mpsc::error::TrySendError<Call>) -> Self {
-        Self::FoundationRunnerMpscTrySendErr(Rc::new(err))
+        Self::FoundationRunnerMpscTrySendErr(Arc::new(err))
     }
 }
 
 impl From<tokio::sync::oneshot::error::RecvError> for FoundationErr {
     fn from(err: tokio::sync::oneshot::error::RecvError) -> Self {
-        Self::FoundationRunnerOneshotRecvErr(Rc::new(err))
+        Self::FoundationRunnerOneshotRecvErr(Arc::new(err))
     }
 }
 
 impl From<tokio::sync::oneshot::error::TryRecvError> for FoundationErr {
     fn from(err: tokio::sync::oneshot::error::TryRecvError) -> Self {
-        Self::FoundationRunnerOneshotTryRecvErr(Rc::new(err))
+        Self::FoundationRunnerOneshotTryRecvErr(Arc::new(err))
     }
 }

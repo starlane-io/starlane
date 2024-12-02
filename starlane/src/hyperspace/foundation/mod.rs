@@ -84,7 +84,7 @@ pub trait Foundation: Send+Sync
 {
     fn kind(&self) -> &FoundationKind;
 
-    fn config(&self) -> &Box<dyn FoundationConfig>;
+    fn config(&self) -> Arc<dyn FoundationConfig>;
 
 
     fn status(&self) -> Status;
@@ -108,7 +108,6 @@ pub trait Foundation: Send+Sync
     /// return a handle to the [`Registry`]
     fn registry(&self) -> Result<Registry,FoundationErr>;
 
-
 }
 
 /// A [`Dependency`] is an add-on to the [`Foundation`] infrastructure which may need to be
@@ -122,7 +121,7 @@ pub trait Dependency: Send+Sync
 {
     fn kind(&self) -> &DependencyKind;
 
-    fn config(&self) -> &Box<dyn DependencyConfig>;
+    fn config(&self) -> Arc<dyn DependencyConfig>;
 
     fn status(&self) -> Status;
 
@@ -156,7 +155,7 @@ pub trait Provider: Send+Sync {
 
     fn kind(&self) -> &ProviderKind;
 
-    fn config(&self) -> &Box<dyn ProviderConfig>;
+    fn config(&self) -> Arc<dyn ProviderConfig>;
 
     fn status(&self) -> Status;
 
@@ -218,7 +217,7 @@ impl Foundation for FoundationSafety  {
         self.foundation.kind()
     }
 
-    fn config(&self) -> &Box<dyn FoundationConfig>{
+    fn config(&self) -> Arc<dyn FoundationConfig>{
         self.foundation.config()
     }
 

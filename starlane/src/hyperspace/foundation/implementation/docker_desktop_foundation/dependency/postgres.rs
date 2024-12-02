@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::str::FromStr;
+use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use crate::hyperspace::foundation::kind::{DependencyKind, Kind, ProviderKind};
 use crate::hyperspace::foundation::{config, LiveService, Provider};
@@ -60,12 +61,12 @@ impl config::DependencyConfig for PostgresDependencyConfig {
         todo!()
     }
 
-    fn require(&self) -> &Vec<Kind> {
+    fn require(&self) -> Vec<Kind> {
         todo!()
     }
 
-    fn clone_me(&self) -> Box<dyn config::DependencyConfig> {
-        Box::new(self.clone())
+    fn clone_me(&self) -> Arc<dyn config::DependencyConfig> {
+        Arc::new(self.clone())
     }
 }
 

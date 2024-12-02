@@ -32,14 +32,14 @@ enum Call {
 }
 
 struct FoundationProxy {
-    config: Box<dyn config::FoundationConfig>,
+    config: Arc<dyn config::FoundationConfig>,
     call_tx: tokio::sync::mpsc::Sender<Call>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
 impl FoundationProxy {
     fn new(
-        config: Box<dyn config::FoundationConfig>,
+        config: Arc<dyn config::FoundationConfig>,
         call_tx: tokio::sync::mpsc::Sender<Call>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
     ) -> Self {
@@ -57,8 +57,8 @@ impl Foundation for FoundationProxy {
         self.config.kind()
     }
 
-    fn config(&self) -> &Box<dyn config::FoundationConfig> {
-        &self.config
+    fn config(&self) -> Arc<dyn config::FoundationConfig> {
+        self.config.clone()
     }
 
     fn status(&self) -> Status {
@@ -144,14 +144,14 @@ enum DepCall {
 }
 
 struct DependencyProxy {
-    config: Box<dyn DependencyConfig>,
+    config: Arc<dyn DependencyConfig>,
     call_tx: tokio::sync::mpsc::Sender<DepCall>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
 impl DependencyProxy {
     fn new(
-        config: Box<dyn DependencyConfig>,
+        config: Arc<dyn DependencyConfig>,
         call_tx: tokio::sync::mpsc::Sender<DepCall>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
     ) -> impl Dependency {
@@ -169,8 +169,8 @@ impl Dependency for DependencyProxy {
         self.config.kind()
     }
 
-    fn config(&self) -> &Box<dyn DependencyConfig> {
-        &self.config
+    fn config(&self) -> Arc<dyn DependencyConfig> {
+        self.config.clone()
     }
 
     fn status(&self) -> Status {
@@ -233,14 +233,14 @@ enum ProviderCall {
 }
 
 struct ProviderProxy {
-    config: Box<dyn ProviderConfig>,
+    config: Arc<dyn ProviderConfig>,
     call_tx: tokio::sync::mpsc::Sender<ProviderCall>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
 impl ProviderProxy {
     fn new(
-        config: Box<dyn ProviderConfig>,
+        config: Arc<dyn ProviderConfig>,
         call_tx: tokio::sync::mpsc::Sender<ProviderCall>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
     ) -> Self {
@@ -258,12 +258,12 @@ impl Provider for ProviderProxy {
         &self.config.kind()
     }
 
-    fn config(&self) -> &Box<dyn ProviderConfig> {
-        &self.config
+    fn config(&self) -> Arc<dyn ProviderConfig> {
+        self.config.clone()
     }
 
     fn status(&self) -> Status {
-        self.status().borrow().clone()
+        self.status.borrow().clone()
     }
 
     fn status_watcher(&self) -> Arc<Receiver<Status>> {
@@ -316,7 +316,7 @@ impl Runner {
     fn dependency(
         &mut self,
         kind: DependencyKind,
-    ) -> Result<Option<Box<dyn Dependency>>, FoundationErr> {
+    ) -> Result<Option<&DependencyRunner>, FoundationErr> {
         if !self.runners.contains_key(&kind) {
             match self.foundation.dependency(&kind) {
                 Ok(None) => return Ok(None),
@@ -328,22 +328,19 @@ impl Runner {
             }
         }
 
-        let (dep_call_tx, mut dep_call_rx) = tokio::sync::mpsc::channel(64);
-        let foundation_call_tx = self.call_tx.clone();
-        tokio::spawn(async move {
-            while let Some(call) = dep_call_rx.recv().await {
-                let wrapper = DepWrapper::new(kind.clone(), call);
-                let call = Call::DepCall(wrapper);
-                foundation_call_tx.send(call).await.unwrap_or_default();
-            }
-        });
 
-        let runner = self.runners.get(&kind).unwrap();
-        let config = runner.dependency.config().clone_me();
-        let dep = DependencyProxy::new(config, dep_call_tx, runner.dependency.status_watcher());
+        let runner =  self.runners.get(&kind).unwrap();
 
-        Ok(Some(dep))
+        Ok(Some(runner))
     }
+
+    fn proxy(&mut self, kind: DependencyKind) -> Result<Option<Box<dyn Dependency>>, FoundationErr> {
+        let runner = self
+            .dependency(kind.clone())?
+            .ok_or(FoundationErr::dep_not_available(kind))?;
+        Ok(Some(runner.proxy()))
+    }
+
 
     async fn run(mut self) -> Result<(), FoundationErr> {
         let logger = logger!(Point::global_foundation());
@@ -354,7 +351,7 @@ impl Runner {
                         .unwrap_or_default();
                 }
                 Call::Dependency { kind, rtn } => {
-                    rtn.send(self.dependency(kind)).unwrap_or_default();
+                    rtn.send(self.proxy(kind)).unwrap_or_default();
                 }
                 Call::Install { progress, rtn } => {
                     rtn.send(self.foundation.install(progress).await)
@@ -388,6 +385,24 @@ impl DependencyRunner {
         }
     }
 
+    fn proxy(&self) -> Box<dyn Dependency> {
+        let kind = self.kind().clone();
+        let (dep_call_tx, mut dep_call_rx) = tokio::sync::mpsc::channel(64);
+        let foundation_call_tx = self.call_tx.clone();
+        tokio::spawn(async move {
+            while let Some(dep_call) = dep_call_rx.recv().await {
+                let prov_wrapper = DepWrapper::new(kind.clone(), dep_call);
+                let call = Call::DepCall(prov_wrapper);
+                foundation_call_tx.send(call).await.unwrap_or_default();
+            }
+        });
+        Box::new(DependencyProxy::new(
+            self.dependency.config().clone_me(),
+            dep_call_tx,
+            self.dependency.status_watcher(),
+        ))
+    }
+
     fn kind(&self) -> &DependencyKind {
         self.dependency.kind()
     }
@@ -412,7 +427,7 @@ impl DependencyRunner {
 
         Ok(Some(runner))
     }
-    fn proxy(&mut self, kind: ProviderKind) -> Result<Option<Box<dyn Provider>>, FoundationErr> {
+    fn provider_proxy(&mut self, kind: ProviderKind) -> Result<Option<Box<dyn Provider>>, FoundationErr> {
         let runner = self
             .provider(kind.clone())?
             .ok_or(FoundationErr::provider_not_available(kind))?;
@@ -438,7 +453,7 @@ impl DependencyRunner {
                     .unwrap_or_default();
             }
             DepCall::Provider { kind, rtn } => {
-                rtn.send(self.proxy(kind)).unwrap_or_default();
+                rtn.send(self.provider_proxy(kind)).unwrap_or_default();
             }
             DepCall::ProviderCall(wrap) => {
                 if let Some(provider) = self.provider(wrap.kind).unwrap_or_default() {
@@ -459,7 +474,6 @@ impl ProviderRunner {
         provider: Box<dyn Provider>,
         foundation_call_tx: tokio::sync::mpsc::Sender<Call>,
     ) -> Self {
-        let provider = Box::new(provider);
         Self {
             provider,
             foundation_call_tx,

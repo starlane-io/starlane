@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::Arc;
 use derive_name::Name;
 use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
+use serde_yaml::{Error, Value};
 use crate::hyperspace::foundation;
 use crate::hyperspace::foundation::config;
 use crate::hyperspace::foundation::err::FoundationErr;
@@ -10,7 +12,7 @@ use crate::hyperspace::foundation::kind::{DependencyKind, Kind, PostgresKind, Pr
 use crate::hyperspace::foundation::Dependency;
 use crate::hyperspace::foundation::implementation::docker_desktop_foundation;
 use crate::hyperspace::foundation::implementation::docker_desktop_foundation::{DependencyConfig};
-use crate::hyperspace::foundation::util::Map;
+use crate::hyperspace::foundation::util::{Map, ToMap};
 use crate::space::parse::CamelCase;
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
@@ -61,13 +63,13 @@ impl config::DependencyConfig for PostgresClusterCoreConfig {
     }
 
 
-    fn require(&self) -> &Vec<Kind> {
-        &foundation::default_requirements()
+    fn require(&self) -> Vec<Kind> {
+        foundation::default_requirements()
     }
 
 
-    fn clone_me(&self) -> Box<dyn config::DependencyConfig> {
-        Box::new(self.clone())
+    fn clone_me(&self) -> Arc<dyn config::DependencyConfig> {
+        Arc::new(self.clone())
     }
 }
 
@@ -115,13 +117,15 @@ impl ProviderConfig {
     }
 }
 
+
+
 impl config::ProviderConfig for ProviderConfig {
     fn kind(&self) -> &ProviderKind {
         todo!()
     }
 
-    fn clone_me(&self) -> Box<dyn config::ProviderConfig> {
-        Box::new(self.clone())
+    fn clone_me(&self) -> Arc<dyn config::ProviderConfig> {
+        Arc::new(self.clone())
     }
 }
 

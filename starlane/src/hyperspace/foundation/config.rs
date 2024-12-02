@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::sync::Arc;
+use derive_name::Name;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, Kind, ProviderKind};
-use crate::hyperspace::foundation::util::Map;
+use crate::hyperspace::foundation::util::ToMap;
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use serde_yaml::Value;
@@ -26,8 +28,9 @@ pub struct Metadata<'a,K> where K: Serialize+Deserialize<'a>+'a{
 
 
 
-pub trait Config
-   where Self: Sized,
+pub trait Config:
+   where
+         Self: Sized+ ToMap +Name,
          Self::PlatformConfig: PlatformConfig,
          Self::FoundationConfig: FoundationConfig,
 
@@ -39,7 +42,7 @@ pub trait Config
     fn platform(&self) -> Self::FoundationConfig;
 }
 
-pub trait FoundationConfig: Send+Sync{
+pub trait FoundationConfig: Send+Sync+ToMap {
     fn kind(&self) -> &FoundationKind;
 
     /// required [`Vec<Kind>`]  must be installed and running for THIS [`Foundation`] to work.
@@ -48,20 +51,24 @@ pub trait FoundationConfig: Send+Sync{
 
     fn dependency_kinds(&self) -> &Vec<DependencyKind>;
 
-    fn dependency(&self, kind: &DependencyKind) -> Option<&Box<dyn DependencyConfig>>;
+    fn dependency(&self, kind: &DependencyKind) -> Option<&Arc<dyn DependencyConfig>>;
 
-    fn clone_me(&self) -> Box<dyn FoundationConfig>;
+    fn clone_me(&self) -> Arc<dyn FoundationConfig>;
 }
 
-pub trait DependencyConfig: Send+Sync{
+
+
+pub trait DependencyConfig: Send+Sync+ ToMap {
     fn kind(&self) -> &DependencyKind;
 
     fn volumes(&self) -> HashMap<String,String>;
 
-    fn require(&self) -> &Vec<Kind>;
+    fn require(&self) -> Vec<Kind>;
 
 
-    fn clone_me(&self) -> Box<dyn DependencyConfig>;
+    fn clone_me(&self) -> Arc<dyn DependencyConfig>;
+
+
 }
 
 pub trait ProviderConfigSrc<P>: DependencyConfig where P: ProviderConfig{
@@ -71,10 +78,10 @@ pub trait ProviderConfigSrc<P>: DependencyConfig where P: ProviderConfig{
 }
 
 
-pub trait ProviderConfig: Send+Sync{
+pub trait ProviderConfig: Send+Sync+ ToMap {
     fn kind(&self) -> &ProviderKind;
 
-    fn clone_me(&self) -> Box<dyn ProviderConfig>;
+    fn clone_me(&self) -> Arc<dyn ProviderConfig>;
 }
 
 

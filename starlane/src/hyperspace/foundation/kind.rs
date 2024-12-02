@@ -5,6 +5,8 @@ use std::str::FromStr;
 use derive_name::Name;
 use nom::bytes::complete::tag;
 use nom::sequence::tuple;
+use nom_supreme::final_parser::final_parser;
+use nom_supreme::parser_ext::FromStrParser;
 use serde_with_macros::DeserializeFromStr;
 use thiserror::__private::AsDisplay;
 use crate::hyperspace::foundation::{Dependency, Foundation};
@@ -107,14 +109,16 @@ impl IKind for DependencyKind{
 
 
 
+
 impl FromStr for ProviderKind {
     type Err = FoundationErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let i = new_span(s);
-        let (dep,_,provider) = result(tuple((camel_case,tag("::"),camel_case)))?;
+        let (dep,_,provider) = result(tuple((camel_case,tag("::"),camel_case))(i))?;
 
-        let dep = DependencyKind::from_str(dep.to_string()).map_err(FoundationErr::config_err)?;
+
+        let dep = DependencyKind::from_str(dep.as_str()).map_err(FoundationErr::config_err)?;
 
         let key = Self {
             dep,
@@ -176,6 +180,12 @@ impl IKind for ProviderKind{
 
     fn as_str(&self) -> &'static str {
         self.into()
+    }
+}
+
+impl From<&ProviderKind> for &str {
+    fn from(kind: &ProviderKind) -> Self {
+        kind.as_str()
     }
 }
 
