@@ -4,7 +4,7 @@ use crate::env::{
     config, config_path, config_save, context, context_dir, Enviro, GlobalMode, StdEnviro,
     STARLANE_GLOBAL_SETTINGS, STARLANE_HOME,
 };
-use starlane::hyperspace::foundation::traits::Foundation;
+use starlane::hyperspace::foundation::Foundation;
 use crate::hyperspace::reg::PgRegistryConfig;
 <<<<<<< Updated upstream
 use crate::hyperspace::registry::postgres::embed::PgEmbedSettings;

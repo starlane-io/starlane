@@ -74,7 +74,7 @@ pub mod util;
 pub mod wasm;
 
 pub mod prelude;
-pub mod task;
+pub mod progress;
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());

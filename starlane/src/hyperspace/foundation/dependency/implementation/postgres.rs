@@ -6,7 +6,7 @@ use crate::hyperspace::foundation::config;
 use crate::hyperspace::foundation::config::ProviderConfig;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, PostgresKind, ProviderKind};
-use crate::hyperspace::foundation::traits::Dependency;
+use crate::hyperspace::foundation::Dependency;
 use crate::hyperspace::foundation::util::Map;
 use crate::space::parse::CamelCase;
 

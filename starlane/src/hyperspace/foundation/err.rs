@@ -1,10 +1,10 @@
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use serde_yaml::Value;
 use std::rc::Rc;
 use ascii::AsciiChar::k;
-use serde::de;
+use serde::{de, Deserialize, Serialize};
 use thiserror::Error;
-use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, ProviderKey, ProviderKind};
+use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind,  ProviderKind};
 use crate::space::err::{ParseErrs, ToSpaceErr};
 
 pub struct Call;
@@ -105,7 +105,7 @@ impl FoundationErr {
 
     pub fn foundation_err<MSG>(kind: FoundationKind, msg: MSG) -> Self where MSG: AsRef<str>{
         let msg = msg.as_ref().to_string();
-        FoundationErr::FoundationErr{ kind, msg }
+        FoundationErr::FoundationError { kind, msg }
     }
 
     pub fn dep_not_found<KIND>(kind:KIND) -> Self where KIND: AsRef<str>{
@@ -129,8 +129,8 @@ impl FoundationErr {
         Self::DepErr{kind,msg}
     }
 
-    pub fn prov_err(key: ProviderKey, msg: String ) -> Self {
-        Self::ProviderErr{key,msg}
+    pub fn prov_err(kind: ProviderKind, msg: String ) -> Self {
+        Self::ProviderErr{ kind: kind,msg}
     }
 
     pub fn foundation_verbose_error<C>(kind: FoundationKind, err: serde_yaml::Error, config: C ) -> Self where C: ToString {
@@ -142,6 +142,11 @@ impl FoundationErr {
     pub fn settings_err<E>(err: E ) -> Self  where E: ToString {
         Self::FoundationSettingsErr(format!("{}",err.to_string()).to_string())
     }
+
+    pub fn msg(err: impl Display ) -> Self {
+        Self::Msg(format!("{}",err).to_string())
+    }
+
 
     pub fn config_err(err: impl Display ) -> Self {
         Self::FoundationConfErr(format!("{}",err).to_string())
@@ -188,8 +193,44 @@ impl FoundationErr {
     }
 }
 
-#[derive(Error,Clone,Debug)]
+
+#[derive(Clone,Debug,Serialize,Deserialize)]
+pub struct ActionItem {
+    pub title: String,
+    pub website: Option<String>,
+    pub details: String
+}
+
+
+
+impl ActionItem {
+    pub fn new(title: String, details: String) -> Self {
+        Self {
+            title,
+            details,
+            website: None,
+        }
+    }
+
+    pub fn with_website( & mut self, website: String ) {
+        self.website = Some(website);
+    }
+
+    pub fn print( vec: &Vec<Self> ) {
+
+    }
+}
+
+impl Display for ActionItem {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.title)
+    }
+}
+
+#[derive(Error,Clone,Debug,Serialize,Deserialize)]
 pub enum FoundationErr {
+    #[error("{kind} {actions.len()} User Actions Required")]
+    ActionRequired { kind: FoundationKind, actions: Vec<ActionItem> },
     #[error("[{id}] -> PANIC! <{kind}> error message: '{msg}'")]
     Panic {id: String, kind: String, msg: String},
     #[error("FoundationConfig.config is set to '{0}' which this Starlane build does not recognize")]
@@ -211,13 +252,13 @@ pub enum FoundationErr {
     #[error("config config err: {0}")]
     FoundationConfErr(String),
     #[error("[{kind}] Foundation Error: '{msg}'")]
-    FoundationErr{ kind: FoundationKind, msg: String },
+    FoundationError { kind: FoundationKind, msg: String },
     #[error("[{kind}] Error: '{msg}'")]
     DepErr{ kind: DependencyKind, msg: String},
     #[error("Action Required: {cat}: {kind} cannot {action} without user help.  Additional Info: '{summary}'")]
     UserActionRequired{ cat: String, kind: String, action: String, summary: String, },
-    #[error("[{key}] Error: '{msg}'")]
-    ProviderErr{ key: ProviderKey, msg: String},
+    #[error("[{kind}] Error: '{msg}'")]
+    ProviderErr{ kind: ProviderKind, msg: String},
     #[error("error converting config args for implementation: '{kind}' serialization err: '{err}' from config: '{config}'")]
     DepConfErr { kind: DependencyKind,err: String, config: String},
     #[error("error converting config args for provider: '{kind}' serialization err: '{err}' from config: '{config}'")]
@@ -239,7 +280,9 @@ pub enum FoundationErr {
     #[error("Missing `kind:` mapping for {0}")]
     MissingKind(String),
     #[error("{0}")]
-    ParseErrs(#[from] ParseErrs)
+    ParseErrs(#[from] ParseErrs),
+    #[error("")]
+    NotInstalledErr{ dependency: String }
 }
 
 impl From<tokio::sync::mpsc::error::SendError<Call>> for FoundationErr {

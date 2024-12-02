@@ -1,15 +1,15 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use ascii::AsciiChar::k;
 use serde_yaml::Value;
+use crate::hyperspace::foundation;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, ProviderKind};
-use crate::hyperspace::foundation::settings::FoundationSettings;
-use crate::hyperspace::foundation::config;use crate::hyperspace::foundation::config::{DependencyConfig};
+use crate::hyperspace::foundation::config;use crate::hyperspace::foundation::config::DependencyConfig;
 use crate::hyperspace::foundation::dependency::implementation::docker::DockerDaemonConfig;
 use crate::hyperspace::foundation::dependency::implementation::postgres::PostgresClusterConfig;
-use crate::hyperspace::foundation::traits;
 use crate::hyperspace::foundation::util::Map;
+use crate::hyperspace::reg::Registry;
+use crate::space::progress::Progress;
 
 pub mod dependency;
 
@@ -18,18 +18,24 @@ pub struct Foundation {
     config: FoundationConfig
 }
 
-impl traits::Foundation for Foundation {
-
-    type Config = FoundationConfig;
-
-    fn create(config: Self::Config) -> Result<impl config::Foundation<Config=Self::Config>, FoundationErr> {
-        Ok(Self{
-            config
-        })
+impl foundation::Foundation for Foundation {
+    fn kind(&self) -> &FoundationKind{
+        &FoundationKind::DockerDaemon
     }
 
-    fn kind() -> FoundationKind {
-        FoundationKind::DockerDaemon
+    fn config(&self) -> &impl config::FoundationConfig {
+        &self.config
+    }
+
+    /// Ensure that core dependencies are downloaded, installed and initialized
+    /// in the case of [`FoundationKind::DockerDaemon`] we first check if the Docker Daemon
+    /// is installed and running.  This installer does not actually install DockerDaemonb
+    fn install(&self, progress: Progress) -> Result<(), FoundationErr> {
+        Ok(())
+    }
+
+    fn registry(&self) -> Result<&Registry, FoundationErr> {
+        Err(FoundationErr::FoundationError {kind: self.kind().clone(), })
     }
 }
 

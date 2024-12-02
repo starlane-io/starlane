@@ -7,8 +7,8 @@ use nom::bytes::complete::tag;
 use nom::sequence::tuple;
 use serde_with_macros::DeserializeFromStr;
 use thiserror::__private::AsDisplay;
+use crate::hyperspace::foundation::{Dependency, Foundation};
 use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::traits::{Dependency, Foundation};
 use crate::space::parse::{camel_case, CamelCase};
 use crate::space::parse::util::{new_span, result};
 
@@ -102,11 +102,6 @@ impl IKind for DependencyKind{
 }
 
 
-#[derive(Clone,Debug,Eq,PartialEq,Hash)]
-pub struct ProviderKey{
-    dep: DependencyKind,
-    kind: CamelCase
-}
 
 
 
@@ -142,6 +137,13 @@ pub struct ProviderKind {
     pub dep: DependencyKind,
     pub provider: CamelCase
 }
+
+impl Display for ProviderKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", format!("{}::{}", self.dep.as_str(), self.provider.as_str()).to_string())
+    }
+}
+
 
 
 #[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString, strum_macros::IntoStaticStr,Serialize, Deserialize)]

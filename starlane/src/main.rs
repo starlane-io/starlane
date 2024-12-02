@@ -35,7 +35,7 @@ pub mod hyperspace;
 
 
 
-use starlane::hyperspace::foundation::traits::Foundation;
+use starlane::hyperspace::foundation::Foundation;
 use starlane::hyperspace::foundation::implementation::docker_desktop_foundation::Foundation;
 pub use crate::hyperspace::platform::Platform;
 use crate::hyperspace::shutdown::shutdown;
