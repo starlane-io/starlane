@@ -4,7 +4,7 @@ use std::sync::Arc;
 use derive_name::Name;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, Kind, ProviderKind};
-use crate::hyperspace::foundation::util::ToMap;
+use crate::hyperspace::foundation::util::{DesMap, SerMap};
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use serde_yaml::Value;
@@ -25,12 +25,9 @@ pub struct Metadata<'a,K> where K: Serialize+Deserialize<'a>+'a{
  */
 
 
-
-
-
 pub trait Config:
    where
-         Self: Sized+ ToMap +Name,
+         Self: Sized+ SerMap +Name,
          Self::PlatformConfig: PlatformConfig,
          Self::FoundationConfig: FoundationConfig,
 
@@ -42,7 +39,7 @@ pub trait Config:
     fn platform(&self) -> Self::FoundationConfig;
 }
 
-pub trait FoundationConfig: Send+Sync+ToMap {
+pub trait FoundationConfig: Send+Sync+SerMap{
     fn kind(&self) -> &FoundationKind;
 
     /// required [`Vec<Kind>`]  must be installed and running for THIS [`Foundation`] to work.
@@ -58,17 +55,26 @@ pub trait FoundationConfig: Send+Sync+ToMap {
 
 
 
-pub trait DependencyConfig: Send+Sync+ ToMap {
+pub trait DependencyConfig: Send+Sync{
     fn kind(&self) -> &DependencyKind;
 
     fn volumes(&self) -> HashMap<String,String>;
 
     fn require(&self) -> Vec<Kind>;
 
-
     fn clone_me(&self) -> Arc<dyn DependencyConfig>;
+}
 
+impl IntoConfigTrait for dyn DependencyConfig {
+    type Config = dyn DependencyConfig;
+}
 
+pub trait IntoConfigTrait {
+    type Config;
+    fn into_trait(self) -> Arc<Self::Config> {
+        let config = Arc::new(self);
+        config as Arc<Self::Config>
+    }
 }
 
 pub trait ProviderConfigSrc<P>: DependencyConfig where P: ProviderConfig{
@@ -78,7 +84,7 @@ pub trait ProviderConfigSrc<P>: DependencyConfig where P: ProviderConfig{
 }
 
 
-pub trait ProviderConfig: Send+Sync+ ToMap {
+pub trait ProviderConfig: Send+Sync{
     fn kind(&self) -> &ProviderKind;
 
     fn clone_me(&self) -> Arc<dyn ProviderConfig>;

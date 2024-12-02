@@ -10,13 +10,14 @@ use serde_yaml::{Error, Mapping, Value};
 use tokio::sync::watch::Receiver;
 use crate::hyperspace::foundation;
 use crate::hyperspace::foundation::{config, Dependency};
-use crate::hyperspace::foundation::config::{ ProviderConfig};
+use crate::hyperspace::foundation::config::{IntoConfigTrait, ProviderConfig};
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, Kind, ProviderKind};
 use crate::hyperspace::foundation::dependency::core::docker::DockerDaemonCoreDependencyConfig;
-use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
+use crate::hyperspace::foundation::dependency::core::postgres::{ PostgresClusterCoreConfig};
+use crate::hyperspace::foundation::kind::DependencyKind::PostgresCluster;
 use crate::hyperspace::foundation::status::Status;
-use crate::hyperspace::foundation::util::{Map, ToMap};
+use crate::hyperspace::foundation::util::{DesMap, Map, SerMap};
 use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
 use crate::space::progress::Progress;
@@ -115,7 +116,7 @@ pub struct FoundationConfig {
 
 impl FoundationConfig {
 
-   pub(self) fn des_from_map(map: impl ToMap) -> Result<Self, FoundationErr> {
+   pub(self) fn des_from_map(map: impl SerMap) -> Result<Self, FoundationErr> {
            let map = map.to_map()?;
            let kind = map.kind()?;
 
@@ -131,17 +132,17 @@ impl FoundationConfig {
            })
        }
 
-    pub(self) fn des_dependencies_from_sequence(dependencies: impl ToMap) -> Result<HashMap<DependencyKind,Arc<dyn DependencyConfig>>, FoundationErr> {
+    pub(self) fn des_dependencies_from_sequence(dependencies: impl SerMap) -> Result<HashMap<DependencyKind,Arc<dyn DependencyConfig>>, FoundationErr> {
         dependencies.to_kind_map(Self::des_dependency_factory)
     }
 
-    pub(self) fn des_dependency_factory(dependency: impl ToMap ) -> Result<Arc<impl DependencyConfig+DeserializeOwned>, FoundationErr> {
+    pub(self) fn des_dependency_factory(dependency: impl SerMap) -> Result<Arc<dyn DependencyConfig>, FoundationErr> {
         let map = dependency.to_map()?;
         let kind: DependencyKind = map.kind()?;
 
         match kind {
-            DependencyKind::PostgresCluster => PostgresClusterCoreConfig::create(map).map(Arc::new),
-            DependencyKind::DockerDaemon => DockerDaemonCoreDependencyConfig::create(map).map(Arc::new)
+            DependencyKind::PostgresCluster => PostgresClusterCoreConfig::create(map).map(PostgresClusterCoreConfig::into_trait),
+            DependencyKind::DockerDaemon => DockerDaemonCoreDependencyConfig::create(map).map(DockerDaemonCoreDependencyConfig::into_trait),
         }
     }
 
@@ -155,6 +156,12 @@ impl FoundationConfig {
 }
 
 
+pub trait DependencyConfig: config::DependencyConfig {
+}
+
+impl IntoConfigTrait for dyn DependencyConfig {
+    type Config = dyn DependencyConfig;
+}
 
 impl config::FoundationConfig for FoundationConfig {
     fn kind(&self) -> & FoundationKind {
@@ -176,7 +183,10 @@ impl config::FoundationConfig for FoundationConfig {
     fn clone_me(&self) -> Arc<dyn config::FoundationConfig>{
        Arc::new(self.clone())
     }
+}
 
+impl IntoConfigTrait for dyn DependencyConfig {
+    type Config = Self;
 }
 
 
@@ -191,15 +201,13 @@ pub struct RegistryProviderConfig {
 
 
 
-pub trait DependencyConfig : config::DependencyConfig {
-}
 
 
 
 #[cfg(test)]
 pub mod test {
     use crate::hyperspace::foundation::err::FoundationErr;
-    use crate::hyperspace::foundation::implementation::docker_desktop_foundation::{Foundation, FoundationConfig};
+    use crate::hyperspace::foundation::implementation::docker_daemon_foundation::{Foundation, FoundationConfig};
     use crate::hyperspace::foundation::util::Map;
 
     #[test]

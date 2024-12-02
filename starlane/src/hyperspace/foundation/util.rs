@@ -11,7 +11,7 @@ use rustls::pki_types::Der;
 use serde::__private::de::missing_field;
 use serde::de::{DeserializeOwned, MapAccess, Visitor};
 use serde::ser::SerializeMap;
-use serde_yaml::{Mapping, Value};
+use serde_yaml::{Mapping, Sequence, Value};
 use serde_yaml::Value::Tagged;
 use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
 use crate::hyperspace::foundation::err::FoundationErr;
@@ -35,13 +35,7 @@ pub trait SubText{
 pub struct Map(Mapping);
 
 
-impl ToMap for Map {
-    fn to_map(self) -> Result<Map, FoundationErr> {
-        Ok(self)
-    }
-}
-
-impl TryInto<serde_yaml::Value> for dyn ToMap {
+impl TryInto<serde_yaml::Value> for dyn SerMap {
     type Error = FoundationErr;
 
     fn try_into(self) -> Result<serde_yaml::Value, Self::Error> {
@@ -59,14 +53,8 @@ impl <S> TryFrom<dyn AsRef<str>> for S where S: Mappable {
 
  */
 
-impl <D> ToMap for D where D: DeserializeOwned{
-    fn to_map(self) -> Result<Map, FoundationErr> {
-        match serde_yaml::to_value(self) {
-            Ok(value) => Map::try_from(value),
-            Err(err) => Err(FoundationErr::serde_err(err))
-        }
-    }
-}
+
+
 
 
 
@@ -105,29 +93,35 @@ impl TryFrom<&str> for Map {
 
 
 
+pub trait SerdeMap: SerMap+DesMap { }
 
-pub trait ToMap {
-    fn to_map(self) -> Result<Map, FoundationErr> where Self: Serialize{
-        serde_yaml::to_value(self).map_err(FoundationErr::serde_err)?.to_map()
+pub trait SerMap {
+    fn to_map(self) -> Result<Map, FoundationErr> {
+        Err(FoundationErr::serde_err("this type does not support Serialization"))
     }
 
-    fn to_sequence(self) -> Result<serde_yaml::Sequence, FoundationErr> where Self: Serialize
-    {
-       serde_yaml::to_value(self).map_err(FoundationErr::serde_err)?.to_sequence()
-    }
-
-    fn to_value(self) -> Result<serde_yaml::Value, FoundationErr> where Self: Serialize{
-        serde_yaml::to_value(self).map_err(FoundationErr::ser_err)
+    fn to_sequence(self) -> Result<Sequence, FoundationErr> {
+        Err(FoundationErr::serde_err("this type does not support Serialization"))
     }
 
 
-    /// Create a [`HashMap<K,D>`] from a sequence. This method accepts a factory closure
-    /// which will generate [`D`] based on [`K`]
+    fn to_value(self) -> Result<serde_yaml::Value, FoundationErr> {
+        Err(FoundationErr::serde_err("this type does not support Serialization"))
+    }
+}
+
+pub trait DesMap {
+    fn to_kind_map<K,D,F>(self, _: F ) -> Result<HashMap<K, D>, FoundationErr> {
+        Err(FoundationErr::serde_err("this type does not support Deserialization"))
+    }
+}
+
+impl <T> DesMap for T where T: DeserializeOwned{
     fn to_kind_map<K,D,F>(self, factory: F ) -> Result<HashMap<K, D>, FoundationErr>
     where
         K: IKind,
         D: DeserializeOwned,
-        F: Fn(K, dyn ToMap) -> Result<D,FoundationErr> {
+        F: Fn(K, dyn SerMap) -> Result<D,FoundationErr> {
 
 
         let mut maps = HashMap::new();
@@ -141,21 +135,23 @@ pub trait ToMap {
 
         Ok(maps)
     }
-
 }
 
-
-impl ToMap for serde_yaml::Value {
-    fn to_value(self) -> Result<Value, FoundationErr> {
-        Ok(self)
+impl <T> SerMap for T where T: Serialize {
+    fn to_map(self) -> Result<Map, FoundationErr> {
+        serde_yaml::to_value(self).map_err(FoundationErr::serde_err)?.to_map()
     }
+
+    fn to_sequence(self) -> Result<serde_yaml::Sequence, FoundationErr>
+    {
+        serde_yaml::to_value(self).map_err(FoundationErr::serde_err)?.to_sequence()
+    }
+
+    fn to_value(self) -> Result<serde_yaml::Value, FoundationErr> {
+        serde_yaml::to_value(self).map_err(FoundationErr::ser_err)
+    }
+
 }
-
-impl ToMap for dyn AsRef<str> { }
-
-impl ToMap for &dyn AsRef<str> { }
-
-
 
 
 
@@ -185,7 +181,7 @@ impl VariantStr for serde_yaml::Value {
 
     fn display(&self) -> impl Display {
         match self {
-            Value::Null => "Null",
+            Value::Null => "Null".to_string(),
             Value::Bool(v) => v.to_string(),
             Value::Number(v) => v.to_string(),
             Value::String(v) => v.to_string(),
@@ -265,7 +261,7 @@ impl Map {
 
     }
 
-    pub fn parse_kinds<K,D>(&self,field: &'static str, f: impl Fn(dyn ToMap) -> Result<D,FoundationErr> ) -> Result<HashMap<K,D>,FoundationErr> where D: DeserializeOwned, K: IKind{
+    pub fn parse_kinds<K,D>(&self, field: &'static str, f: impl Fn(dyn SerMap) -> Result<D,FoundationErr> ) -> Result<HashMap<K,D>,FoundationErr> where D: DeserializeOwned, K: IKind{
         let items: Option<Vec<Map>>  = self.from_field_opt(field)?;
 
         match items {

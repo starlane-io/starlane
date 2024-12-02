@@ -1,4 +1,5 @@
 /// # FOUNDATION
+///
 /// A ['Foundation'] provides abstracted control over the services and dependencies that drive Starlane.
 /// Presently there is only the ['DockerDaemonFoundation'] which uses a local Docker Service
 /// to pull dependent Docker Images, run docker instances and in general enables the Starlane [`Platform`]

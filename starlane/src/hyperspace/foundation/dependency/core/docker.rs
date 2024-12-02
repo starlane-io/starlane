@@ -3,10 +3,11 @@ use std::sync::Arc;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use crate::hyperspace::foundation::config;
+use crate::hyperspace::foundation::config::IntoConfigTrait;
 use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::implementation::docker_desktop_foundation::DependencyConfig;
+use crate::hyperspace::foundation::implementation::docker_daemon_foundation::DependencyConfig;
 use crate::hyperspace::foundation::kind::{DependencyKind, Kind, ProviderKind};
-use crate::hyperspace::foundation::util::Map;
+use crate::hyperspace::foundation::util::{DesMap, Map};
 use crate::space::parse::CamelCase;
 
 
@@ -24,12 +25,19 @@ pub struct DockerDaemonCoreDependencyConfig {
 
 impl DockerDaemonCoreDependencyConfig {
     pub fn create(config: Map) -> Result<Self, FoundationErr> {
-        let providers = config.parse_same("providers" )?;
+        let providers = config.parse_same("providers")?;
 
         Ok(DockerDaemonCoreDependencyConfig {
             providers
         })
     }
+    pub fn into_trait(self) -> Arc<dyn DependencyConfig> {
+        IntoConfigTrait::into_trait(self)
+    }
+}
+
+impl IntoConfigTrait for dyn DependencyConfig{
+    type Config = dyn DependencyConfig;
 }
 
 impl DependencyConfig for DockerDaemonCoreDependencyConfig {

@@ -8,9 +8,9 @@ use crate::hyperspace::foundation::{config, LiveService, Provider};
 use crate::hyperspace::foundation::dependency::core::docker::DockerProviderCoreConfig;
 use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
 use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::implementation::docker_desktop_foundation;
+use crate::hyperspace::foundation::implementation::docker_daemon_foundation;
 use crate::space::parse::{CamelCase, DbCase, VarCase};
-use crate::hyperspace::foundation::implementation::docker_desktop_foundation::Foundation;
+use crate::hyperspace::foundation::implementation::docker_daemon_foundation::Foundation;
 use crate::hyperspace::foundation::util::Map;
 
 fn default_schema() -> DbCase{

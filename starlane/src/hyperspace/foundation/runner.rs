@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
 use wasmer_wasix::virtual_fs::Upcastable;
+use crate::hyperspace::foundation::util::SerMap;
 
 enum Call {
     Synchronize {
@@ -143,15 +144,17 @@ enum DepCall {
     ProviderCall(ProvWrapper),
 }
 
-struct DependencyProxy {
-    config: Arc<dyn DependencyConfig>,
+struct DependencyProxy<C> where C: DependencyConfig+ SerMap
+{
+    config: Arc<C>,
     call_tx: tokio::sync::mpsc::Sender<DepCall>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
-impl DependencyProxy {
+impl <C> DependencyProxy<C> where C: DependencyConfig+ SerMap
+{
     fn new(
-        config: Arc<dyn DependencyConfig>,
+        config: Arc<C>,
         call_tx: tokio::sync::mpsc::Sender<DepCall>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
     ) -> impl Dependency {
@@ -164,7 +167,7 @@ impl DependencyProxy {
 }
 
 #[async_trait]
-impl Dependency for DependencyProxy {
+impl <C> Dependency for DependencyProxy<C> where C: DependencyConfig{
     fn kind(&self) -> &DependencyKind {
         self.config.kind()
     }

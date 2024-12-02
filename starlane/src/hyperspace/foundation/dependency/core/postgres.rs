@@ -3,16 +3,16 @@ use std::str::FromStr;
 use std::sync::Arc;
 use derive_name::Name;
 use futures::TryFutureExt;
+use md5::digest::DynDigest;
 use serde::{Deserialize, Serialize};
-use serde_yaml::{Error, Value};
 use crate::hyperspace::foundation;
 use crate::hyperspace::foundation::config;
+use crate::hyperspace::foundation::config::IntoConfigTrait;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, Kind, PostgresKind, ProviderKind};
 use crate::hyperspace::foundation::Dependency;
-use crate::hyperspace::foundation::implementation::docker_desktop_foundation;
-use crate::hyperspace::foundation::implementation::docker_desktop_foundation::{DependencyConfig};
-use crate::hyperspace::foundation::util::{Map, ToMap};
+use crate::hyperspace::foundation::implementation::docker_daemon_foundation;
+use crate::hyperspace::foundation::util::{Map, SerMap};
 use crate::space::parse::CamelCase;
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
@@ -26,6 +26,7 @@ pub struct PostgresClusterCoreConfig {
 
 
 impl PostgresClusterCoreConfig {
+
     pub fn create(config: Map) -> Result<Self, FoundationErr> {
         let port: u16 = config.from_field_opt("port").map_err(FoundationErr::config_err)?.map_or(5432u16, |port| port);
         let username: String = config.from_field_opt("username").map_err(FoundationErr::config_err)?.map_or("postgres".to_string(), |username| username);
@@ -42,10 +43,25 @@ impl PostgresClusterCoreConfig {
             port,
             data_dir,
             username,
-            password,
-            providers,
+            password, providers,
         })
     }
+
+    pub fn into_trait(self) -> Arc<dyn DependencyConfig> {
+        IntoConfigTrait::into_trait(self)
+    }
+
+}
+
+pub trait DependencyConfig: docker_daemon_foundation::DependencyConfig { }
+
+impl docker_daemon_foundation::DependencyConfig for PostgresClusterCoreConfig { }
+
+
+impl DependencyConfig for PostgresClusterCoreConfig { }
+
+impl IntoConfigTrait for dyn DependencyConfig {
+    type Config = Self;
 }
 
 
@@ -73,9 +89,7 @@ impl config::DependencyConfig for PostgresClusterCoreConfig {
     }
 }
 
-impl docker_desktop_foundation::DependencyConfig for PostgresClusterCoreConfig {
 
-}
 
 
 
