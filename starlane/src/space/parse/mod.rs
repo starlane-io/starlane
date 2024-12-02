@@ -1640,6 +1640,8 @@ pub struct SnakeCase {
     string: String,
 }
 
+pub type DbCase = VarCase;
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct VarCase {
     string: String,

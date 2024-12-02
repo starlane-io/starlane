@@ -1,10 +1,12 @@
+use std::collections::HashMap;
 use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, ProviderKind};
+use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, Kind, ProviderKind};
 use crate::hyperspace::foundation::util::Map;
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use serde_yaml::Value;
 use crate::hyperspace::foundation::{Dependency, Foundation};
+use crate::space::parse::CamelCase;
 
 pub type RawConfig = Value;
 
@@ -37,6 +39,10 @@ pub trait Config
 pub trait FoundationConfig: Clone+Sized {
     fn kind(&self) -> &FoundationKind;
 
+    /// required [`Vec<Kind>`]  must be installed and running for THIS [`Foundation`] to work.
+    /// at a minimum this must contain a Registry of some form.
+    fn required(&self) -> &Vec<Kind>;
+
     fn dependency_kinds(&self) -> &Vec<DependencyKind>;
 
     fn dependency(&self, kind: &DependencyKind) -> Option<&impl DependencyConfig>;
@@ -45,9 +51,11 @@ pub trait FoundationConfig: Clone+Sized {
 pub trait DependencyConfig: Clone+Serialize+DeserializeOwned{
     fn kind(&self) -> &DependencyKind;
 
-    fn volumes(&self) -> Vec<String>;
+    fn volumes(&self) -> &HashMap<String,String>;
 
-    fn provider_kinds(&self) ->  Vec<ProviderKind>;
+    fn require(&self) -> &Vec<Kind>;
+
+    fn providers(&self) ->  &HashMap<CamelCase,dyn ProviderConfig>;
 
     fn provider(&self, kind: &ProviderKind) -> Option<&impl ProviderConfig>;
 }

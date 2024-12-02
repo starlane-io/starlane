@@ -1,7 +1,7 @@
 use crate::hyperspace::foundation::config::{Config, DependencyConfig, ProviderConfig};
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, ProviderKind};
-use crate::hyperspace::foundation::state::State;
+use crate::hyperspace::foundation::status::Phase;
 use crate::hyperspace::foundation::{config, Dependency, Foundation, LiveService, Provider};
 use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
@@ -132,7 +132,7 @@ impl<C, S> Callable<C, S> {
 }
 
 enum DepCall {
-    QueryState(tokio::sync::oneshot::Sender<State>),
+    QueryState(tokio::sync::oneshot::Sender<Phase>),
     Download {
         progress: Progress,
         rtn: tokio::sync::oneshot::Sender<Result<(), FoundationErr>>,
@@ -179,7 +179,7 @@ impl Dependency for DependencyProxy {
         &self.config
     }
 
-    fn state(&self) -> &State {
+    fn phase(&self) -> &Phase {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         let call = DepCall::QueryState(rtn);
         self.call_tx.try_send(call).map_err(FoundationErr::msg)?;
@@ -236,7 +236,7 @@ enum ProviderCall {
         progress: Progress,
         rtn: tokio::sync::oneshot::Sender<Result<LiveService<CamelCase>, FoundationErr>>,
     },
-    State(tokio::sync::oneshot::Sender<State>),
+    State(tokio::sync::oneshot::Sender<Phase>),
 }
 
 struct ProviderProxy {
@@ -262,7 +262,7 @@ impl Provider for ProviderProxy {
         &self.config
     }
 
-    fn state(&self) -> &State {
+    fn phase(&self) -> &Phase {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         let call = ProviderCall::State(rtn);
         self.call_tx.try_send(call).map_err(FoundationErr::msg)?;
@@ -428,7 +428,7 @@ impl DependencyRunner {
     async fn handle(&mut self, call: DepCall) {
         match call {
             DepCall::QueryState(rtn) => {
-                rtn.send(self.dependency.state().clone())
+                rtn.send(self.dependency.phase().clone())
                     .unwrap_or_default();
             }
             DepCall::Download { progress, rtn } => {
@@ -485,7 +485,7 @@ impl ProviderRunner {
                     .unwrap_or_default();
             }
             ProviderCall::State(rtn) => {
-                rtn.send(self.provider.state().clone()).unwrap_or_default();
+                rtn.send(self.provider.phase().clone()).unwrap_or_default();
             }
         }
     }

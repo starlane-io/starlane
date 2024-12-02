@@ -178,6 +178,10 @@ impl FoundationErr {
         let config =config.as_str().unwrap_or("?").to_string();
         Self::ProvConfErr {kind,err,config}
     }
+
+    pub fn unknown_state(method: impl ToString) -> Self {
+        Self::UnknownState(method.to_string())
+    }
 }
 
 impl FoundationErr {
@@ -192,6 +196,61 @@ impl FoundationErr {
         }
     }
 }
+#[derive(Clone,Debug,Serialize,Deserialize)]
+pub struct ActionRequest {
+    pub title: String,
+    pub description: String,
+    pub items: Vec<ActionItem>
+}
+
+impl ActionRequest {
+   pub fn new( title: String, description: String) -> Self {
+      Self { title, description, items: vec![] }
+   }
+
+  pub fn add( & mut self, item: ActionItem) {
+      self.items.push(item);
+  }
+
+  pub fn print(&self) {
+
+  }
+}
+
+
+
+
+
+
+
+impl Display for ActionRequest {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    f.write_str("ACTION REQUEST: ")?;
+        f.write_str(&self.title)?;
+        f.write_str("\n")?;
+        f.write_str(&self.description)?;
+        f.write_str("\n")?;
+        f.write_str(format!("ITEMS: {} required action items...", self.items.len()).as_str() )?;
+        f.write_str("\n")?;
+        for (index,item) in self.items.iter().enumerate() {
+            f.write_str(format!("{} -> {}",index.to_string(), item.title).as_str())?;
+
+            if let Some(ref web) = item.website {
+                f.write_str("\n" )?;
+                f.write_str(format!(" more info: {}",web).as_str())?;
+            }
+            f.write_str("\n" )?;
+            f.write_str(item.details.as_str())?;
+            if self.items.len() != index {
+                f.write_str("\n" )?;
+            }
+        }
+
+        f.write_str("\n")
+    }
+}
+
+
 
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
@@ -223,14 +282,25 @@ impl ActionItem {
 
 impl Display for ActionItem {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.title)
+        f.write_str(&self.title)?;
+        f.write_str("\n")?;
+        if let Some(website) = &self.website {
+            f.write_str("more info: ")?;
+            f.write_str(website)?;
+            f.write_str("\n")?;
+        };
+
+        f.write_str(&self.details)?;
+        f.write_str("\n")
     }
 }
 
 #[derive(Error,Clone,Debug,Serialize,Deserialize)]
 pub enum FoundationErr {
-    #[error("{kind} {actions.len()} User Actions Required")]
-    ActionRequired { kind: FoundationKind, actions: Vec<ActionItem> },
+    #[error("{0}")]
+    ActionRequired(ActionRequest),
+    #[error("Foundation State is unknown when calling Foundation::{0} ... platform should call Foundation::synchronize() first. ")]
+    UnknownState(String),
     #[error("[{id}] -> PANIC! <{kind}> error message: '{msg}'")]
     Panic {id: String, kind: String, msg: String},
     #[error("FoundationConfig.config is set to '{0}' which this Starlane build does not recognize")]

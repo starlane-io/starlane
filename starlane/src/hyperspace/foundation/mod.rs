@@ -28,7 +28,7 @@
 
 
 
-use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, ProviderKind};
+use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, Kind, ProviderKind};
 use crate::hyperspace::platform::PlatformConfig;
 use futures::TryFutureExt;
 use itertools::Itertools;
@@ -42,14 +42,12 @@ use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use crate::hyperspace::foundation::config::{Config, DependencyConfig, FoundationConfig, ProviderConfig};
-use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::state::State;
+use crate::hyperspace::foundation::err::{ActionRequest, FoundationErr};
+use crate::hyperspace::foundation::status::{Phase, Status};
 use crate::hyperspace::reg::Registry;
-use crate::space::log::{Progress, Status};
 use crate::space::parse::CamelCase;
 use crate::space::progress::Progress;
 
-pub mod factory;
 pub mod runner;
 
 
@@ -67,7 +65,7 @@ pub mod util;
 
 
 pub mod dependency;
-pub mod state;
+pub mod status;
 
 /// ['Foundation'] is an abstraction for managing infrastructure.
 #[async_trait]
@@ -78,10 +76,22 @@ pub trait Foundation: Send + Sync
     fn config(&self) -> &impl FoundationConfig;
 
 
+    fn phase(&self) -> &Phase;
+
+
+    fn status(&self) -> &Status;
+
+
+
+    /// synchronize must be called first.  In this method the [`Foundation`] will check its
+    /// environment to determine the
+    async fn synchronize(&self, progress: Progress) -> Result<(),FoundationErr>;
+
+
     /// Install and initialize any Dependencies and/or [`Providers`] that
     /// are required for this Foundation to run (usually this is not much more than whatever
     /// software is required to run the Registry.)
-    fn install(&self, progress: Progress) -> Result<(), FoundationErr>;
+    async fn install(&self, progress: Progress) -> Result<(), FoundationErr>;
 
 
     /// return the given [`Dependency`] if it exists within this [`Foundation`]
@@ -104,7 +114,9 @@ pub trait Dependency: Send + Sync
 
     fn config(&self) -> &impl DependencyConfig;
 
-    fn state(&self) -> &State;
+    fn phase(&self) -> &Phase;
+
+    fn status(&self) -> &Status;
 
     /// perform any downloads for the Dependency
     async fn download(&self, progress: Progress) -> Result<(), FoundationErr>;
@@ -135,8 +147,9 @@ pub trait Provider: Sized {
 
     fn config(&self) -> &impl ProviderConfig;
 
-    fn state(&self) -> &State;
+    fn phase(&self) -> &Phase;
 
+    fn status(&self) -> &Status;
 
     async fn initialize(&self, progress: Progress) -> Result<(), FoundationErr>;
 
@@ -184,30 +197,57 @@ impl <K> LiveService<K>
 }
 
 
+pub(crate) struct FoundationSafety {
+    foundation: dyn Foundation
+}
 
+impl Foundation for FoundationSafety  {
+    fn kind(&self) -> &FoundationKind {
+        self.foundation.kind()
+    }
 
-#[cfg(test)]
-pub mod test {
-    use crate::hyperspace::foundation::err::FoundationErr;
+    fn config(&self) -> &impl FoundationConfig {
+        self.foundation.config()
+    }
 
-    #[test]
-    pub fn test_builder() {
-        fn inner() -> Result<(), FoundationErr> {
-            let foundation = include_str!("../../../../config/foundation/docker-daemon.yaml");
+    fn phase(&self) -> &Phase {
+       self.foundation.phase()
+    }
 
-            let foundation = foundation_config(foundation)?;
+    fn status(&self) -> &Status {
+        self.foundation.status()
+    }
 
+    async fn synchronize(&self, progress: Progress) -> Result<(), FoundationErr> {
+        self.foundation.synchronize(progress).await
+    }
 
-            Ok(())
+    async fn install(&self, progress: Progress) -> Result<(), FoundationErr> {
+        if self.phase() == &Phase::Unknown {
+            Err(FoundationErr::unknown_state("install"))
+        } else {
+            self.foundation.install(progress).await
         }
 
-        match inner() {
-            Ok(_) => {}
-            Err(err) => {
-                println!("ERR: {}", err);
-                Err::<(),FoundationErr>(err).unwrap();
-                assert!(false)
-            }
+    }
+
+    fn dependency(&self, kind: &DependencyKind) -> Result<Option<impl Dependency>, FoundationErr> {
+        if self.phase() == &Phase::Unknown {
+            Err(FoundationErr::unknown_state("dependency"))
+        } else {
+            self.foundation.dependency(kind)
+        }
+    }
+
+    fn registry(&self) -> Result<Registry, FoundationErr> {
+        if self.phase() == &Phase::Unknown {
+            Err(FoundationErr::unknown_state("registry"))
+        } else {
+            self.foundation.registry()
         }
     }
 }
+
+
+#[cfg(test)]
+pub mod test {}

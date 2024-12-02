@@ -22,9 +22,6 @@ pub const PROVIDER: &'static str = "provider";
 pub enum Kind {
    #[serde(alias="{0}")]
    #[strum(to_string="{0}")]
-   Foundation(FoundationKind),
-   #[serde(alias="{0}")]
-   #[strum(to_string="{0}")]
    Dependency(DependencyKind),
    #[serde(alias="{0}")]
    #[strum(to_string="{0}")]
@@ -34,7 +31,6 @@ pub enum Kind {
 impl IKind for Kind {
     fn category(&self) -> &'static str {
         match self {
-            Kind::Foundation(k) => k.category(),
             Kind::Dependency(k) => k.category(),
             Kind::Provider(k) => k.category()
         }
@@ -42,7 +38,6 @@ impl IKind for Kind {
 
     fn as_str(&self) -> &'static str {
        match self {
-           Kind::Foundation(kind) => kind.as_str(),
            Kind::Dependency(kind) => kind.as_str(),
            Kind::Provider(kind) => kind.as_str()
        }
@@ -81,6 +76,12 @@ impl IKind for FoundationKind {
 pub enum DependencyKind {
     PostgresCluster,
     DockerDaemon
+}
+
+impl Into<Kind> for DependencyKind {
+    fn into(self) -> Kind {
+        Kind::Dependency(self)
+    }
 }
 
 impl DependencyKind {
@@ -136,6 +137,14 @@ impl ProviderKind {
 pub struct ProviderKind {
     pub dep: DependencyKind,
     pub provider: CamelCase
+}
+
+
+
+impl Into<Kind> for ProviderKind{
+    fn into(self) -> Kind {
+        Kind::Provider(self)
+    }
 }
 
 impl Display for ProviderKind {

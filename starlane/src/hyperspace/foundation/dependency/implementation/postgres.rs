@@ -50,7 +50,7 @@ impl config::DependencyConfig for PostgresClusterConfig {
         &volumes
     }
 
-    fn provider_kinds(&self) -> Vec<CamelCase> {
+    fn providers(&self) -> Vec<CamelCase> {
         self.providers.keys().clone().collect()
     }
 
