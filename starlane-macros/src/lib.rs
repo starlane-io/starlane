@@ -20,7 +20,7 @@ use syn::{
 
 
 /// This macro will auto implement the `#crt::space::wave::exchange::asynch::DirectedHandler` trait.
-/// In order to finalize the implementation a `#[handler]` attribute must also be specified
+/// In order to finalize the core a `#[handler]` attribute must also be specified
 /// above one of the impls.
 #[proc_macro_derive(DirectedHandler)]
 pub fn directed_handler(item: TokenStream) -> TokenStream {

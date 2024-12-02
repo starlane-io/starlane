@@ -7,8 +7,8 @@
 /// There are two sub concepts that ['Foundation'] provides: ['Dependency'] and  ['Provider'].
 /// The [`FoundationConfig`] enumerates dependencies which are typically things that don't ship
 /// with the Starlane binary.  Common examples are: Postgres, Keycloak, Docker.  Each config
-/// implementation must know how to ready that Dependency and potentially even launch an
-/// instance of that Dependency.  For Example: Postgres Database is a common implementation especially
+/// core must know how to ready that Dependency and potentially even launch an
+/// instance of that Dependency.  For Example: Postgres Database is a common core especially
 /// because the default Starlane [`Registry`] (and at the time of this writing the only Registry support).
 /// The Postgres [`Dependency`] ensures that Postgres is accessible and properly configured for the
 /// Starlane Platform.
@@ -22,8 +22,8 @@
 /// utilizes a common Dependency to provide a specific service etc.
 ///
 /// ## THE REGISTRY
-/// There is one special implementation that the Foundation must manage which is the [`Foundation::registry`]
-/// the Starlane Registry is the only required implementation from the vanilla Starlane installation
+/// There is one special core that the Foundation must manage which is the [`Foundation::registry`]
+/// the Starlane Registry is the only required core from the vanilla Starlane installation
 
 
 
@@ -42,6 +42,8 @@ use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
+use once_cell::sync::Lazy;
+use tokio::sync::watch::Receiver;
 use crate::hyperspace::foundation::config::{Config, DependencyConfig, FoundationConfig, ProviderConfig};
 use crate::hyperspace::foundation::err::{ActionRequest, FoundationErr};
 use crate::hyperspace::foundation::status::{Phase, Status, StatusDetail};
@@ -67,6 +69,10 @@ pub mod util;
 
 pub mod dependency;
 pub mod status;
+
+static REQUIRED: Lazy<Vec<Kind>> = Lazy::new(|| {
+    vec![]
+});
 
 /// ['Foundation'] is an abstraction for managing infrastructure.
 #[async_trait]
@@ -97,6 +103,10 @@ pub trait Foundation
 
     /// return a handle to the [`Registry`]
     fn registry(&self) -> Result<Registry,FoundationErr>;
+
+    fn default_requirements() -> Vec<Kind> {
+        REQUIRED.clone()
+    }
 }
 
 /// A [`Dependency`] is an add-on to the [`Foundation`] infrastructure which may need to be
@@ -206,7 +216,7 @@ impl Foundation for FoundationSafety  {
         self.foundation.kind()
     }
 
-    fn config(&self) -> &dyn FoundationConfig {
+    fn config(&self) -> &Box<dyn FoundationConfig>{
         self.foundation.config()
     }
 
@@ -215,21 +225,24 @@ impl Foundation for FoundationSafety  {
         self.foundation.status()
     }
 
+    fn status_watcher(&self) -> Arc<Receiver<Status>> {
+        self.foundation.status_watcher()
+    }
+
     async fn synchronize(&self, progress: Progress) -> Result<Status, FoundationErr> {
         self.foundation.synchronize(progress).await
     }
 
     async fn install(&self, progress: Progress) -> Result<(), FoundationErr> {
-        if self.phase() == &Phase::Unknown {
+        if self.status().phase == Phase::Unknown {
             Err(FoundationErr::unknown_state("install"))
         } else {
             self.foundation.install(progress).await
         }
-
     }
 
-    fn dependency(&self, kind: &DependencyKind) -> Result<Option<impl Dependency>, FoundationErr> {
-        if self.phase() == &Phase::Unknown {
+    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Box<dyn Dependency>>, FoundationErr> {
+        if self.status().phase == Phase::Unknown {
             Err(FoundationErr::unknown_state("dependency"))
         } else {
             self.foundation.dependency(kind)
@@ -237,7 +250,7 @@ impl Foundation for FoundationSafety  {
     }
 
     fn registry(&self) -> Result<Registry, FoundationErr> {
-        if self.phase() == &Phase::Unknown {
+        if self.status().phase == Phase::Unknown {
             Err(FoundationErr::unknown_state("registry"))
         } else {
             self.foundation.registry()

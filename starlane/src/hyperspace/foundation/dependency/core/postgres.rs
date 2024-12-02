@@ -1,36 +1,40 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 use derive_name::Name;
 use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use crate::hyperspace::foundation::config;
-use crate::hyperspace::foundation::config::ProviderConfig;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, Kind, PostgresKind, ProviderKind};
 use crate::hyperspace::foundation::Dependency;
-use crate::hyperspace::foundation::implementation::docker_desktop_foundation::Foundation;
+use crate::hyperspace::foundation::implementation::docker_desktop_foundation::{DependencyConfig, Foundation};
 use crate::hyperspace::foundation::util::Map;
 use crate::space::parse::CamelCase;
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
-pub struct PostgresClusterConfig {
+pub struct PostgresClusterCoreConfig {
     pub port: u16,
     pub data_dir: String,
     pub username: String,
     pub password: String,
-    pub providers: HashMap<CamelCase,PostgresProviderConfig>,
+    pub providers: HashMap<CamelCase, ProviderConfig>,
 }
 
 
-impl PostgresClusterConfig {
-    pub fn create(config: Map) -> Result<impl config::DependencyConfig, FoundationErr> {
+impl PostgresClusterCoreConfig {
+    pub fn create(config: Map) -> Result<Self, FoundationErr> {
         let port: u16 = config.from_field_opt("port").map_err(FoundationErr::config_err)?.map_or(5432u16, |port| port);
         let username: String = config.from_field_opt("username").map_err(FoundationErr::config_err)?.map_or("postgres".to_string(), |username| username);
         let password : String = config.from_field_opt("password").map_err(FoundationErr::config_err)?.map_or("postgres".to_string(), |password| password);
         let data_dir: String = config.from_field("data_dir")?;
 
-        let providers =  config.parse_same("providers"  )?;
+        let mut providers =  config.parse_same("providers"  )?;
+        let registry_kind = CamelCase::from_str("Registry")?;
+        if !providers.contains_key(&registry_kind) {
+            providers.insert(registry_kind,ProviderConfig::default_registry());
+        }
 
-        Ok(PostgresClusterConfig {
+        Ok(PostgresClusterCoreConfig {
             port,
             data_dir,
             username,
@@ -40,27 +44,40 @@ impl PostgresClusterConfig {
     }
 }
 
-impl config::DependencyConfig for PostgresClusterConfig {
+
+
+impl config::DependencyConfig for PostgresClusterCoreConfig {
 
     fn kind(&self) -> &DependencyKind {
         & DependencyKind::PostgresCluster
     }
 
-    fn volumes(&self) -> &Vec<String> {
-        let volumes = vec![self.data_dir.clone()];
-        &volumes
+    fn volumes(&self) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        map.insert("data".to_string(), self.data_dir.clone() );
+        map
     }
+
 
     fn require(&self) -> &Vec<Kind> {
-        Foundation::re
+        &config::Foundation::default_requirements()
     }
 
-    fn providers(&self) -> Vec<CamelCase> {
-        self.providers.keys().clone().collect()
+
+    fn clone_me(&self) -> Box<dyn DependencyConfig> {
+        todo!()
+    }
+}
+
+
+
+impl config::ProviderConfigSrc<ProviderConfig> for PostgresClusterCoreConfig {
+    fn providers(&self) -> Result<&HashMap<CamelCase, ProviderConfig>, FoundationErr> {
+        todo!()
     }
 
-    fn provider(&self, kind: &CamelCase) -> Option<Box<dyn ProviderConfig>> {
-        self.providers.get(kind).map(|c| Box::new(c.clone()))
+    fn provider(&self, kind: &ProviderKind) -> Result<Option<&ProviderConfig>, FoundationErr> {
+        todo!()
     }
 }
 
@@ -70,10 +87,24 @@ pub enum PostgresSeed {
     Registry
 }
 
+
+
+
+
 #[derive(Clone,Debug,Serialize,Deserialize)]
-pub struct PostgresProviderConfig {
+pub struct ProviderConfig {
     pub kind: PostgresKind,
     pub database: Option<String>,
     pub seed: Option<PostgresSeed>
+}
+
+impl ProviderConfig {
+    pub fn default_registry() -> Self {
+        Self {
+            kind: PostgresKind::Registry,
+            database: Some("/var/lib/postgresql/data".to_string()),
+            seed: Some(PostgresSeed::Registry),
+        }
+    }
 }
 

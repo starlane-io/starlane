@@ -7,7 +7,7 @@ foundation:
     image: "postgres:17"
     # this is the data dir in the container image
     volumes:
-    - database_dir: /etc/data
+    - data_dir: "/data"
 
     providers:
      - kind: Registry
@@ -20,7 +20,8 @@ foundation:
 
 
 ---
-# this Settings configuration is not used to configure the Foundation
+# this Platform configuration is not used to configure the Foundation
+
 # the end user for Starlane should configure the settings in the StarlaneConfig
 # which should have been written by the Starlane Installer.
 # The Settings configuration in this document does supply the default values for the installer

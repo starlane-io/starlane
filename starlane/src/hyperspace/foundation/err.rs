@@ -309,7 +309,7 @@ pub enum FoundationErr {
     FoundationNotAvailable(String),
     #[error("DependencyConfig.config is set to '{0}' which this Starlane build does not recognize")]
     DepNotFound(String),
-    #[error("implementation: '{0}' is recognized but is not available on this build of Starlane")]
+    #[error("core: '{0}' is recognized but is not available on this build of Starlane")]
     DepNotAvailable(String),
     #[error("ProviderConfig.provider is set to '{0}' which this Starlane build does not recognize")]
     ProviderNotFound(String),
@@ -329,7 +329,7 @@ pub enum FoundationErr {
     UserActionRequired{ cat: String, kind: String, action: String, summary: String, },
     #[error("[{kind}] Error: '{msg}'")]
     ProviderErr{ kind: ProviderKind, msg: String},
-    #[error("error converting config args for implementation: '{kind}' serialization err: '{err}' from config: '{config}'")]
+    #[error("error converting config args for core: '{kind}' serialization err: '{err}' from config: '{config}'")]
     DepConfErr { kind: DependencyKind,err: String, config: String},
     #[error("error converting config args for provider: '{kind}' serialization err: '{err}' from config: '{config}'")]
     ProvConfErr { kind: ProviderKind, err: Rc<serde_yaml::Error>, config: String},

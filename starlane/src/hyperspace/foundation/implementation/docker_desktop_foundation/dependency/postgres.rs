@@ -1,11 +1,15 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
-use crate::hyperspace::foundation::config::{DependencyConfig, ProviderConfig};
 use crate::hyperspace::foundation::kind::{DependencyKind, Kind, ProviderKind};
-use crate::hyperspace::foundation::{LiveService, Provider};
+use crate::hyperspace::foundation::{config, LiveService, Provider};
+use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
+use crate::hyperspace::foundation::err::FoundationErr;
+use crate::hyperspace::foundation::implementation::docker_desktop_foundation;
 use crate::space::parse::{CamelCase, DbCase, VarCase};
 use crate::hyperspace::foundation::implementation::docker_desktop_foundation::Foundation;
+use crate::hyperspace::foundation::util::Map;
 
 fn default_schema() -> DbCase{
     DbCase::from_str("PUBLIC").unwrap()
@@ -21,98 +25,50 @@ fn default_registry_provider_kind() -> CamelCase{
 
 
 
-#[derive(Debug,Clone,Eq,PartialEq,Serialize,Deserialize)]
+#[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct PostgresDependencyConfig {
-
-    volumes: HashMap<String, String>,
-
-    #[serde(default="Foundation::default_requirements")]
-    require: Vec<Kind>,
-
-    providers: HashMap<CamelCase,Box<dyn ProviderConfig>>
+    pub core: PostgresClusterCoreConfig,
+    pub image: String
 }
 
-impl DependencyConfig for PostgresDependencyConfig{
+impl PostgresDependencyConfig {
+    pub fn create( config: Map ) -> Result<Self,FoundationErr> {
+        let core = PostgresClusterCoreConfig::create(config.clone())?;
+        let image = config.from_field("image")?;
+        Ok( PostgresDependencyConfig{core,image} )
+    }
+}
+
+impl Deref for PostgresDependencyConfig {
+    type Target = PostgresClusterCoreConfig;
+
+    fn deref(&self) -> &Self::Target {
+        &self.core
+    }
+}
+
+impl config::DependencyConfig for PostgresDependencyConfig {
     fn kind(&self) -> &DependencyKind {
-        &DependencyKind::PostgresCluster
+        todo!()
     }
 
-    fn volumes(&self) -> &HashMap<String,String> {
-        &self.volumes
+    fn volumes(&self) -> HashMap<String, String> {
+        todo!()
     }
 
     fn require(&self) -> &Vec<Kind> {
-        &self.require
+        todo!()
     }
 
-
-    fn providers(&self) -> &HashMap<CamelCase, Box<dyn ProviderConfig>> {
-        &self.providers
-    }
-
-    fn provider(&self, kind: &ProviderKind) -> Option<Box<dyn ProviderConfig>> {
-        self.providers.get(&kind.provider).cloned()
+    fn clone_me(&self) -> Box<dyn config::DependencyConfig> {
+        Box::new(self.clone())
     }
 }
 
-#[derive(Debug,Clone,Eq,PartialEq,Serialize,Deserialize)]
-pub struct PostgresProviderConfig {
-
-    kind: CamelCase,
-
-    #[serde(default="default_schema")]
-    schema: DbCase,
-
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    seed: Option<String>,
-}
-
-
-impl ProviderConfig for PostgresProviderConfig{
-    fn kind(&self) -> &ProviderKind {
-        &ProviderKind::new(DependencyKind::PostgresCluster,self.kind.clone())
+impl docker_desktop_foundation::DependencyConfig for PostgresDependencyConfig{
+    fn image(&self) -> &String {
+        &self.image
     }
 }
 
 
-
-#[derive(Debug,Clone,Eq,PartialEq,Serialize,Deserialize)]
-pub struct RegistryProviderConfig {
-
-    #[serde(default="default_registry_provider_kind")]
-    kind: CamelCase,
-    #[serde(default="default_registry_database")]
-    database: DbCase,
-    #[serde(default="default_schema")]
-    schema: DbCase,
-}
-
-impl RegistryProviderConfig {
-    pub fn new( database: DbCase ) -> RegistryProviderConfig {
-        Self {
-            database,
-            ..Default::default()
-        }
-    }
-}
-
-impl Default for RegistryProviderConfig {
-    fn default() -> Self {
-        let database = default_registry_database();
-        let schema= default_schema();
-        let kind = default_registry_provider_kind();
-
-        Self {
-            kind,
-            database,
-            schema,
-        }
-    }
-}
-
-impl ProviderConfig for RegistryProviderConfig {
-    fn kind(&self) -> &ProviderKind {
-        &ProviderKind::new(DependencyKind::PostgresCluster,self.kind.clone())
-    }
-}

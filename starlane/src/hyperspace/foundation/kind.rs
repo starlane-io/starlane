@@ -13,11 +13,11 @@ use crate::space::parse::{camel_case, CamelCase};
 use crate::space::parse::util::{new_span, result};
 
 pub const FOUNDATION : &'static str = "config";
-pub const DEPENDENCY: &'static str = "implementation";
+pub const DEPENDENCY: &'static str = "core";
 pub const PROVIDER: &'static str = "provider";
 
 
-#[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString, Serialize, Deserialize)]
+#[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Kind {
    #[serde(alias="{0}")]
@@ -27,6 +27,7 @@ pub enum Kind {
    #[strum(to_string="{0}")]
    Provider(ProviderKind)
 }
+
 
 impl IKind for Kind {
     fn category(&self) -> &'static str {
@@ -133,7 +134,7 @@ impl ProviderKind {
     }
 }
 
-#[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,DeserializeFromStr)]
+#[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,DeserializeFromStr,Name)]
 pub struct ProviderKind {
     pub dep: DependencyKind,
     pub provider: CamelCase
@@ -179,7 +180,7 @@ impl IKind for ProviderKind{
     }
 }
 
-pub trait IKind where for<'a> Self: FromStr+Name+Debug+Clone+Eq+PartialEq+Display+Hash+Serialize+Deserialize<'a> {
+pub trait IKind where for<'a> Self: Name+Debug+Clone+Eq+PartialEq+Display+Hash+Serialize+Deserialize<'a> {
   fn category(&self) -> &'static str;
 
   fn as_str(&self) -> &'static str;

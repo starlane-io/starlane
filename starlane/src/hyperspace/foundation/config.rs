@@ -1,24 +1,27 @@
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, Kind, ProviderKind};
 use crate::hyperspace::foundation::util::Map;
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use serde_yaml::Value;
-use crate::hyperspace::foundation::{Dependency, Foundation};
+use crate::hyperspace::foundation::{Dependency, Foundation, Provider};
 use crate::space::parse::CamelCase;
 
 pub type RawConfig = Value;
 
+/*
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct Metadata<K> where K: IKind {
+pub struct Metadata<'a,K> where K: Serialize+Deserialize<'a>+'a{
     pub kind: K,
     pub name: Option<String>,
     pub description: Option<String>,
+    phantom: PhantomData<&'a ()>,
 }
 
-impl <K> Metadata<K> where K: IKind {
-}
+ */
+
 
 
 
@@ -53,17 +56,19 @@ pub trait FoundationConfig{
 pub trait DependencyConfig {
     fn kind(&self) -> &DependencyKind;
 
-    fn volumes(&self) -> &HashMap<String,String>;
+    fn volumes(&self) -> HashMap<String,String>;
 
     fn require(&self) -> &Vec<Kind>;
 
-    fn providers(&self) ->  &HashMap<CamelCase,Box<dyn ProviderConfig>>;
-
-    fn provider(&self, kind: &ProviderKind) -> Option<Box<dyn ProviderConfig>>;
 
     fn clone_me(&self) -> Box<dyn DependencyConfig>;
 }
 
+pub trait ProviderConfigSrc<P>: DependencyConfig where P: ProviderConfig{
+    fn providers(&self) ->  Result<&HashMap<CamelCase,P>,FoundationErr>;
+
+    fn provider(&self, kind: &ProviderKind) -> Result<Option<&P>,FoundationErr>;
+}
 
 
 pub trait ProviderConfig{
@@ -86,6 +91,7 @@ pub trait PlatformConfig {
 
 
 pub(super) mod private {
+    /*
     pub struct Config {
         foundation: <Self as super::Config>::FoundationConfig,
         platform: <Self as super::Config>::PlatformConfig,
@@ -103,4 +109,6 @@ pub(super) mod private {
             todo!()
         }
     }
+
+     */
 }

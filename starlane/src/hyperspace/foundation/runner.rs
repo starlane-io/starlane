@@ -48,12 +48,13 @@ impl FoundationProxy {
     }
 }
 
+#[async_trait]
 impl Foundation for FoundationProxy {
     fn kind(&self) -> &FoundationKind {
         self.config.kind()
     }
 
-    fn config(&self) -> &dyn config::FoundationConfig {
+    fn config(&self) -> &Box<dyn config::FoundationConfig> {
         &self.config
     }
 
@@ -111,16 +112,8 @@ impl<K, C> Wrapper<K, C> {
         Self { kind, call }
     }
 }
-struct Callable<C, S> {
-    pub(crate) config: C,
-    pub(crate) call_tx: tokio::sync::mpsc::Sender<C>,
-}
 
-impl<C, S> Callable<C, S> {
-    pub fn new(config: C, call_tx: tokio::sync::mpsc::Sender<C>) -> Callable<C, S> {
-        Self { config, call_tx }
-    }
-}
+
 
 enum DepCall {
     Download {
@@ -162,6 +155,7 @@ impl DependencyProxy {
     }
 }
 
+#[async_trait]
 impl Dependency for DependencyProxy {
     fn kind(&self) -> &DependencyKind {
         self.config.kind()
@@ -246,6 +240,7 @@ impl ProviderProxy {
     }
 }
 
+#[async_trait]
 impl Provider for ProviderProxy {
     fn kind(&self) -> &ProviderKind {
         &self.config.kind()
@@ -288,7 +283,7 @@ struct Runner {
 impl Runner {
     fn new(foundation: Box<dyn Foundation>) -> impl Foundation {
         let (call_tx, call_rx) = tokio::sync::mpsc::channel(64);
-        let config = (*foundation.config()).clone();
+        let config = foundation.config().clone_me();
         let proxy = FoundationProxy::new(config, call_tx.clone(), foundation.status_watcher());
         let runner = Self {
             foundation,
