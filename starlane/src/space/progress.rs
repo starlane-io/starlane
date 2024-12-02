@@ -56,7 +56,7 @@ pub mod private {
 
     impl Task {
         pub fn new(task: &'static str, tx:tokio::sync::mpsc::Sender<TaskState>) -> Self {
-            let task = task.as_ref().to_string();
+            let task = task.to_string();
             let task = Self {
                 task,
                 step: None,
@@ -72,7 +72,7 @@ pub mod private {
     impl Task {
         fn update(&self) {
             let state = TaskState::new(self.task.clone(),self.step.clone(),self.inc.clone());
-            self.tx.send(state).unwrap_or_default();
+            self.tx.try_send(state).unwrap_or_default();
         }
     }
 
@@ -96,7 +96,7 @@ pub mod private {
 
     impl Drop for Task {
         fn drop(&mut self) {
-            super::Task::inc(& mut self, 100u16);
+            super::Task::inc(self, 100u16);
             self.update();
         }
     }

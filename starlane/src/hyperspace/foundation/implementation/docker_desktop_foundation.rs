@@ -3,13 +3,14 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use once_cell::sync::Lazy;
+use serde::de::DeserializeOwned;
 use tokio::sync::watch::Receiver;
 use crate::hyperspace::foundation;
 use crate::hyperspace::foundation::{config, Dependency};
 use crate::hyperspace::foundation::config::ProviderConfig;
 use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, Kind, ProviderKind};
-use crate::hyperspace::foundation::dependency::core::docker::DockerDaemonConfig;
+use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, Kind, ProviderKind};
+use crate::hyperspace::foundation::dependency::core::docker::DockerDaemonCoreDependencyConfig;
 use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
 use crate::hyperspace::foundation::status::{Phase, Status, StatusDetail};
 use crate::hyperspace::foundation::util::Map;
@@ -30,6 +31,12 @@ static REQUIRED: Lazy<Vec<Kind>> = Lazy::new(|| {
     rtn
 });
 
+/// this method is referenced by various [`DependencyConfig`] as a Default value (which in the case of [`FoundationKind::DockerDaemon`] every [`Dependency`]
+/// and [`Provisioner`] requires the Docker Daemon to be installed and running
+pub fn default_requirements() -> Vec<Kind> {
+    REQUIRED.clone()
+}
+
 pub struct Foundation {
     config: FoundationConfig,
     status: Arc<tokio::sync::watch::Receiver<Status>>
@@ -45,11 +52,7 @@ impl Foundation {
     }
 
 
-    /// this method is referenced by various [`DependencyConfig`] as a Default value (which in the case of [`FoundationKind::DockerDaemon`] every [`Dependency`]
-    /// and [`Provisioner`] requires the Docker Daemon to be installed and running
-    pub fn default_requirements() -> Vec<Kind> {
-        REQUIRED.clone()
-    }
+
 }
 
 #[async_trait]
@@ -93,22 +96,22 @@ impl foundation::Foundation for Foundation {
 
 
 #[derive(Clone,Debug,Serialize, Deserialize)]
-pub struct FoundationConfig{
+pub struct FoundationConfig {
     pub kind: FoundationKind,
     pub registry: RegistryProviderConfig,
     pub dependencies: HashMap<DependencyKind,Box<dyn DependencyConfig>>,
 }
 
 impl FoundationConfig {
-   pub fn create( config: Map ) -> Result<impl config::FoundationConfig, FoundationErr> {
+   pub fn create( config: Map ) -> Result<Self, FoundationErr> {
            let kind = config.kind()?;
            let registry = config.from_field("registry")?;
 
-           let dependencies =  config.parse_kinds("dependencies", | map: Map | -> Result<Box<dyn DependencyConfig>,FoundationErr>{
+           let dependencies=  config.parse_kinds("dependencies", | map: Map | -> Result<Box<dyn DependencyConfig>,FoundationErr>{
                let kind: DependencyKind = map.kind()?;
                match kind {
-                   DependencyKind::PostgresCluster => PostgresClusterCoreConfig::create(map),
-                   DependencyKind::DockerDaemon => DockerDaemonConfig::create(map),
+                   DependencyKind::PostgresCluster => PostgresClusterCoreConfig::create(map).map(Box::new),
+                   DependencyKind::DockerDaemon => DockerDaemonCoreDependencyConfig::create(map).map(Box::new)
                }
            })?;
 
@@ -129,14 +132,14 @@ impl config::FoundationConfig for FoundationConfig{
     }
 
     fn required(&self) -> &Vec<Kind> {
-        &Foundation::default_requirements()
+        &default_requirements()
     }
 
-    fn dependency_kinds(&self) -> Vec<&'static str> {
-        self.dependencies.keys().map(|kind| kind.clone()).collect()
+    fn dependency_kinds(&self) -> &Vec<DependencyKind> {
+        self.dependencies.keys().collect()
     }
 
-    fn dependency(&self, kind: &DependencyKind) -> Option<&Box<dyn DependencyConfig>>{
+    fn dependency(&self, kind: &DependencyKind) -> Option<&Box<dyn config::DependencyConfig>>{
         self.dependencies.get(kind)
     }
 
@@ -157,8 +160,7 @@ pub struct RegistryProviderConfig {
 
 
 
-pub trait DependencyConfig : config::DependencyConfig{
-   fn image(&self) -> &String;
+pub trait DependencyConfig : config::DependencyConfig {
 }
 
 

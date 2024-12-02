@@ -3,11 +3,13 @@ use std::str::FromStr;
 use derive_name::Name;
 use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
+use crate::hyperspace::foundation;
 use crate::hyperspace::foundation::config;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, Kind, PostgresKind, ProviderKind};
 use crate::hyperspace::foundation::Dependency;
-use crate::hyperspace::foundation::implementation::docker_desktop_foundation::{DependencyConfig, Foundation};
+use crate::hyperspace::foundation::implementation::docker_desktop_foundation;
+use crate::hyperspace::foundation::implementation::docker_desktop_foundation::{DependencyConfig};
 use crate::hyperspace::foundation::util::Map;
 use crate::space::parse::CamelCase;
 
@@ -60,14 +62,19 @@ impl config::DependencyConfig for PostgresClusterCoreConfig {
 
 
     fn require(&self) -> &Vec<Kind> {
-        &config::Foundation::default_requirements()
+        &foundation::default_requirements()
     }
 
 
-    fn clone_me(&self) -> Box<dyn DependencyConfig> {
-        todo!()
+    fn clone_me(&self) -> Box<dyn config::DependencyConfig> {
+        Box::new(self.clone())
     }
 }
+
+impl docker_desktop_foundation::DependencyConfig for PostgresClusterCoreConfig {
+
+}
+
 
 
 
@@ -76,7 +83,7 @@ impl config::ProviderConfigSrc<ProviderConfig> for PostgresClusterCoreConfig {
         todo!()
     }
 
-    fn provider(&self, kind: &ProviderKind) -> Result<Option<&ProviderConfig>, FoundationErr> {
+    fn provider(&self, kind: &CamelCase) -> Result<Option<&ProviderConfig>, FoundationErr> {
         todo!()
     }
 }
@@ -105,6 +112,16 @@ impl ProviderConfig {
             database: Some("/var/lib/postgresql/data".to_string()),
             seed: Some(PostgresSeed::Registry),
         }
+    }
+}
+
+impl config::ProviderConfig for ProviderConfig {
+    fn kind(&self) -> &ProviderKind {
+        todo!()
+    }
+
+    fn clone_me(&self) -> Box<dyn config::ProviderConfig> {
+        Box::new(self.clone())
     }
 }
 

@@ -111,6 +111,7 @@ impl Map {
 
     }
 
+    /// when you want to parse a list of configurations that are all the same
     pub fn parse_same<K,D>(&self,field: &'static str ) -> Result<HashMap<K,D>,FoundationErr> where D: DeserializeOwned, K: Eq+PartialEq+Hash+DeserializeOwned {
         let items: Vec<Map>  = self.from_field(field)?;
         let mut rtn = HashMap::new();

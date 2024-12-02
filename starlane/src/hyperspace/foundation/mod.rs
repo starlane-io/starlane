@@ -74,9 +74,13 @@ static REQUIRED: Lazy<Vec<Kind>> = Lazy::new(|| {
     vec![]
 });
 
+pub fn default_requirements() -> Vec<Kind> {
+    REQUIRED.clone()
+}
+
 /// ['Foundation'] is an abstraction for managing infrastructure.
 #[async_trait]
-pub trait Foundation
+pub trait Foundation: Send+Sync
 {
     fn kind(&self) -> &FoundationKind;
 
@@ -104,9 +108,7 @@ pub trait Foundation
     /// return a handle to the [`Registry`]
     fn registry(&self) -> Result<Registry,FoundationErr>;
 
-    fn default_requirements() -> Vec<Kind> {
-        REQUIRED.clone()
-    }
+
 }
 
 /// A [`Dependency`] is an add-on to the [`Foundation`] infrastructure which may need to be
@@ -116,7 +118,7 @@ pub trait Foundation
 /// is a Database server like Postgres... the Dependency will download, install, initialize and
 /// start the service whereas a Provider in this example would represent an individual Database
 #[async_trait]
-pub trait Dependency
+pub trait Dependency: Send+Sync
 {
     fn kind(&self) -> &DependencyKind;
 
@@ -150,7 +152,7 @@ pub trait Dependency
 /// A [`Provider`] is an 'instance' of this dependency... For example a Postgres Dependency
 /// Installs
 #[async_trait]
-pub trait Provider {
+pub trait Provider: Send+Sync {
 
     fn kind(&self) -> &ProviderKind;
 

@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use crate::hyperspace::foundation::config;
-use crate::hyperspace::foundation::config::{ ProviderConfig};
-use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::implementation::docker_desktop_foundation::DependencyConfig;
 use crate::hyperspace::foundation::kind::{DependencyKind, Kind, ProviderKind};
@@ -18,33 +16,26 @@ static REQUIRED: Lazy<Vec<Kind>> = Lazy::new(|| {
 });
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
-pub struct DockerDaemonConfig {
-    pub image: String,
+pub struct DockerDaemonCoreDependencyConfig {
+    providers: HashMap<CamelCase, DockerProviderCoreConfig>
 }
 
 
-impl DockerDaemonConfig {
-    pub fn create(config: Map) -> Result<Box<Self>, FoundationErr> {
-        let core = PostgresClusterCoreConfig::create(config.clone())?;
-        let image= config.from_field("image" )?;
-
+impl DockerDaemonCoreDependencyConfig {
+    pub fn create(config: Map) -> Result<Self, FoundationErr> {
         let providers = config.parse_same("providers" )?;
 
-        Ok(Box::new(DockerDaemonConfig {
-            core,
-            image,
-            providers,
-        }))
+        Ok(DockerDaemonCoreDependencyConfig {
+            providers
+        })
     }
 }
 
-impl DependencyConfig for DockerDaemonConfig {
-    fn image(&self) -> &String {
-        &self.image
-    }
+impl DependencyConfig for DockerDaemonCoreDependencyConfig {
+
 }
 
-impl config::DependencyConfig for DockerDaemonConfig {
+impl config::DependencyConfig for DockerDaemonCoreDependencyConfig {
     fn kind(&self) -> &DependencyKind {
         &DependencyKind::DockerDaemon
     }
@@ -57,28 +48,82 @@ impl config::DependencyConfig for DockerDaemonConfig {
         &REQUIRED
     }
 
-    fn providers<P>(&self) -> &HashMap<CamelCase, P>
-    where
-        P: ProviderConfig
-    {
-        todo!()
-    }
 
-    fn provider<P>(&self, kind: &ProviderKind) -> Option<&P>
-    where
-        P: ProviderConfig
-    {
-        todo!()
-    }
-
-
-    fn clone_me(&self) -> Box<dyn DependencyConfig> {
+    fn clone_me(&self) -> Box<dyn config::DependencyConfig> {
        Box::new(self.clone())
     }
 }
 
+impl config::ProviderConfigSrc<DockerProviderCoreConfig> for DockerDaemonCoreDependencyConfig {
+    fn providers(&self) -> Result<&HashMap<CamelCase, DockerProviderCoreConfig>, FoundationErr> {
+        Ok(&self.providers)
+    }
 
-#[derive(Clone,Debug,Serialize,Deserialize)]
-pub struct DockerProviderConfig  {
-    kind: CamelCase
+    fn provider(&self, kind: &CamelCase) -> Result<Option<&DockerProviderCoreConfig>, FoundationErr> {
+        Ok(self.providers.get(kind))
+    }
+}
+
+
+
+#[derive(Debug,Clone,Serialize,Deserialize)]
+pub struct DockerProviderCoreConfig {
+    kind: ProviderKind,
+    image: String,
+    expose: HashMap<u16,u16>
+}
+
+impl ProviderConfig for DockerProviderCoreConfig {
+    fn image(&self) -> String {
+        self.image.clone()
+    }
+
+    fn expose(&self) -> HashMap<u16, u16> {
+        self.expose.clone()
+    }
+}
+
+impl DockerProviderCoreConfig {
+    pub fn new(kind: ProviderKind, image: String, expose: HashMap<u16,u16>) -> DockerProviderCoreConfig {
+        Self {
+            kind,
+            image,
+            expose,
+        }
+    }
+
+    pub fn create(config: Map) -> Result<Self,FoundationErr> {
+        let kind: CamelCase = config.from_field("kind").map_err(FoundationErr::config_err)?;
+        let kind = ProviderKind::new(DependencyKind::DockerDaemon, kind);
+        let image =  config.from_field("image").map_err(FoundationErr::config_err)?;
+        let expose =  config.from_field_opt("expose").map_err(FoundationErr::config_err)?;
+
+        let expose = match expose {
+            Some(expose) => expose,
+            None => HashMap::new()
+        };
+
+        Ok(Self {
+            kind,
+            image,
+            expose
+        })
+    }
+}
+
+pub trait ProviderConfig: config::ProviderConfig {
+    fn image(&self) -> String;
+
+    fn expose(&self) -> HashMap<u16,u16>;
+
+}
+
+impl config::ProviderConfig for DockerProviderCoreConfig {
+    fn kind(&self) -> &ProviderKind {
+        &self.kind
+    }
+
+    fn clone_me(&self) -> Box<dyn config::ProviderConfig> {
+        Box::new(self.clone())
+    }
 }

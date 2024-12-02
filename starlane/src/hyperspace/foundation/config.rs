@@ -39,7 +39,7 @@ pub trait Config
     fn platform(&self) -> Self::FoundationConfig;
 }
 
-pub trait FoundationConfig{
+pub trait FoundationConfig: Send+Sync{
     fn kind(&self) -> &FoundationKind;
 
     /// required [`Vec<Kind>`]  must be installed and running for THIS [`Foundation`] to work.
@@ -53,7 +53,7 @@ pub trait FoundationConfig{
     fn clone_me(&self) -> Box<dyn FoundationConfig>;
 }
 
-pub trait DependencyConfig {
+pub trait DependencyConfig: Send+Sync{
     fn kind(&self) -> &DependencyKind;
 
     fn volumes(&self) -> HashMap<String,String>;
@@ -67,23 +67,26 @@ pub trait DependencyConfig {
 pub trait ProviderConfigSrc<P>: DependencyConfig where P: ProviderConfig{
     fn providers(&self) ->  Result<&HashMap<CamelCase,P>,FoundationErr>;
 
-    fn provider(&self, kind: &ProviderKind) -> Result<Option<&P>,FoundationErr>;
+    fn provider(&self, kind: &CamelCase) -> Result<Option<&P>,FoundationErr>;
 }
 
 
-pub trait ProviderConfig{
+pub trait ProviderConfig: Send+Sync{
     fn kind(&self) -> &ProviderKind;
 
     fn clone_me(&self) -> Box<dyn ProviderConfig>;
 }
 
 
-pub trait RegistryConfig: Clone+Sized {
-   fn create( config: Map ) -> Result<impl RegistryConfig,FoundationErr>;
+/*
+pub trait RegistryConfig: Send+Sync{
+   fn create( config: Map ) -> Result<Box<dyn RegistryConfig>,FoundationErr>;
 
    fn provider(&self) -> &ProviderKind;
 
 }
+
+ */
 
 pub trait PlatformConfig {
 

@@ -4,6 +4,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use crate::hyperspace::foundation::kind::{DependencyKind, Kind, ProviderKind};
 use crate::hyperspace::foundation::{config, LiveService, Provider};
+use crate::hyperspace::foundation::dependency::core::docker::DockerProviderCoreConfig;
 use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::implementation::docker_desktop_foundation;
@@ -27,15 +28,18 @@ fn default_registry_provider_kind() -> CamelCase{
 
 #[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct PostgresDependencyConfig {
-    pub core: PostgresClusterCoreConfig,
+    pub postgres: PostgresClusterCoreConfig,
+    pub docker: ProviderKind,
     pub image: String
 }
 
 impl PostgresDependencyConfig {
     pub fn create( config: Map ) -> Result<Self,FoundationErr> {
-        let core = PostgresClusterCoreConfig::create(config.clone())?;
+        let postgres = PostgresClusterCoreConfig::create(config.clone())?;
+        let docker  = config.from_field("docker")?;
+        let docker = ProviderKind::new(DependencyKind::DockerDaemon,docker);
         let image = config.from_field("image")?;
-        Ok( PostgresDependencyConfig{core,image} )
+        Ok( Self{ postgres,docker, image} )
     }
 }
 
@@ -43,7 +47,7 @@ impl Deref for PostgresDependencyConfig {
     type Target = PostgresClusterCoreConfig;
 
     fn deref(&self) -> &Self::Target {
-        &self.core
+        &self.postgres
     }
 }
 
@@ -65,10 +69,6 @@ impl config::DependencyConfig for PostgresDependencyConfig {
     }
 }
 
-impl docker_desktop_foundation::DependencyConfig for PostgresDependencyConfig{
-    fn image(&self) -> &String {
-        &self.image
-    }
-}
+
 
 
