@@ -5,7 +5,7 @@ pub struct Progress {
 
 impl Progress {
     /// starts a new task
-    fn task(&self, task: impl AsRef<str>)  -> impl Task{
+    fn task(&self, task: &'static str)  -> impl Task{
         private::Task::new(task,self.tx.clone())
     }
 
@@ -38,14 +38,14 @@ pub trait Task {
 
 
     /// end this task and create another
-    fn task(self, task: impl AsRef<str>) -> impl Task;
+    fn task(self, task: &'static str) -> impl Task;
 
     /// end this task
     fn end(self);
 }
 
 pub mod private {
-    use crate::space::log::TaskState;
+    use crate::space::progress::TaskState;
 
     pub struct Task {
         task: String,
@@ -87,7 +87,7 @@ pub mod private {
             self.update()
         }
 
-        fn task(self, task: &'static str) -> impl crate::space::log::Task {
+        fn task(self, task: &'static str) -> impl super::Task {
            Task::new(task,self.tx.clone())
         }
 

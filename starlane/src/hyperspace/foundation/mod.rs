@@ -41,9 +41,10 @@ use std::future::Future;
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
+use std::sync::Arc;
 use crate::hyperspace::foundation::config::{Config, DependencyConfig, FoundationConfig, ProviderConfig};
 use crate::hyperspace::foundation::err::{ActionRequest, FoundationErr};
-use crate::hyperspace::foundation::status::{Phase, Status};
+use crate::hyperspace::foundation::status::{Phase, Status, StatusDetail};
 use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
 use crate::space::progress::Progress;
@@ -69,23 +70,20 @@ pub mod status;
 
 /// ['Foundation'] is an abstraction for managing infrastructure.
 #[async_trait]
-pub trait Foundation: Send + Sync
+pub trait Foundation
 {
     fn kind(&self) -> &FoundationKind;
 
-    fn config(&self) -> &impl FoundationConfig;
+    fn config(&self) -> &Box<dyn FoundationConfig>;
 
 
-    fn phase(&self) -> &Phase;
+    fn status(&self) -> Status;
 
-
-    fn status(&self) -> &Status;
-
-
+    fn status_watcher(&self) -> Arc<tokio::sync::watch::Receiver<Status>>;
 
     /// synchronize must be called first.  In this method the [`Foundation`] will check its
     /// environment to determine the
-    async fn synchronize(&self, progress: Progress) -> Result<(),FoundationErr>;
+    async fn synchronize(&self, progress: Progress) -> Result<Status,FoundationErr>;
 
 
     /// Install and initialize any Dependencies and/or [`Providers`] that
@@ -95,7 +93,7 @@ pub trait Foundation: Send + Sync
 
 
     /// return the given [`Dependency`] if it exists within this [`Foundation`]
-    fn dependency(&self, kind: &DependencyKind) -> Result<Option<impl Dependency>, FoundationErr>;
+    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Box<dyn Dependency>>, FoundationErr>;
 
     /// return a handle to the [`Registry`]
     fn registry(&self) -> Result<Registry,FoundationErr>;
@@ -108,15 +106,15 @@ pub trait Foundation: Send + Sync
 /// is a Database server like Postgres... the Dependency will download, install, initialize and
 /// start the service whereas a Provider in this example would represent an individual Database
 #[async_trait]
-pub trait Dependency: Send + Sync
+pub trait Dependency
 {
     fn kind(&self) -> &DependencyKind;
 
-    fn config(&self) -> &impl DependencyConfig;
+    fn config(&self) -> &Box<dyn DependencyConfig>;
 
-    fn phase(&self) -> &Phase;
+    fn status(&self) -> Status;
 
-    fn status(&self) -> &Status;
+    fn status_watcher(&self) -> Arc<tokio::sync::watch::Receiver<Status>>;
 
     /// perform any downloads for the Dependency
     async fn download(&self, progress: Progress) -> Result<(), FoundationErr>;
@@ -135,21 +133,22 @@ pub trait Dependency: Send + Sync
 
 
     /// return a [`Provider`] which can create instances from this [`Dependency`]
-    fn provider(&self, kind: &ProviderKind) -> Result<Option<impl Provider>, FoundationErr>;
+    fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<dyn Provider>>, FoundationErr>;
 
 }
 
 /// A [`Provider`] is an 'instance' of this dependency... For example a Postgres Dependency
 /// Installs
-pub trait Provider: Sized {
+#[async_trait]
+pub trait Provider {
 
     fn kind(&self) -> &ProviderKind;
 
-    fn config(&self) -> &impl ProviderConfig;
+    fn config(&self) -> &Box<dyn ProviderConfig>;
 
-    fn phase(&self) -> &Phase;
+    fn status(&self) -> Status;
 
-    fn status(&self) -> &Status;
+    fn status_watcher(&self) -> Arc<tokio::sync::watch::Receiver<Status>>;
 
     async fn initialize(&self, progress: Progress) -> Result<(), FoundationErr>;
 
@@ -201,24 +200,22 @@ pub(crate) struct FoundationSafety {
     foundation: dyn Foundation
 }
 
+#[async_trait]
 impl Foundation for FoundationSafety  {
     fn kind(&self) -> &FoundationKind {
         self.foundation.kind()
     }
 
-    fn config(&self) -> &impl FoundationConfig {
+    fn config(&self) -> &dyn FoundationConfig {
         self.foundation.config()
     }
 
-    fn phase(&self) -> &Phase {
-       self.foundation.phase()
-    }
 
-    fn status(&self) -> &Status {
+    fn status(&self) -> Status{
         self.foundation.status()
     }
 
-    async fn synchronize(&self, progress: Progress) -> Result<(), FoundationErr> {
+    async fn synchronize(&self, progress: Progress) -> Result<Status, FoundationErr> {
         self.foundation.synchronize(progress).await
     }
 

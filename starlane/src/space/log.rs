@@ -483,7 +483,6 @@ pub trait LogAppender: Send + Sync {
 #[derive(Clone)]
 struct RootLogger {
     appender: Arc<dyn LogAppender>,
-    //progress: Progress
 }
 
 /*
@@ -584,16 +583,7 @@ impl RootLogger {
     }
 
 
-    /*
-    fn task( &self, task: &'static str ) -> impl Task {
-        self.progress.task(task)
-    }
 
-    fn watch( &self, task: &'static str ) -> tokio::sync::watch::Receiver<TaskState>{
-        todo!()
-    }
-
-     */
 }
 pub struct NoAppender {}
 
@@ -768,15 +758,6 @@ impl Logger {
     {
         todo!("not really sure what this was supposed to do at one point but will wan tto bring it back sometday")
     }
-
-    pub fn task( &self, task: &'static str ) -> impl Task {
-        root_logger().task(task)
-    }
-
-    pub fn watch( &self, task: &'static str ) -> tokio::sync::watch::Receiver<TaskState> {
-        todo!()
-    }
-
 }
 
 impl Default for Logger {

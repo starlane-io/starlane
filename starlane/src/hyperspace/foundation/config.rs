@@ -36,7 +36,7 @@ pub trait Config
     fn platform(&self) -> Self::FoundationConfig;
 }
 
-pub trait FoundationConfig: Clone+Sized {
+pub trait FoundationConfig{
     fn kind(&self) -> &FoundationKind;
 
     /// required [`Vec<Kind>`]  must be installed and running for THIS [`Foundation`] to work.
@@ -45,25 +45,31 @@ pub trait FoundationConfig: Clone+Sized {
 
     fn dependency_kinds(&self) -> &Vec<DependencyKind>;
 
-    fn dependency(&self, kind: &DependencyKind) -> Option<&impl DependencyConfig>;
+    fn dependency(&self, kind: &DependencyKind) -> Option<&Box<dyn DependencyConfig>>;
+
+    fn clone_me(&self) -> Box<dyn FoundationConfig>;
 }
 
-pub trait DependencyConfig: Clone+Serialize+DeserializeOwned{
+pub trait DependencyConfig {
     fn kind(&self) -> &DependencyKind;
 
     fn volumes(&self) -> &HashMap<String,String>;
 
     fn require(&self) -> &Vec<Kind>;
 
-    fn providers(&self) ->  &HashMap<CamelCase,dyn ProviderConfig>;
+    fn providers(&self) ->  &HashMap<CamelCase,Box<dyn ProviderConfig>>;
 
-    fn provider(&self, kind: &ProviderKind) -> Option<&impl ProviderConfig>;
+    fn provider(&self, kind: &ProviderKind) -> Option<Box<dyn ProviderConfig>>;
+
+    fn clone_me(&self) -> Box<dyn DependencyConfig>;
 }
 
 
 
-pub trait ProviderConfig {
+pub trait ProviderConfig{
     fn kind(&self) -> &ProviderKind;
+
+    fn clone_me(&self) -> Box<dyn ProviderConfig>;
 }
 
 

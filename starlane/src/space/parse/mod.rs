@@ -1542,6 +1542,8 @@ impl FromStr for CamelCase {
     }
 }
 
+/*
+
 impl Serialize for CamelCase {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -1565,6 +1567,8 @@ impl<'de> Deserialize<'de> for CamelCase {
         }
     }
 }
+
+ */
 
 impl Display for CamelCase {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

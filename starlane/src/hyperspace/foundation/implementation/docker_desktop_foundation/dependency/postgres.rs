@@ -29,7 +29,7 @@ pub struct PostgresDependencyConfig {
     #[serde(default="Foundation::default_requirements")]
     require: Vec<Kind>,
 
-    providers: HashMap<CamelCase,dyn ProviderConfig>
+    providers: HashMap<CamelCase,Box<dyn ProviderConfig>>
 }
 
 impl DependencyConfig for PostgresDependencyConfig{
@@ -46,12 +46,12 @@ impl DependencyConfig for PostgresDependencyConfig{
     }
 
 
-    fn providers(&self) -> &HashMap<CamelCase, dyn ProviderConfig> {
+    fn providers(&self) -> &HashMap<CamelCase, Box<dyn ProviderConfig>> {
         &self.providers
     }
 
-    fn provider(&self, kind: &ProviderKind) -> Option<&impl ProviderConfig> {
-        self.providers.get(&kind.provider)
+    fn provider(&self, kind: &ProviderKind) -> Option<Box<dyn ProviderConfig>> {
+        self.providers.get(&kind.provider).cloned()
     }
 }
 

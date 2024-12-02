@@ -1,14 +1,16 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::Arc;
 use once_cell::sync::Lazy;
+use tokio::sync::watch::Receiver;
 use crate::hyperspace::foundation;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, Kind, ProviderKind};
 use crate::hyperspace::foundation::{config, Dependency};use crate::hyperspace::foundation::config::DependencyConfig;
 use crate::hyperspace::foundation::dependency::implementation::docker::DockerDaemonConfig;
 use crate::hyperspace::foundation::dependency::implementation::postgres::PostgresClusterConfig;
-use crate::hyperspace::foundation::status::{Phase, Status};
+use crate::hyperspace::foundation::status::{Phase, Status, StatusDetail};
 use crate::hyperspace::foundation::util::Map;
 use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
@@ -27,8 +29,7 @@ static REQUIRED: Lazy<Vec<Kind>> = Lazy::new(|| {
 
 pub struct Foundation {
     config: FoundationConfig,
-    state: Phase,
-    status: Status
+    status: Arc<tokio::sync::watch::Receiver<Status>>
 }
 
 impl Foundation {
@@ -36,7 +37,6 @@ impl Foundation {
     pub fn new(config: FoundationConfig) -> Self {
         Self {
             config,
-            state: Default::default(),
             status: Default::default(),
         }
     }
@@ -44,7 +44,7 @@ impl Foundation {
 
     /// this method is referenced by various [`DependencyConfig`] as a Default value (which in the case of [`FoundationKind::DockerDaemon`] every [`Dependency`]
     /// and [`Provisioner`] requires the Docker Daemon to be installed and running
-    fn default_requirements() -> Vec<Kind> {
+    pub fn default_requirements() -> Vec<Kind> {
         vec![DependencyKind::DockerDaemon.into()]
     }
 }
@@ -58,12 +58,13 @@ impl foundation::Foundation for Foundation {
         &self.config
     }
 
-    fn phase(&self) -> &Phase {
-        &self.state
+
+    fn status(&self) -> Status{
+        self.status.borrow().clone()
     }
 
-    fn status(&self) -> &Status  {
-        &self.status
+    fn status_watcher(&self) -> Arc<Receiver<Status>> {
+        self.status.clone()
     }
 
     async fn synchronize(&self, progress: Progress) -> Result<(), FoundationErr> {
@@ -135,6 +136,10 @@ impl config::FoundationConfig for FoundationConfig{
     fn dependency(&self, kind: &DependencyKind) -> Option<&impl config::DependencyConfig> {
         self.dependencies.get(kind)
     }
+
+    fn clone_me(&self) -> Box<dyn config::FoundationConfig>{
+       Box::new(self.clone())
+    }
 }
 
 
@@ -156,7 +161,7 @@ pub mod test {
     #[test]
     pub fn foundation_config() {
         fn inner() -> Result<(), FoundationErr> {
-            let foundation_config = include_str!("../../../../config/foundation/docker-daemon.yaml");
+            let foundation_config = include_str!("docker-daemon-test-config.yaml");
             let foundation_config = serde_yaml::from_str( foundation_config ).map_err(FoundationErr::config_err)?;
             let foundation_config = FoundationConfig::create(foundation_config)?;
 

@@ -3,7 +3,31 @@ use crate::hyperspace::foundation::err::{ActionItem, ActionRequest};
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, Kind};
 use crate::space::parse::CamelCase;
 
-/// [`Phase`] (stage,step) ... signifies where a foundation item is in it's provisioning process
+
+#[derive(Clone, Debug,Serialize,Deserialize)]
+pub struct Status{
+    pub phase: Phase,
+    pub detail: StatusDetail
+}
+
+impl Status {
+    pub fn new( phase: Phase, detail: StatusDetail) -> Self {
+        Self { phase, detail }
+    }
+}
+
+impl Default for Status {
+    fn default() -> Self {
+        Self {
+            phase: Default::default(),
+            detail: Default::default(),
+        }
+    }
+}
+
+
+
+    /// [`Phase`] (stage,step) ... signifies where a foundation item is in it's provisioning process
 #[derive(Clone, Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
 pub enum Phase {
     /// [`Phase::Unknown`] means [`Foundation::synchronize()`] must be called where the environment
@@ -25,10 +49,10 @@ impl Default for Phase {
 }
 
 
-/// [`Status`] provides more detailed information than state.  Including ActionRequired which
+/// [`StatusDetail`] provides more detailed information than state.  Including ActionRequired which
 /// should hopefully tell the user exactly what he needs to do to resolve the issue
 #[derive(Clone, Debug,Serialize,Deserialize)]
-pub enum Status {
+pub enum StatusDetail {
     Unknown,
     None,
     /// meaning that any one of the States: Downloaded, Installed, Initialized are still processing
@@ -38,9 +62,9 @@ pub enum Status {
     Ready
 }
 
-impl Default for Status{
+impl Default for StatusDetail {
     fn default() -> Self {
-        Status::Unknown
+        StatusDetail::Unknown
     }
 }
 

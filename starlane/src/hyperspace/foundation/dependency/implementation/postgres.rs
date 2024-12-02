@@ -5,8 +5,9 @@ use serde::{Deserialize, Serialize};
 use crate::hyperspace::foundation::config;
 use crate::hyperspace::foundation::config::ProviderConfig;
 use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::kind::{DependencyKind, PostgresKind, ProviderKind};
+use crate::hyperspace::foundation::kind::{DependencyKind, Kind, PostgresKind, ProviderKind};
 use crate::hyperspace::foundation::Dependency;
+use crate::hyperspace::foundation::implementation::docker_desktop_foundation::Foundation;
 use crate::hyperspace::foundation::util::Map;
 use crate::space::parse::CamelCase;
 
@@ -50,12 +51,16 @@ impl config::DependencyConfig for PostgresClusterConfig {
         &volumes
     }
 
+    fn require(&self) -> &Vec<Kind> {
+        Foundation::re
+    }
+
     fn providers(&self) -> Vec<CamelCase> {
         self.providers.keys().clone().collect()
     }
 
-    fn provider(&self, kind: &CamelCase) -> Option<&impl ProviderConfig> {
-        self.providers.get(kind)
+    fn provider(&self, kind: &CamelCase) -> Option<Box<dyn ProviderConfig>> {
+        self.providers.get(kind).map(|c| Box::new(c.clone()))
     }
 }
 

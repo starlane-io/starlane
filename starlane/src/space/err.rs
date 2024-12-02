@@ -24,7 +24,6 @@ use crate::space::parse::model::Subst;
 use crate::space::parse::ResolverErr;
 use crate::space::point::PointSegKind;
 use crate::space::substance::{Substance, SubstanceErr, SubstanceKind};
-use crate::space::task::OpErr;
 use crate::space::wave::core::http2::StatusCode;
 use crate::space::wave::core::{Method, ReflectedCore};
 use serde::{Deserialize, Serialize};
@@ -84,8 +83,6 @@ pub enum SpaceErr {
     RootLoggerNotInt,
     #[error("the root logger has already been initialized therefore another RootLogger cannot be created.")]
     RootLoggerAlreadyInit,
-    #[error(transparent)]
-    OpErr(#[from] OpErr),
     #[error("{0}")]
     Anyhow(#[from] Arc<anyhow::Error>),
 }
