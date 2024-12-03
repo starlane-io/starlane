@@ -1,86 +1,106 @@
-use serde::{Deserialize, Deserializer, Serialize};
-use std::fmt::{Debug, Display};
-use std::hash::Hash;
-use std::str::FromStr;
+use crate::hyperspace::foundation::err::FoundationErr;
+use crate::hyperspace::foundation::util::IntoSer;
+use crate::hyperspace::foundation::{Dependency, Foundation};
+use crate::space::parse::util::{new_span, result};
+use crate::space::parse::{camel_case, CamelCase};
 use derive_name::Name;
 use nom::bytes::complete::tag;
 use nom::sequence::tuple;
 use nom_supreme::final_parser::final_parser;
 use nom_supreme::parser_ext::FromStrParser;
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_with_macros::DeserializeFromStr;
+use std::fmt::{Debug, Display};
+use std::hash::Hash;
+use std::str::FromStr;
 use thiserror::__private::AsDisplay;
-use crate::hyperspace::foundation::{Dependency, Foundation};
-use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::util::IntoSer;
-use crate::space::parse::{camel_case, CamelCase};
-use crate::space::parse::util::{new_span, result};
 
-pub const FOUNDATION : &'static str = "config";
+pub const FOUNDATION: &'static str = "config";
 pub const DEPENDENCY: &'static str = "core";
 pub const PROVIDER: &'static str = "provider";
 
-
-#[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,Serialize, Deserialize)]
+#[derive(
+    Name, Clone, Debug, Eq, PartialEq, Hash, strum_macros::Display, Serialize, Deserialize,
+)]
 #[serde(untagged)]
 pub enum Kind {
-   #[serde(alias="{0}")]
-   #[strum(to_string="{0}")]
-   Dependency(DependencyKind),
-   #[serde(alias="{0}")]
-   #[strum(to_string="{0}")]
-   Provider(ProviderKind)
+    #[serde(alias = "{0}")]
+    #[strum(to_string = "{0}")]
+    Dependency(DependencyKind),
+    #[serde(alias = "{0}")]
+    #[strum(to_string = "{0}")]
+    Provider(ProviderKind),
 }
-
 
 impl IKind for Kind {
     fn category(&self) -> &'static str {
         match self {
             Kind::Dependency(k) => k.category(),
-            Kind::Provider(k) => k.category()
+            Kind::Provider(k) => k.category(),
         }
     }
 
     fn as_str(&self) -> &'static str {
-       match self {
-           Kind::Dependency(kind) => kind.as_str(),
-           Kind::Provider(kind) => kind.as_str()
-       }
+        match self {
+            Kind::Dependency(kind) => kind.as_str(),
+            Kind::Provider(kind) => kind.as_str(),
+        }
     }
 }
 
-
-
-
-
-#[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString,strum_macros::EnumIter, strum_macros::IntoStaticStr, Serialize, Deserialize)]
+#[derive(
+    Name,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    strum_macros::Display,
+    strum_macros::EnumString,
+    strum_macros::EnumIter,
+    strum_macros::IntoStaticStr,
+    Serialize,
+    Deserialize,
+)]
 pub enum FoundationKind {
-    DockerDaemon
+    DockerDaemon,
 }
 
 impl Default for FoundationKind {
     fn default() -> Self {
-      Self::DockerDaemon
+        Self::DockerDaemon
     }
 }
 
 //pub type FoundationParser = fn(&Value) -> Result<dyn Foundation, FoundationErr>;
 
 impl IKind for FoundationKind {
-
     fn category(&self) -> &'static str {
         FOUNDATION
     }
 
-    fn as_str(&self) -> &'static str  {
+    fn as_str(&self) -> &'static str {
         self.into()
     }
-
 }
 
-#[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString,strum_macros::IntoStaticStr,strum_macros::EnumIter, Serialize, Deserialize)]
+#[derive(
+    Name,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    strum_macros::Display,
+    strum_macros::EnumString,
+    strum_macros::IntoStaticStr,
+    strum_macros::EnumIter,
+    Serialize,
+    Deserialize,
+)]
 pub enum DependencyKind {
     PostgresCluster,
-    DockerDaemon
+    DockerDaemon,
 }
 
 impl Into<Kind> for DependencyKind {
@@ -90,42 +110,31 @@ impl Into<Kind> for DependencyKind {
 }
 
 impl DependencyKind {
-    fn provider( &self, provider: CamelCase ) -> ProviderKind {
-        ProviderKind::new(self.clone(),provider)
+    fn provider(&self, provider: CamelCase) -> ProviderKind {
+        ProviderKind::new(self.clone(), provider)
     }
 }
 
-impl IKind for DependencyKind{
+impl IKind for DependencyKind {
     fn category(&self) -> &'static str {
         DEPENDENCY
     }
 
-    fn as_str(&self) -> &'static str  {
+    fn as_str(&self) -> &'static str {
         self.into()
     }
-
-
 }
-
-
-
-
-
 
 impl FromStr for ProviderKind {
     type Err = FoundationErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let i = new_span(s);
-        let (dep,_,provider) = result(tuple((camel_case,tag("::"),camel_case))(i))?;
-
+        let (dep, _, provider) = result(tuple((camel_case, tag("::"), camel_case))(i))?;
 
         let dep = DependencyKind::from_str(dep.as_str()).map_err(FoundationErr::config_err)?;
 
-        let key = Self {
-            dep,
-            provider
-        };
+        let key = Self { dep, provider };
 
         Ok(key)
     }
@@ -133,21 +142,17 @@ impl FromStr for ProviderKind {
 
 impl ProviderKind {
     pub fn new(dep: DependencyKind, provider: CamelCase) -> Self {
-        Self {
-            dep,
-            provider,
-        }
+        Self { dep, provider }
     }
 }
 
-#[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,DeserializeFromStr,Name)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, DeserializeFromStr, Name)]
 pub struct ProviderKind {
     pub dep: DependencyKind,
-    pub provider: CamelCase
+    pub provider: CamelCase,
 }
 
-
-impl Into<Kind> for ProviderKind{
+impl Into<Kind> for ProviderKind {
     fn into(self) -> Kind {
         Kind::Provider(self)
     }
@@ -155,27 +160,40 @@ impl Into<Kind> for ProviderKind{
 
 impl Display for ProviderKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", format!("{}::{}", self.dep.as_str(), self.provider.as_str()).to_string())
+        write!(
+            f,
+            "{}",
+            format!("{}::{}", self.dep.as_str(), self.provider.as_str()).to_string()
+        )
     }
 }
 
-
-
-#[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString, strum_macros::IntoStaticStr,Serialize, Deserialize)]
+#[derive(
+    Name,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    strum_macros::Display,
+    strum_macros::EnumString,
+    strum_macros::IntoStaticStr,
+    Serialize,
+    Deserialize,
+)]
 #[serde(untagged)]
-pub enum PostgresKind{
+pub enum PostgresKind {
     Registry,
-    Database
+    Database,
 }
 
-impl Default for PostgresKind  {
+impl Default for PostgresKind {
     fn default() -> Self {
         Self::Registry
     }
 }
 
-impl IKind for ProviderKind{
-
+impl IKind for ProviderKind {
     fn category(&self) -> &'static str {
         PROVIDER
     }
@@ -191,28 +209,31 @@ impl From<&ProviderKind> for &str {
     }
 }
 
-pub trait IKind where for<'a> Self: Name+IntoSer+Debug+Clone+Eq+PartialEq+Display+Hash+Serialize+Deserialize<'a> {
-  fn category(&self) -> &'static str;
+pub trait IKind
+where
+    for<'z> Self:
+        Name + Debug + Clone + Eq + PartialEq + Display + Hash + Serialize + Deserialize<'z>,
+{
+    fn category(&self) -> &'static str;
 
-  fn as_str(&self) -> &'static str;
+    fn as_str(&self) -> &'static str;
 }
-
-
-
 
 #[cfg(test)]
 pub mod test {
-    use serde::Serialize;
     use crate::hyperspace::foundation::kind::{DependencyKind, IKind, Kind};
+    use serde::Serialize;
 
     #[test]
-    pub fn test( )  {
-
-        fn ser<K>( kind: &K ) where K: IKind+ToString+Serialize{
+    pub fn test() {
+        fn ser<K>(kind: &K)
+        where
+            K: IKind + ToString + Serialize,
+        {
             let id = kind.category();
             let kind_str = serde_yaml::to_string(kind).unwrap().trim().to_string();
-println!("{}",kind_str);
-            assert_eq!(kind_str.as_str(),format!("{}: {}", id, kind.to_string()))
+            println!("{}", kind_str);
+            assert_eq!(kind_str.as_str(), format!("{}: {}", id, kind.to_string()))
         }
 
         //ser(&Kind::Foundation(FoundationKind::DockerDesktop));
@@ -241,18 +262,14 @@ println!("{}",kind_str);
     }
 }
 
-
-
-#[derive(Debug, Clone,Serialize, Deserialize,Eq,PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct DockerDesktopSettings {
-    pub name: String
+    pub name: String,
 }
 
 impl DockerDesktopSettings {
-    pub fn new( name: String ) -> Self {
-        Self {
-            name
-        }
+    pub fn new(name: String) -> Self {
+        Self { name }
     }
 }
 
@@ -260,6 +277,8 @@ impl FromStr for DockerDesktopSettings {
     type Err = FoundationErr;
 
     fn from_str(settings: &str) -> Result<Self, Self::Err> {
-        serde_yaml::from_str(settings).map_err(|err|FoundationErr::foundation_verbose_error(FoundationKind::DockerDaemon, err, settings))
+        serde_yaml::from_str(settings).map_err(|err| {
+            FoundationErr::foundation_verbose_error(FoundationKind::DockerDaemon, err, settings)
+        })
     }
 }

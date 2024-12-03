@@ -2,6 +2,7 @@ use crate::hyperspace::foundation::config::{Config, DependencyConfig, ProviderCo
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, Kind, ProviderKind};
 use crate::hyperspace::foundation::status::{Phase, Status, StatusDetail};
+use crate::hyperspace::foundation::util::SerMap;
 use crate::hyperspace::foundation::{config, Dependency, Foundation, LiveService, Provider};
 use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
@@ -12,7 +13,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
 use wasmer_wasix::virtual_fs::Upcastable;
-use crate::hyperspace::foundation::util::SerMap;
 
 enum Call {
     Synchronize {
@@ -144,15 +144,13 @@ enum DepCall {
     ProviderCall(ProvWrapper),
 }
 
-struct DependencyProxy
-{
+struct DependencyProxy {
     config: Arc<dyn config::DependencyConfig>,
     call_tx: tokio::sync::mpsc::Sender<DepCall>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
 impl DependencyProxy {
-
     fn new(
         config: Arc<dyn config::DependencyConfig>,
         call_tx: tokio::sync::mpsc::Sender<DepCall>,
@@ -167,7 +165,7 @@ impl DependencyProxy {
 }
 
 #[async_trait]
-impl  Dependency for DependencyProxy {
+impl Dependency for DependencyProxy {
     fn kind(&self) -> &DependencyKind {
         self.config.kind()
     }
@@ -298,7 +296,7 @@ struct Runner {
 impl Runner {
     fn new(foundation: Box<dyn Foundation>) -> impl Foundation {
         let (call_tx, call_rx) = tokio::sync::mpsc::channel(64);
-        let config = foundation.config().clone_me();
+        let config = foundation.config().clone();
         let proxy = FoundationProxy::new(config, call_tx.clone(), foundation.status_watcher());
         let runner = Self {
             foundation,
@@ -331,19 +329,20 @@ impl Runner {
             }
         }
 
-
-        let runner =  self.runners.get(&kind).unwrap();
+        let runner = self.runners.get(&kind).unwrap();
 
         Ok(Some(runner))
     }
 
-    fn proxy(&mut self, kind: DependencyKind) -> Result<Option<Box<dyn Dependency>>, FoundationErr> {
+    fn proxy(
+        &mut self,
+        kind: DependencyKind,
+    ) -> Result<Option<Box<dyn Dependency>>, FoundationErr> {
         let runner = self
             .dependency(kind.clone())?
             .ok_or(FoundationErr::dep_not_available(kind))?;
         Ok(Some(runner.proxy()))
     }
-
 
     async fn run(mut self) -> Result<(), FoundationErr> {
         let logger = logger!(Point::global_foundation());
@@ -430,7 +429,10 @@ impl DependencyRunner {
 
         Ok(Some(runner))
     }
-    fn provider_proxy(&mut self, kind: ProviderKind) -> Result<Option<Box<dyn Provider>>, FoundationErr> {
+    fn provider_proxy(
+        &mut self,
+        kind: ProviderKind,
+    ) -> Result<Option<Box<dyn Provider>>, FoundationErr> {
         let runner = self
             .provider(kind.clone())?
             .ok_or(FoundationErr::provider_not_available(kind))?;

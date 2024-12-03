@@ -3,11 +3,6 @@ pub mod tcp;
 #[cfg(feature = "quic")]
 pub mod quic;
 
-use async_trait::async_trait;
-use dashmap::DashMap;
-use derive_name::Name;
-use once_cell::sync::Lazy;
-use starlane_primitive_macros::{push_loc, push_mark};
 use crate::space::err::SpaceErr;
 use crate::space::hyper::{Greet, InterchangeKind, Knock};
 use crate::space::loc::{Layer, PointFactory, Surface, ToSurface};
@@ -21,6 +16,11 @@ use crate::space::wave::exchange::asynch::{
 use crate::space::wave::exchange::SetStrategy;
 use crate::space::wave::{Agent, DirectedProto, HyperWave, Wave};
 use crate::space::VERSION;
+use async_trait::async_trait;
+use dashmap::DashMap;
+use derive_name::Name;
+use once_cell::sync::Lazy;
+use starlane_primitive_macros::{push_loc, push_mark};
 use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
 use std::process;
@@ -1928,8 +1928,8 @@ impl Bridge {
 #[cfg(test)]
 mod tests {
     use crate::hyperspace::hyperlane::HyperRouter;
-    use async_trait::async_trait;
     use crate::space::wave::HyperWave;
+    use async_trait::async_trait;
 
     /*
     #[no_mangle]
@@ -2002,7 +2002,6 @@ pub mod test_util {
         HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
         MountInterchangeGate,
     };
-    use starlane_primitive_macros::{create_mark, logger, push_loc, push_mark};
     use crate::space::err::SpaceErr;
     use crate::space::hyper::{Greet, InterchangeKind, Knock};
     use crate::space::loc::{Layer, Surface, ToSurface};
@@ -2015,6 +2014,7 @@ pub mod test_util {
     use crate::space::wave::{
         DirectedProto, PongCore, ReflectedKind, ReflectedProto, WaveVariantDef,
     };
+    use starlane_primitive_macros::{create_mark, logger, push_loc, push_mark};
 
     pub static LESS: Lazy<Point> =
         Lazy::new(|| Point::from_str("space:users:less").expect("point"));
@@ -2301,14 +2301,15 @@ pub mod test {
     use std::time::Duration;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
-    use crate::hyperspace::hyperlane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest};
+    use crate::hyperspace::hyperlane::test_util::{
+        SingleInterchangePlatform, TestGreeter, WaveTest,
+    };
     use crate::hyperspace::hyperlane::{
         AnonHyperAuthenticator, Bridge, HyperClient, HyperConnectionDetails, HyperGate,
         HyperGateSelector, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint,
         HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
         MountInterchangeGate,
     };
-    use starlane_primitive_macros::{create_mark, logger, push_mark};
     use crate::space::err::SpaceErr;
     use crate::space::hyper::InterchangeKind;
     use crate::space::loc::{Layer, ToSurface};
@@ -2326,6 +2327,7 @@ pub mod test {
         Agent, DirectedProto, HyperWave, PongCore, ReflectedKind, ReflectedProto, Wave,
         WaveVariantDef,
     };
+    use starlane_primitive_macros::{create_mark, logger, push_mark};
     pub static LESS: Lazy<Point> =
         Lazy::new(|| Point::from_str("space:users:less").expect("point"));
     pub static FAE: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:fae").expect("point"));

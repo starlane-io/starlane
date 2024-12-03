@@ -1,6 +1,5 @@
-
-#[cfg(features="postgres")]
-#[cfg(features="postgres-embed")]
+#[cfg(features = "postgres")]
+#[cfg(features = "postgres-embed")]
 pub mod embed;
 
 use crate::hyperspace::database::{Database, LiveDatabase};
@@ -8,12 +7,7 @@ use crate::hyperspace::platform::Platform;
 use crate::hyperspace::reg::{PgRegistryConfig, Registration, RegistryApi};
 use crate::hyperspace::registry::err::RegErr;
 use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use sqlx::pool::PoolConnection;
-use sqlx::postgres::{PgPoolOptions, PgRow};
-use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
-use starlane_primitive_macros::push_loc;
+use crate::server::PostgresLookups;
 use crate::space::command::common::{PropertyMod, SetProperties};
 use crate::space::command::direct::create::Strategy;
 use crate::space::command::direct::delete::Delete;
@@ -44,11 +38,16 @@ use crate::space::selector::{
 use crate::space::substance::{Substance, SubstanceList, SubstanceMap};
 use crate::space::util::ValuePattern;
 use crate::space::HYPERUSER;
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use sqlx::pool::PoolConnection;
+use sqlx::postgres::{PgPoolOptions, PgRow};
+use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
+use starlane_primitive_macros::push_loc;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
-use crate::server::PostgresLookups;
 
 pub trait PostgresPlatform: Send + Sync {
     fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr>;
@@ -62,14 +61,13 @@ pub struct PostgresRegistry {
 }
 
 impl PostgresRegistry {
-
-    pub async fn new2(database: LiveDatabase, logger: Logger ) -> Result<Self,RegErr> {
+    pub async fn new2(database: LiveDatabase, logger: Logger) -> Result<Self, RegErr> {
         let logger = push_loc!((logger, Point::global_registry()));
         let lookups = PostgresLookups::new(database.clone());
         let mut set = HashSet::new();
         set.insert(database.clone());
         let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookups.clone())).await?);
-        let handle = PostgresRegistryContextHandle::new(database, ctx );
+        let handle = PostgresRegistryContextHandle::new(database, ctx);
         PostgresRegistry::new(handle, Box::new(lookups), logger).await
     }
     pub async fn new(
@@ -1363,10 +1361,7 @@ pub struct PostgresRegistryContextHandle {
 }
 
 impl PostgresRegistryContextHandle {
-    pub fn new(
-        db: LiveDatabase,
-        pool: Arc<PostgresRegistryContext>,
-    ) -> Self {
+    pub fn new(db: LiveDatabase, pool: Arc<PostgresRegistryContext>) -> Self {
         Self {
             key: db.database.to_key(),
             schema: db.database.schema.clone(),

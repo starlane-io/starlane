@@ -1,20 +1,20 @@
-use std::collections::HashMap;
-use std::str::FromStr;
-use std::sync::Arc;
+use crate::hyperspace::foundation;
+use crate::hyperspace::foundation::config;
+use crate::hyperspace::foundation::err::FoundationErr;
+use crate::hyperspace::foundation::implementation::docker_daemon_foundation;
+use crate::hyperspace::foundation::kind::{DependencyKind, Kind, PostgresKind, ProviderKind};
+use crate::hyperspace::foundation::util::{IntoSer, Map, SerMap};
+use crate::hyperspace::foundation::Dependency;
+use crate::space::parse::CamelCase;
 use derive_name::Name;
 use futures::TryFutureExt;
 use md5::digest::DynDigest;
 use serde::{Deserialize, Serialize};
-use crate::hyperspace::foundation;
-use crate::hyperspace::foundation::config;
-use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::kind::{DependencyKind, Kind, PostgresKind, ProviderKind};
-use crate::hyperspace::foundation::Dependency;
-use crate::hyperspace::foundation::implementation::docker_daemon_foundation;
-use crate::hyperspace::foundation::util::{DesMap, IntoSer, Map, SerMap};
-use crate::space::parse::CamelCase;
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::Arc;
 
-#[derive(Clone,Debug,Serialize,Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PostgresClusterCoreConfig {
     pub port: u16,
     pub data_dir: String,
@@ -23,29 +23,36 @@ pub struct PostgresClusterCoreConfig {
     pub providers: HashMap<CamelCase, ProviderConfig>,
 }
 
-
 impl PostgresClusterCoreConfig {
-
     pub fn create(config: Map) -> Result<Self, FoundationErr> {
-        let port: u16 = config.from_field_opt("port").map_err(FoundationErr::config_err)?.map_or(5432u16, |port| port);
-        let username: String = config.from_field_opt("username").map_err(FoundationErr::config_err)?.map_or("postgres".to_string(), |username| username);
-        let password : String = config.from_field_opt("password").map_err(FoundationErr::config_err)?.map_or("postgres".to_string(), |password| password);
+        let port: u16 = config
+            .from_field_opt("port")
+            .map_err(FoundationErr::config_err)?
+            .map_or(5432u16, |port| port);
+        let username: String = config
+            .from_field_opt("username")
+            .map_err(FoundationErr::config_err)?
+            .map_or("postgres".to_string(), |username| username);
+        let password: String = config
+            .from_field_opt("password")
+            .map_err(FoundationErr::config_err)?
+            .map_or("postgres".to_string(), |password| password);
         let data_dir: String = config.from_field("data_dir")?;
 
-        let mut providers =  config.parse_same("providers"  )?;
+        let mut providers = config.parse_same("providers")?;
         let registry_kind = CamelCase::from_str("Registry")?;
         if !providers.contains_key(&registry_kind) {
-            providers.insert(registry_kind,ProviderConfig::default_registry());
+            providers.insert(registry_kind, ProviderConfig::default_registry());
         }
 
         Ok(PostgresClusterCoreConfig {
             port,
             data_dir,
             username,
-            password, providers,
+            password,
+            providers,
         })
     }
-
 
     pub fn create_as_trait(config: Map) -> Result<Arc<dyn DependencyConfig>, FoundationErr> {
         Ok(Self::create(config)?.into_trait())
@@ -55,45 +62,28 @@ impl PostgresClusterCoreConfig {
         let config = Arc::new(self);
         config as Arc<dyn DependencyConfig>
     }
-
 }
 
-pub trait DependencyConfig: docker_daemon_foundation::DependencyConfig { }
-
-impl docker_daemon_foundation::DependencyConfig for PostgresClusterCoreConfig {
-
-}
-
-
-impl DependencyConfig for PostgresClusterCoreConfig { }
-
-
-
+pub trait DependencyConfig: config::DependencyConfig {}
 
 impl config::DependencyConfig for PostgresClusterCoreConfig {
-
     fn kind(&self) -> &DependencyKind {
-        & DependencyKind::PostgresCluster
+        &DependencyKind::PostgresCluster
     }
 
     fn volumes(&self) -> HashMap<String, String> {
         let mut map = HashMap::new();
-        map.insert("data".to_string(), self.data_dir.clone() );
+        map.insert("data".to_string(), self.data_dir.clone());
         map
     }
-
 
     fn require(&self) -> Vec<Kind> {
         foundation::default_requirements()
     }
 
-
     fn clone_me(&self) -> Arc<dyn config::DependencyConfig> {
         Arc::new(self.clone())
     }
-
-
-
 }
 
 impl IntoSer for PostgresClusterCoreConfig {
@@ -102,36 +92,38 @@ impl IntoSer for PostgresClusterCoreConfig {
     }
 }
 
-
-
-
-
-
 impl config::ProviderConfigSrc<ProviderConfig> for PostgresClusterCoreConfig {
     fn providers(&self) -> Result<&HashMap<CamelCase, ProviderConfig>, FoundationErr> {
-        todo!()
+        Ok(&Default::default())
     }
 
     fn provider(&self, kind: &CamelCase) -> Result<Option<&ProviderConfig>, FoundationErr> {
-        todo!()
+        Ok(None)
     }
 }
 
-
-#[derive(Name,Clone,Debug,Eq,PartialEq,Hash,strum_macros::Display,strum_macros::EnumString, strum_macros::IntoStaticStr,Serialize, Deserialize)]
+#[derive(
+    Name,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    strum_macros::Display,
+    strum_macros::EnumString,
+    strum_macros::IntoStaticStr,
+    Serialize,
+    Deserialize,
+)]
 pub enum PostgresSeed {
-    Registry
+    Registry,
 }
 
-
-
-
-
-#[derive(Clone,Debug,Serialize,Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProviderConfig {
     pub kind: PostgresKind,
     pub database: Option<String>,
-    pub seed: Option<PostgresSeed>
+    pub seed: Option<PostgresSeed>,
 }
 
 impl ProviderConfig {
@@ -144,7 +136,11 @@ impl ProviderConfig {
     }
 }
 
-
+impl IntoSer for ProviderConfig {
+    fn into_ser(&self) -> Box<dyn SerMap> {
+        Box::new(self.clone()) as Box<dyn SerMap>
+    }
+}
 
 impl config::ProviderConfig for ProviderConfig {
     fn kind(&self) -> &ProviderKind {
@@ -155,4 +151,3 @@ impl config::ProviderConfig for ProviderConfig {
         Arc::new(self.clone())
     }
 }
-

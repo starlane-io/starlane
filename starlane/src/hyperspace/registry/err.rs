@@ -1,5 +1,4 @@
-
-#[cfg(feature="postgres")]
+#[cfg(feature = "postgres")]
 use sqlx::Error;
 
 use crate::space::err::{HyperSpatialError, ParseErrs, SpaceErr, SpatialError};
@@ -30,14 +29,14 @@ pub enum RegErr {
     #[error("{0}")]
     Msg(String),
 
-    #[cfg(feature="postgres")]
+    #[cfg(feature = "postgres")]
     #[error("postgres error: {0}")]
     SqlxErr(#[from] Arc<sqlx::Error>),
 
     #[error("postgres registry db connection pool '{0}' not found")]
     PoolNotFound(String),
 
-    #[cfg(feature="postgresql-embedded")]
+    #[cfg(feature = "postgresql-embedded")]
     #[error("postgres embed error error: {0}")]
     PgErr(#[from] postgresql_embedded::Error),
     #[error(transparent)]
@@ -47,8 +46,6 @@ pub enum RegErr {
     #[error("expected an embedded postgres registry but received configuration for a remote postgres registry")]
     ExpectedEmbeddedRegistry,
 }
-
-
 
 impl From<std::io::Error> for RegErr {
     fn from(value: std::io::Error) -> Self {
@@ -72,7 +69,7 @@ impl From<&String> for RegErr {
     }
 }
 
-#[cfg(feature="postgres")]
+#[cfg(feature = "postgres")]
 impl From<sqlx::Error> for RegErr {
     fn from(value: Error) -> Self {
         RegErr::SqlxErr(Arc::new(value))
@@ -100,8 +97,10 @@ impl RegErr {
         Self::ExpectedParent(point.clone())
     }
 
-
-    pub fn msg<M>(msg: M) -> RegErr where M: ToString {
+    pub fn msg<M>(msg: M) -> RegErr
+    where
+        M: ToString,
+    {
         Self::Msg(msg.to_string())
     }
 }

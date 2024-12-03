@@ -1,4 +1,3 @@
-use once_cell::sync::Lazy;
 use crate::space::err::SpaceErr;
 use crate::space::kind::BaseKind;
 use crate::space::loc::ToBaseKind;
@@ -6,6 +5,7 @@ use crate::space::particle::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
     PropertySource, U64Pattern, UsernamePattern,
 };
+use once_cell::sync::Lazy;
 
 pub static DEFAULT_PROPERTIES_CONFIG: Lazy<PropertiesConfig> =
     Lazy::new(|| default_properties_config().unwrap());

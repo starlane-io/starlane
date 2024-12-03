@@ -3,7 +3,9 @@ use crate::space::command::Command;
 use crate::space::config::Document;
 use crate::space::err::{PrintErr, SpaceErr};
 use crate::space::parse::context;
-use crate::space::parse::model::{BlockKind, DelimitedBlockKind, NestedBlockKind, TerminatedBlockKind};
+use crate::space::parse::model::{
+    BlockKind, DelimitedBlockKind, NestedBlockKind, TerminatedBlockKind,
+};
 use crate::space::parse::util::{new_span, result, span_with_extra};
 use crate::space::parse::{
     assignment, base_point_segment, base_seg, command_line, doc,

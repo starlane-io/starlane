@@ -28,7 +28,7 @@ where
     Self: 'static,
     Self::StarAuth: HyperAuthenticator,
     Self::RemoteStarConnectionFactory: HyperwayEndpointFactory,
-//    Self::Foundation: Foundation + Clone + Send + Sync,
+    //    Self::Foundation: Foundation + Clone + Send + Sync,
     Self::Config: PlatformConfig,
 {
     type Err;
@@ -217,7 +217,7 @@ impl Default for Settings {
 
 pub trait PlatformConfig: Clone + Send + Sync
 /*where
-    Self::RegistryConfig: Clone + Sized + Send + Sync + 'static,*/
+Self::RegistryConfig: Clone + Sized + Send + Sync + 'static,*/
 {
     type RegistryConfig;
 

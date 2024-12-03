@@ -1,9 +1,9 @@
+use crate::space::parse::util::new_span;
 use convert_case::{Case, Casing};
 use core::str::FromStr;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use crate::space::parse::util::new_span;
 
 use crate::space::err::{ParseErrs, PrintErr, SpaceErr};
 use crate::space::loc::{
@@ -141,7 +141,7 @@ pub enum BaseKind {
     WebServer,
     Foundation,
     Dependency,
-    Provider
+    Provider,
 }
 
 impl BaseKind {
@@ -317,7 +317,7 @@ pub enum Kind {
     WebServer,
     Foundation,
     Dependency,
-    Provider
+    Provider,
 }
 
 impl ToBaseKind for Kind {
@@ -508,7 +508,7 @@ impl TryFrom<KindParts> for Kind {
             BaseKind::WebServer => Kind::WebServer,
             BaseKind::Foundation => Kind::Foundation,
             BaseKind::Dependency => Kind::Dependency,
-            BaseKind::Provider => Kind::Provider
+            BaseKind::Provider => Kind::Provider,
         })
     }
 }

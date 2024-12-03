@@ -1,9 +1,11 @@
 use crate::space::err::{ParseErrs, PrintErr};
 use crate::space::loc::Uuid;
 use crate::space::parse::Env;
-use crate::space::wasm::{ Timestamp};
+use crate::space::wasm::Timestamp;
 use crate::space::wave::core::http2::HttpMethod;
 
+use crate::space::loc;
+use chrono::Utc;
 use core::fmt::Display;
 use core::marker::Sized;
 use core::option::Option;
@@ -15,8 +17,6 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
-use chrono::Utc;
-use crate::space::loc;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum HttpMethodPattern {
@@ -442,20 +442,15 @@ where
     fn convert_from(a: A) -> Result<Self, ParseErrs>;
 }
 
-
-
-
 pub fn uuid() -> loc::Uuid {
     loc::Uuid::from(uuid::Uuid::new_v4()).unwrap()
 }
 
 pub fn timestamp() -> Timestamp {
-    Timestamp { millis: Utc::now().timestamp_millis() }
+    Timestamp {
+        millis: Utc::now().timestamp_millis(),
+    }
 }
-
-
-
-
 
 /*
 pub fn uuid() -> Uuid {

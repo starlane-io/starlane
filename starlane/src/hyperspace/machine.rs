@@ -10,13 +10,10 @@ use crate::hyperspace::reg::Registry;
 use crate::hyperspace::service::{
     service_conf, Service, ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate,
 };
-use crate::hyperspace::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
+use crate::hyperspace::star::{
+    HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
+};
 use crate::hyperspace::template::Templates;
-use async_trait::async_trait;
-use dashmap::DashMap;
-use futures::future::{join_all, select_all, BoxFuture};
-use futures::{FutureExt, TryFutureExt};
-use starlane_primitive_macros::{push_loc, push_mark};
 use crate::space::artifact::asynch::{ArtErr, ArtifactFetcher, Artifacts};
 use crate::space::command::direct::create::KindTemplate;
 use crate::space::err::{HyperSpatialError, SpaceErr, SpatialError};
@@ -34,6 +31,11 @@ use crate::space::util::{OptSelector, ValuePattern};
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::exchange::asynch::Exchanger;
 use crate::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
+use async_trait::async_trait;
+use dashmap::DashMap;
+use futures::future::{join_all, select_all, BoxFuture};
+use futures::{FutureExt, TryFutureExt};
+use starlane_primitive_macros::{push_loc, push_mark};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::mpsc::SendError;

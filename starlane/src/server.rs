@@ -4,10 +4,10 @@ use crate::hyperspace::registry::postgres::{
     PostgresRegistryContextHandle,
 };
 
-use crate::hyperspace::driver::{DriverAvail, DriversBuilder};
 use crate::hyperspace::driver::base::BaseDriverFactory;
 use crate::hyperspace::driver::control::ControlDriverFactory;
 use crate::hyperspace::driver::root::RootDriverFactory;
+use crate::hyperspace::driver::{DriverAvail, DriversBuilder};
 use crate::space::artifact::asynch::Artifacts;
 use crate::space::kind::StarSub;
 use crate::space::loc::{MachineName, StarKey};
@@ -18,9 +18,14 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
+use crate::hyperspace::driver::space::SpaceDriverFactory;
 use crate::hyperspace::err::HypErr;
+use crate::hyperspace::foundation::settings::ProtoFoundationSettings;
+use crate::hyperspace::foundation::Foundation;
 use crate::hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
-use crate::hyperspace::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
+use crate::hyperspace::hyperlane::{
+    AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper,
+};
 use crate::hyperspace::platform::{Platform, PlatformConfig};
 use crate::hyperspace::registry::err::RegErr;
 use crate::hyperspace::shutdown::panic_shutdown;
@@ -31,9 +36,6 @@ use starlane_primitive_macros::{logger, push_loc};
 use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
-use crate::hyperspace::driver::space::SpaceDriverFactory;
-use crate::hyperspace::foundation::settings::ProtoFoundationSettings;
-use crate::hyperspace::foundation::Foundation;
 //use crate::hyperspace::config::docker::DockerDesktopFoundation;
 use crate::hyperspace::machine::MachineTemplate;
 
@@ -44,8 +46,8 @@ pub struct StarlaneConfig {
     pub can_nuke: bool,
     pub can_scorch: bool,
     pub control_port: u16,
-//    pub config: ProtoFoundationConfig,
-    pub registry: ()
+    //    pub config: ProtoFoundationConfig,
+    pub registry: (),
 }
 
 impl PlatformConfig for StarlaneConfig {
@@ -59,7 +61,7 @@ impl PlatformConfig for StarlaneConfig {
         self.can_nuke
     }
 
-    fn registry(&self) -> &Self::RegistryConfig{
+    fn registry(&self) -> &Self::RegistryConfig {
         &self.registry
     }
 
@@ -94,7 +96,7 @@ pub struct Starlane {
     config: StarlaneConfig,
     artifacts: Artifacts,
     registry: Registry,
-//    config: DockerDesktopFoundation,
+    //    config: DockerDesktopFoundation,
 }
 
 /*
@@ -115,7 +117,7 @@ impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
  */
 
 #[cfg(feature = "postgres")]
-#[cfg(feature="blah")]
+#[cfg(feature = "blah")]
 impl Starlane {
     pub async fn new(
         config: StarlaneConfig,

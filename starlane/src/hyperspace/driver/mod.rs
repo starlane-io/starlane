@@ -22,16 +22,6 @@ use crate::hyperspace::service::{
     Service, ServiceErr, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate,
 };
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
-use anyhow::__private::kind::TraitKind;
-use anyhow::{anyhow, Error};
-use async_trait::async_trait;
-use dashmap::DashMap;
-use futures::future::select_all;
-use futures::task::Spawn;
-use futures::{FutureExt, TryFutureExt};
-use once_cell::sync::Lazy;
-use starlane_macros::{handler, route, DirectedHandler, ToSpaceErr};
-use starlane_primitive_macros::push_loc;
 use crate::space::artifact::asynch::{ArtErr, Artifacts};
 use crate::space::artifact::ArtRef;
 use crate::space::command::common::StateSrc::Subst;
@@ -65,6 +55,16 @@ use crate::space::wave::exchange::asynch::{
 use crate::space::wave::exchange::SetStrategy;
 use crate::space::wave::{Agent, DirectedWave, ReflectedWave, Wave};
 use crate::space::HYPERUSER;
+use anyhow::__private::kind::TraitKind;
+use anyhow::{anyhow, Error};
+use async_trait::async_trait;
+use dashmap::DashMap;
+use futures::future::select_all;
+use futures::task::Spawn;
+use futures::{FutureExt, TryFutureExt};
+use once_cell::sync::Lazy;
+use starlane_macros::{handler, route, DirectedHandler, ToSpaceErr};
+use starlane_primitive_macros::push_loc;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;

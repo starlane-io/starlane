@@ -1,7 +1,5 @@
 use crate::hyperspace::platform::Platform;
 use crate::hyperspace::registry::err::RegErr;
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use crate::space::command::common::{SetProperties, SetRegistry};
 use crate::space::command::direct::create::Strategy;
 use crate::space::command::direct::delete::Delete;
@@ -14,6 +12,8 @@ use crate::space::point::Point;
 use crate::space::security::{Access, AccessGrant, IndexedAccessGrant};
 use crate::space::selector::Selector;
 use crate::space::substance::SubstanceList;
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 pub type Registry = Arc<dyn RegistryApi>;
@@ -226,8 +226,3 @@ pub struct Registration {
     pub strategy: Strategy,
     pub status: Status,
 }
-
-
-
-
-

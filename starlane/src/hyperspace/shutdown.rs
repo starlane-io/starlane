@@ -20,8 +20,8 @@ static SHUTDOWN_HOOK_TX: Lazy<tokio::sync::mpsc::Sender<ShutdownCall>> = Lazy::n
                     tokio::time::timeout(Duration::from_secs(15u64), async move {
                         while let Some(res) = set.join_next().await {}
                     })
-                        .await
-                        .unwrap_or_default();
+                    .await
+                    .unwrap_or_default();
                     process::exit(code);
                 }
             }
@@ -41,8 +41,6 @@ pub fn shutdown(code: i32) {
         .try_send(ShutdownCall::Shutdown(code))
         .unwrap_or_default();
 }
-
-
 
 pub fn panic_shutdown<M>(msg: M)
 where

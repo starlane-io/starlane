@@ -1,25 +1,27 @@
-use std::any::Any;
+use crate::hyperspace::foundation;
+use crate::hyperspace::foundation::config::ConfigMap;
+use crate::hyperspace::foundation::dependency::core::docker::DockerDaemonCoreDependencyConfig;
+use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
+use crate::hyperspace::foundation::err::FoundationErr;
+use crate::hyperspace::foundation::kind::{
+    DependencyKind, FoundationKind, IKind, Kind, ProviderKind,
+};
+use crate::hyperspace::foundation::status::Status;
+use crate::hyperspace::foundation::util::{ArcWrap, IntoSer, Map, SerMap};
+use crate::hyperspace::foundation::{config, Dependency};
+use crate::hyperspace::reg::Registry;
+use crate::space::parse::CamelCase;
+use crate::space::progress::Progress;
+use derive_name::{Name, Named};
+use once_cell::sync::Lazy;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::any::Any;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
-use derive_name::{Name, Named};
-use once_cell::sync::Lazy;
-use serde::de::DeserializeOwned;
 use tokio::sync::watch::Receiver;
-use crate::hyperspace::foundation;
-use crate::hyperspace::foundation::{config, Dependency};
-use crate::hyperspace::foundation::config::ConfigMap;
-use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, Kind, ProviderKind};
-use crate::hyperspace::foundation::dependency::core::docker::DockerDaemonCoreDependencyConfig;
-use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
-use crate::hyperspace::foundation::status::Status;
-use crate::hyperspace::foundation::util::{DesMap, IntoSer, Map, SerMap};
-use crate::hyperspace::reg::Registry;
-use crate::space::parse::CamelCase;
-use crate::space::progress::Progress;
 
 pub mod dependency;
 
@@ -28,7 +30,11 @@ static REQUIRED: Lazy<Vec<Kind>> = Lazy::new(|| {
     /// we obviously need DockerDaemon to be installed and running or this Foundation can't do a thing
     let docker_daemon = DependencyKind::DockerDaemon.into();
     /// and this Foundation supports a Postgres Registry (Also very important)
-    let registry = ProviderKind::new(DependencyKind::PostgresCluster,CamelCase::from_str("Registry").unwrap()).into();
+    let registry = ProviderKind::new(
+        DependencyKind::PostgresCluster,
+        CamelCase::from_str("Registry").unwrap(),
+    )
+    .into();
     let mut rtn = vec![docker_daemon, registry];
 
     rtn
@@ -47,26 +53,25 @@ pub struct Foundation {
 }
 
 impl Foundation {
-
     pub fn new(config: FoundationConfig) -> Self {
-        let (status_tx,status) = tokio::sync::watch::channel(Status::default());
+        let (status_tx, status) = tokio::sync::watch::channel(Status::default());
         let status = Arc::new(status);
         let config = Arc::new(config);
         Self {
             config,
             status,
-            status_tx
+            status_tx,
         }
     }
 }
 
 #[async_trait]
 impl foundation::Foundation for Foundation {
-    fn kind(&self) -> &FoundationKind{
+    fn kind(&self) -> &FoundationKind {
         &FoundationKind::DockerDaemon
     }
 
-    fn config(&self) -> Arc<dyn config::FoundationConfig>{
+    fn config(&self) -> Arc<dyn config::FoundationConfig> {
         let config: Arc<dyn config::FoundationConfig> = self.config.clone();
         config
     }
@@ -79,7 +84,7 @@ impl foundation::Foundation for Foundation {
         self.status.clone()
     }
 
-    async fn synchronize(&self, progress: Progress) -> Result<Status,FoundationErr> {
+    async fn synchronize(&self, progress: Progress) -> Result<Status, FoundationErr> {
         todo!();
         Ok(Default::default())
     }
@@ -91,81 +96,72 @@ impl foundation::Foundation for Foundation {
         Ok(())
     }
 
-    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Box<dyn Dependency>>, FoundationErr> {
+    fn dependency(
+        &self,
+        kind: &DependencyKind,
+    ) -> Result<Option<Box<dyn Dependency>>, FoundationErr> {
         todo!()
     }
 
-    fn registry(&self) -> Result<Registry,FoundationErr> {
+    fn registry(&self) -> Result<Registry, FoundationErr> {
         todo!()
     }
 }
 
-
-#[derive(Clone,Serialize, Deserialize,Name)]
+#[derive(Clone, Serialize, Deserialize, Name)]
 pub struct FoundationConfig {
     pub kind: FoundationKind,
     pub registry: RegistryProviderConfig,
-    pub dependencies: ConfigMap<DependencyKind,Arc<dyn DependencyConfig>>,
+    pub dependencies: ConfigMap<DependencyKind, ArcWrap<dyn DependencyConfig>>,
 }
-
-
-
-
 
 impl FoundationConfig {
-
     /*
-   pub(self) fn des_from_map(map: impl SerMap) -> Result<Self, FoundationErr> {
-           let map = map.to_map()?;
-           let kind = map.kind()?;
+    pub(self) fn des_from_map(map: impl SerMap) -> Result<Self, FoundationErr> {
+            let map = map.to_map()?;
+            let kind = map.kind()?;
 
-           let registry = map.from_field("registry")?;
+            let registry = map.from_field("registry")?;
 
-           let dependencies: Map  = map.from_field_opt("dependencies")?.unwrap_or_else(|| Default::default());
-           let dependencies = dependencies.to_config_map(Self::des_dependency_factory)?;
+            let dependencies: Map  = map.from_field_opt("dependencies")?.unwrap_or_else(|| Default::default());
+            let dependencies = dependencies.to_config_map(Self::des_dependency_factory)?;
 
-           Ok(Self {
-               kind,
-               registry,
-               dependencies,
-           })
-       }
-
-
-    pub(self) fn des_dependency_factory(dependency: impl SerMap) -> Result<Arc<dyn DependencyConfig>, FoundationErr> {
-        let map = dependency.to_map()?;
-        let kind: DependencyKind = map.kind()?;
-
-        match kind {
-            DependencyKind::PostgresCluster => PostgresClusterCoreConfig::create_as_trait(map),
-            DependencyKind::DockerDaemon => DockerDaemonCoreDependencyConfig::create_as_trait(map),
+            Ok(Self {
+                kind,
+                registry,
+                dependencies,
+            })
         }
-    }
-
-    pub(self) fn ser_dependencies(dependencies: HashMap<DependencyKind, Arc<impl DependencyConfig+SerMap>>)  -> Result<serde_yaml::Value,FoundationErr> {
-        let mut sequence = serde_yaml::Sequence::new();
-        for (_,item) in dependencies.into_iter() {
-            sequence.push( (*item).clone().to_value()?);
-        }
-        sequence.to_value()
-    }
-
-     */
 
 
+     pub(self) fn des_dependency_factory(dependency: impl SerMap) -> Result<Arc<dyn DependencyConfig>, FoundationErr> {
+         let map = dependency.to_map()?;
+         let kind: DependencyKind = map.kind()?;
+
+         match kind {
+             DependencyKind::PostgresCluster => PostgresClusterCoreConfig::create_as_trait(map),
+             DependencyKind::DockerDaemon => DockerDaemonCoreDependencyConfig::create_as_trait(map),
+         }
+     }
+
+     pub(self) fn ser_dependencies(dependencies: HashMap<DependencyKind, Arc<impl DependencyConfig+SerMap>>)  -> Result<serde_yaml::Value,FoundationErr> {
+         let mut sequence = serde_yaml::Sequence::new();
+         for (_,item) in dependencies.into_iter() {
+             sequence.push( (*item).clone().to_value()?);
+         }
+         sequence.to_value()
+     }
+
+      */
 }
-
 
 pub trait DependencyConfig: config::DependencyConfig {
     fn image(&self) -> String;
-
 }
 
-
-
 impl config::FoundationConfig for FoundationConfig {
-    fn kind(&self) -> & FoundationKind {
-        & self.kind
+    fn kind(&self) -> &FoundationKind {
+        &self.kind
     }
 
     fn required(&self) -> &Vec<Kind> {
@@ -176,15 +172,14 @@ impl config::FoundationConfig for FoundationConfig {
         self.dependencies.keys().collect()
     }
 
-    fn dependency(&self, kind: &DependencyKind) -> Option<&Arc<dyn config::DependencyConfig>> {
+    fn dependency(&self, kind: &DependencyKind) -> Option<&ArcWrap<dyn config::DependencyConfig>> {
         self.dependencies.get(kind)
     }
 
-    fn clone_me(&self) -> Arc<dyn config::FoundationConfig>{
-       Arc::new(self.clone())
+    fn clone_me(&self) -> Arc<dyn config::FoundationConfig> {
+        Arc::new(self.clone())
     }
 }
-
 
 impl IntoSer for FoundationConfig {
     fn into_ser(&self) -> Box<dyn SerMap> {
@@ -192,18 +187,10 @@ impl IntoSer for FoundationConfig {
     }
 }
 
-#[derive(Clone,Debug,Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RegistryProviderConfig {
     provider: ProviderKind,
 }
-
-
-
-
-
-
-
-
 
 #[cfg(test)]
 pub mod test {
@@ -213,7 +200,8 @@ pub mod test {
     pub fn foundation_config() {
         fn inner() -> Result<(), FoundationErr> {
             let foundation_config = include_str!("docker-daemon-test-config.yaml");
-            let foundation_config = serde_yaml::from_str( foundation_config ).map_err(FoundationErr::config_err)?;
+            let foundation_config =
+                serde_yaml::from_str(foundation_config).map_err(FoundationErr::config_err)?;
             let foundation_config = FoundationConfig::des_from_map(foundation_config)?;
 
             Ok(())
@@ -223,10 +211,9 @@ pub mod test {
             Ok(_) => {}
             Err(err) => {
                 println!("ERR: {}", err);
-                Err::<(),FoundationErr>(err).unwrap();
+                Err::<(), FoundationErr>(err).unwrap();
                 assert!(false)
             }
         }
     }
 }
-

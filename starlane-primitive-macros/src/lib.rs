@@ -376,10 +376,7 @@ pub fn to_log_mark(item: TokenStream) -> TokenStream {
 }
 
 #[cfg(test)]
-mod tests {
-
-
-}
+mod tests {}
 
 #[proc_macro_derive(EnumAsStr)]
 pub fn directed_handler(item: TokenStream) -> TokenStream {
@@ -487,23 +484,22 @@ pub fn push_mark(_item: TokenStream) -> TokenStream {
         };
 
     rtn.into()
-
 }
 
 #[proc_macro]
 pub fn create_mark(_item: TokenStream) -> TokenStream {
     let crt = crt_name();
     let rtn = quote! {
-        {
-println!("CARGO_PKG_NAME: {}", env!("CARGO_PKG_NAME"));
-    let mut builder = #crt::space::log::LogMarkBuilder::default();
-    builder.package(env!("CARGO_PKG_NAME").to_string());
-    builder.file(file!().to_string());
-    builder.line(line!().to_string());
-    builder.loc(Default::default());
-    builder.build().unwrap()
-            }
-        };
+            {
+    println!("CARGO_PKG_NAME: {}", env!("CARGO_PKG_NAME"));
+        let mut builder = #crt::space::log::LogMarkBuilder::default();
+        builder.package(env!("CARGO_PKG_NAME").to_string());
+        builder.file(file!().to_string());
+        builder.line(line!().to_string());
+        builder.loc(Default::default());
+        builder.build().unwrap()
+                }
+            };
 
     rtn.into()
 }
@@ -657,18 +653,14 @@ fn find_log_attr(attrs: &Vec<Attribute>) -> TokenStream {
     rtn.into()
 }
 
-
-
-
-fn crt_name () -> TokenStream2{
+fn crt_name() -> TokenStream2 {
     let found_crate = crate_name("starlane").expect("my-crate is present in `Cargo.toml`");
 
     let crt = match found_crate {
-        FoundCrate::Itself => quote!( crate ),
+        FoundCrate::Itself => quote!(crate),
         FoundCrate::Name(name) => {
-            quote!( starlane )
+            quote!(starlane)
         }
     };
     crt
 }
-

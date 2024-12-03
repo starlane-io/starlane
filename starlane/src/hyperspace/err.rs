@@ -28,8 +28,8 @@ pub enum HypErr {
     Iniff(#[from] Infallible),
     #[error("{0}")]
     StripPrefix(#[from] std::path::StripPrefixError),
-//    #[error("{0}")]
-//    OneshotRecvErr(#[from] tokio::sync::oneshot::RecvError),
+    //    #[error("{0}")]
+    //    OneshotRecvErr(#[from] tokio::sync::oneshot::RecvError),
     #[error("{0}")]
     Io(#[from] Arc<tokio::io::Error>),
 }

@@ -6,7 +6,6 @@ use url::Url;
 
 use crate::hyperspace::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, TraverseToNextRouter};
-use starlane_primitive_macros::push_loc;
 use crate::space::artifact::asynch::ArtErr;
 use crate::space::artifact::ArtRef;
 use crate::space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
@@ -27,6 +26,7 @@ use crate::space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, PongCore, Reflection, Wave,
     WaveVariantDef,
 };
+use starlane_primitive_macros::push_loc;
 
 pub struct Field {
     pub port: Surface,

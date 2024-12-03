@@ -8,13 +8,12 @@
 //#![starlane_primitive_macros::loggerhead]
 //extern crate alloc;
 
-
 extern crate core;
 
-use std::ops::Deref;
-use std::str::FromStr;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use std::ops::Deref;
+use std::str::FromStr;
 
 use crate::space::artifact::asynch::ArtifactFetcher;
 use crate::space::command::common::SetProperties;
@@ -34,7 +33,6 @@ use crate::space::hyper::ParticleRecord;
 use crate::space::point::Point;
 use crate::space::wave::Agent;
 
-
 /*
 pub fn starlane_uuid() -> Uuid {
     uuid::Uuid::new_v4().to_string()
@@ -44,7 +42,6 @@ pub fn starlane_timestamp() -> DateTime<Utc> {
 }
 
  */
-
 
 pub mod artifact;
 pub mod asynch;

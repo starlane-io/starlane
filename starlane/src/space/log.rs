@@ -107,7 +107,7 @@ where
     if STACK.try_with(|v| {}).is_ok() {}
 
     let root = root_logger();
-    let logx= root.push_mark(mark);
+    let logx = root.push_mark(mark);
     STACK
         .scope(logx, async move {
             logger().result(match f().await {
@@ -495,7 +495,6 @@ impl Default for RootLogger {
  */
 
 impl RootLogger {
-
     fn log(&self, log: Log) {
         self.appender.log(log);
     }
@@ -581,9 +580,6 @@ impl RootLogger {
 
         logger
     }
-
-
-
 }
 pub struct NoAppender {}
 
@@ -1440,8 +1436,5 @@ impl ToString for Loc {
     }
 }
 
-pub use starlane_primitive_macros::logger;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind};
-
-
-
+pub use starlane_primitive_macros::logger;

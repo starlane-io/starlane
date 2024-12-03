@@ -1,3 +1,7 @@
+use crate::hyperspace::foundation::config::{
+    Config, DependencyConfig, FoundationConfig, ProviderConfig,
+};
+use crate::hyperspace::foundation::err::{ActionRequest, FoundationErr};
 /// # FOUNDATION
 ///
 /// A ['Foundation'] provides abstracted control over the services and dependencies that drive Starlane.
@@ -25,14 +29,17 @@
 /// ## THE REGISTRY
 /// There is one special core that the Foundation must manage which is the [`Foundation::registry`]
 /// the Starlane Registry is the only required core from the vanilla Starlane installation
-
-
-
-
-use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, Kind, ProviderKind};
+use crate::hyperspace::foundation::kind::{
+    DependencyKind, FoundationKind, IKind, Kind, ProviderKind,
+};
+use crate::hyperspace::foundation::status::{Phase, Status, StatusDetail};
 use crate::hyperspace::platform::PlatformConfig;
+use crate::hyperspace::reg::Registry;
+use crate::space::parse::CamelCase;
+use crate::space::progress::Progress;
 use futures::TryFutureExt;
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use serde;
 use serde::de::{MapAccess, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -43,37 +50,24 @@ use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
-use once_cell::sync::Lazy;
 use tokio::sync::watch::Receiver;
-use crate::hyperspace::foundation::config::{Config, DependencyConfig, FoundationConfig, ProviderConfig};
-use crate::hyperspace::foundation::err::{ActionRequest, FoundationErr};
-use crate::hyperspace::foundation::status::{Phase, Status, StatusDetail};
-use crate::hyperspace::reg::Registry;
-use crate::space::parse::CamelCase;
-use crate::space::progress::Progress;
 
 pub mod runner;
-
 
 //pub mod docker;
 pub mod err;
 pub mod kind;
 
-
 pub mod config;
-
 
 pub mod implementation;
 
 pub mod util;
 
-
 pub mod dependency;
 pub mod status;
 
-static REQUIRED: Lazy<Vec<Kind>> = Lazy::new(|| {
-    vec![]
-});
+static REQUIRED: Lazy<Vec<Kind>> = Lazy::new(|| vec![]);
 
 pub fn default_requirements() -> Vec<Kind> {
     REQUIRED.clone()
@@ -81,12 +75,10 @@ pub fn default_requirements() -> Vec<Kind> {
 
 /// ['Foundation'] is an abstraction for managing infrastructure.
 #[async_trait]
-pub trait Foundation: Send+Sync
-{
+pub trait Foundation: Send + Sync {
     fn kind(&self) -> &FoundationKind;
 
     fn config(&self) -> Arc<dyn FoundationConfig>;
-
 
     fn status(&self) -> Status;
 
@@ -94,21 +86,21 @@ pub trait Foundation: Send+Sync
 
     /// synchronize must be called first.  In this method the [`Foundation`] will check its
     /// environment to determine the
-    async fn synchronize(&self, progress: Progress) -> Result<Status,FoundationErr>;
-
+    async fn synchronize(&self, progress: Progress) -> Result<Status, FoundationErr>;
 
     /// Install and initialize any Dependencies and/or [`Providers`] that
     /// are required for this Foundation to run (usually this is not much more than whatever
     /// software is required to run the Registry.)
     async fn install(&self, progress: Progress) -> Result<(), FoundationErr>;
 
-
     /// return the given [`Dependency`] if it exists within this [`Foundation`]
-    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Box<dyn Dependency>>, FoundationErr>;
+    fn dependency(
+        &self,
+        kind: &DependencyKind,
+    ) -> Result<Option<Box<dyn Dependency>>, FoundationErr>;
 
     /// return a handle to the [`Registry`]
-    fn registry(&self) -> Result<Registry,FoundationErr>;
-
+    fn registry(&self) -> Result<Registry, FoundationErr>;
 }
 
 /// A [`Dependency`] is an add-on to the [`Foundation`] infrastructure which may need to be
@@ -118,8 +110,7 @@ pub trait Foundation: Send+Sync
 /// is a Database server like Postgres... the Dependency will download, install, initialize and
 /// start the service whereas a Provider in this example would represent an individual Database
 #[async_trait]
-pub trait Dependency: Send+Sync
-{
+pub trait Dependency: Send + Sync {
     fn kind(&self) -> &DependencyKind;
 
     fn config(&self) -> Arc<dyn DependencyConfig>;
@@ -137,23 +128,20 @@ pub trait Dependency: Send+Sync
     /// perform any steps needed to initialize the dependency
     async fn initialize(&self, progress: Progress) -> Result<(), FoundationErr>;
 
-
     /// Start the dependency (if appropriate)
     /// returns a LiveService which will keep the service alive until
     /// LiveService handle gets dropped
-    async fn start(&self, progress: Progress) -> Result<LiveService<DependencyKind>, FoundationErr>;
-
+    async fn start(&self, progress: Progress)
+        -> Result<LiveService<DependencyKind>, FoundationErr>;
 
     /// return a [`Provider`] which can create instances from this [`Dependency`]
     fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<dyn Provider>>, FoundationErr>;
-
 }
 
 /// A [`Provider`] is an 'instance' of this dependency... For example a Postgres Dependency
 /// Installs
 #[async_trait]
-pub trait Provider: Send+Sync {
-
+pub trait Provider: Send + Sync {
     fn kind(&self) -> &ProviderKind;
 
     fn config(&self) -> Arc<dyn ProviderConfig>;
@@ -164,14 +152,8 @@ pub trait Provider: Send+Sync {
 
     async fn initialize(&self, progress: Progress) -> Result<(), FoundationErr>;
 
-
     async fn start(&self, progress: Progress) -> Result<LiveService<CamelCase>, FoundationErr>;
-
-
 }
-
-
-
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
@@ -183,7 +165,6 @@ pub struct StarlaneConfig {
     //    pub foundation: ProtoFoundationSettings,
 }
 
-
 fn deserialize_from_value<'de, D>(deserializer: D) -> Result<Value, D::Error>
 where
     D: Deserializer<'de>,
@@ -193,37 +174,33 @@ where
 }
 
 #[derive(Clone)]
-pub struct LiveService<K>
-{
+pub struct LiveService<K> {
     name: String,
     kind: K,
     tx: tokio::sync::mpsc::Sender<()>,
 }
 
-impl <K> LiveService<K>
-{
+impl<K> LiveService<K> {
     pub fn new(name: String, kind: K, tx: tokio::sync::mpsc::Sender<()>) -> Self {
         Self { name, kind, tx }
     }
 }
 
-
 pub(crate) struct FoundationSafety {
-    foundation: dyn Foundation
+    foundation: dyn Foundation,
 }
 
 #[async_trait]
-impl Foundation for FoundationSafety  {
+impl Foundation for FoundationSafety {
     fn kind(&self) -> &FoundationKind {
         self.foundation.kind()
     }
 
-    fn config(&self) -> Arc<dyn FoundationConfig>{
+    fn config(&self) -> Arc<dyn FoundationConfig> {
         self.foundation.config()
     }
 
-
-    fn status(&self) -> Status{
+    fn status(&self) -> Status {
         self.foundation.status()
     }
 
@@ -243,7 +220,10 @@ impl Foundation for FoundationSafety  {
         }
     }
 
-    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Box<dyn Dependency>>, FoundationErr> {
+    fn dependency(
+        &self,
+        kind: &DependencyKind,
+    ) -> Result<Option<Box<dyn Dependency>>, FoundationErr> {
         if self.status().phase == Phase::Unknown {
             Err(FoundationErr::unknown_state("dependency"))
         } else {
@@ -259,7 +239,6 @@ impl Foundation for FoundationSafety  {
         }
     }
 }
-
 
 #[cfg(test)]
 pub mod test {}

@@ -18,7 +18,6 @@ use syn::{
     PathArguments, PathSegment, ReturnType, Type,
 };
 
-
 /// This macro will auto implement the `#crt::space::wave::exchange::asynch::DirectedHandler` trait.
 /// In order to finalize the core a `#[handler]` attribute must also be specified
 /// above one of the impls.
@@ -238,12 +237,11 @@ pub fn route(attr: TokenStream, item: TokenStream ) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
-
     let crt = crt_name();
 
     let input = parse_macro_input!(input as syn::ImplItemMethod);
 
-//    log(route_attribute_value(attr.to_string().as_str())).expect("valid route selector");
+    //    log(route_attribute_value(attr.to_string().as_str())).expect("valid route selector");
 
     //    attr.to_tokens().next();
     // we do this just to mem for a valid selector...
@@ -355,7 +353,6 @@ fn messsage_ctx(input: &FnArg) -> Result<RequestCtx, String> {
 }
 
 fn rtn_type(output: &ReturnType) -> TokenStream2 {
-
     let crt = crt_name();
     match output {
         ReturnType::Default => {
@@ -432,7 +429,6 @@ impl Parse for RouteAttr {
 /// adds a trait to given struct or enum
 #[proc_macro_derive(ToSpaceErr)]
 pub fn to_space_err(item: TokenStream) -> TokenStream {
-
     let crt = crt_name();
     let input = parse_macro_input!(item as DeriveInput);
     let ident = &input.ident;
@@ -446,23 +442,20 @@ pub fn to_space_err(item: TokenStream) -> TokenStream {
     rtn.into()
 }
 
-fn crt_name () -> TokenStream2{
+fn crt_name() -> TokenStream2 {
     let found_crate = crate_name("starlane").expect("my-crate is present in `Cargo.toml`");
 
     let crt = match found_crate {
-        FoundCrate::Itself => quote!( crate ),
+        FoundCrate::Itself => quote!(crate),
         FoundCrate::Name(name) => {
-            quote!( starlane )
+            quote!(starlane)
         }
     };
     crt
 }
 
-
 #[cfg(test)]
 mod test {
-   #[test]
-   pub fn test() {
-
-   }
+    #[test]
+    pub fn test() {}
 }

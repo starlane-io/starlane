@@ -2,16 +2,16 @@ use crate::hyperspace::hyperlane::{
     HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
     HyperwayEndpointFactory,
 };
-use async_trait::async_trait;
-use rcgen::{generate_simple_self_signed, RcgenError};
-use rustls::pki_types::ServerName;
-use rustls::{RootCertStore, ServerConfig};
 use crate::space::err::SpaceErr;
 use crate::space::hyper::Knock;
 use crate::space::log::Logger;
 use crate::space::substance::Substance;
 use crate::space::wave::{PingCore, Wave, WaveVariantDef};
 use crate::space::VERSION;
+use async_trait::async_trait;
+use rcgen::{generate_simple_self_signed, RcgenError};
+use rustls::pki_types::ServerName;
+use rustls::{RootCertStore, ServerConfig};
 use std::io;
 use std::io::{BufReader, Read};
 use std::str::FromStr;
@@ -576,19 +576,21 @@ impl From<&str> for Error {
 
 #[cfg(test)]
 mod tests {
-    use crate::hyperspace::hyperlane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
+    use crate::hyperspace::hyperlane::tcp::{
+        CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer,
+    };
     use crate::hyperspace::hyperlane::test_util::{
         LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
     };
+    use crate::space::err::SpaceErr;
+    use crate::space::loc::ToSurface;
+    use crate::space::log::{LogAppender, StdOutAppender};
+    use crate::space::point::Point;
     use anyhow::anyhow;
     use chrono::{DateTime, Utc};
     use starlane_primitive_macros::{logger, push_loc};
-    use crate::space::log::{LogAppender, StdOutAppender};
-    use crate::space::point::Point;
     use std::str::FromStr;
     use std::sync::Arc;
-    use crate::space::err::SpaceErr;
-    use crate::space::loc::ToSurface;
 
     /*
     #[no_mangle]

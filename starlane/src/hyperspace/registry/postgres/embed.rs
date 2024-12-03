@@ -163,9 +163,7 @@ pub struct PostgresClusterConfig {
     pub timeout: Option<Duration>,
 }
 
-impl PostgresClusterConfig {
-
-}
+impl PostgresClusterConfig {}
 
 impl Into<Database<PostgresConnectInfo>> for Database<PostgresClusterConfig> {
     fn into(self) -> Database<PostgresConnectInfo> {
@@ -184,7 +182,6 @@ impl Into<Database<PostgresConnectInfo>> for Database<PostgresClusterConfig> {
 impl Default for PostgresClusterConfig {
     fn default() -> Self {
         Self {
-
             database_dir: format!("{}/postgres", STARLANE_DATA_DIR.to_string())
                 .to_string()
                 .into(),

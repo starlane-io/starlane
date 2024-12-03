@@ -1,6 +1,6 @@
-use chrono::Utc;
 use crate::space::loc;
 use crate::space::wasm::Timestamp;
+use chrono::Utc;
 
 pub mod err;
 pub mod global;
@@ -20,12 +20,7 @@ pub mod registry;
 pub mod shutdown;
 pub mod tests;
 
-#[cfg(feature="postgres")]
+#[cfg(feature = "postgres")]
 pub mod database;
 pub mod service;
 pub mod template;
-
-
-
-
-

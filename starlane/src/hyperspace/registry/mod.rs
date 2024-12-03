@@ -1,5 +1,4 @@
-
-#[cfg(features="postgres")]
+#[cfg(features = "postgres")]
 pub mod postgres;
 
 pub mod mem;

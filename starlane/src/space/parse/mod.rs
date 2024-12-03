@@ -1523,7 +1523,7 @@ pub fn consume_path<I: Span>(input: I) -> Res<I, I> {
     all_consuming(path)(input)
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash,SerializeDisplay,DeserializeFromStr)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, SerializeDisplay, DeserializeFromStr)]
 pub struct CamelCase {
     string: String,
 }

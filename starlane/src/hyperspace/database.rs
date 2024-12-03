@@ -27,15 +27,11 @@ impl<Info> Database<Info> {
 #[derive(Clone)]
 pub struct LiveDatabase {
     pub database: Database<PostgresConnectInfo>,
-    tx: tokio::sync::mpsc::Sender<()>
+    tx: tokio::sync::mpsc::Sender<()>,
 }
 
 impl LiveDatabase {
-    pub fn new(
-        database: Database<PostgresConnectInfo>,
-        tx: tokio::sync::mpsc::Sender<()>
-
-    ) -> Self {
+    pub fn new(database: Database<PostgresConnectInfo>, tx: tokio::sync::mpsc::Sender<()>) -> Self {
         Self { database, tx }
     }
 }
