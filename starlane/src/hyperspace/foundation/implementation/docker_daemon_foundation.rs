@@ -157,7 +157,7 @@ impl FoundationConfig {
 
 
 pub trait DependencyConfig: config::DependencyConfig {
-
+    fn image(&self) -> String;
 
 }
 

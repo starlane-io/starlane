@@ -159,31 +159,19 @@ impl <K,C> ConfigMap<K,C> where K: Eq+PartialEq+Hash+Clone, C: Clone{
 }
 
 
-impl <K,C> IntoSer for ConfigMap<K,C> where K: Eq+PartialEq+Hash+Clone+IntoSer, C: Clone+IntoSer {
+impl <K,C> IntoSer for ConfigMap<K,C> where K: Eq+PartialEq+Hash+Clone+IntoSer+?Serialize, C: Clone+IntoSer {
     fn into_ser(&self) -> Box<dyn SerMap> {
         Box::new(self.clone()) as Box<dyn SerMap>
     }
 }
 
-impl <K,C> Serialize for ConfigMap<K,C> where K: IntoSer, C: IntoSer{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer
-    {
-        let map = self.map.clone().into_iter().map(|(key,value)| (key.into_ser(), value.into_ser())).collect::<HashMap<Box<dyn SerMap>,Box<dyn SerMap>>>();
-
-        let config = ConfigMap {
-            map
-        };
-
-        config.serialize(serializer)
+impl <K,C> IntoSer for ConfigMap<K,C> where K: Eq+PartialEq+Hash+Clone+Serialize, C: Clone+IntoSer {
+    fn into_ser(&self) -> Box<dyn SerMap> {
+        Box::new(self.clone()) as Box<dyn SerMap>
     }
 }
 
-
-
-
-impl <K,C> Serialize for ConfigMap<K,C> where K: Eq+PartialEq+Hash+Clone+Serialize, C: Serialize{
+impl <K,C> Serialize for ConfigMap<K,C> where K: Eq+PartialEq+Hash+Clone+Serialize, C: Serialize+Clone{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer
@@ -196,7 +184,9 @@ impl <K,C> Serialize for ConfigMap<K,C> where K: Eq+PartialEq+Hash+Clone+Seriali
         map.end()
     }
 }
-impl <'de,K,C> Deserialize for ConfigMap<K,C> where K: Eq+PartialEq+Hash+Clone, C: Clone{
+
+/*
+impl <'de,K,C> Deserialize<'de> for ConfigMap<K,C> where K: Eq+PartialEq+Hash+Clone+Deserialize<'de>, C: Clone+?Deserialize<'de>{
     fn deserialize<D>(deserializer: D) -> Result<ConfigMap<K,C>, D::Error>
     where
         D: Deserializer<'de>
@@ -209,7 +199,10 @@ impl <'de,K,C> Deserialize for ConfigMap<K,C> where K: Eq+PartialEq+Hash+Clone, 
     }
 }
 
-impl <'de,K,C> Deserialize for ConfigMap<K,C> where K: Eq+PartialEq+Hash+Clone+Deserialize<'de>, C: Clone+DeserializeOwned{
+ */
+
+
+impl <'de,K,C> Deserialize<'de> for ConfigMap<K,C> where K: Eq+PartialEq+Hash+Clone+Deserialize<'de>, C: Clone+Deserialize<'de>{
     fn deserialize<D>(deserializer: D) -> Result<ConfigMap<K,C>, D::Error>
     where
         D: Deserializer<'de>

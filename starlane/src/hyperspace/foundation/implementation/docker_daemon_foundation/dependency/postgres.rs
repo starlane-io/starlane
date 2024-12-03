@@ -11,7 +11,7 @@ use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::implementation::docker_daemon_foundation;
 use crate::space::parse::{CamelCase, DbCase, VarCase};
 use crate::hyperspace::foundation::implementation::docker_daemon_foundation::Foundation;
-use crate::hyperspace::foundation::util::{Map, SerMap};
+use crate::hyperspace::foundation::util::{IntoSer, Map, SerMap};
 
 fn default_schema() -> DbCase{
     DbCase::from_str("PUBLIC").unwrap()
@@ -52,26 +52,36 @@ impl Deref for PostgresDependencyConfig {
     }
 }
 
+
+
 impl config::DependencyConfig for PostgresDependencyConfig {
+
     fn kind(&self) -> &DependencyKind {
-        todo!()
+        &DependencyKind::PostgresCluster
     }
 
     fn volumes(&self) -> HashMap<String, String> {
-        todo!()
+        self.postgres.volumes()
     }
 
     fn require(&self) -> Vec<Kind> {
-        todo!()
+        self.postgres.require()
     }
 
     fn clone_me(&self) -> Arc<dyn config::DependencyConfig> {
-        Arc::new(self.clone())
+        Arc::new( self.clone() ) as Arc<dyn config::DependencyConfig>
     }
+}
 
+impl IntoSer for PostgresDependencyConfig {
     fn into_ser(&self) -> Box<dyn SerMap> {
-       let config = Box::new(self.clone());
-       config as Box<dyn SerMap>
+       Box::new(self.clone()) as Box<dyn SerMap>
+    }
+}
+
+impl docker_daemon_foundation::DependencyConfig for PostgresDependencyConfig {
+    fn image(&self) -> String {
+        self.image.clone()
     }
 }
 
