@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
+use nom_supreme::ParserExt;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PostgresClusterCoreConfig {
@@ -20,7 +21,7 @@ pub struct PostgresClusterCoreConfig {
     pub data_dir: String,
     pub username: String,
     pub password: String,
-    pub providers: HashMap<CamelCase, ProviderConfig>,
+    pub providers: HashMap<CamelCase, Arc<ProviderConfig>>,
 }
 
 impl PostgresClusterCoreConfig {
@@ -40,9 +41,10 @@ impl PostgresClusterCoreConfig {
         let data_dir: String = config.from_field("data_dir")?;
 
         let mut providers = config.parse_same("providers")?;
+        let mut providers: HashMap<CamelCase,Arc<ProviderConfig>> = providers.into_iter().map(|(key,value)| (key,Arc::new(value))).collect();
         let registry_kind = CamelCase::from_str("Registry")?;
         if !providers.contains_key(&registry_kind) {
-            providers.insert(registry_kind, ProviderConfig::default_registry());
+            providers.insert(registry_kind, Arc::new(ProviderConfig::default_registry()));
         }
 
         Ok(PostgresClusterCoreConfig {
@@ -59,8 +61,11 @@ impl PostgresClusterCoreConfig {
     }
 
     pub fn into_trait(self) -> Arc<dyn DependencyConfig> {
-        let config = Arc::new(self);
+        todo!();
+/*        let config = Arc::new(self);
         config as Arc<dyn DependencyConfig>
+
+ */
     }
 }
 
@@ -88,18 +93,21 @@ impl config::DependencyConfig for PostgresClusterCoreConfig {
 
 impl IntoSer for PostgresClusterCoreConfig {
     fn into_ser(&self) -> Box<dyn SerMap> {
-        self.clone() as Box<dyn SerMap>
+        todo!()
+//        self.clone() as Box<dyn SerMap>
     }
 }
 
-impl config::ProviderConfigSrc<ProviderConfig> for PostgresClusterCoreConfig {
-    fn providers(&self) -> Result<&HashMap<CamelCase, ProviderConfig>, FoundationErr> {
-        Ok(&Default::default())
+impl config::ProviderConfigSrc for PostgresClusterCoreConfig {
+    type Config = Arc<ProviderConfig>;
+    fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, FoundationErr> {
+        Ok(self.providers.clone())
     }
 
-    fn provider(&self, kind: &CamelCase) -> Result<Option<&ProviderConfig>, FoundationErr> {
-        Ok(None)
+    fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, FoundationErr> {
+        Ok(self.providers.get(kind))
     }
+
 }
 
 #[derive(

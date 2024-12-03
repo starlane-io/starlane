@@ -7,7 +7,7 @@ use crate::hyperspace::foundation::kind::{
     DependencyKind, FoundationKind, IKind, Kind, ProviderKind,
 };
 use crate::hyperspace::foundation::status::Status;
-use crate::hyperspace::foundation::util::{ArcWrap, IntoSer, Map, SerMap};
+use crate::hyperspace::foundation::util::{ IntoSer, Map, SerMap};
 use crate::hyperspace::foundation::{config, Dependency};
 use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
@@ -67,13 +67,14 @@ impl Foundation {
 
 #[async_trait]
 impl foundation::Foundation for Foundation {
-    fn kind(&self) -> &FoundationKind {
-        &FoundationKind::DockerDaemon
+    type Config = Arc<FoundationConfig>;
+
+    fn kind(&self) -> FoundationKind {
+        FoundationKind::DockerDaemon
     }
 
-    fn config(&self) -> Arc<dyn config::FoundationConfig> {
-        let config: Arc<dyn config::FoundationConfig> = self.config.clone();
-        config
+    fn config(&self) -> Self::Config {
+        self.config.clone()
     }
 
     fn status(&self) -> Status {
@@ -108,11 +109,12 @@ impl foundation::Foundation for Foundation {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Name)]
+//#[derive(Clone, Serialize, Deserialize, Name)]
+#[derive(Clone,  Name)]
 pub struct FoundationConfig {
     pub kind: FoundationKind,
     pub registry: RegistryProviderConfig,
-    pub dependencies: ConfigMap<DependencyKind, ArcWrap<dyn DependencyConfig>>,
+    pub dependencies: ConfigMap<DependencyKind, Arc<dyn DependencyConfig>>,
 }
 
 impl FoundationConfig {
@@ -160,37 +162,43 @@ pub trait DependencyConfig: config::DependencyConfig {
 }
 
 impl config::FoundationConfig for FoundationConfig {
-    fn kind(&self) -> &FoundationKind {
-        &self.kind
+    type DependencyConfig = Arc<dyn DependencyConfig>;
+
+    fn kind(&self) -> FoundationKind {
+        self.kind.clone()
     }
 
-    fn required(&self) -> &Vec<Kind> {
-        &default_requirements()
+    fn required(&self) -> Vec<Kind> {
+        default_requirements()
     }
 
     fn dependency_kinds(&self) -> &Vec<DependencyKind> {
-        self.dependencies.keys().collect()
+        todo!()
+//        self.dependencies.keys().collect()
     }
 
-    fn dependency(&self, kind: &DependencyKind) -> Option<&ArcWrap<dyn config::DependencyConfig>> {
+    fn dependency(&self, kind: &DependencyKind) -> Option<&Self::DependencyConfig> {
         self.dependencies.get(kind)
     }
 
-    fn clone_me(&self) -> Arc<dyn config::FoundationConfig> {
-        Arc::new(self.clone())
-    }
+
 }
 
+/*
 impl IntoSer for FoundationConfig {
     fn into_ser(&self) -> Box<dyn SerMap> {
         self.clone() as Box<dyn SerMap>
     }
 }
 
+ */
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RegistryProviderConfig {
     provider: ProviderKind,
 }
+
+
 
 #[cfg(test)]
 pub mod test {
@@ -202,7 +210,9 @@ pub mod test {
             let foundation_config = include_str!("docker-daemon-test-config.yaml");
             let foundation_config =
                 serde_yaml::from_str(foundation_config).map_err(FoundationErr::config_err)?;
-            let foundation_config = FoundationConfig::des_from_map(foundation_config)?;
+
+            todo!();
+//            let foundation_config = FoundationConfig::des_from_map(foundation_config)?;
 
             Ok(())
         }

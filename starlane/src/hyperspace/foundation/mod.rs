@@ -1,6 +1,4 @@
-use crate::hyperspace::foundation::config::{
-    Config, DependencyConfig, FoundationConfig, ProviderConfig,
-};
+
 use crate::hyperspace::foundation::err::{ActionRequest, FoundationErr};
 /// # FOUNDATION
 ///
@@ -76,9 +74,12 @@ pub fn default_requirements() -> Vec<Kind> {
 /// ['Foundation'] is an abstraction for managing infrastructure.
 #[async_trait]
 pub trait Foundation: Send + Sync {
-    fn kind(&self) -> &FoundationKind;
 
-    fn config(&self) -> Arc<dyn FoundationConfig>;
+    type Config;
+
+    fn kind(&self) -> FoundationKind;
+
+    fn config(&self) -> Self::Config;
 
     fn status(&self) -> Status;
 
@@ -113,7 +114,7 @@ pub trait Foundation: Send + Sync {
 pub trait Dependency: Send + Sync {
     fn kind(&self) -> &DependencyKind;
 
-    fn config(&self) -> Arc<dyn DependencyConfig>;
+    fn config(&self) -> Arc<dyn config::DependencyConfig>;
 
     fn status(&self) -> Status;
 
@@ -144,7 +145,7 @@ pub trait Dependency: Send + Sync {
 pub trait Provider: Send + Sync {
     fn kind(&self) -> &ProviderKind;
 
-    fn config(&self) -> Arc<dyn ProviderConfig>;
+    fn config(&self) -> Arc<dyn config::ProviderConfig>;
 
     fn status(&self) -> Status;
 
@@ -187,16 +188,18 @@ impl<K> LiveService<K> {
 }
 
 pub(crate) struct FoundationSafety {
-    foundation: dyn Foundation,
+    foundation: default::Foundation
 }
 
 #[async_trait]
 impl Foundation for FoundationSafety {
-    fn kind(&self) -> &FoundationKind {
+    type Config = config::default::FoundationConfig;
+
+    fn kind(&self) -> FoundationKind {
         self.foundation.kind()
     }
 
-    fn config(&self) -> Arc<dyn FoundationConfig> {
+    fn config(&self) -> Self::Config {
         self.foundation.config()
     }
 
@@ -238,6 +241,11 @@ impl Foundation for FoundationSafety {
             self.foundation.registry()
         }
     }
+}
+
+pub mod default {
+    use crate::hyperspace::foundation::config;
+    pub type Foundation = Box<dyn super::Foundation<Config=config::default::FoundationConfig>>;
 }
 
 #[cfg(test)]

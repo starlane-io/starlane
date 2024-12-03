@@ -4,7 +4,7 @@ use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::implementation::docker_daemon_foundation;
 use crate::hyperspace::foundation::implementation::docker_daemon_foundation::Foundation;
 use crate::hyperspace::foundation::kind::{DependencyKind, Kind, ProviderKind};
-use crate::hyperspace::foundation::util::{AsSer, IntoSer, Map, SerMap};
+use crate::hyperspace::foundation::util::{ IntoSer, Map, SerMap};
 use crate::hyperspace::foundation::{config, LiveService, Provider};
 use crate::space::parse::{CamelCase, DbCase, VarCase};
 use serde::{Deserialize, Serialize, Serializer};

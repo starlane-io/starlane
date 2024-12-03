@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
 use wasmer_wasix::virtual_fs::Upcastable;
+use crate::hyperspace::foundation;
 
 enum Call {
     Synchronize {
@@ -33,14 +34,14 @@ enum Call {
 }
 
 struct FoundationProxy {
-    config: Arc<dyn config::FoundationConfig>,
+    config: config::default::FoundationConfig,
     call_tx: tokio::sync::mpsc::Sender<Call>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
 impl FoundationProxy {
     fn new(
-        config: Arc<dyn config::FoundationConfig>,
+        config: config::default::FoundationConfig,
         call_tx: tokio::sync::mpsc::Sender<Call>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
     ) -> Self {
@@ -54,11 +55,13 @@ impl FoundationProxy {
 
 #[async_trait]
 impl Foundation for FoundationProxy {
-    fn kind(&self) -> &FoundationKind {
-        self.config.kind()
+    type Config = config::default::FoundationConfig;
+
+    fn kind(&self) -> FoundationKind {
+        self.config.kind().clone()
     }
 
-    fn config(&self) -> Arc<dyn config::FoundationConfig> {
+    fn config(&self) -> Self::Config {
         self.config.clone()
     }
 
@@ -289,12 +292,12 @@ impl Provider for ProviderProxy {
 struct Runner {
     call_rx: tokio::sync::mpsc::Receiver<Call>,
     call_tx: tokio::sync::mpsc::Sender<Call>,
-    foundation: Box<dyn Foundation>,
+    foundation: foundation::default::Foundation,
     runners: HashMap<DependencyKind, DependencyRunner>,
 }
 
 impl Runner {
-    fn new(foundation: Box<dyn Foundation>) -> impl Foundation {
+    fn new(foundation: foundation::default::Foundation) -> impl Foundation {
         let (call_tx, call_rx) = tokio::sync::mpsc::channel(64);
         let config = foundation.config().clone();
         let proxy = FoundationProxy::new(config, call_tx.clone(), foundation.status_watcher());

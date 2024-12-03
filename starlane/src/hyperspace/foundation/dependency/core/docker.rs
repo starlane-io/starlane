@@ -18,7 +18,7 @@ static REQUIRED: Lazy<Vec<Kind>> = Lazy::new(|| {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DockerDaemonCoreDependencyConfig {
-    providers: HashMap<CamelCase, DockerProviderCoreConfig>,
+    providers: HashMap<CamelCase, Arc<DockerProviderCoreConfig>>,
 }
 
 impl DockerDaemonCoreDependencyConfig {
@@ -65,19 +65,19 @@ impl config::DependencyConfig for DockerDaemonCoreDependencyConfig {
 
 impl IntoSer for DockerDaemonCoreDependencyConfig {
     fn into_ser(&self) -> Box<dyn SerMap> {
-        self.clone() as Box<dyn SerMap>
+        todo!()
+        //self.clone() as Box<dyn SerMap>
     }
 }
 
-impl config::ProviderConfigSrc<DockerProviderCoreConfig> for DockerDaemonCoreDependencyConfig {
-    fn providers(&self) -> Result<&HashMap<CamelCase, DockerProviderCoreConfig>, FoundationErr> {
-        Ok(&self.providers)
+impl config::ProviderConfigSrc for DockerDaemonCoreDependencyConfig {
+    type Config = Arc<DockerProviderCoreConfig>;
+
+    fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, FoundationErr> {
+        Ok(self.providers.clone())
     }
 
-    fn provider(
-        &self,
-        kind: &CamelCase,
-    ) -> Result<Option<&DockerProviderCoreConfig>, FoundationErr> {
+    fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, FoundationErr> {
         Ok(self.providers.get(kind))
     }
 }
@@ -154,6 +154,7 @@ impl config::ProviderConfig for DockerProviderCoreConfig {
 }
 impl IntoSer for DockerProviderCoreConfig {
     fn into_ser(&self) -> Box<dyn SerMap> {
-        self.clone() as Box<dyn SerMap>
+        todo!();
+        //self.clone() as Box<dyn SerMap>
     }
 }

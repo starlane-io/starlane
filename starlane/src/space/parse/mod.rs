@@ -73,6 +73,7 @@ use std::fmt::Formatter;
 use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
+use derive_name::Name;
 //use ariadne::{Label, Report, ReportKind};
 use nom::branch::alt;
 use nom::bytes::complete::{is_a, is_not};
@@ -1523,7 +1524,7 @@ pub fn consume_path<I: Span>(input: I) -> Res<I, I> {
     all_consuming(path)(input)
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, SerializeDisplay, DeserializeFromStr)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, SerializeDisplay, DeserializeFromStr, derive_name::Name)]
 pub struct CamelCase {
     string: String,
 }

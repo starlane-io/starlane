@@ -1,10 +1,14 @@
 use crate::hyperspace::foundation::config::ConfigMap;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{FoundationKind, IKind};
+use bincode::Options;
 use derive_name::Name;
+use md5::digest::typenum::op;
 use serde::de::{DeserializeOwned, MapAccess, Visitor};
 use serde::ser::{Error, SerializeMap};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_with::SerializeAs;
+use serde_with_macros::serde_as;
 use serde_yaml::{Mapping, Sequence, Value};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter, Write};
@@ -12,7 +16,6 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use bincode::Options;
 
 pub trait SubText {}
 
@@ -61,117 +64,23 @@ pub trait SerMap {
                                                                    */
 }
 
-
 pub enum Warpy {
-    Ser {
-        phantom: PhantomData<()>,
-    }
+    Ser { phantom: PhantomData<()> },
 }
 
-pub struct Wrap<Q>(Q) where Q: ?Sized;
+#[derive(Clone, Serialize, Deserialize)]
+pub struct LocalType {}
 
-
-impl <Q> Wrap<Q>  {
-    pub fn new(core: Q) -> Wrap<Q> {
-        Wrap(core)
-    }
-}
-
-pub type ArcWrap<Q:?Sized> = Wrap<Arc<Q>>;
-
-impl <Q> ArcWrap<Q> {
-    pub fn arc(item: Q) -> ArcWrap<Q> {
-        Wrap::new(Arc::new(item))
-    }
-}
-
-/// ArcWrap clones the Arc, not Q
-impl <Q> Clone for ArcWrap<Q> where Q: ?Sized{
-    fn clone(&self) -> Self {
-        Wrap::new(self.0.clone())
-    }
-}
-
-impl<Q> Deref for Wrap<Q> {
-    type Target = Q;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl <Q> DerefMut for Wrap<Q> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl <Q> Serialize for Wrap<Q> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+impl<T> SerializeAs<T> for LocalType {
+    fn serialize_as<S>(source: &T, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer
-    {
-        let ser = self.0.into_ser();
-        let value = ser.to_value().map_err(S::Error::custom)?;
-        serializer.serialize(&value)
-    }
-}
-
-impl <'de,Q> Deserialize<'de> for Wrap<Q> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>
+        S: Serializer,
     {
         todo!()
     }
 }
 
-
-#[derive(Clone)]
-pub struct SerMapDef<S>
-where
-    S: SerMap + Clone,
-{
-    map: S,
-}
-
-impl<S> SerMap for SerMapDef<S>
-where
-    S: SerMap + Clone,
-{
-    fn to_map(self) -> Result<Map, FoundationErr> {
-        self.map.to_map()
-    }
-
-    fn to_sequence(self) -> Result<Sequence, FoundationErr> {
-        self.map.to_sequence()
-    }
-
-    fn to_value(self) -> Result<Value, FoundationErr> {
-        self.map.to_value()
-    }
-}
-
-impl<S> SerMapDef<S>
-where
-    S: SerMap + Clone,
-{
-    pub fn new(map: S) -> Self {
-        Self { map }
-    }
-}
-
-impl<S> Deref for SerMapDef<S>
-where
-    S: SerMap + Clone,
-{
-    type Target = S;
-
-    fn deref(&self) -> &Self::Target {
-        &self.map
-    }
-}
-
+/*
 pub fn to_config_map<K, C, F>(
     map: impl SerMap,
     factory: F,
@@ -185,13 +94,15 @@ where
 
     for item in map.to_sequence()? {
         let map = item.to_map()?;
-        let kind = map.kind()?;
-        let item = factory(kind.clone(), map)?;
+        let kind: K  = map.kind()?;
+        let item = factory(kind.clone(), Arc::new(map.clone()))?;
         maps.insert(kind, item);
     }
 
     Ok(maps)
 }
+
+ */
 
 impl<T> SerMap for T
 where
@@ -210,7 +121,7 @@ where
     }
 
     fn to_value(self) -> Result<serde_yaml::Value, FoundationErr> {
-        serde_yaml::to_value(self).map_err(FoundationErr::ser_err)
+        serde_yaml::to_value(self).map_err(FoundationErr::serde_err)
     }
 }
 
@@ -297,7 +208,7 @@ impl Map {
 
     pub fn kind<K>(&self) -> Result<K, FoundationErr>
     where
-        K: IKind,
+        K: Eq + PartialEq + Hash + DeserializeOwned + Name,
     {
         let kind_as_value = self
             .0
@@ -336,19 +247,19 @@ impl Map {
         }
     }
 
-
     /// when you want to parse a list of configurations that are all the same
     pub fn parse_same<K, D>(&self, field: &'static str) -> Result<HashMap<K, D>, FoundationErr>
     where
         D: DeserializeOwned,
-        K: Eq + PartialEq + Hash + DeserializeOwned,
+        K: Eq + PartialEq + Hash + DeserializeOwned + derive_name::Name,
     {
         let items: Vec<Map> = self.from_field(field)?;
         let mut rtn = HashMap::new();
-        for item in items {
-            let item =
-                serde_yaml::from_value(item.to_value()).map_err(FoundationErr::config_err)?;
-            rtn.insert(item.from_field("kind")?, item);
+        for map in items {
+            let kind = map.kind()?;
+            let item: D =
+                serde_yaml::from_value(map.to_value()).map_err(FoundationErr::config_err)?;
+            rtn.insert(kind, item);
         }
         Ok(rtn)
     }
@@ -413,7 +324,10 @@ pub struct Registry {
     pub seed: String,
 }
 
-struct ConfigMapVisitor<'de, K, C> where K: Deserialize<'de> + Eq + PartialEq + Hash + Clone, C: Deserialize<'de> + Clone
+struct ConfigMapVisitor<'de, K, C>
+where
+    K: Deserialize<'de> + Eq + PartialEq + Hash + Clone,
+    C: Deserialize<'de> + Clone,
 {
     config: PhantomData<fn() -> ConfigMap<K, C>>,
     lifetime: PhantomData<&'de ()>,
@@ -453,5 +367,67 @@ where
             map.insert(key, value);
         }
         Ok(map)
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use serde::{Deserialize, Serialize};
+
+    #[test]
+    pub fn test_serde_factory() -> anyhow::Result<()> {
+        #[typetag::serde(tag = "kind")]
+        trait SomeConfig {
+            fn say_my_name(&self) -> &'static str;
+        }
+
+        #[derive(
+            Eq,
+            PartialEq,
+            Hash,
+            Deserialize,
+            Serialize,
+            Debug,
+            strum_macros::EnumString,
+            strum_macros::Display,
+        )]
+        enum Key {
+            AConf,
+            BConf,
+        }
+
+        #[derive(Clone, Default, Serialize, Deserialize)]
+        struct AConf {
+            something: u32,
+        }
+
+        #[typetag::serde]
+        impl SomeConfig for AConf {
+            fn say_my_name(&self) -> &'static str {
+                "AConf"
+            }
+        }
+
+        #[derive(Clone, Default, Serialize, Deserialize)]
+        struct BConf {
+            and_another_thing: String,
+        }
+        #[typetag::serde]
+        impl SomeConfig for BConf {
+            fn say_my_name(&self) -> &'static str {
+                "BConf"
+            }
+        }
+
+        let raw = r#"
+kind: AConf
+something: 34
+        "#;
+
+        let item: Box<dyn SomeConfig> = Box::new(serde_yaml::from_str(raw)?);
+
+        assert_eq!("AConf", item.say_my_name());
+
+        Ok(())
     }
 }

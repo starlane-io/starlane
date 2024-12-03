@@ -2,7 +2,7 @@ use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{
     DependencyKind, FoundationKind, IKind, Kind, ProviderKind,
 };
-use crate::hyperspace::foundation::util::{ArcWrap, AsSer,  IntoSer, SerMap};
+use crate::hyperspace::foundation::util::{  IntoSer, SerMap};
 use crate::hyperspace::foundation::{Dependency, Foundation, Provider};
 use crate::space::parse::CamelCase;
 use derive_name::Name;
@@ -42,21 +42,23 @@ where
     fn platform(&self) -> Self::FoundationConfig;
 }
 
-pub trait FoundationConfig: Send + Sync + IntoSer {
-    fn kind(&self) -> &FoundationKind;
+pub trait FoundationConfig: Send + Sync  {
+    type DependencyConfig;
+
+    fn kind(&self) -> FoundationKind;
 
     /// required [`Vec<Kind>`]  must be installed and running for THIS [`Foundation`] to work.
     /// at a minimum this must contain a Registry of some form.
-    fn required(&self) -> &Vec<Kind>;
+    fn required(&self) -> Vec<Kind>;
 
     fn dependency_kinds(&self) -> &Vec<DependencyKind>;
 
-    fn dependency(&self, kind: &DependencyKind) -> Option<&ArcWrap<dyn DependencyConfig>>;
+    fn dependency(&self, kind: &DependencyKind) -> Option<&Self::DependencyConfig>;
 
-    fn clone_me(&self) -> Arc<dyn FoundationConfig>;
 }
 
-pub trait DependencyConfig: Send + Sync + IntoSer {
+
+pub trait DependencyConfig: Send + Sync {
     fn kind(&self) -> &DependencyKind;
 
     fn volumes(&self) -> HashMap<String, String>;
@@ -66,16 +68,15 @@ pub trait DependencyConfig: Send + Sync + IntoSer {
     fn clone_me(&self) -> Arc<dyn DependencyConfig>;
 }
 
-pub trait ProviderConfigSrc<P>
-where
-    P: ProviderConfig,
+pub trait ProviderConfigSrc
 {
-    fn providers(&self) -> Result<&HashMap<CamelCase, P>, FoundationErr>;
+    type Config;
+    fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, FoundationErr>;
 
-    fn provider(&self, kind: &CamelCase) -> Result<Option<&P>, FoundationErr>;
+    fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, FoundationErr>;
 }
 
-pub trait ProviderConfig: Send + Sync + IntoSer {
+pub trait ProviderConfig: Send + Sync {
     fn kind(&self) -> &ProviderKind;
 
     fn clone_me(&self) -> Arc<dyn ProviderConfig>;
@@ -116,7 +117,7 @@ pub(super) mod private {
      */
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone)]
 pub struct ConfigMap<K, C>
 where
     K: Eq + PartialEq + Hash + Clone,
@@ -257,4 +258,11 @@ where
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.map
     }
+}
+
+
+pub mod default {
+    use std::sync::Arc;
+
+    pub type FoundationConfig = Arc<dyn super::FoundationConfig<DependencyConfig=Arc<dyn super::DependencyConfig>>>;
 }
