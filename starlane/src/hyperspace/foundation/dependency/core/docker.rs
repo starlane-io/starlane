@@ -3,11 +3,11 @@ use std::sync::Arc;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use crate::hyperspace::foundation::config;
-use crate::hyperspace::foundation::config::IntoConfigTrait;
+use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::implementation::docker_daemon_foundation::DependencyConfig;
 use crate::hyperspace::foundation::kind::{DependencyKind, Kind, ProviderKind};
-use crate::hyperspace::foundation::util::{DesMap, Map};
+use crate::hyperspace::foundation::util::{DesMap, IntoSer, Map, SerMap};
 use crate::space::parse::CamelCase;
 
 
@@ -31,14 +31,18 @@ impl DockerDaemonCoreDependencyConfig {
             providers
         })
     }
+    pub fn create_as_trait(config: Map) -> Result<Arc<dyn DependencyConfig>, FoundationErr> {
+        Ok(Self::create(config)?.into_trait())
+    }
+
+
     pub fn into_trait(self) -> Arc<dyn DependencyConfig> {
-        IntoConfigTrait::into_trait(self)
+        let config = Arc::new(self);
+        config as Arc<dyn DependencyConfig>
     }
 }
 
-impl IntoConfigTrait for dyn DependencyConfig{
-    type Config = dyn DependencyConfig;
-}
+
 
 impl DependencyConfig for DockerDaemonCoreDependencyConfig {
 
@@ -60,6 +64,12 @@ impl config::DependencyConfig for DockerDaemonCoreDependencyConfig {
 
     fn clone_me(&self) -> Arc<dyn config::DependencyConfig> {
        Arc::new(self.clone())
+    }
+}
+
+impl IntoSer for DockerDaemonCoreDependencyConfig {
+    fn into_ser(&self) -> Box<dyn SerMap> {
+        self.clone() as Box<dyn SerMap>
     }
 }
 
@@ -127,6 +137,8 @@ pub trait ProviderConfig: config::ProviderConfig {
 
 }
 
+
+
 impl config::ProviderConfig for DockerProviderCoreConfig {
     fn kind(&self) -> &ProviderKind {
         &self.kind
@@ -134,5 +146,10 @@ impl config::ProviderConfig for DockerProviderCoreConfig {
 
     fn clone_me(&self) -> Arc<dyn config::ProviderConfig> {
         Arc::new(self.clone())
+    }
+}
+impl IntoSer for DockerProviderCoreConfig {
+    fn into_ser(&self) -> Box<dyn SerMap> {
+        self.clone() as Box<dyn SerMap>
     }
 }

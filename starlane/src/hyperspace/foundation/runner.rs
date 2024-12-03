@@ -144,17 +144,17 @@ enum DepCall {
     ProviderCall(ProvWrapper),
 }
 
-struct DependencyProxy<C> where C: DependencyConfig+ SerMap
+struct DependencyProxy
 {
-    config: Arc<C>,
+    config: Arc<dyn config::DependencyConfig>,
     call_tx: tokio::sync::mpsc::Sender<DepCall>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
-impl <C> DependencyProxy<C> where C: DependencyConfig+ SerMap
-{
+impl DependencyProxy {
+
     fn new(
-        config: Arc<C>,
+        config: Arc<dyn config::DependencyConfig>,
         call_tx: tokio::sync::mpsc::Sender<DepCall>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
     ) -> impl Dependency {
@@ -167,7 +167,7 @@ impl <C> DependencyProxy<C> where C: DependencyConfig+ SerMap
 }
 
 #[async_trait]
-impl <C> Dependency for DependencyProxy<C> where C: DependencyConfig{
+impl  Dependency for DependencyProxy {
     fn kind(&self) -> &DependencyKind {
         self.config.kind()
     }

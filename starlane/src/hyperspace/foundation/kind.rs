@@ -11,6 +11,7 @@ use serde_with_macros::DeserializeFromStr;
 use thiserror::__private::AsDisplay;
 use crate::hyperspace::foundation::{Dependency, Foundation};
 use crate::hyperspace::foundation::err::FoundationErr;
+use crate::hyperspace::foundation::util::IntoSer;
 use crate::space::parse::{camel_case, CamelCase};
 use crate::space::parse::util::{new_span, result};
 
@@ -46,6 +47,7 @@ impl IKind for Kind {
        }
     }
 }
+
 
 
 
@@ -189,7 +191,7 @@ impl From<&ProviderKind> for &str {
     }
 }
 
-pub trait IKind where for<'a> Self: Name+Debug+Clone+Eq+PartialEq+Display+Hash+Serialize+Deserialize<'a> {
+pub trait IKind where for<'a> Self: Name+IntoSer+Debug+Clone+Eq+PartialEq+Display+Hash+Serialize+Deserialize<'a> {
   fn category(&self) -> &'static str;
 
   fn as_str(&self) -> &'static str;

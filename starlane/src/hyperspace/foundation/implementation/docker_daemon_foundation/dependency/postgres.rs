@@ -11,7 +11,7 @@ use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::implementation::docker_daemon_foundation;
 use crate::space::parse::{CamelCase, DbCase, VarCase};
 use crate::hyperspace::foundation::implementation::docker_daemon_foundation::Foundation;
-use crate::hyperspace::foundation::util::Map;
+use crate::hyperspace::foundation::util::{Map, SerMap};
 
 fn default_schema() -> DbCase{
     DbCase::from_str("PUBLIC").unwrap()
@@ -67,6 +67,11 @@ impl config::DependencyConfig for PostgresDependencyConfig {
 
     fn clone_me(&self) -> Arc<dyn config::DependencyConfig> {
         Arc::new(self.clone())
+    }
+
+    fn into_ser(&self) -> Box<dyn SerMap> {
+       let config = Box::new(self.clone());
+       config as Box<dyn SerMap>
     }
 }
 

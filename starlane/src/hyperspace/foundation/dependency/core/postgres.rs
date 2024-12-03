@@ -7,12 +7,11 @@ use md5::digest::DynDigest;
 use serde::{Deserialize, Serialize};
 use crate::hyperspace::foundation;
 use crate::hyperspace::foundation::config;
-use crate::hyperspace::foundation::config::IntoConfigTrait;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, Kind, PostgresKind, ProviderKind};
 use crate::hyperspace::foundation::Dependency;
 use crate::hyperspace::foundation::implementation::docker_daemon_foundation;
-use crate::hyperspace::foundation::util::{Map, SerMap};
+use crate::hyperspace::foundation::util::{DesMap, IntoSer, Map, SerMap};
 use crate::space::parse::CamelCase;
 
 #[derive(Clone,Debug,Serialize,Deserialize)]
@@ -47,22 +46,27 @@ impl PostgresClusterCoreConfig {
         })
     }
 
+
+    pub fn create_as_trait(config: Map) -> Result<Arc<dyn DependencyConfig>, FoundationErr> {
+        Ok(Self::create(config)?.into_trait())
+    }
+
     pub fn into_trait(self) -> Arc<dyn DependencyConfig> {
-        IntoConfigTrait::into_trait(self)
+        let config = Arc::new(self);
+        config as Arc<dyn DependencyConfig>
     }
 
 }
 
 pub trait DependencyConfig: docker_daemon_foundation::DependencyConfig { }
 
-impl docker_daemon_foundation::DependencyConfig for PostgresClusterCoreConfig { }
+impl docker_daemon_foundation::DependencyConfig for PostgresClusterCoreConfig {
+
+}
 
 
 impl DependencyConfig for PostgresClusterCoreConfig { }
 
-impl IntoConfigTrait for dyn DependencyConfig {
-    type Config = Self;
-}
 
 
 
@@ -86,6 +90,15 @@ impl config::DependencyConfig for PostgresClusterCoreConfig {
 
     fn clone_me(&self) -> Arc<dyn config::DependencyConfig> {
         Arc::new(self.clone())
+    }
+
+
+
+}
+
+impl IntoSer for PostgresClusterCoreConfig {
+    fn into_ser(&self) -> Box<dyn SerMap> {
+        self.clone() as Box<dyn SerMap>
     }
 }
 
