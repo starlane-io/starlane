@@ -370,16 +370,35 @@ where
     }
 }
 
+
+
 #[cfg(test)]
 pub mod test {
     use serde::{Deserialize, Serialize};
+    use std::fmt::Debug;
+    use std::sync::Arc;
+    use ascii::AsciiChar::o;
+    use derive_name::{Name, Named};
+    use downcast_rs::{impl_downcast, Downcast, DowncastSync};
+    use crate::hyperspace::foundation::err::FoundationErr;
 
     #[test]
     pub fn test_serde_factory() -> anyhow::Result<()> {
         #[typetag::serde(tag = "kind")]
-        trait SomeConfig {
+        trait SomeConfig: DowncastSync+Debug {
             fn say_my_name(&self) -> &'static str;
         }
+        impl_downcast!(sync SomeConfig);
+
+        /*
+        impl dyn SomeConfig where Self: Sized{
+            unsafe fn downcast<T>(&self) -> &T {
+                &*(self as *const Self as *const T)
+            }
+        }
+
+         */
+
 
         #[derive(
             Eq,
@@ -396,7 +415,7 @@ pub mod test {
             BConf,
         }
 
-        #[derive(Clone, Default, Serialize, Deserialize)]
+        #[derive(Clone, Debug, Default, Serialize, Deserialize,Name)]
         struct AConf {
             something: u32,
         }
@@ -404,11 +423,11 @@ pub mod test {
         #[typetag::serde]
         impl SomeConfig for AConf {
             fn say_my_name(&self) -> &'static str {
-                "AConf"
+                self.name()
             }
         }
 
-        #[derive(Clone, Default, Serialize, Deserialize)]
+        #[derive(Clone, Debug, Default, Serialize, Deserialize)]
         struct BConf {
             and_another_thing: String,
         }
@@ -417,17 +436,112 @@ pub mod test {
             fn say_my_name(&self) -> &'static str {
                 "BConf"
             }
+
         }
 
         let raw = r#"
-kind: AConf
-something: 34
+- kind: AConf
+  something: 34
+- kind: BConf
+  and_another_thing: "Hello World!"
+
         "#;
 
-        let item: Box<dyn SomeConfig> = Box::new(serde_yaml::from_str(raw)?);
+        let mut items: Vec<Arc<dyn SomeConfig>> = serde_yaml::from_str(raw)?;
+        let item0  =items.remove(0);
+        let item1  =items.remove(0);
 
-        assert_eq!("AConf", item.say_my_name());
+        assert_eq!("AConf", item0.say_my_name());
+        assert_eq!("BConf", item1.say_my_name());
+
+        println!("0:\n{:?}", item0);
+        println!("1:\n{:?}", item1);
+
+        let conf0 = item0.clone().downcast_arc::<AConf>().unwrap();
+        let conf1 = item1.clone().downcast_arc::<BConf>().unwrap();
+
+
+
+        println!("AConf::something(&conf0): {}", conf0.something);
+        println!("BConf::and_another_thing(&conf1): {}", conf1.and_another_thing);
+
+        println!("item0 is still alive?: {}",item0.say_my_name());
+
 
         Ok(())
     }
+
+    #[test]
+    pub fn test_downgrade() -> anyhow::Result<()> {
+        trait Trait {}
+        impl Trait for String {}
+        impl Trait for u8 {}
+
+        impl dyn Trait {
+            // SAFETY: I hope you know what you're doing
+            unsafe fn downcast<T>(&self) -> &T {
+                &*(self as *const dyn Trait as *const T)
+            }
+        }
+
+            let a: &dyn Trait = &42_u8;
+            let b: &dyn Trait = &String::from("hello");
+
+            let _number: u8 = *unsafe { a.downcast::<u8>() };
+            let _text: &str = unsafe { b.downcast::<String>() };
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn analyze_vtable() {
+
+        trait Trait {
+            fn do_something(&self);
+            fn do_something_else(&self);
+        }
+
+        impl Trait for String {
+            fn do_something(&self) { println!("a string: {}", self); }
+            fn do_something_else(&self) { println!("a string: {}", self); }
+        }
+
+        impl Trait for u128 {
+            fn do_something(&self) { println!("a y=u128: {}", self); }
+            fn do_something_else(&self) { println!("a u128: {}", self); }
+        }
+
+
+        fn analyse_fatp<T: ?Sized>(p: *const T, datasize: usize, vtsize: usize) {
+            let addr = &p as *const *const T as *const usize;
+            let second = (addr as usize + std::mem::size_of::<usize>()) as *const usize;
+            let datap = unsafe { *addr } as *const usize;
+            let vtp = unsafe { *second } as *const usize;
+            let data = unsafe { std::slice::from_raw_parts(datap, datasize) };
+            let vtable = unsafe { std::slice::from_raw_parts(vtp, vtsize) };
+            let vtable = vtable
+                .iter()
+                .map(|val| format!("0x{:x}", val))
+                .collect::<Vec<_>>();
+
+            println!("Addr of fat pointer (1st word): {:p}", addr);
+            println!("Addr of fat pointer (2nd word): {:p}", second);
+            println!("Addr of data:                   {:p}", datap);
+            println!("Addr of vtable:                 {:p}", vtp);
+            println!("Data:   {:?}", data);
+            println!("VTable: {:?}", vtable);
+        }
+
+        let obj: &dyn Trait = &String::from("hello");
+        dbg!(String::do_something as *const ());
+        dbg!(String::do_something_else as *const ());
+        analyse_fatp(obj, std::mem::size_of::<String>() / std::mem::size_of::<usize>(), 5);
+
+        let obj: &dyn Trait = &12_u128;
+//        dbg!(u128::do_something as *const ());
+//        dbg!(u128::do_something_else as *const ());
+        analyse_fatp(obj, std::mem::size_of::<u128>() / std::mem::size_of::<usize>(), 5);
+
+    }
+
 }

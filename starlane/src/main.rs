@@ -1,4 +1,5 @@
 #![allow(warnings)]
+#![feature()]
 
 
 shadow!(build);
