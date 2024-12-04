@@ -8,3 +8,6 @@ pub mod common;
 pub mod platform;
 
 pub mod kind;
+
+
+pub mod err;

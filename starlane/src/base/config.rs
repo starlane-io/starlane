@@ -2,9 +2,10 @@ use std::hash::Hash;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use downcast_rs::{impl_downcast, DowncastSync};
-use crate::base::foundation::err::FoundationErr;
-use crate::base::foundation::Foundation;
+use crate::base;
+use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
+use crate::base::foundation::Provider;
 use crate::base::kind::{DependencyKind, Kind, ProviderKind};
 use crate::space::parse::CamelCase;
 
@@ -13,7 +14,8 @@ where
     Self::PlatformConfig: PlatformConfig,
     Self::FoundationConfig: FoundationConfig,
 {
-    type PlatformConfig;
+    type Err: Into<BaseErr>;
+    type PlatformConfig: PlatformConfig;
     type FoundationConfig: FoundationConfig+Clone;
 
     fn foundation(&self) -> Self::FoundationConfig;
@@ -46,10 +48,14 @@ pub trait DependencyConfig: DowncastSync {
 
 pub trait ProviderConfigSrc
 {
-    type Config;
-    fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, FoundationErr>;
+    type Err: Into<BaseErr>;
 
-    fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, FoundationErr>;
+    type Config: ProviderConfig;
+
+
+    fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, Self::Err>;
+
+    fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, Self::Err>;
 }
 
 pub trait ProviderConfig: DowncastSync {
@@ -193,5 +199,12 @@ pub mod default {
     pub type DependencyConfig = Arc<dyn super::DependencyConfig<ProviderConfig=ProviderConfig>>;
 
     pub type ProviderConfig= Arc<dyn super::ProviderConfig>;
+
+}
+
+/// this is the super trait of [`foundation::config::FoundationConfig`] and [`platform::config::PlatformConfig`]
+pub trait BaseConfig  {
+
+    type DependencyConfig: DependencyConfig<ProviderConfig:ProviderConfig>;
 
 }

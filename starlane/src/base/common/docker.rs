@@ -1,4 +1,4 @@
-use crate::base::foundation::err::FoundationErr;
+use crate::base::err::BaseErr;
 use crate::base::foundation::implementation::docker_daemon_foundation;
 use crate::base::foundation::util::{IntoSer, Map, SerMap};
 use crate::space::parse::CamelCase;
@@ -21,14 +21,14 @@ pub struct DockerDaemonCoreDependencyConfig {
 }
 
 impl DockerDaemonCoreDependencyConfig {
-    pub fn create(config: Map) -> Result<Self, FoundationErr> {
+    pub fn create(config: Map) -> Result<Self, BaseErr> {
         let providers = config.parse_same("providers")?;
 
         Ok(DockerDaemonCoreDependencyConfig { providers })
     }
     pub fn create_as_trait(
         config: Map,
-    ) -> Result<Arc<dyn docker_daemon_foundation::DependencyConfig>, FoundationErr> {
+    ) -> Result<Arc<dyn docker_daemon_foundation::DependencyConfig>, BaseErr> {
         Ok(Self::create(config)?.into_trait())
     }
 
@@ -70,11 +70,11 @@ impl IntoSer for DockerDaemonCoreDependencyConfig {
 impl base::config::ProviderConfigSrc for DockerDaemonCoreDependencyConfig {
     type Config = Arc<DockerProviderCoreConfig>;
 
-    fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, FoundationErr> {
+    fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, BaseErr> {
         Ok(self.providers.clone())
     }
 
-    fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, FoundationErr> {
+    fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, BaseErr> {
         Ok(self.providers.get(kind))
     }
 }
@@ -109,17 +109,17 @@ impl DockerProviderCoreConfig {
         }
     }
 
-    pub fn create(config: Map) -> Result<Self, FoundationErr> {
+    pub fn create(config: Map) -> Result<Self, BaseErr> {
         let kind: CamelCase = config
             .from_field("kind")
-            .map_err(FoundationErr::config_err)?;
+            .map_err(BaseErr::config_err)?;
         let kind = ProviderKind::new(DependencyKind::DockerDaemon, kind);
         let image = config
             .from_field("image")
-            .map_err(FoundationErr::config_err)?;
+            .map_err(BaseErr::config_err)?;
         let expose = config
             .from_field_opt("expose")
-            .map_err(FoundationErr::config_err)?;
+            .map_err(BaseErr::config_err)?;
 
         let expose = match expose {
             Some(expose) => expose,

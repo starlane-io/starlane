@@ -1,5 +1,5 @@
 use crate::base::foundation;
-use crate::base::foundation::err::FoundationErr;
+use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::status::Status;
 use crate::base::foundation::util::{IntoSer, SerMap};
@@ -19,6 +19,7 @@ use std::sync::Arc;
 use tokio::sync::watch::Receiver;
 use crate::base;
 use crate::base::kind::{DependencyKind, IKind, Kind, ProviderKind};
+use crate::base::foundation;
 
 pub mod dependency;
 /// docker daemon support is supplied through the docker core dependency... there is no need
@@ -96,7 +97,7 @@ impl foundation::Foundation for DockerDaemonFoundation {
         self.status.clone()
     }
 
-    async fn synchronize(&self, progress: Progress) -> Result<Status, FoundationErr> {
+    async fn synchronize(&self, progress: Progress) -> Result<Status, BaseErr> {
         todo!();
         Ok(Default::default())
     }
@@ -104,18 +105,18 @@ impl foundation::Foundation for DockerDaemonFoundation {
     /// Ensure that core dependencies are downloaded, installed and initialized
     /// in the case of [`FoundationKind::DockerDaemon`] we first check if the Docker Daemon
     /// is installed and running.  This installer does not actually install DockerDaemonb
-    async fn install(&self, progress: Progress) -> Result<(), FoundationErr> {
+    async fn install(&self, progress: Progress) -> Result<(), BaseErr> {
         Ok(())
     }
 
     fn dependency(
         &self,
         kind: &DependencyKind,
-    ) -> Result<Option<Self::Dependency>, FoundationErr> {
+    ) -> Result<Option<Self::Dependency>, BaseErr> {
         todo!()
     }
 
-    fn registry(&self) -> Result<Registry, FoundationErr> {
+    fn registry(&self) -> Result<Registry, BaseErr> {
         todo!()
     }
 }
@@ -135,7 +136,8 @@ pub struct FoundationConfig {
 }
 
 
-pub trait DependencyConfig: base::config::DependencyConfig {
+pub trait DependencyConfig: foundation::config::DependencyConfig {
+
     type ProviderConfig: base::config::ProviderConfig;
 
     fn image(&self) -> String;
@@ -214,13 +216,13 @@ pub mod default {
 
 #[cfg(test)]
 pub mod test {
-    use crate::base::foundation::err::FoundationErr;
+    use crate::base::err::BaseErr;
     #[test]
     pub fn foundation_config() {
-        fn inner() -> Result<(), FoundationErr> {
+        fn inner() -> Result<(), BaseErr> {
             let foundation_config = include_str!("docker-daemon-test-config.yaml");
             let foundation_config =
-                serde_yaml::from_str(foundation_config).map_err(FoundationErr::config_err)?;
+                serde_yaml::from_str(foundation_config).map_err(BaseErr::config_err)?;
 
             todo!();
 //            let foundation_config = FoundationConfig::des_from_map(foundation_config)?;
@@ -232,7 +234,7 @@ pub mod test {
             Ok(_) => {}
             Err(err) => {
                 println!("ERR: {}", err);
-                Err::<(), FoundationErr>(err).unwrap();
+                Err::<(), BaseErr>(err).unwrap();
                 assert!(false)
             }
         }

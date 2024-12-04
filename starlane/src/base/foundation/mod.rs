@@ -1,4 +1,4 @@
-use crate::base::foundation::err::FoundationErr;
+use crate::base::err::BaseErr;
 /// # FOUNDATION
 ///
 /// A ['Foundation'] provides abstracted control over the services and dependencies that drive Starlane.
@@ -82,6 +82,9 @@ pub mod proxy;
 
 pub mod runner;
 
+/// [`skel`] provides a starter implementation of [`foundation`] where all the traits are extended
+pub mod skel;
+
 //pub mod docker;
 pub mod err;
 pub mod kind;
@@ -132,18 +135,18 @@ pub trait Foundation: Downcast + Sync + Send {
 
     /// synchronize must be called first.  In this method the [`Foundation`] will check its
     /// environment to determine the
-    async fn synchronize(&self, progress: Progress) -> Result<Status, FoundationErr>;
+    async fn synchronize(&self, progress: Progress) -> Result<Status, BaseErr>;
 
     /// Install and initialize any Dependencies and/or [`Providers`] that
     /// are required for this Foundation to run (usually this is not much more than whatever
     /// software is required to run the Registry.)
-    async fn install(&self, progress: Progress) -> Result<(), FoundationErr>;
+    async fn install(&self, progress: Progress) -> Result<(), BaseErr>;
 
     /// return the given [`Dependency`] if it exists within this [`Foundation`]
-    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Self::Dependency>, FoundationErr>;
+    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Self::Dependency>, BaseErr>;
 
     /// return a handle to the [`Registry`]
-    fn registry(&self) -> Result<Registry, FoundationErr>;
+    fn registry(&self) -> Result<Registry, BaseErr>;
 }
 
 impl_downcast!(Foundation assoc Config, Dependency, Provider);
@@ -169,22 +172,22 @@ pub trait Dependency: Downcast + Send + Sync {
     fn status_watcher(&self) -> Arc<tokio::sync::watch::Receiver<Status>>;
 
        /// perform any downloads for the Dependency
-    async fn download(&self, progress: Progress) -> Result<(), FoundationErr>;
+    async fn download(&self, progress: Progress) -> Result<(), BaseErr>;
 
     /// install the dependency
-    async fn install(&self, progress: Progress) -> Result<(), FoundationErr>;
+    async fn install(&self, progress: Progress) -> Result<(), BaseErr>;
 
     /// perform any steps needed to initialize the dependency
-    async fn initialize(&self, progress: Progress) -> Result<(), FoundationErr>;
+    async fn initialize(&self, progress: Progress) -> Result<(), BaseErr>;
 
     /// Start the dependency (if appropriate)
     /// returns a LiveService which will keep the service alive until
     /// LiveService handle gets dropped
     async fn start(&self, progress: Progress)
-        -> Result<LiveService<DependencyKind>, FoundationErr>;
+        -> Result<LiveService<DependencyKind>, BaseErr>;
 
     /// return a [`Provider`] which can create instances from this [`Dependency`]
-    fn provider(&self, kind: &ProviderKind) -> Result<Option<Self::Provider>, FoundationErr>;
+    fn provider(&self, kind: &ProviderKind) -> Result<Option<Self::Provider>, BaseErr>;
 }
 
 impl_downcast!(Dependency assoc Config, Provider);
@@ -203,9 +206,9 @@ pub trait Provider: Downcast + Send + Sync {
 
     fn status_watcher(&self) -> Arc<tokio::sync::watch::Receiver<Status>>;
 
-    async fn initialize(&self, progress: Progress) -> Result<(), FoundationErr>;
+    async fn initialize(&self, progress: Progress) -> Result<(), BaseErr>;
 
-    async fn start(&self, progress: Progress) -> Result<LiveService<CamelCase>, FoundationErr>;
+    async fn start(&self, progress: Progress) -> Result<LiveService<CamelCase>, BaseErr>;
 }
 
 impl_downcast!(Provider assoc Config);
@@ -274,29 +277,29 @@ where
         self.foundation.status_watcher()
     }
 
-    async fn synchronize(&self, progress: Progress) -> Result<Status, FoundationErr> {
+    async fn synchronize(&self, progress: Progress) -> Result<Status, BaseErr> {
         self.foundation.synchronize(progress).await
     }
 
-    async fn install(&self, progress: Progress) -> Result<(), FoundationErr> {
+    async fn install(&self, progress: Progress) -> Result<(), BaseErr> {
         if self.status().phase == Phase::Unknown {
-            Err(FoundationErr::unknown_state("install"))
+            Err(BaseErr::unknown_state("install"))
         } else {
             self.foundation.install(progress).await
         }
     }
 
-    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Self::Dependency>, FoundationErr> {
+    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Self::Dependency>, BaseErr> {
         if self.status().phase == Phase::Unknown {
-            Err(FoundationErr::unknown_state("dependency"))
+            Err(BaseErr::unknown_state("dependency"))
         } else {
             self.foundation.dependency(kind)
         }
     }
 
-    fn registry(&self) -> Result<Registry, FoundationErr> {
+    fn registry(&self) -> Result<Registry, BaseErr> {
         if self.status().phase == Phase::Unknown {
-            Err(FoundationErr::unknown_state("registry"))
+            Err(BaseErr::unknown_state("registry"))
         } else {
             self.foundation.registry()
         }
@@ -309,7 +312,7 @@ where
 {
     type Proxy = F;
 
-    fn proxy(&self) -> Result<Self::Proxy, FoundationErr> {}
+    fn proxy(&self) -> Result<Self::Proxy, BaseErr> {}
 }
 
 pub mod default {

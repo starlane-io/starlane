@@ -1,4 +1,4 @@
-use crate::base::foundation::err::FoundationErr;
+use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::status::{Phase, PhaseDetail, Status};
 use crate::base::foundation::util::SerMap;
@@ -22,18 +22,18 @@ use crate::base::kind::{DependencyKind, Kind, ProviderKind};
 enum Call<F> where F: Foundation {
     Synchronize {
         progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<Status, FoundationErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<Status, BaseErr>>,
     },
     Dependency {
         kind: DependencyKind,
-        rtn: tokio::sync::oneshot::Sender<Result<Option<F::Dependency>, FoundationErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<Option<F::Dependency>, BaseErr>>,
     },
 
     Install {
         progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<(), FoundationErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
     },
-    Registry(tokio::sync::oneshot::Sender<Result<Registry, FoundationErr>>),
+    Registry(tokio::sync::oneshot::Sender<Result<Registry, BaseErr>>),
     DepCall(DepWrapper<F>),
     _Phantom(PhantomData<F>),
 }
@@ -83,40 +83,40 @@ impl <F> Foundation for FoundationTx<F> where F: Foundation {
         self.status.clone()
     }
 
-    async fn synchronize(&self, progress: Progress) -> Result<Status, FoundationErr> {
+    async fn synchronize(&self, progress: Progress) -> Result<Status, BaseErr> {
         let (rtn, rx) = tokio::sync::oneshot::channel();
         self.call_tx
             .try_send(Call::Synchronize { progress, rtn })
-            .map_err(FoundationErr::msg)?;
-        rx.await.map_err(FoundationErr::msg)?
+            .map_err(BaseErr::msg)?;
+        rx.await.map_err(BaseErr::msg)?
     }
 
-    async fn install(&self, progress: Progress) -> Result<(), FoundationErr> {
+    async fn install(&self, progress: Progress) -> Result<(), BaseErr> {
         let (rtn, rx) = tokio::sync::oneshot::channel();
         self.call_tx
             .try_send(Call::Install { progress, rtn })
-            .map_err(FoundationErr::msg)?;
-        rx.await.map_err(FoundationErr::msg)?
+            .map_err(BaseErr::msg)?;
+        rx.await.map_err(BaseErr::msg)?
     }
 
     fn dependency(
         &self,
         kind: &DependencyKind,
-    ) -> Result<Option<Self::Dependency>, FoundationErr> {
+    ) -> Result<Option<Self::Dependency>, BaseErr> {
         let kind = kind.clone();
         let (rtn, rx) = tokio::sync::oneshot::channel();
         self.call_tx
             .try_send(Call::Dependency { kind, rtn })
-            .map_err(FoundationErr::msg)?;
-        Ok(rx.blocking_recv().map_err(FoundationErr::msg)??)
+            .map_err(BaseErr::msg)?;
+        Ok(rx.blocking_recv().map_err(BaseErr::msg)??)
     }
 
-    fn registry(&self) -> Result<Registry, FoundationErr> {
+    fn registry(&self) -> Result<Registry, BaseErr> {
         let (rtn, rx) = tokio::sync::oneshot::channel();
         self.call_tx
             .try_send(Call::Registry(rtn))
-            .map_err(FoundationErr::msg)?;
-        rx.blocking_recv().map_err(FoundationErr::msg)?
+            .map_err(BaseErr::msg)?;
+        rx.blocking_recv().map_err(BaseErr::msg)?
     }
 }
 
@@ -136,23 +136,23 @@ impl<K, C> Wrapper<K, C> {
 enum DepCall<D> where D: Dependency {
     Download {
         progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<(), FoundationErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
     },
     Install {
         progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<(), FoundationErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
     },
     Initialize {
         progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<(), FoundationErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
     },
     Start {
         progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<LiveService<DependencyKind>, FoundationErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<LiveService<DependencyKind>, BaseErr>>,
     },
     Provider {
         kind: ProviderKind,
-        rtn: tokio::sync::oneshot::Sender<Result<D::Provider, FoundationErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<D::Provider, BaseErr>>,
     },
     ProviderCall(ProvWrapper<D::Provider>),
     _Phantom(PhantomData<D>)
@@ -199,21 +199,21 @@ impl <F> Dependency for DependencyTx<F> where F: Foundation {
         self.status.clone()
     }
 
-    async fn download(&self, progress: Progress) -> Result<(), FoundationErr> {
+    async fn download(&self, progress: Progress) -> Result<(), BaseErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         let call = DepCall::Download { progress, rtn };
         self.call_tx.send(call).await.unwrap();
         rtn_rx.await?
     }
 
-    async fn install(&self, progress: Progress) -> Result<(), FoundationErr> {
+    async fn install(&self, progress: Progress) -> Result<(), BaseErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         let call = DepCall::Install { progress, rtn };
         self.call_tx.send(call).await.unwrap();
         rtn_rx.await?
     }
 
-    async fn initialize(&self, progress: Progress) -> Result<(), FoundationErr> {
+    async fn initialize(&self, progress: Progress) -> Result<(), BaseErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         let call = DepCall::Initialize { progress, rtn };
         self.call_tx.send(call).await.unwrap();
@@ -223,30 +223,30 @@ impl <F> Dependency for DependencyTx<F> where F: Foundation {
     async fn start(
         &self,
         progress: Progress,
-    ) -> Result<LiveService<DependencyKind>, FoundationErr> {
+    ) -> Result<LiveService<DependencyKind>, BaseErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         let call = DepCall::Start { progress, rtn };
         self.call_tx.send(call).await.unwrap();
         rtn_rx.await?
     }
 
-    fn provider(&self, kind: &ProviderKind) -> Result<Option<Self::Provider>, FoundationErr> {
+    fn provider(&self, kind: &ProviderKind) -> Result<Option<Self::Provider>, BaseErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         let kind = kind.clone();
         let call = DepCall::Provider { kind, rtn };
-        self.call_tx.try_send(call).map_err(FoundationErr::msg)?;
-        rtn_rx.blocking_recv().map_err(FoundationErr::msg)?
+        self.call_tx.try_send(call).map_err(BaseErr::msg)?;
+        rtn_rx.blocking_recv().map_err(BaseErr::msg)?
     }
 }
 
 enum ProviderCall<P> where P: Provider {
     Initialize {
         progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<(), FoundationErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
     },
     Start {
         progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<LiveService<CamelCase>, FoundationErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<LiveService<CamelCase>, BaseErr>>,
     },
     _Phantom(PhantomData<P>),
 }
@@ -291,14 +291,14 @@ impl <P> Provider for ProviderTx<P> where P: Provider {
         self.status.clone()
     }
 
-    async fn initialize(&self, progress: Progress) -> Result<(), FoundationErr> {
+    async fn initialize(&self, progress: Progress) -> Result<(), BaseErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         let call = ProviderCall::Initialize { progress, rtn };
         self.call_tx.send(call).await.unwrap();
         rtn_rx.await?
     }
 
-    async fn start(&self, progress: Progress) -> Result<LiveService<CamelCase>, FoundationErr> {
+    async fn start(&self, progress: Progress) -> Result<LiveService<CamelCase>, BaseErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         let call = ProviderCall::Start { progress, rtn };
         self.call_tx.send(call).await.unwrap();
@@ -337,7 +337,7 @@ impl <F> Runner<F> where F: Foundation{
     fn dependency(
         &mut self,
         kind: DependencyKind,
-    ) -> Result<Option<&DependencyRunner<F>>, FoundationErr> {
+    ) -> Result<Option<&DependencyRunner<F>>, BaseErr> {
         if !self.runners.contains_key(&kind) {
             match self.foundation.dependency(&kind) {
                 Ok(None) => return Ok(None),
@@ -357,14 +357,14 @@ impl <F> Runner<F> where F: Foundation{
     fn proxy(
         &mut self,
         kind: DependencyKind,
-    ) -> Result<Option<Box<F::Dependency>>, FoundationErr> {
+    ) -> Result<Option<Box<F::Dependency>>, BaseErr> {
         let runner = self
             .dependency(kind.clone())?
-            .ok_or(FoundationErr::dep_not_available(kind))?;
+            .ok_or(BaseErr::dep_not_available(kind))?;
         Ok(Some(runner.proxy()))
     }
 
-    async fn run(mut self) -> Result<(), FoundationErr> {
+    async fn run(mut self) -> Result<(), BaseErr> {
         let logger = logger!(Point::global_foundation());
         while let Some(call) = self.call_rx.recv().await {
             match call {
@@ -434,7 +434,7 @@ impl <F> DependencyRunner<F> where F: Foundation{
     fn provider(
         &mut self,
         kind: ProviderKind,
-    ) -> Result<Option<&mut ProviderRunner<F>>, FoundationErr> {
+    ) -> Result<Option<&mut ProviderRunner<F>>, BaseErr> {
         if !self.runners.contains_key(&kind) {
             match self.dependency.provider(&kind) {
                 Ok(None) => return Ok(None),
@@ -454,10 +454,10 @@ impl <F> DependencyRunner<F> where F: Foundation{
     fn provider_proxy(
         &mut self,
         kind: ProviderKind,
-    ) -> Result<Option<Box<F::Provider>>, FoundationErr> {
+    ) -> Result<Option<Box<F::Provider>>, BaseErr> {
         let runner = self
             .provider(kind.clone())?
-            .ok_or(FoundationErr::provider_not_available(kind))?;
+            .ok_or(BaseErr::provider_not_available(kind))?;
         Ok(Some(runner.proxy()))
     }
 

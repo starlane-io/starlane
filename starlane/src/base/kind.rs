@@ -6,7 +6,8 @@ use std::str::FromStr;
 use nom::sequence::tuple;
 use nom::bytes::complete::tag;
 use serde_with_macros::DeserializeFromStr;
-use crate::base::foundation::err::FoundationErr;
+use crate::base::err::BaseErr;
+use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
 use crate::space::parse::{camel_case, CamelCase};
 use crate::space::parse::util::{new_span, result};
@@ -95,14 +96,14 @@ impl IKind for DependencyKind {
     }
 }
 
-impl FromStr for ProviderKind {
-    type Err = FoundationErr;
+impl FromStr for ProviderKind where Self::Err: Into<BaseErr>{
+    type Err=BaseErr ;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let i = new_span(s);
         let (dep, _, provider) = result(tuple((camel_case, tag("::"), camel_case))(i))?;
 
-        let dep = DependencyKind::from_str(dep.as_str()).map_err(FoundationErr::config_err)?;
+        let dep = DependencyKind::from_str(dep.as_str()).map_err(BaseErr::config_err)?;
 
         let key = Self { dep, provider };
 
@@ -189,66 +190,3 @@ where
     fn as_str(&self) -> &'static str;
 }
 
-#[cfg(test)]
-pub mod test {
-    use serde::Serialize;
-    use crate::base::kind::{DependencyKind, IKind, Kind};
-
-    #[test]
-    pub fn test() {
-        fn ser<K>(kind: &K)
-        where
-            K: IKind + ToString + Serialize,
-        {
-            let id = kind.category();
-            let kind_str = serde_yaml::to_string(kind).unwrap().trim().to_string();
-            println!("{}", kind_str);
-            assert_eq!(kind_str.as_str(), format!("{}: {}", id, kind.to_string()))
-        }
-
-        //ser(&Kind::Foundation(FoundationKind::DockerDesktop));
-        ser(&Kind::Dependency(DependencyKind::PostgresCluster));
-        //ser(&Kind::Provider(ProviderKind::Postgres(PostgresKind::Database)));
-
-        /*
-        assert_eq!("{}",serde_yaml::to_string(&kind).unwrap());
-
-        let kind = FoundationKind::DockerDesktop;
-        println!("{}",serde_yaml::to_string(&kind).unwrap());
-
-        let string = serde_yaml::to_string(&kind).unwrap();
-        let kind : FoundationKind = serde_yaml::from_str(string.as_str()).unwrap();
-        println!("{}", kind);
-
-        let kind = Kind::Foundation(FoundationKind::DockerDesktop);
-        let string = serde_yaml::to_string(&kind).unwrap();
-        println!("input: '{}'",string.trim());
-        let kind : Kind  = serde_yaml::from_str(string.as_str()).unwrap();
-
-        println!("result: '{}'",kind.to_string());
-        assert_eq!("DockerDesktop",kind.to_string().as_str());
-
-         */
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct DockerDesktopSettings {
-    pub name: String,
-}
-
-impl DockerDesktopSettings {
-    pub fn new(name: String) -> Self {
-        Self { name }
-    }
-}
-
-impl FromStr for DockerDesktopSettings {
-    type Err = FoundationErr;
-
-    fn from_str(settings: &str) -> Result<Self, Self::Err> {
-        serde_yaml::from_str(settings).map_err(|err| {
-            FoundationErr::foundation_verbose_error(FoundationKind::DockerDaemon, err, settings)
-        })
-    }
-}

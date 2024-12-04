@@ -4,7 +4,7 @@ use tokio::sync::watch::Receiver;
 use crate::base::config::Config;
 use crate::base::foundation;
 use crate::base::config::ProviderConfig;
-use crate::base::foundation::err::FoundationErr;
+use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::proxy::sealed::ProxySealed;
 use crate::base::foundation::status::Status;
@@ -50,19 +50,19 @@ impl <F> foundation::Foundation for Foundation<F> where F: foundation::Foundatio
         todo!()
     }
 
-    async fn synchronize(&self, progress: Progress) -> Result<Status, FoundationErr> {
+    async fn synchronize(&self, progress: Progress) -> Result<Status, BaseErr> {
         todo!()
     }
 
-    async fn install(&self, progress: Progress) -> Result<(), FoundationErr> {
+    async fn install(&self, progress: Progress) -> Result<(), BaseErr> {
         todo!()
     }
 
-    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Self::Dependency>, FoundationErr> {
+    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Self::Dependency>, BaseErr> {
         todo!()
     }
 
-    fn registry(&self) -> Result<Registry, FoundationErr> {
+    fn registry(&self) -> Result<Registry, BaseErr> {
         todo!()
     }
 }

@@ -1,5 +1,5 @@
 use crate::base::config::ConfigMap;
-use crate::base::foundation::err::FoundationErr;
+use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
 use bincode::Options;
 use derive_name::Name;
@@ -21,14 +21,14 @@ pub trait SubText {}
 pub struct Map(Mapping);
 
 impl TryFrom<serde_yaml::Value> for Map {
-    type Error = FoundationErr;
+    type Error = BaseErr;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Mapping(mapping) => Ok(Self(mapping)),
             other => {
                 other.var_string();
-                Err(FoundationErr::serde_err(format!(
+                Err(BaseErr::serde_err(format!(
                     "expecting `Value::Mapping` found: 'Value::{}'",
                     other.var_string()
                 )))
@@ -38,7 +38,7 @@ impl TryFrom<serde_yaml::Value> for Map {
 }
 
 impl TryFrom<&str> for Map {
-    type Error = FoundationErr;
+    type Error = BaseErr;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         serde_yaml::from_str(value).map_err(Self::Error::serde_err)
@@ -46,17 +46,17 @@ impl TryFrom<&str> for Map {
 }
 
 pub trait SerMap {
-    fn to_map(self) -> Result<Map, FoundationErr>; /* {
+    fn to_map(self) -> Result<Map, BaseErr>; /* {
                                                        Err(FoundationErr::serde_err("this type does not support Serialization"))
                                                    }
                                                    */
 
-    fn to_sequence(self) -> Result<Sequence, FoundationErr>; /*{
+    fn to_sequence(self) -> Result<Sequence, BaseErr>; /*{
                                                                  Err(FoundationErr::serde_err("this type does not support Serialization"))
                                                              }
                                                              */
 
-    fn to_value(self) -> Result<serde_yaml::Value, FoundationErr>; /* {
+    fn to_value(self) -> Result<serde_yaml::Value, BaseErr>; /* {
                                                                        Err(FoundationErr::serde_err("this type does not support Serialization"))
                                                                    }
                                                                    */
@@ -106,20 +106,20 @@ impl<T> SerMap for T
 where
     T: Serialize,
 {
-    fn to_map(self) -> Result<Map, FoundationErr> {
+    fn to_map(self) -> Result<Map, BaseErr> {
         serde_yaml::to_value(self)
-            .map_err(FoundationErr::serde_err)?
+            .map_err(BaseErr::serde_err)?
             .to_map()
     }
 
-    fn to_sequence(self) -> Result<serde_yaml::Sequence, FoundationErr> {
+    fn to_sequence(self) -> Result<serde_yaml::Sequence, BaseErr> {
         serde_yaml::to_value(self)
-            .map_err(FoundationErr::serde_err)?
+            .map_err(BaseErr::serde_err)?
             .to_sequence()
     }
 
-    fn to_value(self) -> Result<serde_yaml::Value, FoundationErr> {
-        serde_yaml::to_value(self).map_err(FoundationErr::serde_err)
+    fn to_value(self) -> Result<serde_yaml::Value, BaseErr> {
+        serde_yaml::to_value(self).map_err(BaseErr::serde_err)
     }
 }
 
@@ -178,48 +178,48 @@ impl Map {
         Value::Mapping(self.0)
     }
 
-    pub fn from_field<M>(&self, field: &'static str) -> Result<M, FoundationErr>
+    pub fn from_field<M>(&self, field: &'static str) -> Result<M, BaseErr>
     where
         M: DeserializeOwned,
     {
         match self.get(field) {
             Some(value) => {
-                Ok(serde_yaml::from_value(value.clone()).map_err(FoundationErr::config_err)?)
+                Ok(serde_yaml::from_value(value.clone()).map_err(BaseErr::config_err)?)
             }
-            None => Err(FoundationErr::config_err(
+            None => Err(BaseErr::config_err(
                 "missing required attribute 'kind'",
             )),
         }
     }
 
-    pub fn from_field_opt<M>(&self, field: &'static str) -> Result<Option<M>, FoundationErr>
+    pub fn from_field_opt<M>(&self, field: &'static str) -> Result<Option<M>, BaseErr>
     where
         M: DeserializeOwned,
     {
         match self.get(field) {
             None => Ok(None),
             Some(value) => Ok(Some(
-                serde_yaml::from_value(value.clone()).map_err(FoundationErr::config_err)?,
+                serde_yaml::from_value(value.clone()).map_err(BaseErr::config_err)?,
             )),
         }
     }
 
-    pub fn kind<K>(&self) -> Result<K, FoundationErr>
+    pub fn kind<K>(&self) -> Result<K, BaseErr>
     where
         K: Eq + PartialEq + Hash + DeserializeOwned + Name,
     {
         let kind_as_value = self
             .0
             .get("kind")
-            .ok_or_else(|| FoundationErr::missing_kind_declaration(K::name()))?;
+            .ok_or_else(|| BaseErr::missing_kind_declaration(K::name()))?;
         let result = serde_yaml::from_value(kind_as_value.clone());
         match result {
             Ok(kind) => Ok(kind),
             Err(_) => {
                 /// now we have to convert kind into a string
                 let kind_str = serde_yaml::to_string(kind_as_value)
-                    .map_err(|err| FoundationErr::config_err(format!("{:?}", err)))?;
-                Err(FoundationErr::kind_not_found(K::name(), kind_str))
+                    .map_err(|err| BaseErr::config_err(format!("{:?}", err)))?;
+                Err(BaseErr::kind_not_found(K::name(), kind_str))
             }
         }
     }
@@ -227,8 +227,8 @@ impl Map {
     pub fn parse_list<D>(
         &self,
         field: &'static str,
-        f: impl Fn(Map) -> Result<D, FoundationErr>,
-    ) -> Result<Vec<D>, FoundationErr>
+        f: impl Fn(Map) -> Result<D, BaseErr>,
+    ) -> Result<Vec<D>, BaseErr>
     where
         D: DeserializeOwned,
     {
@@ -246,7 +246,7 @@ impl Map {
     }
 
     /// when you want to parse a list of configurations that are all the same
-    pub fn parse_same<K, D>(&self, field: &'static str) -> Result<HashMap<K, D>, FoundationErr>
+    pub fn parse_same<K, D>(&self, field: &'static str) -> Result<HashMap<K, D>, BaseErr>
     where
         D: DeserializeOwned,
         K: Eq + PartialEq + Hash + DeserializeOwned + derive_name::Name,
@@ -256,7 +256,7 @@ impl Map {
         for map in items {
             let kind = map.kind()?;
             let item: D =
-                serde_yaml::from_value(map.to_value()).map_err(FoundationErr::config_err)?;
+                serde_yaml::from_value(map.to_value()).map_err(BaseErr::config_err)?;
             rtn.insert(kind, item);
         }
         Ok(rtn)
@@ -289,7 +289,7 @@ pub trait IntoSer {
 
 pub trait CreateProxy {
     type Proxy;
-    fn proxy(&self) -> Result<Self::Proxy,FoundationErr>;
+    fn proxy(&self) -> Result<Self::Proxy, BaseErr>;
 }
 
 
