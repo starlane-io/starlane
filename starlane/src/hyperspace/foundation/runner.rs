@@ -10,19 +10,20 @@ use crate::space::point::Point;
 use crate::space::progress::Progress;
 use starlane_primitive_macros::logger;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
 use wasmer_wasix::virtual_fs::Upcastable;
 use crate::hyperspace::foundation;
 
-enum Call {
+enum Call<F> where F: Foundation {
     Synchronize {
         progress: Progress,
         rtn: tokio::sync::oneshot::Sender<Result<Status, FoundationErr>>,
     },
     Dependency {
         kind: DependencyKind,
-        rtn: tokio::sync::oneshot::Sender<Result<Option<Box<dyn Dependency>>, FoundationErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<Option<F::Dependency>, FoundationErr>>,
     },
 
     Install {
@@ -30,32 +31,37 @@ enum Call {
         rtn: tokio::sync::oneshot::Sender<Result<(), FoundationErr>>,
     },
     Registry(tokio::sync::oneshot::Sender<Result<Registry, FoundationErr>>),
-    DepCall(DepWrapper),
+    DepCall(DepWrapper<F>),
+    _Phantom(PhantomData<F>),
 }
 
-struct FoundationProxy {
+struct FoundationTx<F> where F: Foundation {
+    phantom: PhantomData<F>,
     config: config::default::FoundationConfig,
-    call_tx: tokio::sync::mpsc::Sender<Call>,
+    call_tx: tokio::sync::mpsc::Sender<Call<F>>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
-impl FoundationProxy {
+impl <F> FoundationTx<F> where F: Foundation{
     fn new(
         config: config::default::FoundationConfig,
-        call_tx: tokio::sync::mpsc::Sender<Call>,
+        call_tx: tokio::sync::mpsc::Sender<Call<F>>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
     ) -> Self {
         Self {
             config,
             call_tx,
             status,
+            phantom: PhantomData::default()
         }
     }
 }
 
 #[async_trait]
-impl Foundation for FoundationProxy {
-    type Config = config::default::FoundationConfig;
+impl <F> Foundation for FoundationTx<F> where F: Foundation {
+    type Config = F::Config;
+    type Dependency = F::Dependency;
+    type Provider = F::Provider;
 
     fn kind(&self) -> FoundationKind {
         self.config.kind().clone()
@@ -92,7 +98,7 @@ impl Foundation for FoundationProxy {
     fn dependency(
         &self,
         kind: &DependencyKind,
-    ) -> Result<Option<Box<dyn Dependency>>, FoundationErr> {
+    ) -> Result<Option<Box<Self::Dependency>>, FoundationErr> {
         let kind = kind.clone();
         let (rtn, rx) = tokio::sync::oneshot::channel();
         self.call_tx
@@ -110,8 +116,8 @@ impl Foundation for FoundationProxy {
     }
 }
 
-type DepWrapper = Wrapper<DependencyKind, DepCall>;
-type ProvWrapper = Wrapper<ProviderKind, ProviderCall>;
+type DepWrapper<D: Dependency> = Wrapper<DependencyKind, DepCall<D>>;
+type ProvWrapper<P: Provider> = Wrapper<ProviderKind, ProviderCall<P>>;
 
 struct Wrapper<K, C> {
     kind: K,
@@ -123,7 +129,7 @@ impl<K, C> Wrapper<K, C> {
     }
 }
 
-enum DepCall {
+enum DepCall<D> where D: Dependency {
     Download {
         progress: Progress,
         rtn: tokio::sync::oneshot::Sender<Result<(), FoundationErr>>,
@@ -142,18 +148,19 @@ enum DepCall {
     },
     Provider {
         kind: ProviderKind,
-        rtn: tokio::sync::oneshot::Sender<Result<Option<Box<dyn Provider>>, FoundationErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<, FoundationErr>>,
     },
-    ProviderCall(ProvWrapper),
+    ProviderCall(ProvWrapper<D::Provider>),
+    _Phantom(PhantomData<D>)
 }
 
-struct DependencyProxy {
+struct DependencyTx {
     config: Arc<dyn config::DependencyConfig>,
     call_tx: tokio::sync::mpsc::Sender<DepCall>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
-impl DependencyProxy {
+impl DependencyTx {
     fn new(
         config: Arc<dyn config::DependencyConfig>,
         call_tx: tokio::sync::mpsc::Sender<DepCall>,
@@ -168,7 +175,11 @@ impl DependencyProxy {
 }
 
 #[async_trait]
-impl Dependency for DependencyProxy {
+impl Dependency for DependencyTx {
+    type Config = config::default::DependencyConfig;
+    type Provider = foundation::default::Provider;
+
+
     fn kind(&self) -> &DependencyKind {
         self.config.kind()
     }
@@ -216,7 +227,7 @@ impl Dependency for DependencyProxy {
         rtn_rx.await?
     }
 
-    fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<dyn Provider>>, FoundationErr> {
+    fn provider(&self, kind: &ProviderKind) -> Result<Option<Self::Provider>, FoundationErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         let kind = kind.clone();
         let call = DepCall::Provider { kind, rtn };
@@ -225,7 +236,7 @@ impl Dependency for DependencyProxy {
     }
 }
 
-enum ProviderCall {
+enum ProviderCall<P> where P: Provider {
     Initialize {
         progress: Progress,
         rtn: tokio::sync::oneshot::Sender<Result<(), FoundationErr>>,
@@ -234,18 +245,19 @@ enum ProviderCall {
         progress: Progress,
         rtn: tokio::sync::oneshot::Sender<Result<LiveService<CamelCase>, FoundationErr>>,
     },
+    _Phantom(PhantomData<P>),
 }
 
-struct ProviderProxy {
-    config: Arc<dyn ProviderConfig>,
-    call_tx: tokio::sync::mpsc::Sender<ProviderCall>,
+struct ProviderTx<P> where P: Provider {
+    config: P::Config,
+    call_tx: tokio::sync::mpsc::Sender<ProviderCall<P>>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
-impl ProviderProxy {
+impl <P> ProviderTx<P> where P: Provider{
     fn new(
         config: Arc<dyn ProviderConfig>,
-        call_tx: tokio::sync::mpsc::Sender<ProviderCall>,
+        call_tx: tokio::sync::mpsc::Sender<ProviderCall<P>>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
     ) -> Self {
         Self {
@@ -257,7 +269,9 @@ impl ProviderProxy {
 }
 
 #[async_trait]
-impl Provider for ProviderProxy {
+impl <P> Provider for ProviderTx<P> where P: Provider {
+    type Config = P::Config;
+
     fn kind(&self) -> &ProviderKind {
         &self.config.kind()
     }
@@ -289,18 +303,18 @@ impl Provider for ProviderProxy {
     }
 }
 
-struct Runner {
-    call_rx: tokio::sync::mpsc::Receiver<Call>,
-    call_tx: tokio::sync::mpsc::Sender<Call>,
-    foundation: foundation::default::Foundation,
-    runners: HashMap<DependencyKind, DependencyRunner>,
+struct Runner<F> where F: Foundation {
+    call_rx: tokio::sync::mpsc::Receiver<Call<F>>,
+    call_tx: tokio::sync::mpsc::Sender<Call<F>>,
+    foundation: Box<dyn foundation::Foundation<Config=F::Config, Dependency=F::Dependency, Provider=F::Provider>>,
+    runners: HashMap<DependencyKind, DependencyRunner<F>>,
 }
 
-impl Runner {
-    fn new(foundation: foundation::default::Foundation) -> impl Foundation {
+impl <F> Runner<F> where F: Foundation{
+    fn new(foundation: ) -> impl Foundation {
         let (call_tx, call_rx) = tokio::sync::mpsc::channel(64);
         let config = foundation.config().clone();
-        let proxy = FoundationProxy::new(config, call_tx.clone(), foundation.status_watcher());
+        let proxy = FoundationTx::new(config, call_tx.clone(), foundation.status_watcher());
         let runner = Self {
             foundation,
             call_rx,
@@ -340,7 +354,7 @@ impl Runner {
     fn proxy(
         &mut self,
         kind: DependencyKind,
-    ) -> Result<Option<Box<dyn Dependency>>, FoundationErr> {
+    ) -> Result<Option<Box<F::Dependency>>, FoundationErr> {
         let runner = self
             .dependency(kind.clone())?
             .ok_or(FoundationErr::dep_not_available(kind))?;
@@ -369,20 +383,22 @@ impl Runner {
                     None => {}
                     Some(runner) => runner.handle(wrap.call).await,
                 },
+                /// should never be called...
+                Call::_Phantom(_) => {}
             }
         }
         Ok(())
     }
 }
 
-struct DependencyRunner {
-    dependency: Box<dyn Dependency>,
+struct DependencyRunner<F> where F: Foundation{
+    dependency: F::Dependency,
     runners: HashMap<ProviderKind, ProviderRunner>,
-    call_tx: tokio::sync::mpsc::Sender<Call>,
+    call_tx: tokio::sync::mpsc::Sender<Call<F::Dependency>>,
 }
 
-impl DependencyRunner {
-    fn new(dependency: Box<dyn Dependency>, call_tx: tokio::sync::mpsc::Sender<Call>) -> Self {
+impl <F> DependencyRunner<F> where F: Foundation{
+    fn new(dependency: F::Dependency, call_tx: tokio::sync::mpsc::Sender<Call<F>>) -> Self {
         Self {
             dependency,
             runners: Default::default(),
@@ -390,7 +406,7 @@ impl DependencyRunner {
         }
     }
 
-    fn proxy(&self) -> Box<dyn Dependency> {
+    fn proxy(&self) -> F::Dependency {
         let kind = self.kind().clone();
         let (dep_call_tx, mut dep_call_rx) = tokio::sync::mpsc::channel(64);
         let foundation_call_tx = self.call_tx.clone();
@@ -401,15 +417,15 @@ impl DependencyRunner {
                 foundation_call_tx.send(call).await.unwrap_or_default();
             }
         });
-        Box::new(DependencyProxy::new(
-            self.dependency.config().clone_me(),
+        Box::new(DependencyTx::new(
+            self.dependency.config(),
             dep_call_tx,
             self.dependency.status_watcher(),
         ))
     }
 
     fn kind(&self) -> &DependencyKind {
-        self.dependency.kind()
+        &self.dependency.kind()
     }
 
     fn provider(
@@ -472,15 +488,15 @@ impl DependencyRunner {
     }
 }
 
-struct ProviderRunner {
-    provider: Box<dyn Provider>,
-    foundation_call_tx: tokio::sync::mpsc::Sender<Call>,
+struct ProviderRunner<F> where F: Foundation {
+    provider: F::Provider,
+    foundation_call_tx: tokio::sync::mpsc::Sender<Call<F>>,
 }
 
-impl ProviderRunner {
+impl <F> ProviderRunner<F> where F: Foundation  {
     fn new(
-        provider: Box<dyn Provider>,
-        foundation_call_tx: tokio::sync::mpsc::Sender<Call>,
+        provider: F::Provider,
+        foundation_call_tx: tokio::sync::mpsc::Sender<Call<F>>,
     ) -> Self {
         Self {
             provider,
@@ -488,7 +504,7 @@ impl ProviderRunner {
         }
     }
 
-    fn proxy(&self) -> Box<dyn Provider> {
+    fn proxy(&self) -> Box<dyn Provider<Config=F::Provider::Config>>  {
         let kind = self.kind().clone();
         let (prov_call_tx, mut prov_call_rx) = tokio::sync::mpsc::channel(64);
         let foundation_call_tx = self.foundation_call_tx.clone();
@@ -501,8 +517,8 @@ impl ProviderRunner {
                 foundation_call_tx.send(call).await.unwrap_or_default();
             }
         });
-        Box::new(ProviderProxy::new(
-            self.provider.config().clone_me(),
+        Box::new(ProviderTx::new(
+            self.provider.config().clone(),
             prov_call_tx,
             self.provider.status_watcher(),
         ))

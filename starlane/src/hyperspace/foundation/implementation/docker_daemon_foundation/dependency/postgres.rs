@@ -2,7 +2,7 @@ use crate::hyperspace::foundation::dependency::core::docker::DockerProviderCoreC
 use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::implementation::docker_daemon_foundation;
-use crate::hyperspace::foundation::implementation::docker_daemon_foundation::Foundation;
+use crate::hyperspace::foundation::implementation::docker_daemon_foundation::DockerDaemonFoundation;
 use crate::hyperspace::foundation::kind::{DependencyKind, Kind, ProviderKind};
 use crate::hyperspace::foundation::util::{ IntoSer, Map, SerMap};
 use crate::hyperspace::foundation::{config, LiveService, Provider};
@@ -57,6 +57,8 @@ impl Deref for PostgresDependencyConfig {
 
 
 impl config::DependencyConfig for PostgresDependencyConfig {
+    type ProviderConfig = config::default::ProviderConfig;
+
     fn kind(&self) -> &DependencyKind {
         &DependencyKind::PostgresCluster
     }
@@ -69,9 +71,7 @@ impl config::DependencyConfig for PostgresDependencyConfig {
         self.postgres.require()
     }
 
-    fn clone_me(&self) -> Arc<dyn config::DependencyConfig> {
-        Arc::new(self.clone()) as Arc<dyn config::DependencyConfig>
-    }
+
 }
 
 impl IntoSer for PostgresDependencyConfig {

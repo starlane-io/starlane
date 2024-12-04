@@ -154,6 +154,7 @@ tracing = { workspace = true, features=["std","log","attributes","tracing-attrib
 tracing-subscriber = { workspace = true, features = ["default"]}
 tracing-attributes= { workspace = true,  features=["async-await"]}
 tracing-core= { workspace = true,  features = ["valuable","default"] }
+dyn-clone = {workspace = true}
 
 [build-dependencies]
 shadow-rs = { workspace = true }

@@ -4802,6 +4802,7 @@ dependencies = [
  "derive_builder 0.20.2",
  "dirs",
  "downcast-rs",
+ "dyn-clone",
  "enum-ordinalize",
  "erased-serde",
  "futures",

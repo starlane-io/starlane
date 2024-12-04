@@ -288,6 +288,13 @@ impl Map {
 pub trait IntoSer {
     fn into_ser(&self) -> Box<dyn SerMap>;
 }
+
+pub trait CreateProxy {
+    type Proxy;
+    fn proxy(&self) -> Result<Self::Proxy,FoundationErr>;
+}
+
+
 #[test]
 pub fn kind_map() {
     //        let mut map: Map= Map::new();

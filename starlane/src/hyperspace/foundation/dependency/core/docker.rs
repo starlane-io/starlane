@@ -58,9 +58,7 @@ impl config::DependencyConfig for DockerDaemonCoreDependencyConfig {
         REQUIRED.clone()
     }
 
-    fn clone_me(&self) -> Arc<dyn config::DependencyConfig> {
-        Arc::new(self.clone())
-    }
+
 }
 
 impl IntoSer for DockerDaemonCoreDependencyConfig {

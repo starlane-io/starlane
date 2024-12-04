@@ -15,6 +15,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use downcast_rs::{impl_downcast, DowncastSync};
 
 pub type RawConfig = Value;
 
@@ -36,14 +37,14 @@ where
     Self::FoundationConfig: FoundationConfig,
 {
     type PlatformConfig;
-    type FoundationConfig;
+    type FoundationConfig: FoundationConfig+Clone;
 
     fn foundation(&self) -> Self::FoundationConfig;
     fn platform(&self) -> Self::FoundationConfig;
 }
 
-pub trait FoundationConfig: Send + Sync  {
-    type DependencyConfig;
+pub trait FoundationConfig: DowncastSync {
+    type DependencyConfig: DependencyConfig+Clone;
 
     fn kind(&self) -> FoundationKind;
 
@@ -57,16 +58,21 @@ pub trait FoundationConfig: Send + Sync  {
 
 }
 
+impl_downcast!(sync FoundationConfig assoc DependencyConfig);
 
-pub trait DependencyConfig: Send + Sync {
+
+pub trait DependencyConfig: DowncastSync {
+    type ProviderConfig: ProviderConfig+Clone;
+
     fn kind(&self) -> &DependencyKind;
 
     fn volumes(&self) -> HashMap<String, String>;
 
     fn require(&self) -> Vec<Kind>;
-
-    fn clone_me(&self) -> Arc<dyn DependencyConfig>;
 }
+
+
+impl_downcast!(sync DependencyConfig assoc ProviderConfig);
 
 pub trait ProviderConfigSrc
 {
@@ -76,11 +82,12 @@ pub trait ProviderConfigSrc
     fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, FoundationErr>;
 }
 
-pub trait ProviderConfig: Send + Sync {
+pub trait ProviderConfig: DowncastSync {
     fn kind(&self) -> &ProviderKind;
-
-    fn clone_me(&self) -> Arc<dyn ProviderConfig>;
 }
+
+impl_downcast!(sync ProviderConfig);
+
 
 /*
 pub trait RegistryConfig: Send+Sync{
@@ -264,5 +271,9 @@ where
 pub mod default {
     use std::sync::Arc;
 
-    pub type FoundationConfig = Arc<dyn super::FoundationConfig<DependencyConfig=Arc<dyn super::DependencyConfig>>>;
+    pub type FoundationConfig = Arc<dyn super::FoundationConfig<DependencyConfig=DependencyConfig>>;
+    pub type DependencyConfig = Arc<dyn super::DependencyConfig<ProviderConfig=ProviderConfig>>;
+
+    pub type ProviderConfig= Arc<dyn super::ProviderConfig>;
+
 }

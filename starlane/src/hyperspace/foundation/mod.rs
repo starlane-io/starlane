@@ -1,4 +1,4 @@
-
+use crate::hyperspace::foundation::config::{DependencyConfig, FoundationConfig};
 use crate::hyperspace::foundation::err::{ActionRequest, FoundationErr};
 /// # FOUNDATION
 ///
@@ -31,10 +31,12 @@ use crate::hyperspace::foundation::kind::{
     DependencyKind, FoundationKind, IKind, Kind, ProviderKind,
 };
 use crate::hyperspace::foundation::status::{Phase, Status, StatusDetail};
+use crate::hyperspace::foundation::util::CreateProxy;
 use crate::hyperspace::platform::PlatformConfig;
 use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
 use crate::space::progress::Progress;
+use downcast_rs::{impl_downcast, Downcast, DowncastSync};
 use futures::TryFutureExt;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -45,10 +47,13 @@ use serde_yaml::Value;
 use std::fmt::{Debug, Display};
 use std::future::Future;
 use std::hash::Hash;
+use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
+
+pub mod proxy;
 
 pub mod runner;
 
@@ -73,9 +78,13 @@ pub fn default_requirements() -> Vec<Kind> {
 
 /// ['Foundation'] is an abstraction for managing infrastructure.
 #[async_trait]
-pub trait Foundation: Send + Sync {
+pub trait Foundation: Downcast + Sync + Send {
+    type Config: FoundationConfig + Clone;
+    type Types: FoundationTypeTraits;
 
-    type Config;
+    type Dependency: Dependency;
+
+    type Provider: Provider;
 
     fn kind(&self) -> FoundationKind;
 
@@ -95,14 +104,60 @@ pub trait Foundation: Send + Sync {
     async fn install(&self, progress: Progress) -> Result<(), FoundationErr>;
 
     /// return the given [`Dependency`] if it exists within this [`Foundation`]
-    fn dependency(
-        &self,
-        kind: &DependencyKind,
-    ) -> Result<Option<Box<dyn Dependency>>, FoundationErr>;
+    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Self::Dependency>, FoundationErr>;
 
     /// return a handle to the [`Registry`]
     fn registry(&self) -> Result<Registry, FoundationErr>;
 }
+
+/// [`FoundationTypeTraits`] should reference the best trait fit for [`Foundation`] types.
+/// whereas the implementing Foundation may map its types to concrete structs or enums--
+/// [`FoundationTypeTraits`] should only ever constrain to a trait. [`FoundationTypeTraits`]
+/// is used by [`runner::FoundationProxy`] in order to create workable proxies for [`Dependency`]
+/// and [`Provider`].  Notice that [`Foundation::Config`] is NOT included... this is because
+/// configs are static and the [`runner::FoundationProxy`] should always
+pub trait FoundationTypeTraits {
+    type Dependency: Dependency;
+
+    type Provider: Provider;
+}
+
+#[derive(Default)]
+pub struct FoundationTypes<F> where F: Foundation {
+    phantom: PhantomData<F>
+}
+
+/*
+impl <F> FoundationTypeTraits for FoundationTypes<F> where F: Foundation, Self::Dependency: F::Dependency{
+
+}
+
+ */
+
+
+
+
+/// call [`EasyFoundationTypeTraits::default`]
+/// ```
+/// use starlane::hyperspace::foundation::{implementation, Dependency, EasyFoundationTypeTraits, Foundation, Provider};
+/// use implementation::docker_daemon_foundation as foundation;
+///
+/// let easy : EasyFoundationTypeTraits<foundation::DockerDaemonFoundation,foundation::Dependency,foundation::Provider> = EasyFoundationTypeTraits::default();///
+#[derive(Default)]
+pub struct EasyFoundationTypeTraits<F, D, P>(PhantomData<F>, PhantomData<D>, PhantomData<P>)
+where
+    F: Foundation,
+    D: Dependency<Config = F::Dependency::Config, Provider = P>,
+    P: Provider<Config = F::Dependency::Config>;
+
+
+
+
+
+
+//pub type FoundationTypeTraitsCheat<D:Dependency<Provider=P>,P> = dyn FoundationTypeTraits<Dependency=D, Provider=P>;
+
+impl_downcast!(Foundation assoc Config);
 
 /// A [`Dependency`] is an add-on to the [`Foundation`] infrastructure which may need to be
 /// downloaded, installed, initialized and started.
@@ -111,10 +166,14 @@ pub trait Foundation: Send + Sync {
 /// is a Database server like Postgres... the Dependency will download, install, initialize and
 /// start the service whereas a Provider in this example would represent an individual Database
 #[async_trait]
-pub trait Dependency: Send + Sync {
+pub trait Dependency: Downcast + Send + Sync {
+    type Config: config::DependencyConfig + Clone;
+
+    type Provider: Provider;
+
     fn kind(&self) -> &DependencyKind;
 
-    fn config(&self) -> Arc<dyn config::DependencyConfig>;
+    fn config(&self) -> Self::Config;
 
     fn status(&self) -> Status;
 
@@ -136,16 +195,20 @@ pub trait Dependency: Send + Sync {
         -> Result<LiveService<DependencyKind>, FoundationErr>;
 
     /// return a [`Provider`] which can create instances from this [`Dependency`]
-    fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<dyn Provider>>, FoundationErr>;
+    fn provider(&self, kind: &ProviderKind) -> Result<Option<Self::Provider>, FoundationErr>;
 }
+
+impl_downcast!(Dependency assoc Config);
 
 /// A [`Provider`] is an 'instance' of this dependency... For example a Postgres Dependency
 /// Installs
 #[async_trait]
-pub trait Provider: Send + Sync {
+pub trait Provider: Downcast + Send + Sync {
+    type Config: config::ProviderConfig + Clone;
+
     fn kind(&self) -> &ProviderKind;
 
-    fn config(&self) -> Arc<dyn config::ProviderConfig>;
+    fn config(&self) -> Self::Config;
 
     fn status(&self) -> Status;
 
@@ -155,6 +218,8 @@ pub trait Provider: Send + Sync {
 
     async fn start(&self, progress: Progress) -> Result<LiveService<CamelCase>, FoundationErr>;
 }
+
+impl_downcast!(Provider assoc Config);
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
@@ -187,13 +252,23 @@ impl<K> LiveService<K> {
     }
 }
 
-pub(crate) struct FoundationSafety {
-    foundation: default::Foundation
+pub(crate) struct FoundationSafety<F>
+where
+    F: Foundation,
+{
+    foundation: Box<dyn F>,
 }
 
 #[async_trait]
-impl Foundation for FoundationSafety {
-    type Config = config::default::FoundationConfig;
+impl<F> Foundation for FoundationSafety<F>
+where
+    F: Foundation,
+{
+    type Config = F::Config;
+
+    type Dependency = F::Dependency;
+
+    type Provider = F::Provider;
 
     fn kind(&self) -> FoundationKind {
         self.foundation.kind()
@@ -204,7 +279,7 @@ impl Foundation for FoundationSafety {
     }
 
     fn status(&self) -> Status {
-        self.foundation.status()
+        self.status()
     }
 
     fn status_watcher(&self) -> Arc<Receiver<Status>> {
@@ -223,10 +298,7 @@ impl Foundation for FoundationSafety {
         }
     }
 
-    fn dependency(
-        &self,
-        kind: &DependencyKind,
-    ) -> Result<Option<Box<dyn Dependency>>, FoundationErr> {
+    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Self::Dependency>, FoundationErr> {
         if self.status().phase == Phase::Unknown {
             Err(FoundationErr::unknown_state("dependency"))
         } else {
@@ -243,9 +315,27 @@ impl Foundation for FoundationSafety {
     }
 }
 
+impl<F> CreateProxy for FoundationSafety<F>
+where
+    F: Foundation,
+{
+    type Proxy = F;
+
+    fn proxy(&self) -> Result<Self::Proxy, FoundationErr> {}
+}
+
 pub mod default {
     use crate::hyperspace::foundation::config;
-    pub type Foundation = Box<dyn super::Foundation<Config=config::default::FoundationConfig>>;
+    pub type Provider = Box<dyn super::Provider<Config = config::default::ProviderConfig>>;
+    pub type Dependency =
+        Box<dyn super::Dependency<Config = config::default::DependencyConfig, Provider = Provider>>;
+    pub type Foundation = Box<
+        dyn super::Foundation<
+            Config = config::default::FoundationConfig,
+            Dependency = Dependency,
+            Provider = Provider,
+        >,
+    >;
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
 use crate::hyperspace::foundation;
-use crate::hyperspace::foundation::config::ConfigMap;
+use crate::hyperspace::foundation::config::{ConfigMap};
 use crate::hyperspace::foundation::dependency::core::docker::DockerDaemonCoreDependencyConfig;
 use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
 use crate::hyperspace::foundation::err::FoundationErr;
@@ -8,7 +8,7 @@ use crate::hyperspace::foundation::kind::{
 };
 use crate::hyperspace::foundation::status::Status;
 use crate::hyperspace::foundation::util::{ IntoSer, Map, SerMap};
-use crate::hyperspace::foundation::{config, Dependency};
+use crate::hyperspace::foundation::{config, FoundationTypeTraits, Provider};
 use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
 use crate::space::progress::Progress;
@@ -46,13 +46,17 @@ pub fn default_requirements() -> Vec<Kind> {
     REQUIRED.clone()
 }
 
-pub struct Foundation {
+pub trait Foundation: foundation::Foundation<Config=FoundationConfig,Dependency:dyn Dependency,Provider: dyn Provider> {
+
+}
+
+pub struct DockerDaemonFoundation {
     config: Arc<FoundationConfig>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
     status_tx: tokio::sync::watch::Sender<Status>,
 }
 
-impl Foundation {
+impl DockerDaemonFoundation {
     pub fn new(config: FoundationConfig) -> Self {
         let (status_tx, status) = tokio::sync::watch::channel(Status::default());
         let status = Arc::new(status);
@@ -66,8 +70,15 @@ impl Foundation {
 }
 
 #[async_trait]
-impl foundation::Foundation for Foundation {
+impl Foundation for DockerDaemonFoundation { }
+
+#[async_trait]
+impl foundation::Foundation for DockerDaemonFoundation {
     type Config = Arc<FoundationConfig>;
+    type Types = dyn FoundationTypeTraits<Dependency=dyn Dependency<Config=Box<dyn DependencyConfig<ProviderConfig=dyn ProviderConfig>>,Provider:dyn Provider<Config=dyn ProviderConfig>>, Provider=dyn Provider<Config=dyn ProviderConfig>>;
+
+    type Dependency = default::Dependency;
+    type Provider = default::Provider;
 
     fn kind(&self) -> FoundationKind {
         FoundationKind::DockerDaemon
@@ -109,12 +120,18 @@ impl foundation::Foundation for Foundation {
     }
 }
 
+
+pub trait Dependency: foundation::Dependency {
+
+}
+
+
 //#[derive(Clone, Serialize, Deserialize, Name)]
 #[derive(Clone,  Name)]
 pub struct FoundationConfig {
     pub kind: FoundationKind,
     pub registry: RegistryProviderConfig,
-    pub dependencies: ConfigMap<DependencyKind, Arc<dyn DependencyConfig>>,
+    pub dependencies: ConfigMap<DependencyKind, default::DependencyConfig>
 }
 
 impl FoundationConfig {
@@ -158,11 +175,15 @@ impl FoundationConfig {
 }
 
 pub trait DependencyConfig: config::DependencyConfig {
+    type ProviderConfig: config::ProviderConfig;
+
     fn image(&self) -> String;
 }
 
+pub trait ProviderConfig: config::ProviderConfig { }
+
 impl config::FoundationConfig for FoundationConfig {
-    type DependencyConfig = Arc<dyn DependencyConfig>;
+    type DependencyConfig = default::DependencyConfig;
 
     fn kind(&self) -> FoundationKind {
         self.kind.clone()
@@ -196,6 +217,40 @@ impl IntoSer for FoundationConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RegistryProviderConfig {
     provider: ProviderKind,
+}
+
+pub mod default {
+    use std::sync::Arc;
+    use crate::hyperspace::foundation;
+    use crate::hyperspace::foundation::kind::IKind;
+
+    pub type FoundationConfig = Arc<super::FoundationConfig>;
+    pub type DependencyConfig = Arc<dyn super::DependencyConfig<ProviderConfig = ProviderConfig>>;
+
+    pub type ProviderConfig = Arc<dyn super::ProviderConfig>;
+
+    pub type Dependency = Box<dyn super::Dependency<Config=DependencyConfig, Provider=Provider>>;
+    pub type Provider = Box<dyn foundation::Provider<Config=ProviderConfig>>;
+
+    /// the defaults are the most concrete implementation of the main traits,
+    /// the [`traits`] mod implements the best trait implementation for this foundation suite
+    pub mod traits {
+        use crate::hyperspace::foundation::{EasyFoundationTypeTraits, FoundationTypeTraits};
+        use super::super as foundation;
+
+        pub type FoundationConfig = foundation::FoundationConfig;
+        pub type DependencyConfig = dyn foundation::DependencyConfig<ProviderConfig=ProviderConfig>;
+
+        pub type ProviderConfig= dyn foundation::ProviderConfig;
+
+        pub type Types =dyn FoundationTypeTraits<Dependency=Dependency,Provider=Provider>;
+        pub type Foundation<D,P> = dyn foundation::Foundation<Config=FoundationConfig,Types=Types,Dependency=D,Provider=P>;
+        pub type Dependency = dyn foundation::Dependency<Config=DependencyConfig, Provider=Provider>;
+        pub type Provider = Box<dyn foundation::Provider<Config=ProviderConfig>>;
+
+
+
+    }
 }
 
 
