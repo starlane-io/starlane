@@ -1436,5 +1436,6 @@ impl ToString for Loc {
     }
 }
 
-use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind};
+use crate::base::foundation::kind::FoundationKind;
 pub use starlane_primitive_macros::logger;
+use crate::base::kind::DependencyKind;

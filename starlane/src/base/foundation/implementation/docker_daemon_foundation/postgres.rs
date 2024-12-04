@@ -1,17 +1,16 @@
-use crate::hyperspace::foundation::dependency::core::docker::DockerProviderCoreConfig;
-use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
-use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::implementation::docker_daemon_foundation;
-use crate::hyperspace::foundation::implementation::docker_daemon_foundation::DockerDaemonFoundation;
-use crate::hyperspace::foundation::kind::{DependencyKind, Kind, ProviderKind};
-use crate::hyperspace::foundation::util::{ IntoSer, Map, SerMap};
-use crate::hyperspace::foundation::{config, LiveService, Provider};
-use crate::space::parse::{CamelCase, DbCase, VarCase};
+use crate::base::common::postgres::PostgresClusterCoreConfig;
+use crate::base::foundation::err::FoundationErr;
+use crate::base::foundation::implementation::docker_daemon_foundation;
+use crate::base::foundation::util::{IntoSer, Map, SerMap};
+use crate::base::foundation::Provider;
+use crate::space::parse::{CamelCase, DbCase};
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::str::FromStr;
-use std::sync::Arc;
+use crate::base;
+use crate::base::kind::{DependencyKind, Kind, ProviderKind};
+use crate::base::foundation::config;
 
 fn default_schema() -> DbCase {
     DbCase::from_str("PUBLIC").unwrap()
@@ -54,23 +53,30 @@ impl Deref for PostgresDependencyConfig {
     }
 }
 
+pub trait ProviderConfig: base::config::ProviderConfig {
+
+}
 
 
-impl config::DependencyConfig for PostgresDependencyConfig {
-    type ProviderConfig = config::default::ProviderConfig;
+impl base::config::DependencyConfig for PostgresDependencyConfig {
+    type ProviderConfig = ;
 
     fn kind(&self) -> &DependencyKind {
-        &DependencyKind::PostgresCluster
+        todo!()
     }
+
+    fn require(&self) -> Vec<Kind> {
+        todo!()
+    }
+}
+
+impl config::DependencyConfig for PostgresDependencyConfig where Self::ProviderConfig:  PostgresDependencyConfig
+
+  pub type Depe=PostgresDependencyConfig;
 
     fn volumes(&self) -> HashMap<String, String> {
         self.postgres.volumes()
     }
-
-    fn require(&self) -> Vec<Kind> {
-        self.postgres.require()
-    }
-
 
 }
 

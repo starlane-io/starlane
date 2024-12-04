@@ -1,12 +1,11 @@
-use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, IKind, ProviderKind};
-use crate::space::err::{ParseErrs, ToSpaceErr};
-use ascii::AsciiChar::k;
-use derive_name::{Name, Named};
-use serde::{de, Deserialize, Serialize};
+use crate::base::foundation::kind::FoundationKind;
+use crate::space::err::ParseErrs;
+use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use thiserror::Error;
+use crate::base::kind::{DependencyKind, IKind, ProviderKind};
 
 pub struct Call;
 

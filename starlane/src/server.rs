@@ -20,8 +20,8 @@ use std::sync::Arc;
 use crate::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
 use crate::hyperspace::driver::space::SpaceDriverFactory;
 use crate::hyperspace::err::HypErr;
-use crate::hyperspace::foundation::settings::ProtoFoundationSettings;
-use crate::hyperspace::foundation::Foundation;
+use crate::base::foundation::settings::ProtoFoundationSettings;
+use crate::base::foundation::Foundation;
 use crate::hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
 use crate::hyperspace::hyperlane::{
     AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper,

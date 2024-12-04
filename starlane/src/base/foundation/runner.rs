@@ -1,9 +1,8 @@
-use crate::hyperspace::foundation::config::{Config, DependencyConfig, FoundationConfig, ProviderConfig};
-use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, Kind, ProviderKind};
-use crate::hyperspace::foundation::status::{Phase, Status, StatusDetail};
-use crate::hyperspace::foundation::util::SerMap;
-use crate::hyperspace::foundation::{config, Dependency, Foundation, FoundationTypeTraits, LiveService, Provider};
+use crate::base::foundation::err::FoundationErr;
+use crate::base::foundation::kind::FoundationKind;
+use crate::base::foundation::status::{Phase, PhaseDetail, Status};
+use crate::base::foundation::util::SerMap;
+use crate::base::foundation::{config, Dependency, Foundation, LiveService, Provider};
 use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
 use crate::space::point::Point;
@@ -15,7 +14,10 @@ use std::sync::Arc;
 use md5::digest::FixedOutput;
 use tokio::sync::watch::Receiver;
 use wasmer_wasix::virtual_fs::Upcastable;
-use crate::hyperspace::foundation;
+use crate::base;
+use crate::base::config::{Config, DependencyConfig, FoundationConfig, ProviderConfig};
+use crate::base::foundation;
+use crate::base::kind::{DependencyKind, Kind, ProviderKind};
 
 enum Call<F> where F: Foundation {
     Synchronize {
@@ -38,14 +40,14 @@ enum Call<F> where F: Foundation {
 
 struct FoundationTx<F> where F: Foundation {
     phantom: PhantomData<F>,
-    config: config::default::FoundationConfig,
+    config: base::config::default::FoundationConfig,
     call_tx: tokio::sync::mpsc::Sender<Call<F>>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
 impl <F> FoundationTx<F> where F: Foundation{
     fn new(
-        config: config::default::FoundationConfig,
+        config: base::config::default::FoundationConfig,
         call_tx: tokio::sync::mpsc::Sender<Call<F>>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
     ) -> Self {
@@ -61,9 +63,9 @@ impl <F> FoundationTx<F> where F: Foundation{
 #[async_trait]
 impl <F> Foundation for FoundationTx<F> where F: Foundation {
     type Config = F::Config;
-    type Types = F::Types;
-    type Dependency = Box<F::Types::Dependency>;
-    type Provider = Box<F::Types::Provider>;
+    type Traits = F::Traits;
+    type Dependency = Box<F::Traits::Dependency>;
+    type Provider = Box<F::Traits::Provider>;
 
     fn kind(&self) -> FoundationKind {
         self.config.kind().clone()
@@ -118,8 +120,8 @@ impl <F> Foundation for FoundationTx<F> where F: Foundation {
     }
 }
 
-type DepWrapper<D: Dependency> = Wrapper<DependencyKind, DepCall<D>>;
-type ProvWrapper<P: Provider> = Wrapper<ProviderKind, ProviderCall<P>>;
+type DepWrapper<D> = Wrapper<DependencyKind, DepCall<D>>;
+type ProvWrapper<P> = Wrapper<ProviderKind, ProviderCall<P>>;
 
 struct Wrapper<K, C> {
     kind: K,

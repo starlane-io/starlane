@@ -1,19 +1,15 @@
-use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::util::IntoSer;
-use crate::hyperspace::foundation::{Dependency, Foundation};
-use crate::space::parse::util::{new_span, result};
-use crate::space::parse::{camel_case, CamelCase};
 use derive_name::Name;
-use nom::bytes::complete::tag;
-use nom::sequence::tuple;
-use nom_supreme::final_parser::final_parser;
-use nom_supreme::parser_ext::FromStrParser;
-use serde::{Deserialize, Deserializer, Serialize};
-use serde_with_macros::DeserializeFromStr;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use thiserror::__private::AsDisplay;
+use nom::sequence::tuple;
+use nom::bytes::complete::tag;
+use serde_with_macros::DeserializeFromStr;
+use crate::base::foundation::err::FoundationErr;
+use crate::base::foundation::kind::FoundationKind;
+use crate::space::parse::{camel_case, CamelCase};
+use crate::space::parse::util::{new_span, result};
 
 pub const FOUNDATION: &'static str = "config";
 pub const DEPENDENCY: &'static str = "core";
@@ -47,32 +43,6 @@ impl IKind for Kind {
         }
     }
 }
-
-#[derive(
-    Name,
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    strum_macros::Display,
-    strum_macros::EnumString,
-    strum_macros::EnumIter,
-    strum_macros::IntoStaticStr,
-    Serialize,
-    Deserialize,
-)]
-pub enum FoundationKind {
-    DockerDaemon,
-}
-
-impl Default for FoundationKind {
-    fn default() -> Self {
-        Self::DockerDaemon
-    }
-}
-
-//pub type FoundationParser = fn(&Value) -> Result<dyn Foundation, FoundationErr>;
 
 impl IKind for FoundationKind {
     fn category(&self) -> &'static str {
@@ -221,8 +191,8 @@ where
 
 #[cfg(test)]
 pub mod test {
-    use crate::hyperspace::foundation::kind::{DependencyKind, IKind, Kind};
     use serde::Serialize;
+    use crate::base::kind::{DependencyKind, IKind, Kind};
 
     #[test]
     pub fn test() {

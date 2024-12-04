@@ -4,7 +4,7 @@ use crate::env::{
     config, config_path, config_save, context, context_dir, Enviro, GlobalMode, StdEnviro,
     STARLANE_GLOBAL_SETTINGS, STARLANE_HOME,
 };
-use starlane::hyperspace::foundation::Foundation;
+use starlane::base::foundation::Foundation;
 use crate::hyperspace::reg::PgRegistryConfig;
 <<<<<<< Updated upstream
 use crate::hyperspace::registry::postgres::embed::PgEmbedSettings;
@@ -39,7 +39,7 @@ use std::time::Duration;
 use std::{io, thread};
 use text_to_ascii_art::to_art;
 use textwrap::Options;
-use starlane::hyperspace::foundation::implementation::docker_daemon_foundation::DockerDaemonFoundation;
+use starlane::base::foundation::implementation::docker_daemon_foundation::DockerDaemonFoundation;
 
 #[tokio::main]
 pub async fn install(edit: bool) -> Result<(), anyhow::Error> {

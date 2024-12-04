@@ -1,2 +1,2 @@
-pub mod docker;
 pub mod postgres;
+pub mod docker;

@@ -1,19 +1,16 @@
-use crate::hyperspace::foundation;
-use crate::hyperspace::foundation::config;
-use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::implementation::docker_daemon_foundation;
-use crate::hyperspace::foundation::kind::{DependencyKind, Kind, PostgresKind, ProviderKind};
-use crate::hyperspace::foundation::util::{IntoSer, Map, SerMap};
-use crate::hyperspace::foundation::Dependency;
+use crate::base::foundation;
+use crate::base::foundation::err::FoundationErr;
+use crate::base::foundation::util::{IntoSer, Map, SerMap};
+use crate::base::foundation::Dependency;
 use crate::space::parse::CamelCase;
 use derive_name::Name;
 use futures::TryFutureExt;
-use md5::digest::DynDigest;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
-use nom_supreme::ParserExt;
+use crate::base;
+use crate::base::kind::{DependencyKind, Kind, PostgresKind, ProviderKind};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PostgresClusterCoreConfig {
@@ -69,9 +66,9 @@ impl PostgresClusterCoreConfig {
     }
 }
 
-pub trait DependencyConfig: config::DependencyConfig {}
+pub trait DependencyConfig: base::config::DependencyConfig {}
 
-impl config::DependencyConfig for PostgresClusterCoreConfig {
+impl base::config::DependencyConfig for PostgresClusterCoreConfig {
     fn kind(&self) -> &DependencyKind {
         &DependencyKind::PostgresCluster
     }
@@ -86,9 +83,11 @@ impl config::DependencyConfig for PostgresClusterCoreConfig {
         foundation::default_requirements()
     }
 
-    fn clone_me(&self) -> Arc<dyn config::DependencyConfig> {
+    fn clone_me(&self) -> Arc<dyn base::config::DependencyConfig> {
         Arc::new(self.clone())
     }
+
+    type ProviderConfig = ();
 }
 
 impl IntoSer for PostgresClusterCoreConfig {
@@ -98,7 +97,7 @@ impl IntoSer for PostgresClusterCoreConfig {
     }
 }
 
-impl config::ProviderConfigSrc for PostgresClusterCoreConfig {
+impl base::config::ProviderConfigSrc for PostgresClusterCoreConfig {
     type Config = Arc<ProviderConfig>;
     fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, FoundationErr> {
         Ok(self.providers.clone())
@@ -150,12 +149,12 @@ impl IntoSer for ProviderConfig {
     }
 }
 
-impl config::ProviderConfig for ProviderConfig {
+impl base::config::ProviderConfig for ProviderConfig {
     fn kind(&self) -> &ProviderKind {
         todo!()
     }
 
-    fn clone_me(&self) -> Arc<dyn config::ProviderConfig> {
+    fn clone_me(&self) -> Arc<dyn base::config::ProviderConfig> {
         Arc::new(self.clone())
     }
 }

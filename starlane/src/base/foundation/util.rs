@@ -1,21 +1,19 @@
-use crate::hyperspace::foundation::config::ConfigMap;
-use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::kind::{FoundationKind, IKind};
+use crate::base::config::ConfigMap;
+use crate::base::foundation::err::FoundationErr;
+use crate::base::foundation::kind::FoundationKind;
 use bincode::Options;
 use derive_name::Name;
-use md5::digest::typenum::op;
 use serde::de::{DeserializeOwned, MapAccess, Visitor};
 use serde::ser::{Error, SerializeMap};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::SerializeAs;
-use serde_with_macros::serde_as;
 use serde_yaml::{Mapping, Sequence, Value};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter, Write};
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
+use crate::base::kind::IKind;
 
 pub trait SubText {}
 
@@ -384,11 +382,8 @@ pub mod test {
     use serde::{Deserialize, Serialize};
     use std::fmt::Debug;
     use std::sync::Arc;
-    use ascii::AsciiChar::o;
     use derive_name::{Name, Named};
     use downcast_rs::{impl_downcast, Downcast, DowncastSync};
-    use crate::hyperspace::foundation::err::FoundationErr;
-
     #[test]
     pub fn test_serde_factory() -> anyhow::Result<()> {
         #[typetag::serde(tag = "kind")]

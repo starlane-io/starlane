@@ -1,14 +1,13 @@
-use crate::hyperspace::foundation::config;
-use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
-use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::implementation::docker_daemon_foundation;
-use crate::hyperspace::foundation::kind::{DependencyKind, Kind, ProviderKind};
-use crate::hyperspace::foundation::util::{IntoSer, Map, SerMap};
+use crate::base::foundation::err::FoundationErr;
+use crate::base::foundation::implementation::docker_daemon_foundation;
+use crate::base::foundation::util::{IntoSer, Map, SerMap};
 use crate::space::parse::CamelCase;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use crate::base;
+use crate::base::kind::{DependencyKind, Kind, ProviderKind};
 
 static REQUIRED: Lazy<Vec<Kind>> = Lazy::new(|| {
     let mut rtn = vec![];
@@ -45,7 +44,7 @@ impl docker_daemon_foundation::DependencyConfig for DockerDaemonCoreDependencyCo
     }
 }
 
-impl config::DependencyConfig for DockerDaemonCoreDependencyConfig {
+impl base::config::DependencyConfig for DockerDaemonCoreDependencyConfig {
     fn kind(&self) -> &DependencyKind {
         &DependencyKind::DockerDaemon
     }
@@ -68,7 +67,7 @@ impl IntoSer for DockerDaemonCoreDependencyConfig {
     }
 }
 
-impl config::ProviderConfigSrc for DockerDaemonCoreDependencyConfig {
+impl base::config::ProviderConfigSrc for DockerDaemonCoreDependencyConfig {
     type Config = Arc<DockerProviderCoreConfig>;
 
     fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, FoundationErr> {
@@ -135,18 +134,18 @@ impl DockerProviderCoreConfig {
     }
 }
 
-pub trait ProviderConfig: config::ProviderConfig {
+pub trait ProviderConfig: base::config::ProviderConfig {
     fn image(&self) -> String;
 
     fn expose(&self) -> HashMap<u16, u16>;
 }
 
-impl config::ProviderConfig for DockerProviderCoreConfig {
+impl base::config::ProviderConfig for DockerProviderCoreConfig {
     fn kind(&self) -> &ProviderKind {
         &self.kind
     }
 
-    fn clone_me(&self) -> Arc<dyn config::ProviderConfig> {
+    fn clone_me(&self) -> Arc<dyn base::config::ProviderConfig> {
         Arc::new(self.clone())
     }
 }

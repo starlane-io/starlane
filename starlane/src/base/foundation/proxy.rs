@@ -1,12 +1,14 @@
 use std::ops::Deref;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
-use crate::hyperspace::foundation;
-use crate::hyperspace::foundation::config::{Config, ProviderConfig};
-use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind};
-use crate::hyperspace::foundation::proxy::sealed::ProxySealed;
-use crate::hyperspace::foundation::status::Status;
+use crate::base::config::Config;
+use crate::base::foundation;
+use crate::base::config::ProviderConfig;
+use crate::base::foundation::err::FoundationErr;
+use crate::base::foundation::kind::FoundationKind;
+use crate::base::foundation::proxy::sealed::ProxySealed;
+use crate::base::foundation::status::Status;
+use crate::base::kind::DependencyKind;
 use crate::hyperspace::reg::Registry;
 use crate::space::progress::Progress;
 
@@ -67,7 +69,7 @@ impl <F> foundation::Foundation for Foundation<F> where F: foundation::Foundatio
 
 
 
-pub(super) mod sealed {
+pub(crate) mod sealed {
     pub trait ProxySealed<T> {
         fn get(&self) -> &T;
     }

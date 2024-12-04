@@ -62,6 +62,7 @@ ctrlc = {workspace = true}
 bincode = {workspace = true}
 strum =  {workspace = true}
 strum_macros = {workspace = true}
+remote-trait-object = { workspace = true }
 wasmer = {workspace = true}
 wasmer-compiler-singlepass = {workspace = true}
 wasmer-wasix = {workspace = true}

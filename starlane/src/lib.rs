@@ -26,6 +26,9 @@ pub mod env;
 #[cfg(feature = "server")]
 pub mod server;
 
+pub mod base;
+
+
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
 

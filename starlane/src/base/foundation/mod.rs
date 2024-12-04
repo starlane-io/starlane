@@ -1,5 +1,4 @@
-use crate::hyperspace::foundation::config::{DependencyConfig, FoundationConfig};
-use crate::hyperspace::foundation::err::{ActionRequest, FoundationErr};
+use crate::base::foundation::err::FoundationErr;
 /// # FOUNDATION
 ///
 /// A ['Foundation'] provides abstracted control over the services and dependencies that drive Starlane.
@@ -20,18 +19,16 @@ use crate::hyperspace::foundation::err::{ActionRequest, FoundationErr};
 /// ## PROVIDER
 /// A [`Dependency`] has a one to many child concept called a [`Provider`] (poorly named!)  Not all Dependencies
 /// have a Provider.  A Provider is something of an instance of a given Dependency.... For example:
-/// The Postgres Cluster [`DependencyKind::PostgresCluster`]  (talking the actual postgresql software which can serve multiple databases)
-/// The Postgres Dependency may have multiple Databases ([`ProviderKind::Database`]).  The provider
+/// The Postgres Cluster [`crate::base::kind::DependencyKind::PostgresCluster`]  (talking the actual postgresql software which can serve multiple databases)
+/// The Postgres Dependency may have multiple Databases ([`crate::base::kind::ProviderKind::Database`]).  The provider
 /// utilizes a common Dependency to provide a specific service etc.
 ///
 /// ## THE REGISTRY
 /// There is one special core that the Foundation must manage which is the [`Foundation::registry`]
 /// the Starlane Registry is the only required core from the vanilla Starlane installation
-use crate::hyperspace::foundation::kind::{
-    DependencyKind, FoundationKind, IKind, Kind, ProviderKind,
-};
-use crate::hyperspace::foundation::status::{Phase, Status, StatusDetail};
-use crate::hyperspace::foundation::util::CreateProxy;
+use crate::base::foundation::kind::FoundationKind;
+use crate::base::foundation::status::{Phase, Status};
+use crate::base::foundation::util::CreateProxy;
 use crate::hyperspace::platform::PlatformConfig;
 use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
@@ -47,11 +44,39 @@ use serde_yaml::Value;
 use std::fmt::{Debug, Display};
 use std::future::Future;
 use std::hash::Hash;
-use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
+use crate::base;
+/// # FOUNDATION
+///
+/// A ['Foundation'] provides abstracted control over the services and dependencies that drive Starlane.
+/// Presently there is only the ['DockerDaemonFoundation'] which uses a local Docker Service
+/// to pull dependent Docker Images, run docker instances and in general enables the Starlane [`Platform`]
+/// manage the lifecycle of arbitrary services.
+///
+/// There are two sub concepts that ['Foundation'] provides: ['Dependency'] and  ['Provider'].
+/// The [`FoundationConfig`] enumerates dependencies which are typically things that don't ship
+/// with the Starlane binary.  Common examples are: Postgres, Keycloak, Docker.  Each config
+/// core must know how to ready that Dependency and potentially even launch an
+/// instance of that Dependency.  For Example: Postgres Database is a common core especially
+/// because the default Starlane [`Registry`] (and at the time of this writing the only Registry support).
+/// The Postgres [`Dependency`] ensures that Postgres is accessible and properly configured for the
+/// Starlane Platform.
+///
+///
+/// ## PROVIDER
+/// A [`Dependency`] has a one to many child concept called a [`Provider`] (poorly named!)  Not all Dependencies
+/// have a Provider.  A Provider is something of an instance of a given Dependency.... For example:
+/// The Postgres Cluster [`crate::base::kind::DependencyKind::PostgresCluster`]  (talking the actual postgresql software which can serve multiple databases)
+/// The Postgres Dependency may have multiple Databases ([`crate::base::kind::ProviderKind::Database`]).  The provider
+/// utilizes a common Dependency to provide a specific service etc.
+///
+/// ## THE REGISTRY
+/// There is one special core that the Foundation must manage which is the [`Foundation::registry`]
+/// the Starlane Registry is the only required core from the vanilla Starlane installation
+use crate::base::kind::{DependencyKind, IKind, Kind, ProviderKind};
 
 pub mod proxy;
 
@@ -67,7 +92,6 @@ pub mod implementation;
 
 pub mod util;
 
-pub mod dependency;
 pub mod status;
 
 static REQUIRED: Lazy<Vec<Kind>> = Lazy::new(|| vec![]);
@@ -76,14 +100,26 @@ pub fn default_requirements() -> Vec<Kind> {
     REQUIRED.clone()
 }
 
+pub trait Types {
+    type Foundation;
+
+    type Dependency;
+
+    type Provider;
+}
+
+
 /// ['Foundation'] is an abstraction for managing infrastructure.
 #[async_trait]
 pub trait Foundation: Downcast + Sync + Send {
-    type Config: FoundationConfig + Clone;
-    type Types: FoundationTypeTraits;
 
+    /// [`Foundation::Config`] should be a `concrete` implementation of [`base::config::FoundationConfig`]
+    type Config: base::config::FoundationConfig + Clone;
+
+    /// [`Foundation::Dependency`] Should be [`Dependency`] or a custom `trait` that implements [`Dependency`] ... it should not be a concrete implementation
     type Dependency: Dependency;
 
+    /// [`Foundation::Provider`] Should be [`Provider`] or a custom `trait` that implements [`Provider`] ... it should not be a concrete implementation
     type Provider: Provider;
 
     fn kind(&self) -> FoundationKind;
@@ -110,54 +146,7 @@ pub trait Foundation: Downcast + Sync + Send {
     fn registry(&self) -> Result<Registry, FoundationErr>;
 }
 
-/// [`FoundationTypeTraits`] should reference the best trait fit for [`Foundation`] types.
-/// whereas the implementing Foundation may map its types to concrete structs or enums--
-/// [`FoundationTypeTraits`] should only ever constrain to a trait. [`FoundationTypeTraits`]
-/// is used by [`runner::FoundationProxy`] in order to create workable proxies for [`Dependency`]
-/// and [`Provider`].  Notice that [`Foundation::Config`] is NOT included... this is because
-/// configs are static and the [`runner::FoundationProxy`] should always
-pub trait FoundationTypeTraits {
-    type Dependency: Dependency;
-
-    type Provider: Provider;
-}
-
-#[derive(Default)]
-pub struct FoundationTypes<F> where F: Foundation {
-    phantom: PhantomData<F>
-}
-
-/*
-impl <F> FoundationTypeTraits for FoundationTypes<F> where F: Foundation, Self::Dependency: F::Dependency{
-
-}
-
- */
-
-
-
-
-/// call [`EasyFoundationTypeTraits::default`]
-/// ```
-/// use starlane::hyperspace::foundation::{implementation, Dependency, EasyFoundationTypeTraits, Foundation, Provider};
-/// use implementation::docker_daemon_foundation as foundation;
-///
-/// let easy : EasyFoundationTypeTraits<foundation::DockerDaemonFoundation,foundation::Dependency,foundation::Provider> = EasyFoundationTypeTraits::default();///
-#[derive(Default)]
-pub struct EasyFoundationTypeTraits<F, D, P>(PhantomData<F>, PhantomData<D>, PhantomData<P>)
-where
-    F: Foundation,
-    D: Dependency<Config = F::Dependency::Config, Provider = P>,
-    P: Provider<Config = F::Dependency::Config>;
-
-
-
-
-
-
-//pub type FoundationTypeTraitsCheat<D:Dependency<Provider=P>,P> = dyn FoundationTypeTraits<Dependency=D, Provider=P>;
-
-impl_downcast!(Foundation assoc Config);
+impl_downcast!(Foundation assoc Config, Dependency, Provider);
 
 /// A [`Dependency`] is an add-on to the [`Foundation`] infrastructure which may need to be
 /// downloaded, installed, initialized and started.
@@ -167,7 +156,7 @@ impl_downcast!(Foundation assoc Config);
 /// start the service whereas a Provider in this example would represent an individual Database
 #[async_trait]
 pub trait Dependency: Downcast + Send + Sync {
-    type Config: config::DependencyConfig + Clone;
+    type Config: base::config::DependencyConfig + Clone;
 
     type Provider: Provider;
 
@@ -179,7 +168,7 @@ pub trait Dependency: Downcast + Send + Sync {
 
     fn status_watcher(&self) -> Arc<tokio::sync::watch::Receiver<Status>>;
 
-    /// perform any downloads for the Dependency
+       /// perform any downloads for the Dependency
     async fn download(&self, progress: Progress) -> Result<(), FoundationErr>;
 
     /// install the dependency
@@ -198,13 +187,13 @@ pub trait Dependency: Downcast + Send + Sync {
     fn provider(&self, kind: &ProviderKind) -> Result<Option<Self::Provider>, FoundationErr>;
 }
 
-impl_downcast!(Dependency assoc Config);
+impl_downcast!(Dependency assoc Config, Provider);
 
 /// A [`Provider`] is an 'instance' of this dependency... For example a Postgres Dependency
 /// Installs
 #[async_trait]
 pub trait Provider: Downcast + Send + Sync {
-    type Config: config::ProviderConfig + Clone;
+    type Config: base::config::ProviderConfig + Clone;
 
     fn kind(&self) -> &ProviderKind;
 
@@ -256,7 +245,7 @@ pub(crate) struct FoundationSafety<F>
 where
     F: Foundation,
 {
-    foundation: Box<dyn F>,
+    foundation: Box<F>,
 }
 
 #[async_trait]
@@ -265,7 +254,6 @@ where
     F: Foundation,
 {
     type Config = F::Config;
-
     type Dependency = F::Dependency;
 
     type Provider = F::Provider;
@@ -325,13 +313,13 @@ where
 }
 
 pub mod default {
-    use crate::hyperspace::foundation::config;
-    pub type Provider = Box<dyn super::Provider<Config = config::default::ProviderConfig>>;
+    use crate::base;
+    pub type Provider = Box<dyn super::Provider<Config =base::config::default::ProviderConfig>>;
     pub type Dependency =
-        Box<dyn super::Dependency<Config = config::default::DependencyConfig, Provider = Provider>>;
+        Box<dyn super::Dependency<Config =base::config::default::DependencyConfig, Provider = Provider>>;
     pub type Foundation = Box<
         dyn super::Foundation<
-            Config = config::default::FoundationConfig,
+            Config =base::config::default::FoundationConfig,
             Dependency = Dependency,
             Provider = Provider,
         >,

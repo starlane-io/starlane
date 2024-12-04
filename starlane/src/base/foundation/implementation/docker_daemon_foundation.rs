@@ -1,14 +1,9 @@
-use crate::hyperspace::foundation;
-use crate::hyperspace::foundation::config::{ConfigMap};
-use crate::hyperspace::foundation::dependency::core::docker::DockerDaemonCoreDependencyConfig;
-use crate::hyperspace::foundation::dependency::core::postgres::PostgresClusterCoreConfig;
-use crate::hyperspace::foundation::err::FoundationErr;
-use crate::hyperspace::foundation::kind::{
-    DependencyKind, FoundationKind, IKind, Kind, ProviderKind,
-};
-use crate::hyperspace::foundation::status::Status;
-use crate::hyperspace::foundation::util::{ IntoSer, Map, SerMap};
-use crate::hyperspace::foundation::{config, FoundationTypeTraits, Provider};
+use crate::base::foundation;
+use crate::base::foundation::err::FoundationErr;
+use crate::base::foundation::kind::FoundationKind;
+use crate::base::foundation::status::Status;
+use crate::base::foundation::util::{IntoSer, SerMap};
+use crate::base::foundation::Provider;
 use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
 use crate::space::progress::Progress;
@@ -22,8 +17,14 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
+use crate::base;
+use crate::base::kind::{DependencyKind, IKind, Kind, ProviderKind};
 
 pub mod dependency;
+/// docker daemon support is supplied through the docker core dependency... there is no need
+/// for customizing docker configurations and behavior beyond that...
+//pub mod docker;
+pub mod postgres;
 
 /// the REQUIRED
 static REQUIRED: Lazy<Vec<Kind>> = Lazy::new(|| {
@@ -46,7 +47,7 @@ pub fn default_requirements() -> Vec<Kind> {
     REQUIRED.clone()
 }
 
-pub trait Foundation: foundation::Foundation<Config=FoundationConfig,Dependency:dyn Dependency,Provider: dyn Provider> {
+pub trait Foundation: foundation::Foundation<Config=FoundationConfig,Dependency:Dependency,Provider:Provider> {
 
 }
 
@@ -75,7 +76,6 @@ impl Foundation for DockerDaemonFoundation { }
 #[async_trait]
 impl foundation::Foundation for DockerDaemonFoundation {
     type Config = Arc<FoundationConfig>;
-    type Types = dyn FoundationTypeTraits<Dependency=dyn Dependency<Config=Box<dyn DependencyConfig<ProviderConfig=dyn ProviderConfig>>,Provider:dyn Provider<Config=dyn ProviderConfig>>, Provider=dyn Provider<Config=dyn ProviderConfig>>;
 
     type Dependency = default::Dependency;
     type Provider = default::Provider;
@@ -111,7 +111,7 @@ impl foundation::Foundation for DockerDaemonFoundation {
     fn dependency(
         &self,
         kind: &DependencyKind,
-    ) -> Result<Option<Box<dyn Dependency>>, FoundationErr> {
+    ) -> Result<Option<Self::Dependency>, FoundationErr> {
         todo!()
     }
 
@@ -131,58 +131,19 @@ pub trait Dependency: foundation::Dependency {
 pub struct FoundationConfig {
     pub kind: FoundationKind,
     pub registry: RegistryProviderConfig,
-    pub dependencies: ConfigMap<DependencyKind, default::DependencyConfig>
+    pub dependencies: HashMap<DependencyKind, default::DependencyConfig>
 }
 
-impl FoundationConfig {
-    /*
-    pub(self) fn des_from_map(map: impl SerMap) -> Result<Self, FoundationErr> {
-            let map = map.to_map()?;
-            let kind = map.kind()?;
 
-            let registry = map.from_field("registry")?;
-
-            let dependencies: Map  = map.from_field_opt("dependencies")?.unwrap_or_else(|| Default::default());
-            let dependencies = dependencies.to_config_map(Self::des_dependency_factory)?;
-
-            Ok(Self {
-                kind,
-                registry,
-                dependencies,
-            })
-        }
-
-
-     pub(self) fn des_dependency_factory(dependency: impl SerMap) -> Result<Arc<dyn DependencyConfig>, FoundationErr> {
-         let map = dependency.to_map()?;
-         let kind: DependencyKind = map.kind()?;
-
-         match kind {
-             DependencyKind::PostgresCluster => PostgresClusterCoreConfig::create_as_trait(map),
-             DependencyKind::DockerDaemon => DockerDaemonCoreDependencyConfig::create_as_trait(map),
-         }
-     }
-
-     pub(self) fn ser_dependencies(dependencies: HashMap<DependencyKind, Arc<impl DependencyConfig+SerMap>>)  -> Result<serde_yaml::Value,FoundationErr> {
-         let mut sequence = serde_yaml::Sequence::new();
-         for (_,item) in dependencies.into_iter() {
-             sequence.push( (*item).clone().to_value()?);
-         }
-         sequence.to_value()
-     }
-
-      */
-}
-
-pub trait DependencyConfig: config::DependencyConfig {
-    type ProviderConfig: config::ProviderConfig;
+pub trait DependencyConfig: base::config::DependencyConfig {
+    type ProviderConfig: base::config::ProviderConfig;
 
     fn image(&self) -> String;
 }
 
-pub trait ProviderConfig: config::ProviderConfig { }
+pub trait ProviderConfig: base::config::ProviderConfig { }
 
-impl config::FoundationConfig for FoundationConfig {
+impl base::config::FoundationConfig for FoundationConfig {
     type DependencyConfig = default::DependencyConfig;
 
     fn kind(&self) -> FoundationKind {
@@ -221,8 +182,8 @@ pub struct RegistryProviderConfig {
 
 pub mod default {
     use std::sync::Arc;
-    use crate::hyperspace::foundation;
-    use crate::hyperspace::foundation::kind::IKind;
+    use crate::base::foundation;
+    use crate::base::kind::IKind;
 
     pub type FoundationConfig = Arc<super::FoundationConfig>;
     pub type DependencyConfig = Arc<dyn super::DependencyConfig<ProviderConfig = ProviderConfig>>;
@@ -235,21 +196,17 @@ pub mod default {
     /// the defaults are the most concrete implementation of the main traits,
     /// the [`traits`] mod implements the best trait implementation for this foundation suite
     pub mod traits {
-        use crate::hyperspace::foundation::{EasyFoundationTypeTraits, FoundationTypeTraits};
-        use super::super as foundation;
+        use crate::base::foundation;
+        use crate::base::config;
 
-        pub type FoundationConfig = foundation::FoundationConfig;
-        pub type DependencyConfig = dyn foundation::DependencyConfig<ProviderConfig=ProviderConfig>;
+        pub type FoundationConfig = dyn config::FoundationConfig<DependencyConfig=DependencyConfig>;
+        pub type DependencyConfig = dyn config::DependencyConfig<ProviderConfig=ProviderConfig>;
 
-        pub type ProviderConfig= dyn foundation::ProviderConfig;
+        pub type ProviderConfig= dyn config::ProviderConfig;
 
-        pub type Types =dyn FoundationTypeTraits<Dependency=Dependency,Provider=Provider>;
-        pub type Foundation<D,P> = dyn foundation::Foundation<Config=FoundationConfig,Types=Types,Dependency=D,Provider=P>;
+        pub type Foundation<D,P> = dyn foundation::Foundation<Config=FoundationConfig, Dependency=D,Provider=P>;
         pub type Dependency = dyn foundation::Dependency<Config=DependencyConfig, Provider=Provider>;
         pub type Provider = Box<dyn foundation::Provider<Config=ProviderConfig>>;
-
-
-
     }
 }
 
@@ -257,8 +214,7 @@ pub mod default {
 
 #[cfg(test)]
 pub mod test {
-    use crate::hyperspace::foundation::err::FoundationErr;
-    use crate::hyperspace::foundation::implementation::docker_daemon_foundation::FoundationConfig;
+    use crate::base::foundation::err::FoundationErr;
     #[test]
     pub fn foundation_config() {
         fn inner() -> Result<(), FoundationErr> {
