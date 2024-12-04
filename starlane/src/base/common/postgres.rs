@@ -26,18 +26,18 @@ pub mod concrete {
     }
 
     impl PostgresClusterCoreConfig {
-        pub fn create(config: Map) -> Result<Self, FoundationErr> {
+        pub fn create(config: Map) -> Result<Self, BaseErr> {
             let port: u16 = config
                 .from_field_opt("port")
-                .map_err(FoundationErr::config_err)?
+                .map_err(BaseErr::config_err)?
                 .map_or(5432u16, |port| port);
             let username: String = config
                 .from_field_opt("username")
-                .map_err(FoundationErr::config_err)?
+                .map_err(BaseErr::config_err)?
                 .map_or("postgres".to_string(), |username| username);
             let password: String = config
                 .from_field_opt("password")
-                .map_err(FoundationErr::config_err)?
+                .map_err(BaseErr::config_err)?
                 .map_or("postgres".to_string(), |password| password);
             let data_dir: String = config.from_field("data_dir")?;
 
@@ -57,7 +57,7 @@ pub mod concrete {
             })
         }
 
-        pub fn create_as_trait(config: Map) -> Result<Arc<dyn DependencyConfig>, FoundationErr> {
+        pub fn create_as_trait(config: Map) -> Result<Arc<dyn DependencyConfig>, BaseErr> {
             Ok(Self::create(config)?.into_trait())
         }
 
@@ -103,11 +103,11 @@ pub mod concrete {
 
     impl base::config::ProviderConfigSrc for PostgresClusterCoreConfig {
         type Config = Arc<ProviderConfig>;
-        fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, FoundationErr> {
+        fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, BaseErr> {
             Ok(self.providers.clone())
         }
 
-        fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, FoundationErr> {
+        fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, BaseErr> {
             Ok(self.providers.get(kind))
         }
     }

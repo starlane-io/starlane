@@ -1,4 +1,4 @@
-use crate::base::foundation::err::ActionRequest;
+use crate::base::err::ActionRequest;
 use crate::base::foundation::kind::FoundationKind;
 use crate::space::parse::CamelCase;
 use serde::{Deserialize, Serialize};

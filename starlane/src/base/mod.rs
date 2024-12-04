@@ -11,3 +11,5 @@ pub mod kind;
 
 
 pub mod err;
+pub mod registry;
+pub mod partial;

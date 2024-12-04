@@ -1,15 +1,16 @@
 use thiserror::Error;
 use std::sync::Arc;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use serde_yaml::Value;
-use crate::base::foundation::err::{ActionRequest, Call, FoundationErrBuilder};
+use serde::{Deserialize, Serialize};
+use crate::base::foundation::err::Call;
 use crate::base::foundation::kind::FoundationKind;
-use crate::base::kind::{DependencyKind, IKind, ProviderKind};
+use crate::base::kind::{DependencyKind, IKind, Kind, ProviderKind};
 use crate::space::err::ParseErrs;
 
 impl BaseErr {
-    pub fn kind<'z>(kind: &impl IKind) -> FoundationErrBuilder<'z> {
-        FoundationErrBuilder {
+    pub fn kind<'z>(kind: &impl IKind) -> BaseErrBuilder<'z> {
+        BaseErrBuilder {
             kind: Some((kind.category(), kind.as_str())),
             ..Default::default()
         }
@@ -55,7 +56,7 @@ impl BaseErr {
     where
         K: AsRef<str>,
     {
-        BaseErr::FoundationNotFound(kind.as_ref().to_string())
+        BaseErr::BaseNotFound(kind.as_ref().to_string())
     }
 
     pub fn foundation_not_available(kind: FoundationKind) -> Self {
@@ -67,7 +68,7 @@ impl BaseErr {
         MSG: AsRef<str>,
     {
         let msg = msg.as_ref().to_string();
-        BaseErr::FoundationError { kind, msg }
+        BaseErr::BaseError { kind, msg }
     }
 
     pub fn dep_not_found<KIND>(kind: KIND) -> Self
@@ -101,7 +102,7 @@ impl BaseErr {
     }
 
     pub fn foundation_verbose_error<C>(
-        kind: FoundationKind,
+        kind: impl Into<Kind>,
         err: serde_yaml::Error,
         config: C,
     ) -> Self
@@ -110,15 +111,9 @@ impl BaseErr {
     {
         let err = err.to_string();
         let config = config.to_string();
-        Self::FoundationVerboseErr { kind, err, config }
+        Self::BaseVerboseErr { kind, err, config }
     }
 
-    pub fn settings_err<E>(err: E) -> Self
-    where
-        E: ToString,
-    {
-        Self::FoundationSettingsErr(format!("{}", err.to_string()).to_string())
-    }
 
     pub fn msg(err: impl Display) -> Self {
         Self::Msg(format!("{}", err).to_string())
@@ -142,7 +137,7 @@ impl BaseErr {
     }
 
     pub fn config_err(err: impl Display) -> Self {
-        Self::FoundationConfErr(format!("{}", err).to_string())
+        Self::BaseConfErr(format!("{}", err).to_string())
     }
 
     pub fn kind_not_found(category: impl Display, variant: impl Display) -> Self {
@@ -178,7 +173,7 @@ impl BaseErr {
     pub fn is_fatal(&self) -> bool {
         match self {
             BaseErr::Panic { .. } => true,
-            BaseErr::FoundationNotFound(_) => true,
+            BaseErr::BaseNotFound(_) => true,
             BaseErr::FoundationNotAvailable(_) => true,
             _ => false,
         }
@@ -200,7 +195,7 @@ pub enum BaseErr {
     #[error(
         "FoundationConfig.config is set to '{0}' which this Starlane build does not recognize"
     )]
-    FoundationNotFound(String),
+    BaseNotFound(String),
     #[error("config: '{0}' is recognized but is not available on this build of Starlane")]
     FoundationNotAvailable(String),
     #[error(
@@ -218,17 +213,16 @@ pub enum BaseErr {
     #[error(
         "error converting config config for '{kind}' serialization err: '{err}' config: {config}"
     )]
-    FoundationVerboseErr {
-        kind: FoundationKind,
+    BaseVerboseErr {
+        kind: Kind,
         err: String,
         config: String,
     },
-    #[error("config settings err: {0}")]
-    FoundationSettingsErr(String),
+
     #[error("config config err: {0}")]
-    FoundationConfErr(String),
+    BaseConfErr(String),
     #[error("[{kind}] Foundation Error: '{msg}'")]
-    FoundationError { kind: FoundationKind, msg: String },
+    BaseError { kind: FoundationKind, msg: String },
     #[error("[{kind}] Error: '{msg}'")]
     DepErr { kind: DependencyKind, msg: String },
     #[error("Action Required: {cat}: {kind} cannot {action} without user help.  Additional Info: '{summary}'")]
@@ -301,5 +295,149 @@ impl From<tokio::sync::oneshot::error::RecvError> for BaseErr {
 impl From<tokio::sync::oneshot::error::TryRecvError> for BaseErr {
     fn from(err: tokio::sync::oneshot::error::TryRecvError) -> Self {
         Self::FoundationRunnerOneshotTryRecvErr(Arc::new(err))
+    }
+}
+
+pub struct BaseErrBuilder<'z> {
+    pub kind: Option<(&'static str, &'static str)>,
+    pub config: Option<&'z (dyn Display + 'z)>,
+    pub settings: Option<&'z (dyn Display + 'z)>,
+}
+
+impl<'z> Default for BaseErrBuilder<'z> {
+    fn default() -> Self {
+        Self {
+            kind: None,
+            config: None,
+            settings: None,
+        }
+    }
+}
+
+impl<'z> BaseErrBuilder<'z> {
+    pub fn kind(&mut self, kind: impl IKind) -> &mut Self {
+        self.kind = Some((kind.category(), kind.as_str()));
+        self
+    }
+
+    pub fn config(&mut self, config: &'z (dyn Display + 'z)) -> &mut Self {
+        self.config = Some(config);
+        self
+    }
+
+    pub fn settings(&mut self, settings: &'z (dyn Display + 'z)) -> &mut Self {
+        self.settings = Some(settings);
+        self
+    }
+
+    pub fn err(mut self, err: impl Display + 'z) -> BaseErr {
+        let mut rtn = String::new();
+
+        if let Some((cat, kind)) = self.kind {
+            let fmt = format!("Foundation ERR {}::{} --> ", cat, kind);
+            rtn.push_str(fmt.as_str());
+        }
+        let (action, verbose) = if let Some(config) = self.config {
+            ("config".to_string(), config.to_string())
+        } else if let Some(settings) = self.settings {
+            ("settings".to_string(), settings.to_string())
+        } else {
+            ("<yaml>".to_string(), "<?>".to_string())
+        };
+
+        let fmt = format!("{}: \n```{}```\n", action, verbose);
+        rtn.push_str(fmt.as_str());
+
+        let err = format!("serde err: '{}'", err);
+        rtn.push_str(err.as_str());
+        BaseErr::Msg(rtn)
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ActionRequest {
+    pub title: String,
+    pub description: String,
+    pub items: Vec<ActionItem>,
+}
+
+impl ActionRequest {
+    pub fn new(title: String, description: String) -> Self {
+        Self {
+            title,
+            description,
+            items: vec![],
+        }
+    }
+
+    pub fn add(&mut self, item: ActionItem) {
+        self.items.push(item);
+    }
+
+    pub fn print(&self) {}
+}
+
+impl Display for ActionRequest {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ACTION REQUEST: ")?;
+        f.write_str(&self.title)?;
+        f.write_str("\n")?;
+        f.write_str(&self.description)?;
+        f.write_str("\n")?;
+        f.write_str(format!("ITEMS: {} required action items...", self.items.len()).as_str())?;
+        f.write_str("\n")?;
+        for (index, item) in self.items.iter().enumerate() {
+            f.write_str(format!("{} -> {}", index.to_string(), item.title).as_str())?;
+
+            if let Some(ref web) = item.website {
+                f.write_str("\n")?;
+                f.write_str(format!(" more info: {}", web).as_str())?;
+            }
+            f.write_str("\n")?;
+            f.write_str(item.details.as_str())?;
+            if self.items.len() != index {
+                f.write_str("\n")?;
+            }
+        }
+
+        f.write_str("\n")
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ActionItem {
+    pub title: String,
+    pub website: Option<String>,
+    pub details: String,
+}
+
+impl ActionItem {
+    pub fn new(title: String, details: String) -> Self {
+        Self {
+            title,
+            details,
+            website: None,
+        }
+    }
+
+    pub fn with_website(&mut self, website: String) {
+        self.website = Some(website);
+    }
+
+    pub fn print(vec: &Vec<Self>) {}
+}
+
+impl Display for ActionItem {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.title)?;
+        f.write_str("\n")?;
+        if let Some(website) = &self.website {
+            f.write_str("more info: ")?;
+            f.write_str(website)?;
+            f.write_str("\n")?;
+        };
+
+        f.write_str(&self.details)?;
+        f.write_str("\n")
     }
 }

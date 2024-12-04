@@ -30,9 +30,9 @@ use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::status::{Phase, Status};
 use crate::base::foundation::util::CreateProxy;
 use crate::hyperspace::platform::PlatformConfig;
-use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
 use crate::space::progress::Progress;
+use base::registry;
 use downcast_rs::{impl_downcast, Downcast, DowncastSync};
 use futures::TryFutureExt;
 use itertools::Itertools;
@@ -86,7 +86,6 @@ pub mod runner;
 pub mod skel;
 
 //pub mod docker;
-pub mod err;
 pub mod kind;
 
 pub mod config;
@@ -146,7 +145,7 @@ pub trait Foundation: Downcast + Sync + Send {
     fn dependency(&self, kind: &DependencyKind) -> Result<Option<Self::Dependency>, BaseErr>;
 
     /// return a handle to the [`Registry`]
-    fn registry(&self) -> Result<Registry, BaseErr>;
+    fn registry(&self) -> Result<registry::Registry, BaseErr>;
 }
 
 impl_downcast!(Foundation assoc Config, Dependency, Provider);
@@ -282,7 +281,7 @@ where
     }
 
     async fn install(&self, progress: Progress) -> Result<(), BaseErr> {
-        if self.status().phase == Phase::Unknown {
+        if self.status().phase.into() == Phase::Unknown {
             Err(BaseErr::unknown_state("install"))
         } else {
             self.foundation.install(progress).await
@@ -290,15 +289,15 @@ where
     }
 
     fn dependency(&self, kind: &DependencyKind) -> Result<Option<Self::Dependency>, BaseErr> {
-        if self.status().phase == Phase::Unknown {
+        if self.status().phase.into() == Phase::Unknown {
             Err(BaseErr::unknown_state("dependency"))
         } else {
             self.foundation.dependency(kind)
         }
     }
 
-    fn registry(&self) -> Result<Registry, BaseErr> {
-        if self.status().phase == Phase::Unknown {
+    fn registry(&self) -> Result<registry::Registry, BaseErr> {
+        if self.status().phase.into() == Phase::Unknown {
             Err(BaseErr::unknown_state("registry"))
         } else {
             self.foundation.registry()
@@ -312,7 +311,9 @@ where
 {
     type Proxy = F;
 
-    fn proxy(&self) -> Result<Self::Proxy, BaseErr> {}
+    fn proxy(&self) -> Result<Self::Proxy, BaseErr>  {
+     todo!()
+    }
 }
 
 pub mod default {

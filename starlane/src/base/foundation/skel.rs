@@ -21,8 +21,32 @@ pub trait DependencyConfig: foundation::config::DependencyConfig { }
 pub trait ProviderConfig: foundation::config::ProviderConfig { }
 
 
-
-
 pub mod concrete {
+    ///  reference the above a [`my`] implementation ...
+    pub(self) use super as my;
+
+    pub struct Foundation {}
+    impl my::Foundation for Foundation {}
+
+    /// [super::variant] is just a generic mod name for a [`Dependency`] variant.
+    /// when implementing this pattern probably give it a name that differentiates if from
+    /// other dependencies.  For example: if the hypothetical implementation is for [`FoundationKind::Kubernetes`]
+    /// the various concrete dependency implementations should have meaningful names like: `postgres`,
+    /// `keycloak`, `s3`, `kafka` ...  and of course instead of one custom dependency variant
+    /// multiple implementations can and should be implemented for this Foundation
+    pub mod variant {
+        use super::my;
+
+        pub struct Dependency {}
+        impl my::Dependency for Dependency {}
+
+        /// [super::variant] follows the same pattern as [`super::variant`] except in this case it is for
+        /// [crate::base::foundation::Provider] variants
+        pub mod variant {
+            use super::my;
+            pub struct Provider {}
+            impl my::Provider for Provider {}
+        }
+    }
 
 }

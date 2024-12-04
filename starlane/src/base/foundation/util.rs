@@ -47,17 +47,17 @@ impl TryFrom<&str> for Map {
 
 pub trait SerMap {
     fn to_map(self) -> Result<Map, BaseErr>; /* {
-                                                       Err(FoundationErr::serde_err("this type does not support Serialization"))
+                                                       Err(BaseErr::serde_err("this type does not support Serialization"))
                                                    }
                                                    */
 
     fn to_sequence(self) -> Result<Sequence, BaseErr>; /*{
-                                                                 Err(FoundationErr::serde_err("this type does not support Serialization"))
+                                                                 Err(BaseErr::serde_err("this type does not support Serialization"))
                                                              }
                                                              */
 
     fn to_value(self) -> Result<serde_yaml::Value, BaseErr>; /* {
-                                                                       Err(FoundationErr::serde_err("this type does not support Serialization"))
+                                                                       Err(BaseErr::serde_err("this type does not support Serialization"))
                                                                    }
                                                                    */
 }
@@ -82,11 +82,11 @@ impl<T> SerializeAs<T> for LocalType {
 pub fn to_config_map<K, C, F>(
     map: impl SerMap,
     factory: F,
-) -> Result<ConfigMap<K, C>, FoundationErr>
+) -> Result<ConfigMap<K, C>, BaseErr>
 where
     K: Eq + PartialEq + Hash + Clone + DeserializeOwned,
     C: DeserializeOwned + Clone,
-    F: Fn((K, Arc<C>)) -> Result<C, FoundationErr> + Copy,
+    F: Fn((K, Arc<C>)) -> Result<C, BaseErr> + Copy,
 {
     let mut maps = HashMap::new();
 

@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use downcast_rs::{impl_downcast, DowncastSync};
 use crate::base;
-use crate::base::err::BaseErr;
+use crate::base::err::{BaseErr, BaseErrBuilder};
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::Provider;
 use crate::base::kind::{DependencyKind, Kind, ProviderKind};
+use crate::hyperspace::driver::base::Base;
 use crate::space::parse::CamelCase;
 
 pub trait Config
@@ -48,19 +49,49 @@ pub trait DependencyConfig: DowncastSync {
 
 pub trait ProviderConfigSrc
 {
-    type Err: Into<BaseErr>;
 
     type Config: ProviderConfig;
 
 
-    fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, Self::Err>;
+    fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, BaseErr>;
 
-    fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, Self::Err>;
+    fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, BaseErr>;
 }
 
 pub trait ProviderConfig: DowncastSync {
     fn kind(&self) -> &ProviderKind;
 }
+
+
+pub enum ProviderMode<C,U> where C: provider::mode::create::ProviderConfig, U: C+provider::mode::utilize::ProviderConfig {
+    Create(C),
+    Utilize(U)
+}
+
+
+pub mod provider {
+    use super as config;
+    pub mod mode {
+        use super::config;
+        pub mod create {
+            use super::config;
+            use super::utilize;
+            ///  [`Create`] mode must also [`Utilize`] mode's properties since the foundation
+            /// will want to Create the Provision (potentially meaning: downloading, instancing, credential setup,  initializing...etc.)
+            /// and then will want to [`Utilize`] the Provision (potentially meaning: authenticating via the same credentials supplied from
+            /// [`Create`], connecting to the same port that was set up etc.
+            pub trait ProviderConfig: config::ProviderConfig+utilize::ProviderConfig { }
+        }
+
+        pub mod utilize{
+            use super::config;
+            pub trait ProviderConfig: config::ProviderConfig{
+            }
+        }
+
+    }
+}
+
 
 pub trait PlatformConfig {}
 

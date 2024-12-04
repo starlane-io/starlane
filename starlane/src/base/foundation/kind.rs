@@ -28,5 +28,5 @@ impl Default for FoundationKind {
     }
 }
 
-//pub type FoundationParser = fn(&Value) -> Result<dyn Foundation, FoundationErr>;
+//pub type FoundationParser = fn(&Value) -> Result<dyn Foundation, BaseErr>;
 

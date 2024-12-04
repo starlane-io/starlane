@@ -35,7 +35,7 @@ pub mod concrete {
         CamelCase::from_str("Registry").unwrap()
     }
     impl PostgresDependencyConfig {
-        pub fn create(config: Map) -> Result<Self, FoundationErr> {
+        pub fn create(config: Map) -> Result<Self, BaseErr> {
             let postgres = PostgresClusterCoreConfig::create(config.clone())?;
             let docker = config.from_field("docker")?;
             let docker = ProviderKind::new(DependencyKind::DockerDaemon, docker);
