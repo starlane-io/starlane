@@ -1,9 +1,9 @@
-use crate::hyperspace::foundation::config::{Config, DependencyConfig, ProviderConfig};
+use crate::hyperspace::foundation::config::{Config, DependencyConfig, FoundationConfig, ProviderConfig};
 use crate::hyperspace::foundation::err::FoundationErr;
 use crate::hyperspace::foundation::kind::{DependencyKind, FoundationKind, Kind, ProviderKind};
 use crate::hyperspace::foundation::status::{Phase, Status, StatusDetail};
 use crate::hyperspace::foundation::util::SerMap;
-use crate::hyperspace::foundation::{config, Dependency, Foundation, LiveService, Provider};
+use crate::hyperspace::foundation::{config, Dependency, Foundation, FoundationTypeTraits, LiveService, Provider};
 use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
 use crate::space::point::Point;
@@ -12,6 +12,7 @@ use starlane_primitive_macros::logger;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use md5::digest::FixedOutput;
 use tokio::sync::watch::Receiver;
 use wasmer_wasix::virtual_fs::Upcastable;
 use crate::hyperspace::foundation;
@@ -60,8 +61,9 @@ impl <F> FoundationTx<F> where F: Foundation{
 #[async_trait]
 impl <F> Foundation for FoundationTx<F> where F: Foundation {
     type Config = F::Config;
-    type Dependency = F::Dependency;
-    type Provider = F::Provider;
+    type Types = F::Types;
+    type Dependency = Box<F::Types::Dependency>;
+    type Provider = Box<F::Types::Provider>;
 
     fn kind(&self) -> FoundationKind {
         self.config.kind().clone()
@@ -98,7 +100,7 @@ impl <F> Foundation for FoundationTx<F> where F: Foundation {
     fn dependency(
         &self,
         kind: &DependencyKind,
-    ) -> Result<Option<Box<Self::Dependency>>, FoundationErr> {
+    ) -> Result<Option<Self::Dependency>, FoundationErr> {
         let kind = kind.clone();
         let (rtn, rx) = tokio::sync::oneshot::channel();
         self.call_tx
@@ -148,24 +150,24 @@ enum DepCall<D> where D: Dependency {
     },
     Provider {
         kind: ProviderKind,
-        rtn: tokio::sync::oneshot::Sender<Result<, FoundationErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<D::Provider, FoundationErr>>,
     },
     ProviderCall(ProvWrapper<D::Provider>),
     _Phantom(PhantomData<D>)
 }
 
-struct DependencyTx {
-    config: Arc<dyn config::DependencyConfig>,
-    call_tx: tokio::sync::mpsc::Sender<DepCall>,
+struct DependencyTx<F> where F: Foundation {
+    config: F::Dependency::Config,
+    call_tx: tokio::sync::mpsc::Sender<DepCall<F>>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
-impl DependencyTx {
+impl <F> DependencyTx<F> where F: Foundation {
     fn new(
-        config: Arc<dyn config::DependencyConfig>,
-        call_tx: tokio::sync::mpsc::Sender<DepCall>,
+        config: F::Dependency::Config,
+        call_tx: tokio::sync::mpsc::Sender<DepCall<F>>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
-    ) -> impl Dependency {
+    ) -> F::Dependency {
         Self {
             config,
             call_tx,
@@ -175,16 +177,15 @@ impl DependencyTx {
 }
 
 #[async_trait]
-impl Dependency for DependencyTx {
-    type Config = config::default::DependencyConfig;
-    type Provider = foundation::default::Provider;
-
+impl <F> Dependency for DependencyTx<F> where F: Foundation {
+    type Config = F::Config;
+    type Provider = F::Provider;
 
     fn kind(&self) -> &DependencyKind {
         self.config.kind()
     }
 
-    fn config(&self) -> Arc<dyn DependencyConfig> {
+    fn config(&self) -> Self::Config {
         self.config.clone()
     }
 
@@ -306,12 +307,12 @@ impl <P> Provider for ProviderTx<P> where P: Provider {
 struct Runner<F> where F: Foundation {
     call_rx: tokio::sync::mpsc::Receiver<Call<F>>,
     call_tx: tokio::sync::mpsc::Sender<Call<F>>,
-    foundation: Box<dyn foundation::Foundation<Config=F::Config, Dependency=F::Dependency, Provider=F::Provider>>,
-    runners: HashMap<DependencyKind, DependencyRunner<F>>,
+    foundation: F,
+    runners: HashMap<DependencyKind, DependencyRunner<Self>>,
 }
 
 impl <F> Runner<F> where F: Foundation{
-    fn new(foundation: ) -> impl Foundation {
+    fn new(foundation: F) -> impl Foundation {
         let (call_tx, call_rx) = tokio::sync::mpsc::channel(64);
         let config = foundation.config().clone();
         let proxy = FoundationTx::new(config, call_tx.clone(), foundation.status_watcher());
@@ -334,7 +335,7 @@ impl <F> Runner<F> where F: Foundation{
     fn dependency(
         &mut self,
         kind: DependencyKind,
-    ) -> Result<Option<&DependencyRunner>, FoundationErr> {
+    ) -> Result<Option<&DependencyRunner<F>>, FoundationErr> {
         if !self.runners.contains_key(&kind) {
             match self.foundation.dependency(&kind) {
                 Ok(None) => return Ok(None),
@@ -393,7 +394,7 @@ impl <F> Runner<F> where F: Foundation{
 
 struct DependencyRunner<F> where F: Foundation{
     dependency: F::Dependency,
-    runners: HashMap<ProviderKind, ProviderRunner>,
+    runners: HashMap<ProviderKind, ProviderRunner<F>>,
     call_tx: tokio::sync::mpsc::Sender<Call<F::Dependency>>,
 }
 
@@ -431,7 +432,7 @@ impl <F> DependencyRunner<F> where F: Foundation{
     fn provider(
         &mut self,
         kind: ProviderKind,
-    ) -> Result<Option<&mut ProviderRunner>, FoundationErr> {
+    ) -> Result<Option<&mut ProviderRunner<F>>, FoundationErr> {
         if !self.runners.contains_key(&kind) {
             match self.dependency.provider(&kind) {
                 Ok(None) => return Ok(None),
@@ -451,14 +452,14 @@ impl <F> DependencyRunner<F> where F: Foundation{
     fn provider_proxy(
         &mut self,
         kind: ProviderKind,
-    ) -> Result<Option<Box<dyn Provider>>, FoundationErr> {
+    ) -> Result<Option<Box<F::Provider>>, FoundationErr> {
         let runner = self
             .provider(kind.clone())?
             .ok_or(FoundationErr::provider_not_available(kind))?;
         Ok(Some(runner.proxy()))
     }
 
-    async fn handle(&mut self, call: DepCall) {
+    async fn handle(&mut self, call: DepCall<F>) {
         match call {
             DepCall::Download { progress, rtn } => {
                 rtn.send(self.dependency.download(progress).await)
@@ -484,6 +485,7 @@ impl <F> DependencyRunner<F> where F: Foundation{
                     provider.handle(wrap.call).await;
                 }
             }
+            DepCall::_Phantom(_) => {}
         }
     }
 }
@@ -528,7 +530,7 @@ impl <F> ProviderRunner<F> where F: Foundation  {
         self.provider.kind()
     }
 
-    async fn handle(&mut self, call: ProviderCall) {
+    async fn handle(&mut self, call: ProviderCall<F>) {
         match call {
             ProviderCall::Initialize { progress, rtn } => {
                 rtn.send(self.provider.initialize(progress).await)
@@ -538,6 +540,7 @@ impl <F> ProviderRunner<F> where F: Foundation  {
                 rtn.send(self.provider.start(progress).await)
                     .unwrap_or_default();
             }
+            ProviderCall::_Phantom(_) => {}
         }
     }
 }

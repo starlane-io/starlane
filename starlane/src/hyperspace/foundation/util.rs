@@ -397,14 +397,6 @@ pub mod test {
         }
         impl_downcast!(sync SomeConfig);
 
-        /*
-        impl dyn SomeConfig where Self: Sized{
-            unsafe fn downcast<T>(&self) -> &T {
-                &*(self as *const Self as *const T)
-            }
-        }
-
-         */
 
 
         #[derive(
@@ -449,8 +441,8 @@ pub mod test {
         let raw = r#"
 - kind: AConf
   something: 34
-- kind: BConf
-  and_another_thing: "Hello World!"
+- and_another_thing: "Hello World!"
+  kind: BConf
 
         "#;
 

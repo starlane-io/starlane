@@ -171,7 +171,7 @@ pub trait Dependency: Downcast + Send + Sync {
 
     type Provider: Provider;
 
-    fn kind(&self) -> &DependencyKind;
+    fn kind(&self) -> DependencyKind;
 
     fn config(&self) -> Self::Config;
 
