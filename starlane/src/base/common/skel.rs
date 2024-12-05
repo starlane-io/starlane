@@ -1,70 +1,100 @@
-/// # SKEL
-///  a starter template for defining the `common` properties and behaviors of
-///  new [`DependencyKind`](crate::base::kind::DependencyKind)s and/or [`ProviderKind`](crate::base::kind::ProviderKind)s.
+/// # Resource [base::kind::Kind] **Common** Definition
+///  A starter template for defining the `common` properties and behaviors of a new
+/// [`DependencyKind`](crate::base::kind::DependencyKind)s and/or [`ProviderKind`](crate::base::kind::ProviderKind)s.
 ///
-/// for a new [`Kind`] to work it will also need a concrete implementation for one or more [`Foundation`](crate::base::foundation::Foundation)s.
-/// See  [`skel`](crate::base::foundation::skel)
-use crate::base::foundation;
+/// ## !Foundation implementation required!
+/// For a new [`Kind`] to work it will also need a concrete implementation for one or more
+/// [`Foundation`](crate::base::foundation::Foundation)s. See foundation starter template: [`skel`](crate::base::foundation::skel)
+use crate::base;
+use base::foundation;
 
+pub trait Dependency: foundation::Dependency<Config:DependencyConfig, Provider: Provider> { }
+pub trait Provider: foundation::Provider<Config: ProviderConfig>{ }
+
+pub trait DependencyConfig: foundation::config::DependencyConfig { }
+pub trait ProviderConfig: foundation::config::ProviderConfig { }
+
+/// instead of the [foundation::skel::concrete] where the traits defs end and the real
+/// implementation begins, when defining a [`common`] for a child resource (Dependency or Provider),
+/// [dependency] and [dependency::provider] mods should make the final definition for all the
+/// particular `variety` and `mode` abstractions which are relevant to the particular resource
+/// being defined yet lacking specific definitions that any particular [foundation::Foundation]
+/// requires.
+///
+/// A good example of this is the `Postgres` common definition which should implement every
+/// aspect needed to maybe `initialize` and certainly to `connect` to the Postgres Cluster instance.
+/// ```
+/// pub mod postgres {
+///   use starlane::base::foundation;
+///   use starlane::base::foundation::config;
+///
+///   /// this example implementation is not configured for `modes`.
+///   /// a mode implementation example is documented here: [starlane::base::mode]
+///   ///
+///   /// As you can see this overloaded example provides everything needed to set up a Postgres
+///   /// cluster except for any information pertaining to installing and starting the service, because
+///   /// the mechanisms for installing and starting differ amongst Foundation implementations.
+///   ///
+///   /// `DockerDaemonFoundation` implements a concrete version of this `Postgres` dependency
+///   /// that inherits the common interface but also adds contextual foundation definitions
+///   /// such as a Docker `repository`:`image`:`tag` to be pulled, instanced, initialized and started
+///   pub trait DependencyConfig: config::DependencyConfig {
+///     fn url(&self) -> String;
+///     fn port(&self) -> u16;
+///     fn data_directory(&self) -> String;
+///     fn username(&self) -> String;
+///     fn password(&self) -> String;
+///   }
+/// }
+/// ````
+///
+pub mod dependency {
+    pub mod my { pub use super::super::*; }
+
+    pub mod provider {
+
+    }
+
+}
+    /*
 pub mod provider {
-    use super as config;
+    use super::my;
 
-    /// an Example of a Provider with `modes` . It's basically a custom
     pub mod mode {
-        use super::config;
+        use crate::base::foundation;
+
+        use super::my;
         pub mod create {
-            use super::config;
+            use super::my;
             use super::utilize;
             ///  [`Create`] mode must also [`Utilize`] mode's properties since the foundation
             /// will want to Create the Provision (potentially meaning: downloading, instancing, credential setup,  initializing...etc.)
             /// and then will want to [`Utilize`] the Provision (potentially meaning: authenticating via the same credentials supplied from
             /// [`Create`], connecting to the same port that was set up etc.
-            pub trait ProviderConfig: crate::base::config::ProviderConfig+ crate::base::config::provider::mode::utilize::ProviderConfig { }
+            pub trait ProviderConfig: my::ProviderConfig + crate::base::config::provider::mode::utilize::ProviderConfig {}
         }
 
-        pub mod utilize{
-            use super::config;
+        pub mod utilize {
+            use super::my;
             /// provide any necessary configuration properties to use this Provider after it has been created... etc.
-            pub trait ProviderConfig: crate::base::config::ProviderConfig{
+            pub trait ProviderConfig: my::ProviderConfig{
 
             }
 
         }
 
     }
-}///
-///
-/// /// create a variant of
-///
-///
-
-/// [`common::skel`] provides
-
-
-/// this trait is for extending [`foundation::Foundation`] API and constraining generic traits like [`FoundationConfig`] so
-/// that foundation implementations can better customize their traits for whatever is required.
-pub trait Foundation: foundation::Foundation<Config:FoundationConfig, Dependency: Dependency, Provider: Provider> { }
-pub trait Dependency: foundation::Dependency<Config:DependencyConfig, Provider: Provider> { }
-pub trait Provider: foundation::Provider<Config: ProviderConfig>{ }
-
-pub trait FoundationConfig: foundation::config::FoundationConfig<DependencyConfig:DependencyConfig> { }
-pub trait DependencyConfig: foundation::config::DependencyConfig { }
-pub trait ProviderConfig: foundation::config::ProviderConfig { }
+    }
+     */
 
 
 pub mod concrete {
     ///  reference the above a [`my`] implementation ...
-    pub(self) use super as my;
+    pub mod my { pub use super::super::*; }
+    pub use crate::base::foundation;
 
-    pub struct Foundation {}
-    impl my::Foundation for Foundation {}
 
-    /// [super::variant] is just a generic mod name for a [`Dependency`] variant.
-    /// when implementing this pattern probably give it a name that differentiates if from
-    /// other dependencies.  For example: if the hypothetical implementation is for [`FoundationKind::Kubernetes`]
-    /// the various concrete dependency implementations should have meaningful names like: `postgres`,
-    /// `keycloak`, `s3`, `kafka` ...  and of course instead of one custom dependency variant
-    /// multiple implementations can and should be implemented for this Foundation
+
     pub mod variant {
         use super::my;
 
@@ -82,69 +112,23 @@ pub mod concrete {
 
 
     pub mod provider {
-    use super as config;
-    pub mod mode {
-        use super::config;
-        pub mod create {
-            use super::config;
-            use super::utilize;
-            ///  [`Create`] mode must also [`Utilize`] mode's properties since the foundation
-            /// will want to Create the Provision (potentially meaning: downloading, instancing, credential setup,  initializing...etc.)
-            /// and then will want to [`Utilize`] the Provision (potentially meaning: authenticating via the same credentials supplied from
-            /// [`Create`], connecting to the same port that was set up etc.
-            pub trait ProviderConfig: crate::base::config::ProviderConfig+ crate::base::config::provider::mode::utilize::ProviderConfig { }
-        }
+        use super::my;
+        pub mod mode {
+            use super::my;
+            pub mod create {
+                use super::my;
+                use super::utilize;
+                ///  [`Create`] mode must also [`Utilize`] mode's properties since the foundation
+                /// will want to Create the Provision (potentially meaning: downloading, instancing, credential setup,  initializing...etc.)
+                /// and then will want to [`Utilize`] the Provision (potentially meaning: authenticating via the same credentials supplied from
+                /// [`Create`], connecting to the same port that was set up etc.
+                pub trait ProviderConfig: my::ProviderConfig + crate::base::config::provider::mode::utilize::ProviderConfig {}
+            }
 
-        pub mod utilize{
-            use super::config;
-            pub trait ProviderConfig: crate::base::config::ProviderConfig{
+            pub mod utilize {
+                use super::my;
+                pub trait ProviderConfig: my::ProviderConfig {}
             }
         }
-
     }
-}///
-///
-/// /// create a variant of
-///
-///
-
-/// [`common::skel`] provides
-
-
-/// this trait is for extending [`foundation::Foundation`] API and constraining generic traits like [`FoundationConfig`] so
-/// that foundation implementations can better customize their traits for whatever is required.
-
-
-
-
-
-
-pub mod concrete {
-    ///  reference the above a [`my`] implementation ...
-    pub(self) use super as my;
-
-    pub struct Foundation {}
-    impl my::Foundation for Foundation {}
-
-    /// [super::variant] is just a generic mod name for a [`Dependency`] variant.
-    /// when implementing this pattern probably give it a name that differentiates if from
-    /// other dependencies.  For example: if the hypothetical implementation is for [`FoundationKind::Kubernetes`]
-    /// the various concrete dependency implementations should have meaningful names like: `postgres`,
-    /// `keycloak`, `s3`, `kafka` ...  and of course instead of one custom dependency variant
-    /// multiple implementations can and should be implemented for this Foundation
-    pub mod variant {
-        use super::my;
-
-        pub struct Dependency {}
-        impl my::Dependency for Dependency {}
-
-        /// [super::variant] follows the same pattern as [`super::variant`] except in this case it is for
-        /// [crate::base::foundation::Provider] variants
-        pub mod variant {
-            use super::my;
-            pub struct Provider {}
-            impl my::Provider for Provider {}
-        }
-    }
-
 }

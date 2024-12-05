@@ -7,7 +7,6 @@ use nom::sequence::tuple;
 use nom::bytes::complete::tag;
 use serde_with_macros::DeserializeFromStr;
 use crate::base::err::BaseErr;
-use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
 use crate::space::parse::{camel_case, CamelCase};
 use crate::space::parse::util::{new_span, result};
@@ -96,8 +95,8 @@ impl IKind for DependencyKind {
     }
 }
 
-impl FromStr for ProviderKind where Self::Err: Into<BaseErr>{
-    type Err=BaseErr ;
+impl FromStr for ProviderKind {
+    type Err=BaseErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let i = new_span(s);

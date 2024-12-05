@@ -43,21 +43,23 @@ use crate::space::parse::DbCase;
 
 
 pub mod provider {
-    use super as config;
+//    use crate::base::common::postgres as my;
+    mod my { pub use super::*; }
+
     pub mod mode {
-        use super::config;
+        use super::my;
         pub mod create {
-            use super::config;
+            use super::my;
             use super::utilize;
             ///  [`Create`] mode must also [`Utilize`] mode's properties since the foundation
             /// will want to Create the Provision (potentially meaning: downloading, instancing, credential setup,  initializing...etc.)
             /// and then will want to [`Utilize`] the Provision (potentially meaning: authenticating via the same credentials supplied from
             /// [`Create`], connecting to the same port that was set up etc.
-            pub trait ProviderConfig: crate::base::config::ProviderConfig+ crate::base::config::provider::mode::utilize::ProviderConfig { }
+            pub trait ProviderConfig: my::ProviderConfig+ my::provider::mode::utilize::ProviderConfig { }
         }
 
         pub mod utilize{
-            use super::config;
+            use super::my;
             pub trait ProviderConfig: crate::base::config::ProviderConfig{
             }
         }
@@ -79,15 +81,9 @@ pub trait FoundationConfig: foundation::config::FoundationConfig<DependencyConfi
 
 pub mod concrete {
     ///  reference the above a [`my`] implementation ...
-    pub(self) use super as my;
+    ///
+    mod my { pub use super::*; }
 
-
-    /// [super::variant] is just a generic mod name for a [`Dependency`] variant.
-    /// when implementing this pattern probably give it a name that differentiates if from
-    /// other dependencies.  For example: if the hypothetical implementation is for [`FoundationKind::Kubernetes`]
-    /// the various concrete dependency implementations should have meaningful names like: `postgres`,
-    /// `keycloak`, `s3`, `kafka` ...  and of course instead of one custom dependency variant
-    /// multiple implementations can and should be implemented for this Foundation
     pub mod variant {
         use super::my;
 

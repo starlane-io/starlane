@@ -1,5 +1,5 @@
-use ariadne::Config;
-use crate::base::foundation;
+use crate::base;
+use base::foundation;
 
 
 /// [`foundation::skel`] provides a starter custom implementation of a [`crate::base::foundation`]
@@ -19,6 +19,49 @@ pub trait Provider: foundation::Provider<Config: ProviderConfig>{ }
 pub trait FoundationConfig: foundation::config::FoundationConfig<DependencyConfig:DependencyConfig> { }
 pub trait DependencyConfig: foundation::config::DependencyConfig { }
 pub trait ProviderConfig: foundation::config::ProviderConfig { }
+
+
+/// we create this trait just in case we need to custom traits for this partial with this feature
+pub trait Partial: base::partial::Partial { }
+
+pub trait PartialConfig: base::partial::config::PartialConfig{}
+
+pub mod partial {
+    /// here is the continued implementation of the `mount` partial defined here: [partial::skel]
+    use crate::base;
+    use base::err;
+    use base::partial;
+    use partial::skel as mount;
+    use base::foundation;
+
+    /// here we add a few odds and ends for the [Mounts] partial that are
+    /// required for this particular [foundation::Foundation]
+    pub trait MountsConfig: mount::MountsConfig {
+        /// Returns the `$user` to own child Volumes
+        fn owner(&self) -> String;
+
+        /// Returns the `$permissons` to be set for child Volumes in octal
+        fn permissons(&self) -> u16;
+
+    }
+    #[async_trait]
+    pub trait Mounts: mount::Mounts<Config: MountsConfig,Volume:Volume> {
+
+        /// the concrete implementation of Mounts for this Foundation
+        /// will call [Mounts::chown] which will set the permission sof all child volumes
+        /// to `$permissions` where the value of `$permission` be the octal value return
+        /// of [MountsConfig::permissons]
+        /// ```bash
+        /// chmod $permissions $volume
+        /// ```
+        async fn chown(&self) -> Result<(),err::BaseErr>;
+        async fn chmod(&self) -> Result<(),err::BaseErr>;
+
+
+    }
+    pub trait VolumeConfig: mount::VolumeConfig{ }
+    pub trait Volume: mount::Volume<Config: MountsConfig> { }
+}
 
 
 pub mod concrete {
@@ -46,6 +89,15 @@ pub mod concrete {
             use super::my;
             pub struct Provider {}
             impl my::Provider for Provider {}
+        }
+    }
+
+
+    pub mod partial {
+        use super::my;
+        pub mod mounts {
+            use super::my;
+
         }
     }
 

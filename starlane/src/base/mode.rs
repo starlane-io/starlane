@@ -77,7 +77,6 @@
 ///      Create
 ///  }
 ///  ```
-///
 /// So, here is the sequence that [foundation::Foundation] follows on startup:
 ///
 /// * [Mode::Connect] -> Try to connect to the database

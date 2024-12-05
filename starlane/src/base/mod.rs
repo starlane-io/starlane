@@ -1,3 +1,5 @@
+use downcast_rs::Downcast;
+use partial::config::PartialConfig;
 
 pub mod foundation;
 pub mod config;
@@ -14,3 +16,4 @@ pub mod err;
 pub mod registry;
 pub mod partial;
 pub mod mode;
+

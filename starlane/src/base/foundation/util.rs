@@ -1,4 +1,3 @@
-use crate::base::config::ConfigMap;
 use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
 use bincode::Options;
@@ -329,6 +328,7 @@ pub struct Registry {
     pub seed: String,
 }
 
+/*
 struct ConfigMapVisitor<'de, K, C>
 where
     K: Deserialize<'de> + Eq + PartialEq + Hash + Clone,
@@ -374,6 +374,8 @@ where
         Ok(map)
     }
 }
+
+ */
 
 
 

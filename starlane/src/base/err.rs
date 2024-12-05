@@ -3,10 +3,10 @@ use std::sync::Arc;
 use std::fmt::{Display, Formatter};
 use serde_yaml::Value;
 use serde::{Deserialize, Serialize};
-use crate::base::foundation::err::Call;
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::kind::{DependencyKind, IKind, Kind, ProviderKind};
 use crate::space::err::ParseErrs;
+use crate::space::substance::Call;
 
 impl BaseErr {
     pub fn kind<'z>(kind: &impl IKind) -> BaseErrBuilder<'z> {

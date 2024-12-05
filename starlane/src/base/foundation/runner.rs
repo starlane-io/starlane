@@ -3,7 +3,6 @@ use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::status::{Phase, PhaseDetail, Status};
 use crate::base::foundation::util::SerMap;
 use crate::base::foundation::{config, Dependency, Foundation, LiveService, Provider};
-use crate::hyperspace::reg::Registry;
 use crate::space::parse::CamelCase;
 use crate::space::point::Point;
 use crate::space::progress::Progress;
@@ -15,9 +14,10 @@ use md5::digest::FixedOutput;
 use tokio::sync::watch::Receiver;
 use wasmer_wasix::virtual_fs::Upcastable;
 use crate::base;
-use crate::base::config::{Config, DependencyConfig, FoundationConfig, ProviderConfig};
-use crate::base::foundation;
+use crate::base::config::{Config, DependencyConfig, FoundationConfig};
+use crate::base::{foundation, registry};
 use crate::base::kind::{DependencyKind, Kind, ProviderKind};
+use crate::base::config::ProviderConfig;
 
 enum Call<F> where F: Foundation {
     Synchronize {
@@ -33,7 +33,7 @@ enum Call<F> where F: Foundation {
         progress: Progress,
         rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
     },
-    Registry(tokio::sync::oneshot::Sender<Result<Registry, BaseErr>>),
+    Registry(tokio::sync::oneshot::Sender<Result<registry::Registry, BaseErr>>),
     DepCall(DepWrapper<F>),
     _Phantom(PhantomData<F>),
 }
@@ -63,9 +63,8 @@ impl <F> FoundationTx<F> where F: Foundation{
 #[async_trait]
 impl <F> Foundation for FoundationTx<F> where F: Foundation {
     type Config = F::Config;
-    type Traits = F::Traits;
-    type Dependency = Box<F::Traits::Dependency>;
-    type Provider = Box<F::Traits::Provider>;
+    type Dependency = ();
+    type Provider = ();
 
     fn kind(&self) -> FoundationKind {
         self.config.kind().clone()
@@ -111,7 +110,7 @@ impl <F> Foundation for FoundationTx<F> where F: Foundation {
         Ok(rx.blocking_recv().map_err(BaseErr::msg)??)
     }
 
-    fn registry(&self) -> Result<Registry, BaseErr> {
+    fn registry(&self) -> Result<registry::Registry, BaseErr> {
         let (rtn, rx) = tokio::sync::oneshot::channel();
         self.call_tx
             .try_send(Call::Registry(rtn))

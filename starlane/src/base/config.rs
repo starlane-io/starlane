@@ -1,13 +1,12 @@
 use std::hash::Hash;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
-use downcast_rs::{impl_downcast, DowncastSync};
-use crate::base;
-use crate::base::err::{BaseErr, BaseErrBuilder};
+use downcast_rs::{impl_downcast, Downcast, DowncastSync};
+use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::Provider;
 use crate::base::kind::{DependencyKind, Kind, ProviderKind};
-use crate::hyperspace::driver::base::Base;
+use crate::base::partial::{skel, ProviderConfig};
 use crate::space::parse::CamelCase;
 
 pub trait Config
@@ -58,34 +57,31 @@ pub trait ProviderConfigSrc
     fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, BaseErr>;
 }
 
-pub trait ProviderConfig: DowncastSync {
-    fn kind(&self) -> &ProviderKind;
-}
 
-
-pub enum ProviderMode<C,U> where C: provider::mode::create::ProviderConfig, U: C+provider::mode::utilize::ProviderConfig {
+pub enum ProviderMode<C,U> where C: provider::mode::create::ProviderConfig, U: provider::mode::utilize::ProviderConfig {
     Create(C),
     Utilize(U)
 }
 
 
+
 pub mod provider {
-    use super as config;
+    use crate::base::config as my;
     pub mod mode {
-        use super::config;
+        use super::my;
         pub mod create {
-            use super::config;
+            use super::my;
             use super::utilize;
             ///  [`Create`] mode must also [`Utilize`] mode's properties since the foundation
             /// will want to Create the Provision (potentially meaning: downloading, instancing, credential setup,  initializing...etc.)
             /// and then will want to [`Utilize`] the Provision (potentially meaning: authenticating via the same credentials supplied from
             /// [`Create`], connecting to the same port that was set up etc.
-            pub trait ProviderConfig: config::ProviderConfig+utilize::ProviderConfig { }
+            pub trait ProviderConfig: my::ProviderConfig+utilize::ProviderConfig { }
         }
 
         pub mod utilize{
-            use super::config;
-            pub trait ProviderConfig: config::ProviderConfig{
+            use super::my;
+            pub trait ProviderConfig: my::ProviderConfig{
             }
         }
 
@@ -124,6 +120,8 @@ impl_downcast!(sync FoundationConfig assoc DependencyConfig);
 impl_downcast!(sync DependencyConfig assoc ProviderConfig);
 
 impl_downcast!(sync ProviderConfig);
+
+
 
 /*
 #[derive(Clone)]
@@ -238,4 +236,9 @@ pub trait BaseConfig  {
 
     type DependencyConfig: DependencyConfig<ProviderConfig:ProviderConfig>;
 
+}
+
+/// see: [skel]
+pub trait ProviderConfig: DowncastSync {
+    fn kind(&self) -> &ProviderKind;
 }

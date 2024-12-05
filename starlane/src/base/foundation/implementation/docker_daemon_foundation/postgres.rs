@@ -17,11 +17,15 @@ use crate::base::foundation::config;
 pub trait DependencyConfig: foundation::config::DependencyConfig { }
 pub trait ProviderConfig: foundation::config::ProviderConfig { }
 
+
+/*
+
 pub mod concrete {
     use std::str::FromStr;
     use crate::base;
+    use crate::base::err::BaseErr;
     use crate::base::foundation::implementation::docker_daemon_foundation::postgres::PostgresDependencyConfig;
-    use crate::space::parse::DbCase;
+    use crate::space::parse::{CamelCase, DbCase};
 
     fn default_schema() -> DbCase {
         DbCase::from_str("PUBLIC").unwrap()
@@ -85,13 +89,18 @@ pub mod concrete {
 
 }
 
+ */
 
 
+
+/*
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostgresDependencyConfig {
     pub postgres: PostgresClusterCoreConfig,
     pub docker: ProviderKind,
     pub image: String,
 }
+
+ */
 
 

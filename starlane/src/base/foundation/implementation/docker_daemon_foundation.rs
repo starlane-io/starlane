@@ -54,17 +54,17 @@ pub trait DependencyConfig: foundation::config::DependencyConfig {
 pub trait ProviderConfig: foundation::config::ProviderConfig { }
 
 pub mod concrete {
+    use crate::base::foundation::implementation::docker_daemon_foundation as my;
     use std::collections::HashMap;
     use std::sync::Arc;
     use derive_name::Name;
     use crate::base::foundation::status::Status;
     /// we refer to this as [`my`](my) [`Foundation`] implementation. see [crate::base::foundation::skel] for recommended foundation pattern
-    use super as my;
     use crate::base;
     use crate::base::err::BaseErr;
     use crate::base::foundation;
     use crate::base::foundation::kind::FoundationKind;
-    use crate::base::kind::DependencyKind;
+    use crate::base::kind::{DependencyKind, Kind};
     use crate::space::progress::Progress;
 
     pub struct Foundation {
@@ -138,7 +138,7 @@ pub mod concrete {
     #[derive(Clone, Name)]
     pub struct FoundationConfig {
         pub kind: FoundationKind,
-        pub registry: RegistryProviderConfig,
+        //pub registry: RegistryProviderConfig,
         pub dependencies: HashMap<DependencyKind, default::DependencyConfig>
     }
 
@@ -154,7 +154,7 @@ pub mod concrete {
         }
 
         fn required(&self) -> Vec<Kind> {
-            default_requirements()
+            my::default_requirements()
         }
 
         fn dependency_kinds(&self) -> &Vec<DependencyKind> {
@@ -176,10 +176,6 @@ pub mod concrete {
 
      */
 
-    #[derive(Clone, Debug, Serialize, Deserialize)]
-    pub struct RegistryProviderConfig {
-        provider: ProviderKind,
-    }
 
 
     pub mod default {
