@@ -1,165 +1,106 @@
-use crate::base::foundation;
-use crate::base::err::BaseErr;
-use crate::base::foundation::util::{IntoSer, Map, SerMap};
-use crate::base::foundation::Dependency;
-use crate::space::parse::CamelCase;
-use derive_name::Name;
-use futures::TryFutureExt;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::str::FromStr;
-use std::sync::Arc;
 use crate::base;
-use crate::base::kind::{DependencyKind, Kind, PostgresKind, ProviderKind};
+use base::foundation;
+use crate::space::parse::DbCase;
+
+/// Dependency and Providers of a particular Kind usually share some common traits regardless
+/// of any Foundation affiliation. For example: multiple foundations define a dependency for
+/// `Postgres` (and at the time of this writing `Postgres` *is* the only Registry Foundation implemented.
+/// A `common` trait definition for postgres might look like this:
 
 
+ /// Here we define the common config api for a Postgres Cluster instance
+ pub trait DependencyConfig: base::config::DependencyConfig {
+    /// define the Postgres port
+    fn port(&self) -> u16;
+
+    /// the `root` username for this Postgres Cluster
+    fn username(&self) -> String;
+
+    /// um... hrm... well, Starlane should get this from a Secrets Vault... but that isn't implemented
+    /// so for now it's provided in plaintext
+    fn password(&self) -> String;
+
+    /// provide Postgres' actual persistent storage volume. Should default to: `/var/lib/postgresql/data`
+    fn volume(&self)  -> String;
+ }
+
+ pub trait Dependency: foundation::Dependency<Config:DependencyConfig, Provider: Provider> { }///
+
+ /// here we define the common attributes and api for every Postgres Provider (which in the case of Postgres is an actual Database in the Dependency cluster we created)
+ pub trait ProviderConfig: base::config::ProviderConfig {
+
+    /// the name of the database to create in the parent dependency postgres cluster.
+    /// notice it uses `DbCase` which is a String implementation that enforces SQL nameing rules (mixed snake case... yes -> [ "my_database", "I_am_Your_Database"]  no -> ["no-Hyphens Spaces_or_!#%Weird_Characters!"]
+    fn database(&self) -> DbCase;
+ }
+
+ /// define the common Mode's of a Postgres Provider
+ pub mod mode {
+
+ }
+
+
+
+
+pub mod provider {
+    use super as config;
+    pub mod mode {
+        use super::config;
+        pub mod create {
+            use super::config;
+            use super::utilize;
+            ///  [`Create`] mode must also [`Utilize`] mode's properties since the foundation
+            /// will want to Create the Provision (potentially meaning: downloading, instancing, credential setup,  initializing...etc.)
+            /// and then will want to [`Utilize`] the Provision (potentially meaning: authenticating via the same credentials supplied from
+            /// [`Create`], connecting to the same port that was set up etc.
+            pub trait ProviderConfig: crate::base::config::ProviderConfig+ crate::base::config::provider::mode::utilize::ProviderConfig { }
+        }
+
+        pub mod utilize{
+            use super::config;
+            pub trait ProviderConfig: crate::base::config::ProviderConfig{
+            }
+        }
+
+    }
+}///
+///
+/// /// create a variant of
+///
+///
+
+/// [`common::skel`] provides
+
+
+pub trait Provider: foundation::Provider<Config: ProviderConfig>{ }
+
+pub trait FoundationConfig: foundation::config::FoundationConfig<DependencyConfig:DependencyConfig> { }
 
 
 pub mod concrete {
-    #[derive(Clone, Debug, Serialize, Deserialize)]
-    pub struct PostgresClusterCoreConfig {
-        pub port: u16,
-        pub data_dir: String,
-        pub username: String,
-        pub password: String,
-        pub providers: HashMap<CamelCase, Arc<ProviderConfig>>,
-    }
+    ///  reference the above a [`my`] implementation ...
+    pub(self) use super as my;
 
-    impl PostgresClusterCoreConfig {
-        pub fn create(config: Map) -> Result<Self, BaseErr> {
-            let port: u16 = config
-                .from_field_opt("port")
-                .map_err(BaseErr::config_err)?
-                .map_or(5432u16, |port| port);
-            let username: String = config
-                .from_field_opt("username")
-                .map_err(BaseErr::config_err)?
-                .map_or("postgres".to_string(), |username| username);
-            let password: String = config
-                .from_field_opt("password")
-                .map_err(BaseErr::config_err)?
-                .map_or("postgres".to_string(), |password| password);
-            let data_dir: String = config.from_field("data_dir")?;
 
-            let mut providers = config.parse_same("providers")?;
-            let mut providers: HashMap<CamelCase, Arc<ProviderConfig>> = providers.into_iter().map(|(key, value)| (key, Arc::new(value))).collect();
-            let registry_kind = CamelCase::from_str("Registry")?;
-            if !providers.contains_key(&registry_kind) {
-                providers.insert(registry_kind, Arc::new(ProviderConfig::default_registry()));
-            }
+    /// [super::variant] is just a generic mod name for a [`Dependency`] variant.
+    /// when implementing this pattern probably give it a name that differentiates if from
+    /// other dependencies.  For example: if the hypothetical implementation is for [`FoundationKind::Kubernetes`]
+    /// the various concrete dependency implementations should have meaningful names like: `postgres`,
+    /// `keycloak`, `s3`, `kafka` ...  and of course instead of one custom dependency variant
+    /// multiple implementations can and should be implemented for this Foundation
+    pub mod variant {
+        use super::my;
 
-            Ok(PostgresClusterCoreConfig {
-                port,
-                data_dir,
-                username,
-                password,
-                providers,
-            })
-        }
+        pub struct Dependency {}
+        impl my::Dependency for Dependency {}
 
-        pub fn create_as_trait(config: Map) -> Result<Arc<dyn DependencyConfig>, BaseErr> {
-            Ok(Self::create(config)?.into_trait())
-        }
-
-        pub fn into_trait(self) -> Arc<dyn DependencyConfig> {
-            todo!();
-            /*        let config = Arc::new(self);
-                    config as Arc<dyn DependencyConfig>
-
-             */
+        /// [super::variant] follows the same pattern as [`super::variant`] except in this case it is for
+        /// [crate::base::foundation::Provider] variants
+        pub mod variant {
+            use super::my;
+            pub struct Provider {}
+            impl my::Provider for Provider {}
         }
     }
-
-    pub trait DependencyConfig: base::config::DependencyConfig {}
-
-    impl base::config::DependencyConfig for PostgresClusterCoreConfig {
-        fn kind(&self) -> &DependencyKind {
-            &DependencyKind::PostgresCluster
-        }
-
-        fn volumes(&self) -> HashMap<String, String> {
-            let mut map = HashMap::new();
-            map.insert("data".to_string(), self.data_dir.clone());
-            map
-        }
-
-        fn require(&self) -> Vec<Kind> {
-            foundation::default_requirements()
-        }
-
-        fn clone_me(&self) -> Arc<dyn base::config::DependencyConfig> {
-            Arc::new(self.clone())
-        }
-
-        type ProviderConfig = ();
-    }
-
-    impl IntoSer for PostgresClusterCoreConfig {
-        fn into_ser(&self) -> Box<dyn SerMap> {
-            todo!()
-            //        self.clone() as Box<dyn SerMap>
-        }
-    }
-
-    impl base::config::ProviderConfigSrc for PostgresClusterCoreConfig {
-        type Config = Arc<ProviderConfig>;
-        fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, BaseErr> {
-            Ok(self.providers.clone())
-        }
-
-        fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, BaseErr> {
-            Ok(self.providers.get(kind))
-        }
-    }
-
-    #[derive(
-        Name,
-        Clone,
-        Debug,
-        Eq,
-        PartialEq,
-        Hash,
-        strum_macros::Display,
-        strum_macros::EnumString,
-        strum_macros::IntoStaticStr,
-        Serialize,
-        Deserialize,
-    )]
-    pub enum PostgresSeed {
-        Registry,
-    }
-
-    #[derive(Clone, Debug, Serialize, Deserialize)]
-    pub struct ProviderConfig {
-        pub kind: PostgresKind,
-        pub database: Option<String>,
-        pub seed: Option<PostgresSeed>,
-    }
-
-    impl ProviderConfig {
-        pub fn default_registry() -> Self {
-            Self {
-                kind: PostgresKind::Registry,
-                database: Some("/var/lib/postgresql/data".to_string()),
-                seed: Some(PostgresSeed::Registry),
-            }
-        }
-    }
-
-    impl IntoSer for ProviderConfig {
-        fn into_ser(&self) -> Box<dyn SerMap> {
-            Box::new(self.clone()) as Box<dyn SerMap>
-        }
-    }
-
-    impl base::config::ProviderConfig for ProviderConfig {
-        fn kind(&self) -> &ProviderKind {
-            todo!()
-        }
-
-        fn clone_me(&self) -> Arc<dyn base::config::ProviderConfig> {
-            Arc::new(self.clone())
-        }
-    }
-
 }
+
