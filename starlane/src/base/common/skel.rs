@@ -88,6 +88,7 @@ pub mod provider {
      */
 
 
+/*
 pub mod concrete {
     ///  reference the above a [`my`] implementation ...
     pub mod my { pub use super::super::*; }
@@ -96,9 +97,10 @@ pub mod concrete {
 
 
     pub mod variant {
+        use crate::base::foundation;
         use super::my;
 
-        pub struct Dependency {}
+        impl foundation::Dependency for Dependency {}
         impl my::Dependency for Dependency {}
 
         /// [super::variant] follows the same pattern as [`super::variant`] except in this case it is for
@@ -132,3 +134,5 @@ pub mod concrete {
         }
     }
 }
+
+ */

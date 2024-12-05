@@ -26,9 +26,6 @@ impl <F> Deref for Foundation<F> where F: foundation::Foundation {
     }
 }
 
-impl <F> Proxy<F> for Foundation<F> where F: foundation::Foundation{
-
-}
 
 impl <F> foundation::Foundation for Foundation<F> where F: foundation::Foundation {
     type Config = F::Config;

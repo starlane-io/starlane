@@ -1,22 +1,21 @@
 use std::hash::Hash;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 use downcast_rs::{impl_downcast, Downcast, DowncastSync};
 use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::Provider;
 use crate::base::kind::{DependencyKind, Kind, ProviderKind};
-use crate::base::partial::{skel, ProviderConfig};
+use crate::base::partial::skel;
 use crate::space::parse::CamelCase;
 
 pub trait Config
-where
-    Self::PlatformConfig: PlatformConfig,
-    Self::FoundationConfig: FoundationConfig,
+
 {
     type Err: Into<BaseErr>;
-    type PlatformConfig: PlatformConfig;
-    type FoundationConfig: FoundationConfig+Clone;
+    type PlatformConfig: PlatformConfig+?Sized;
+    type FoundationConfig: FoundationConfig+?Sized;
 
     fn foundation(&self) -> Self::FoundationConfig;
     fn platform(&self) -> Self::FoundationConfig;
@@ -24,7 +23,7 @@ where
 
 
 pub trait FoundationConfig: DowncastSync {
-    type DependencyConfig: DependencyConfig+Clone;
+    type DependencyConfig:  DependencyConfig+?Sized;
 
     fn kind(&self) -> FoundationKind;
 
@@ -35,11 +34,10 @@ pub trait FoundationConfig: DowncastSync {
     fn dependency_kinds(&self) -> &Vec<DependencyKind>;
 
     fn dependency(&self, kind: &DependencyKind) -> Option<&Self::DependencyConfig>;
-
 }
 
 pub trait DependencyConfig: DowncastSync {
-    type ProviderConfig: ProviderConfig+Clone;
+    type ProviderConfig: ProviderConfig+?Sized;
 
     fn kind(&self) -> &DependencyKind;
 
@@ -49,10 +47,10 @@ pub trait DependencyConfig: DowncastSync {
 pub trait ProviderConfigSrc
 {
 
-    type Config: ProviderConfig;
+    type Config: ProviderConfig+?Sized;
 
 
-    fn providers(&self) -> Result<HashMap<CamelCase, Self::Config>, BaseErr>;
+    fn providers(&self) -> Result<HashMap<CamelCase, &Self::Config>, BaseErr>;
 
     fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, BaseErr>;
 }

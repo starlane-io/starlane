@@ -2,7 +2,6 @@ use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::status::{Phase, PhaseDetail, Status};
 use crate::base::foundation::util::SerMap;
-use crate::base::foundation::{config, Dependency, Foundation, LiveService, Provider};
 use crate::space::parse::CamelCase;
 use crate::space::point::Point;
 use crate::space::progress::Progress;
@@ -19,7 +18,7 @@ use crate::base::{foundation, registry};
 use crate::base::kind::{DependencyKind, Kind, ProviderKind};
 use crate::base::config::ProviderConfig;
 
-enum Call<F> where F: Foundation {
+enum Call<F> where F: foundation::Foundation {
     Synchronize {
         progress: Progress,
         rtn: tokio::sync::oneshot::Sender<Result<Status, BaseErr>>,
@@ -38,14 +37,14 @@ enum Call<F> where F: Foundation {
     _Phantom(PhantomData<F>),
 }
 
-struct FoundationTx<F> where F: Foundation {
+struct FoundationTx<F> where F: foundation::Foundation {
     phantom: PhantomData<F>,
     config: base::config::default::FoundationConfig,
     call_tx: tokio::sync::mpsc::Sender<Call<F>>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
-impl <F> FoundationTx<F> where F: Foundation{
+impl <F> FoundationTx<F> where F: foundation::Foundation{
     fn new(
         config: base::config::default::FoundationConfig,
         call_tx: tokio::sync::mpsc::Sender<Call<F>>,
@@ -61,7 +60,7 @@ impl <F> FoundationTx<F> where F: Foundation{
 }
 
 #[async_trait]
-impl <F> Foundation for FoundationTx<F> where F: Foundation {
+impl <F> foundation::Foundation for FoundationTx<F> where F: foundation::Foundation {
     type Config = F::Config;
     type Dependency = ();
     type Provider = ();
@@ -132,7 +131,7 @@ impl<K, C> Wrapper<K, C> {
     }
 }
 
-enum DepCall<D> where D: Dependency {
+enum DepCall<D> where D: foundation::Dependency {
     Download {
         progress: Progress,
         rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
@@ -147,7 +146,7 @@ enum DepCall<D> where D: Dependency {
     },
     Start {
         progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<LiveService<DependencyKind>, BaseErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<foundation::LiveService<DependencyKind>, BaseErr>>,
     },
     Provider {
         kind: ProviderKind,
@@ -157,13 +156,13 @@ enum DepCall<D> where D: Dependency {
     _Phantom(PhantomData<D>)
 }
 
-struct DependencyTx<F> where F: Foundation {
-    config: F::Dependency::Config,
+struct DependencyTx<F> where F: foundation::Foundation {
+    config: <<F as foundation::Foundation>::Dependency as foundation::Dependency>::Config,
     call_tx: tokio::sync::mpsc::Sender<DepCall<F>>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
-impl <F> DependencyTx<F> where F: Foundation {
+impl <F> DependencyTx<F> where F: foundation::Foundation {
     fn new(
         config: F::Dependency::Config,
         call_tx: tokio::sync::mpsc::Sender<DepCall<F>>,
@@ -178,7 +177,7 @@ impl <F> DependencyTx<F> where F: Foundation {
 }
 
 #[async_trait]
-impl <F> Dependency for DependencyTx<F> where F: Foundation {
+impl <F> foundation::Dependency for DependencyTx<F> where F: foundation::Foundation {
     type Config = F::Config;
     type Provider = F::Provider;
 

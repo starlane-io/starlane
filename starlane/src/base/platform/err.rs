@@ -3,6 +3,6 @@ use crate::base::foundation;
 
 #[derive(Error, Clone, Debug)]
 pub enum PlatformErr{
-    #[error(transparent)]
+    #[error("{0}")]
     Msg(String)
 }

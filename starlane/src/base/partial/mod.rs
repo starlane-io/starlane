@@ -27,8 +27,8 @@ pub mod config;
 
 /// trait for a partial that has a status
 #[async_trait]
-pub trait Partial {
-    type Config: config::PartialConfig;
+pub trait Partial: Downcast{
+    type Config: config::PartialConfig+?Sized;
    fn status(&self) -> Status {
        self.status_watcher().borrow().clone()
    }

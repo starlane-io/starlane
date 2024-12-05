@@ -1,4 +1,3 @@
-use crate::base::err::BaseErr;
 /// # FOUNDATION
 ///
 /// A ['Foundation'] provides abstracted control over the services and dependencies that drive Starlane.
@@ -27,7 +26,7 @@ use crate::base::err::BaseErr;
 /// There is one special core that the Foundation must manage which is the [`Foundation::registry`]
 /// the Starlane Registry is the only required core from the vanilla Starlane installation
 use crate::base::foundation::kind::FoundationKind;
-use crate::base::foundation::status::{Phase, Status};
+use crate::base::foundation::status::{Phase, Status, StatusDetail};
 use crate::base::foundation::util::CreateProxy;
 use crate::hyperspace::platform::PlatformConfig;
 use crate::space::parse::CamelCase;
@@ -49,6 +48,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
 use crate::base;
+use crate::base::err::BaseErr;
 /// # FOUNDATION
 ///
 /// A ['Foundation'] provides abstracted control over the services and dependencies that drive Starlane.
@@ -78,9 +78,9 @@ use crate::base;
 /// the Starlane Registry is the only required core from the vanilla Starlane installation
 use crate::base::kind::{DependencyKind, IKind, Kind, ProviderKind};
 
-pub mod proxy;
+//pub mod proxy;
 
-pub mod runner;
+//pub mod runner;
 
 /// [`skel`] provides a starter implementation of [`foundation`] where all the traits are extended
 pub mod skel;
@@ -116,24 +116,27 @@ pub trait Types {
 pub trait Foundation: Downcast + Sync + Send {
 
     /// [`Foundation::Config`] should be a `concrete` implementation of [`base::config::FoundationConfig`]
-    type Config: base::config::FoundationConfig + Clone;
+    type Config: base::config::FoundationConfig+?Sized;
 
     /// [`Foundation::Dependency`] Should be [`Dependency`] or a custom `trait` that implements [`Dependency`] ... it should not be a concrete implementation
-    type Dependency: Dependency;
+    type Dependency: Dependency+?Sized;
 
     /// [`Foundation::Provider`] Should be [`Provider`] or a custom `trait` that implements [`Provider`] ... it should not be a concrete implementation
-    type Provider: Provider;
+    type Provider: Provider + ?Sized;
 
     fn kind(&self) -> FoundationKind;
 
-    fn config(&self) -> Self::Config;
+    fn config(&self) -> Arc<Self::Config>;
 
     fn status(&self) -> Status;
 
+
+    async fn status_detail(&self) -> Result<StatusDetail,BaseErr>;
+
     fn status_watcher(&self) -> Arc<tokio::sync::watch::Receiver<Status>>;
 
-    /// synchronize must be called first.  In this method the [`Foundation`] will check its
-    /// environment to determine the
+    /// synchronize must be called first.  In this method the [`Foundation`] will check
+    /// update the present [Foundation::status] to be consistent with the actual infrastructure
     async fn synchronize(&self, progress: Progress) -> Result<Status, BaseErr>;
 
     /// Install and initialize any Dependencies and/or [`Providers`] that
@@ -142,7 +145,7 @@ pub trait Foundation: Downcast + Sync + Send {
     async fn install(&self, progress: Progress) -> Result<(), BaseErr>;
 
     /// return the given [`Dependency`] if it exists within this [`Foundation`]
-    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Self::Dependency>, BaseErr>;
+    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Box<Self::Dependency>>, BaseErr>;
 
     /// return a handle to the [`Registry`]
     fn registry(&self) -> Result<registry::Registry, BaseErr>;
@@ -158,13 +161,13 @@ impl_downcast!(Foundation assoc Config, Dependency, Provider);
 /// start the service whereas a Provider in this example would represent an individual Database
 #[async_trait]
 pub trait Dependency: Downcast + Send + Sync {
-    type Config: base::config::DependencyConfig + Clone;
+    type Config: base::config::DependencyConfig+?Sized;
 
-    type Provider: Provider;
+    type Provider: Provider+?Sized;
 
     fn kind(&self) -> DependencyKind;
 
-    fn config(&self) -> Self::Config;
+    fn config(&self) -> Arc<Self::Config>;
 
     fn status(&self) -> Status;
 
@@ -186,7 +189,7 @@ pub trait Dependency: Downcast + Send + Sync {
         -> Result<LiveService<DependencyKind>, BaseErr>;
 
     /// return a [`Provider`] which can create instances from this [`Dependency`]
-    fn provider(&self, kind: &ProviderKind) -> Result<Option<Self::Provider>, BaseErr>;
+    fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<Self::Provider>>, BaseErr>;
 }
 
 impl_downcast!(Dependency assoc Config, Provider);
@@ -195,11 +198,11 @@ impl_downcast!(Dependency assoc Config, Provider);
 /// Installs
 #[async_trait]
 pub trait Provider: Downcast + Send + Sync {
-    type Config: base::config::ProviderConfig + Clone;
+    type Config: base::config::ProviderConfig + ?Sized;
 
     fn kind(&self) -> &ProviderKind;
 
-    fn config(&self) -> Self::Config;
+    fn config(&self) -> Arc<Self::Config>;
 
     fn status(&self) -> Status;
 
@@ -264,12 +267,16 @@ where
         self.foundation.kind()
     }
 
-    fn config(&self) -> Self::Config {
+    fn config(&self) -> Arc<Self::Config> {
         self.foundation.config()
     }
 
     fn status(&self) -> Status {
         self.status()
+    }
+
+    async fn status_detail(&self) -> Result<StatusDetail,BaseErr> {
+        todo!()
     }
 
     fn status_watcher(&self) -> Arc<Receiver<Status>> {
@@ -281,15 +288,15 @@ where
     }
 
     async fn install(&self, progress: Progress) -> Result<(), BaseErr> {
-        if self.status().phase.into() == Phase::Unknown {
+        if self.status().phase == Phase::Unknown {
             Err(BaseErr::unknown_state("install"))
         } else {
             self.foundation.install(progress).await
         }
     }
 
-    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Self::Dependency>, BaseErr> {
-        if self.status().phase.into() == Phase::Unknown {
+    fn dependency(&self, kind: &DependencyKind) -> Result<Option<Box<Self::Dependency>>, BaseErr> {
+        if self.status().phase == Phase::Unknown {
             Err(BaseErr::unknown_state("dependency"))
         } else {
             self.foundation.dependency(kind)
@@ -297,7 +304,7 @@ where
     }
 
     fn registry(&self) -> Result<registry::Registry, BaseErr> {
-        if self.status().phase.into() == Phase::Unknown {
+        if self.status().phase == Phase::Unknown {
             Err(BaseErr::unknown_state("registry"))
         } else {
             self.foundation.registry()

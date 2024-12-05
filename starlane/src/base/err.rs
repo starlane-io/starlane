@@ -1,9 +1,9 @@
 use thiserror::Error;
 use std::sync::Arc;
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 use serde_yaml::Value;
-use serde::{Deserialize, Serialize};
 use crate::base::foundation::kind::FoundationKind;
+use crate::base::foundation::status::ActionRequest;
 use crate::base::kind::{DependencyKind, IKind, Kind, ProviderKind};
 use crate::space::err::ParseErrs;
 use crate::space::substance::Call;
@@ -109,6 +109,7 @@ impl BaseErr {
     where
         C: ToString,
     {
+        let kind = kind.into();
         let err = err.to_string();
         let config = config.to_string();
         Self::BaseVerboseErr { kind, err, config }
@@ -354,90 +355,4 @@ impl<'z> BaseErrBuilder<'z> {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ActionRequest {
-    pub title: String,
-    pub description: String,
-    pub items: Vec<ActionItem>,
-}
 
-impl ActionRequest {
-    pub fn new(title: String, description: String) -> Self {
-        Self {
-            title,
-            description,
-            items: vec![],
-        }
-    }
-
-    pub fn add(&mut self, item: ActionItem) {
-        self.items.push(item);
-    }
-
-    pub fn print(&self) {}
-}
-
-impl Display for ActionRequest {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str("ACTION REQUEST: ")?;
-        f.write_str(&self.title)?;
-        f.write_str("\n")?;
-        f.write_str(&self.description)?;
-        f.write_str("\n")?;
-        f.write_str(format!("ITEMS: {} required action items...", self.items.len()).as_str())?;
-        f.write_str("\n")?;
-        for (index, item) in self.items.iter().enumerate() {
-            f.write_str(format!("{} -> {}", index.to_string(), item.title).as_str())?;
-
-            if let Some(ref web) = item.website {
-                f.write_str("\n")?;
-                f.write_str(format!(" more info: {}", web).as_str())?;
-            }
-            f.write_str("\n")?;
-            f.write_str(item.details.as_str())?;
-            if self.items.len() != index {
-                f.write_str("\n")?;
-            }
-        }
-
-        f.write_str("\n")
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ActionItem {
-    pub title: String,
-    pub website: Option<String>,
-    pub details: String,
-}
-
-impl ActionItem {
-    pub fn new(title: String, details: String) -> Self {
-        Self {
-            title,
-            details,
-            website: None,
-        }
-    }
-
-    pub fn with_website(&mut self, website: String) {
-        self.website = Some(website);
-    }
-
-    pub fn print(vec: &Vec<Self>) {}
-}
-
-impl Display for ActionItem {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.title)?;
-        f.write_str("\n")?;
-        if let Some(website) = &self.website {
-            f.write_str("more info: ")?;
-            f.write_str(website)?;
-            f.write_str("\n")?;
-        };
-
-        f.write_str(&self.details)?;
-        f.write_str("\n")
-    }
-}
