@@ -6,9 +6,8 @@ use nom::combinator::all_consuming;
 use serde::de::{DeserializeOwned, Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::space::command::direct::select::SubSelect;
 use crate::space::err::ParseErrs;
-use crate::space::kind::{BaseKind, Kind, KindParts, Specific, Sub, SubKind};
+use crate::space::kind::{BaseKind, Kind, KindParts, Specific, SubKind};
 use crate::space::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};
 use crate::space::parse::util::result;
 use crate::space::parse::util::{new_span, Trace};
@@ -37,7 +36,7 @@ pub type PointSelector = Selector;
 
 pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, SpecificSelector>;
 pub type KindSelectorVar =
-    KindSelectorDef<VarVal<KindBaseSelector>, VarVal<SubKindSelector>, VarVal<SpecificSelector>>;
+KindSelectorDef<VarVal<KindBaseSelector>, VarVal<SubKindSelector>, VarVal<SpecificSelector>>;
 
 impl PartialEq<Kind> for KindSelector {
     fn eq(&self, kind: &Kind) -> bool {
@@ -789,7 +788,7 @@ pub mod specific {
     use core::ops::Deref;
     use core::str::FromStr;
 
-    use crate::space::err::{ParseErrs, SpaceErr};
+    use crate::space::err::ParseErrs;
     use crate::space::parse::{Domain, SkewerCase};
     use crate::space::selector::Pattern;
 
@@ -975,7 +974,7 @@ where
 
     pub fn convert<To>(self) -> Result<Pattern<To>, SpaceErr>
     where
-        P: TryInto<To, Error = SpaceErr> + Eq + PartialEq,
+        P: TryInto<To, Error=SpaceErr> + Eq + PartialEq,
     {
         Ok(match self {
             Pattern::Always => Pattern::Always,
@@ -1027,7 +1026,7 @@ where
 
     pub fn convert<To>(self) -> Result<EmptyPattern<To>, SpaceErr>
     where
-        P: TryInto<To, Error = SpaceErr> + Eq + PartialEq,
+        P: TryInto<To, Error=SpaceErr> + Eq + PartialEq,
     {
         Ok(match self {
             EmptyPattern::Any => EmptyPattern::Any,
@@ -1370,7 +1369,7 @@ impl ToResolved<PayloadBlock> for PayloadBlockVar {
 #[cfg(test)]
 mod test {
     use crate::space::kind::BaseKind;
-    use crate::space::selector::{PointKindSeg, PointSegKindHop, PointSelector};
+    use crate::space::selector::{PointSegKindHop, PointSelector};
     use crate::space::util::ValueMatcher;
 
     #[test]

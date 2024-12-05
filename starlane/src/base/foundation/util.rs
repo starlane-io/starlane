@@ -1,5 +1,6 @@
 use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
+use crate::base::kind::IKind;
 use bincode::Options;
 use derive_name::Name;
 use serde::de::{DeserializeOwned, MapAccess, Visitor};
@@ -8,11 +9,10 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::SerializeAs;
 use serde_yaml::{Mapping, Sequence, Value};
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter, Write};
+use std::fmt::{Display, Write};
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
-use crate::base::kind::IKind;
 
 pub trait SubText {}
 
@@ -378,18 +378,17 @@ where
  */
 
 
-
 #[cfg(test)]
 pub mod test {
+    use derive_name::{Name, Named};
+    use downcast_rs::{impl_downcast, Downcast, DowncastSync};
     use serde::{Deserialize, Serialize};
     use std::fmt::Debug;
     use std::sync::Arc;
-    use derive_name::{Name, Named};
-    use downcast_rs::{impl_downcast, Downcast, DowncastSync};
     #[test]
     pub fn test_serde_factory() -> anyhow::Result<()> {
         #[typetag::serde(tag = "kind")]
-        trait SomeConfig: DowncastSync+Debug {
+        trait SomeConfig: DowncastSync + Debug {
             fn say_my_name(&self) -> &'static str;
         }
         impl_downcast!(sync SomeConfig);
@@ -411,7 +410,7 @@ pub mod test {
             BConf,
         }
 
-        #[derive(Clone, Debug, Default, Serialize, Deserialize,Name)]
+        #[derive(Clone, Debug, Default, Serialize, Deserialize, Name)]
         struct AConf {
             something: u32,
         }
@@ -432,7 +431,6 @@ pub mod test {
             fn say_my_name(&self) -> &'static str {
                 "BConf"
             }
-
         }
 
         let raw = r#"
@@ -444,8 +442,8 @@ pub mod test {
         "#;
 
         let mut items: Vec<Arc<dyn SomeConfig>> = serde_yaml::from_str(raw)?;
-        let item0  =items.remove(0);
-        let item1  =items.remove(0);
+        let item0 = items.remove(0);
+        let item1 = items.remove(0);
 
         assert_eq!("AConf", item0.say_my_name());
         assert_eq!("BConf", item1.say_my_name());
@@ -457,11 +455,10 @@ pub mod test {
         let conf1 = item1.clone().downcast_arc::<BConf>().unwrap();
 
 
-
         println!("AConf::something(&conf0): {}", conf0.something);
         println!("BConf::and_another_thing(&conf1): {}", conf1.and_another_thing);
 
-        println!("item0 is still alive?: {}",item0.say_my_name());
+        println!("item0 is still alive?: {}", item0.say_my_name());
 
 
         Ok(())
@@ -480,18 +477,17 @@ pub mod test {
             }
         }
 
-            let a: &dyn Trait = &42_u8;
-            let b: &dyn Trait = &String::from("hello");
+        let a: &dyn Trait = &42_u8;
+        let b: &dyn Trait = &String::from("hello");
 
-            let _number: u8 = *unsafe { a.downcast::<u8>() };
-            let _text: &str = unsafe { b.downcast::<String>() };
+        let _number: u8 = *unsafe { a.downcast::<u8>() };
+        let _text: &str = unsafe { b.downcast::<String>() };
 
         Ok(())
     }
 
     #[test]
     pub fn analyze_vtable() {
-
         trait Trait {
             fn do_something(&self);
             fn do_something_else(&self);
@@ -506,7 +502,6 @@ pub mod test {
             fn do_something(&self) { println!("a y=u128: {}", self); }
             fn do_something_else(&self) { println!("a u128: {}", self); }
         }
-
 
         fn analyse_fatp<T: ?Sized>(p: *const T, datasize: usize, vtsize: usize) {
             let addr = &p as *const *const T as *const usize;
@@ -534,10 +529,8 @@ pub mod test {
         analyse_fatp(obj, std::mem::size_of::<String>() / std::mem::size_of::<usize>(), 5);
 
         let obj: &dyn Trait = &12_u128;
-//        dbg!(u128::do_something as *const ());
-//        dbg!(u128::do_something_else as *const ());
+        //        dbg!(u128::do_something as *const ());
+        //        dbg!(u128::do_something_else as *const ());
         analyse_fatp(obj, std::mem::size_of::<u128>() / std::mem::size_of::<usize>(), 5);
-
     }
-
 }

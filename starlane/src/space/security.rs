@@ -13,7 +13,7 @@ use crate::space::err::ParseErrs;
 use crate::space::parse::util::result;
 use crate::space::parse::{particle_perms, permissions, permissions_mask, privilege};
 use crate::space::point::Point;
-use crate::space::selector::{PointHierarchy, PointHierarchyOpt, Selector};
+use crate::space::selector::{PointHierarchy, Selector};
 use crate::space::wave::ScopeGrant;
 use crate::space::Agent;
 

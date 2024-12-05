@@ -1,8 +1,7 @@
 use crate::hyperspace::executor::cli::os::CliOsExecutor;
-use crate::hyperspace::executor::cli::{CliIn, CliOut, HostEnv};
-use crate::hyperspace::executor::{ExeConf, Executor};
+use crate::hyperspace::executor::cli::HostEnv;
+use crate::hyperspace::executor::Executor;
 use crate::hyperspace::host::err::HostErr;
-use crate::hyperspace::service::ServiceErr;
 use crate::space::wave::exchange::asynch::DirectedHandler;
 use clap::CommandFactory;
 use itertools::Itertools;
@@ -78,7 +77,7 @@ impl Host {
     }
     pub fn create<D>(&self) -> Result<D, HostErr>
     where
-        D: TryFrom<CliOsExecutor, Error = HostErr>,
+        D: TryFrom<CliOsExecutor, Error=HostErr>,
     {
         match self {
             Host::Cli(host) => host.create(),
@@ -107,7 +106,7 @@ impl HostCli {
 
     pub fn create<D>(&self) -> Result<D, HostErr>
     where
-        D: TryFrom<CliOsExecutor, Error = HostErr>,
+        D: TryFrom<CliOsExecutor, Error=HostErr>,
     {
         match self {
             HostCli::Os(stub) => Ok(D::try_from(CliOsExecutor::new(stub.clone()))?),

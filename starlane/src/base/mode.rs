@@ -91,10 +91,7 @@
 ///   initialized and then performs the necessary actions to download, install and initialize as needed.
 ///   IF [Mode::Create] succeeds... the [foundation::Foundation] will then reverse its mode traversal
 
-
-
-
-
 use crate::base;
+use base::config;
 use base::foundation;
-use base::config; use base::platform;
+use base::platform;

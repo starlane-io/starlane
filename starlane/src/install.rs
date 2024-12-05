@@ -6,13 +6,13 @@ use crate::env::{
 };
 use starlane::base::foundation::Foundation;
 use crate::hyperspace::reg::PgRegistryConfig;
-<<<<<<< Updated upstream
+< < < < < < < Updated upstream
 use crate::hyperspace::registry::postgres::embed::PgEmbedSettings;
 use crate::server::StarlaneConfig;
-=======
+== == == =
 use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
 use crate::server::{Starlane, StarlaneConfig};
->>>>>>> Stashed changes
+> > > > > > > Stashed changes
 use crate::hyperspace::shutdown::shutdown;
 use crate::{env, COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION};
 use anyhow::anyhow;
@@ -77,7 +77,7 @@ context: {context}
 version: {version}
 "#
                 )
-                .as_str(),
+                    .as_str(),
             ),
         )?;
 
@@ -86,7 +86,7 @@ version: {version}
         match env::config() {
             Ok(Some(_)) => {
                 if !self.edit {
-                    let msg  = format!("A config for context '{}' already exists.  To overwrite run install with the --edit flag i.e. `{}`", context, "starlane install --edit".custom_color(self.console.theme.important()));
+                    let msg = format!("A config for context '{}' already exists.  To overwrite run install with the --edit flag i.e. `{}`", context, "starlane install --edit".custom_color(self.console.theme.important()));
                     self.console.outro_err(msg.as_str())?;
                     Err(anyhow!("{}", msg))?;
                 }
@@ -130,7 +130,7 @@ version: {version}
 
         self.console.long_delay();
 
-        self.console.note("Foundation", "Starlane requires a Foundation in order to provision and manage various resources. If you aren't sure what to select just choose the first option: Local Standalone" );
+        self.console.note("Foundation", "Starlane requires a Foundation in order to provision and manage various resources. If you aren't sure what to select just choose the first option: Local Standalone");
 
         self.console.long_delay();
         let mut selector = self
@@ -196,22 +196,24 @@ impl StandaloneInstaller {
                     "registry configuration saved",
                     "creating registry data directory",
                 );
-<<<<<<< Updated upstream
+                < < < < < < < Updated
+                upstream
                 tokio::fs::create_dir_all(db.settings.database_dir.unwrap_or_default()).await?;
                 spinner.stop("data directory created successfully");
-=======
+                == == == =
                 tokio::fs::create_dir_all(db_dir.clone()).await?;
                 spinner.next(format!("data directory created successfully: '{}'", db_dir.display()), "initializing registry");
-                let db = foundation.provision_postgres_cluster( & config ).await?;
+                let db = foundation.provision_postgres_cluster(&config).await?;
 
                 let logger = logger!(&Point::global_registry());
-                let registry = PostgresRegistry::new2( config.registry.clone(), logger ).await?;
+                let registry = PostgresRegistry::new2(config.registry.clone(), logger).await?;
                 registry.setup().await?;
                 spinner.stop("registry initialized");
             }
             PgRegistryConfig::External(_) => {
                 panic!("not implemented yet")
->>>>>>> Stashed changes
+                    >> >> >> > Stashed
+                changes
             }
             PgRegistryConfig::External(_) => {}
         }
@@ -916,7 +918,6 @@ pub enum InstallType {
 
 #[cfg(test)]
 pub mod test {
-
     #[test]
     pub fn test() {}
 }

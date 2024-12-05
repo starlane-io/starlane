@@ -13,9 +13,8 @@ use crate::base::kind::{DependencyKind, Kind, ProviderKind};
 use crate::base::foundation::config;
 
 
-
-pub trait DependencyConfig: foundation::config::DependencyConfig { }
-pub trait ProviderConfig: foundation::config::ProviderConfig { }
+pub trait DependencyConfig: foundation::config::DependencyConfig {}
+pub trait ProviderConfig: foundation::config::ProviderConfig {}
 
 
 /*

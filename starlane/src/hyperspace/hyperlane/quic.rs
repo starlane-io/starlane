@@ -34,7 +34,7 @@ impl rustls::client::ServerCertVerifier for SkipServerVerification {
         _end_entity: &rustls::Certificate,
         _intermediates: &[rustls::Certificate],
         _server_name: &rustls::ServerName,
-        _scts: &mut dyn Iterator<Item = &[u8]>,
+        _scts: &mut dyn Iterator<Item=&[u8]>,
         _ocsp_response: &[u8],
         _now: std::time::SystemTime,
     ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
@@ -74,8 +74,8 @@ impl HyperServerQuic {
                             Duration::from_secs(30),
                             connection.uni_streams.next(),
                         )
-                        .await?
-                        .ok_or(SpaceErr::server_error())??;
+                            .await?
+                            .ok_or(SpaceErr::server_error())??;
                         let version = recv.read_to_end(2 * 1024).await?;
                         let version = PrimitiveFrame::from(version);
                         let version = version.try_into()?;
@@ -101,8 +101,8 @@ impl HyperServerQuic {
                             Duration::from_secs(30),
                             connection.uni_streams.next(),
                         )
-                        .await?
-                        .ok_or(SpaceErr::server_error())??;
+                            .await?
+                            .ok_or(SpaceErr::server_error())??;
                         let req = recv.read_to_end(32 * 1024).await?;
                         let req = PrimitiveFrame::from(req);
                         let req = req.try_into()?;

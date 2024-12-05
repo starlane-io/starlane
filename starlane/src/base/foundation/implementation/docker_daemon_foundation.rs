@@ -26,7 +26,7 @@ static REQUIRED: Lazy<Vec<Kind>> = Lazy::new(|| {
         DependencyKind::PostgresCluster,
         CamelCase::from_str("Registry").unwrap(),
     )
-    .into();
+        .into();
     let mut rtn = vec![docker_daemon, registry];
 
     rtn
@@ -38,20 +38,19 @@ fn default_requirements() -> Vec<Kind> {
     REQUIRED.clone()
 }
 
-pub trait Foundation: foundation::Foundation<Config: foundation::skel::FoundationConfig, Dependency: foundation::skel::Dependency, Provider: foundation::skel::Provider> { }
-pub trait Dependency: foundation::Dependency<Config: foundation::skel::DependencyConfig, Provider: crate::base::foundation::skel::Provider> { }
-pub trait Provider: foundation::Provider<Config: foundation::skel::ProviderConfig>{ }
+pub trait Foundation: foundation::Foundation<Config: foundation::skel::FoundationConfig, Dependency: foundation::skel::Dependency, Provider: foundation::skel::Provider> {}
+pub trait Dependency: foundation::Dependency<Config: foundation::skel::DependencyConfig, Provider: crate::base::foundation::skel::Provider> {}
+pub trait Provider: foundation::Provider<Config: foundation::skel::ProviderConfig> {}
 
-pub trait FoundationConfig: foundation::config::FoundationConfig<DependencyConfig: foundation::skel::DependencyConfig> { }
+pub trait FoundationConfig: foundation::config::FoundationConfig<DependencyConfig: foundation::skel::DependencyConfig> {}
 
 
 pub trait DependencyConfig: foundation::config::DependencyConfig {
     /// in this foundation all dependencies are docker images.
     fn image(&self) -> String;
-
 }
 
-pub trait ProviderConfig: foundation::config::ProviderConfig { }
+pub trait ProviderConfig: foundation::config::ProviderConfig {}
 
 pub mod concrete {
     use crate::base::foundation::implementation::docker_daemon_foundation as my;
@@ -127,11 +126,10 @@ pub mod concrete {
             todo!()
         }
 
-        fn registry(&self) -> Result<base::registry::Registry, BaseErr> { todo!()
+        fn registry(&self) -> Result<base::registry::Registry, BaseErr> {
+            todo!()
         }
     }
-
-
 
 
     //#[derive(Clone, Serialize, Deserialize, Name)]
@@ -139,9 +137,8 @@ pub mod concrete {
     pub struct FoundationConfig {
         pub kind: FoundationKind,
         //pub registry: RegistryProviderConfig,
-        pub dependencies: HashMap<DependencyKind, default::DependencyConfig>
+        pub dependencies: HashMap<DependencyKind, default::DependencyConfig>,
     }
-
 
 
     pub trait ProviderConfig: base::config::ProviderConfig {}
@@ -177,7 +174,6 @@ pub mod concrete {
      */
 
 
-
     pub mod default {
         use std::sync::Arc;
         use crate::base::foundation;
@@ -199,14 +195,13 @@ pub mod concrete {
             pub type FoundationConfig = dyn config::FoundationConfig<DependencyConfig=DependencyConfig>;
             pub type DependencyConfig = dyn config::DependencyConfig<ProviderConfig=ProviderConfig>;
 
-            pub type ProviderConfig= dyn config::ProviderConfig;
+            pub type ProviderConfig = dyn config::ProviderConfig;
 
-            pub type Foundation<D,P> = dyn foundation::Foundation<Config=FoundationConfig, Dependency=D,Provider=P>;
+            pub type Foundation<D, P> = dyn foundation::Foundation<Config=FoundationConfig, Dependency=D, Provider=P>;
             pub type Dependency = dyn foundation::Dependency<Config=DependencyConfig, Provider=Provider>;
             pub type Provider = Box<dyn foundation::Provider<Config=ProviderConfig>>;
         }
     }
-
 }
 
 
@@ -221,7 +216,7 @@ pub mod test {
                 serde_yaml::from_str(foundation_config).map_err(BaseErr::config_err)?;
 
             todo!();
-//            let foundation_config = FoundationConfig::des_from_map(foundation_config)?;
+            //            let foundation_config = FoundationConfig::des_from_map(foundation_config)?;
 
             Ok(())
         }

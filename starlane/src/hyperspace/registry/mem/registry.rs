@@ -1,20 +1,17 @@
-use crate::hyperspace::platform::Platform;
 use crate::hyperspace::reg::{Registration, RegistryApi};
 use crate::hyperspace::registry::err::RegErr;
 use crate::space::command::common::{PropertyMod, SetProperties};
 use crate::space::command::direct::delete::Delete;
 use crate::space::command::direct::query::{Query, QueryResult};
-use crate::space::command::direct::select::{Select, SubSelect};
+use crate::space::command::direct::select::SubSelect;
 use crate::space::hyper::{ParticleLocation, ParticleRecord};
 use crate::space::particle::{Details, Properties, Property, Status, Stub};
 use crate::space::point::Point;
 use crate::space::security::{Access, AccessGrant, IndexedAccessGrant};
 use crate::space::selector::Selector;
 use crate::space::substance::SubstanceList;
-use crate::space::util::ValueMatcher;
 use async_trait::async_trait;
 use dashmap::DashMap;
-use std::marker::PhantomData;
 use std::sync::atomic::AtomicU64;
 use std::sync::{atomic, Arc};
 

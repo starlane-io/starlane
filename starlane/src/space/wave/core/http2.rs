@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::space::err::SpaceErr;
 use crate::space::substance::{FormErrs, Substance};
-use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore};
 use url::Url;
 

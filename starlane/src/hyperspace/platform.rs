@@ -28,7 +28,7 @@ where
     Self: 'static,
     Self::StarAuth: HyperAuthenticator,
     Self::RemoteStarConnectionFactory: HyperwayEndpointFactory,
-    //    Self::Foundation: Foundation + Clone + Send + Sync,
+//    Self::Foundation: Foundation + Clone + Send + Sync,
     Self::Config: PlatformConfig,
 {
     type Err;

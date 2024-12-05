@@ -12,7 +12,6 @@ use thiserror::Error;
 use crate::space::command::{Command, RawCommand};
 use crate::space::err::{ParseErrs, SpatialError};
 use crate::space::hyper::{Greet, HyperSubstance, HyperSubstanceKind, Knock, ParticleLocation};
-use crate::space::kind::Sub;
 use crate::space::loc::Meta;
 use crate::space::log::{Log, LogSpan, PointlessLog, SpanEvent};
 use crate::space::parse::model::Subst;

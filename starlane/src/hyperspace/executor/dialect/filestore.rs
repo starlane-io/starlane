@@ -1,15 +1,12 @@
 use crate::hyperspace::executor::cli::os::CliOsExecutor;
-use crate::hyperspace::executor::cli::{CliErr, CliExecutor, CliIn, CliOut};
+use crate::hyperspace::executor::cli::{CliErr, CliIn, CliOut};
 use crate::hyperspace::executor::Executor;
 use crate::hyperspace::host::err::HostErr;
-use crate::space::loc::ToPoint;
-use crate::space::path::Path;
-use crate::space::point::Point;
 use crate::space::substance::Bin;
 use clap::{Parser, Subcommand};
 use itertools::Itertools;
 use path_clean::PathClean;
-use std::io::{BufRead, Error};
+use std::io::BufRead;
 use std::path::{PathBuf, StripPrefixError};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -60,7 +57,7 @@ impl From<Box<CliOsExecutor>> for FileStore {
 }
 
 pub enum FileStore {
-    Cli(Box<dyn Executor<In = CliIn, Out = CliOut, Err = CliErr> + Send + Sync>),
+    Cli(Box<dyn Executor<In=CliIn, Out=CliOut, Err=CliErr> + Send + Sync>),
 }
 
 impl FileStore {

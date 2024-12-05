@@ -5,7 +5,7 @@ use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
-use crate::space::err::{ParseErrs, PrintErr, SpaceErr};
+use crate::space::err::{ParseErrs, PrintErr};
 use crate::space::loc::{
     ProvisionAffinity, StarKey, ToBaseKind, Version, CONTROL_WAVE_TRAVERSAL_PLAN,
     MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
@@ -151,7 +151,10 @@ impl BaseKind {
             BaseKind::Driver => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>driver.bind<File<File>>"),
             BaseKind::Global => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>global.bind<File<File>>"),
             _ => Ok(Self::nothing_bind_point_hierarchy())
-        }).map_err(|errs| { errs.print(); errs }).unwrap()
+        }).map_err(|errs| {
+            errs.print();
+            errs
+        }).unwrap()
     }
 
     pub fn bind(&self) -> Point {
@@ -832,18 +835,15 @@ impl TryInto<SpecificSelector> for Specific {
 pub mod test {
     use crate::space::err::{ParseErrs, PrintErr};
     use crate::space::kind::FileSubKind;
-    use crate::space::parse::model::{BlockKind, NestedBlockKind};
-    use crate::space::parse::util::{new_span, recognize, result};
+    use crate::space::parse::util::{new_span, result};
     use crate::space::parse::{
-        consume_hierarchy, delim_kind, file_point_kind_segment, kind, lex_block,
-        point_kind_hierarchy, resolve_kind, unwrap_block,
+        file_point_kind_segment,
+        point_kind_hierarchy,
     };
-    use crate::space::point::Point;
-    use crate::space::selector::{KindSelector, PointHierarchy, Selector};
+    use crate::space::selector::{KindSelector, PointHierarchy};
     use crate::space::util::ValueMatcher;
     use crate::space::{Kind, StarSub};
     use nom::combinator::all_consuming;
-    use nom::IResult;
     use std::str::FromStr;
 
     #[test]

@@ -151,7 +151,7 @@ impl Driver for ControlDriver {
             PointSegTemplate::Exact("controls".to_string()),
             Kind::Base.to_template(),
         )
-        .await?;
+            .await?;
 
         let remote_point_factory = Arc::new(ControlCreator::new(
             self.skel.clone(),

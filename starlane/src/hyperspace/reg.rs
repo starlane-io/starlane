@@ -1,4 +1,3 @@
-use crate::hyperspace::platform::Platform;
 use crate::hyperspace::registry::err::RegErr;
 use crate::space::command::common::{SetProperties, SetRegistry};
 use crate::space::command::direct::create::Strategy;
@@ -13,7 +12,6 @@ use crate::space::security::{Access, AccessGrant, IndexedAccessGrant};
 use crate::space::selector::Selector;
 use crate::space::substance::SubstanceList;
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 pub type Registry = Arc<dyn RegistryApi>;
@@ -43,7 +41,7 @@ pub trait RegistryApi: Send + Sync {
     async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, RegErr>;
 
     async fn query<'a>(&'a self, point: &'a Point, query: &'a Query)
-        -> Result<QueryResult, RegErr>;
+                       -> Result<QueryResult, RegErr>;
 
     async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, RegErr>;
 

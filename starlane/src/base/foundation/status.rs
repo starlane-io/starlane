@@ -6,13 +6,13 @@ use thiserror::Error;
 use crate::base::kind::Kind;
 use std::fmt::{Display, Formatter};
 
-#[derive(Default,Clone, Debug, Serialize, Deserialize)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct Status {
     pub phase: Phase,
     pub action: Action,
 }
 
-#[derive(Default,Clone, Debug, Serialize, Deserialize)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct StatusDetail {
     pub phase: PhaseDetail,
     pub action: ActionDetail,
@@ -25,18 +25,15 @@ impl Status {
 }
 
 
-
-
-
 impl Status {
     pub fn new(phase: Phase, action: Action) -> Self {
-        Self { phase, action}
+        Self { phase, action }
     }
 }
 
 impl StatusDetail {
     pub fn new(phase: PhaseDetail, action: ActionDetail) -> Self {
-        Self { phase, action}
+        Self { phase, action }
     }
 }
 
@@ -51,10 +48,10 @@ impl Into<Status> for StatusDetail {
 
 /// [`PhaseDetail`] provides more detailed information than state.  Including ActionRequired which
 /// should hopefully tell the user exactly what he needs to do to resolve the issue
-#[derive(Clone, Debug, Serialize, Deserialize,EnumDiscriminants)]
+#[derive(Clone, Debug, Serialize, Deserialize, EnumDiscriminants)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(Phase))]
-#[strum_discriminants(derive(Hash,Serialize,Deserialize))]
+#[strum_discriminants(derive(Hash, Serialize, Deserialize))]
 pub enum PhaseDetail {
     Unknown,
     None,
@@ -92,32 +89,30 @@ pub struct Panic {
 }
 
 
-
-#[derive(Clone,Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AwaitCondition {
     /// in case it's waiting for an actual other kind (DependencyKind or ProviderKind)
     pub kind: Option<Kind>,
-    pub description: String
+    pub description: String,
 }
 
-#[derive(Clone,Debug, EnumDiscriminants,Serialize, Deserialize)]
+#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(Action))]
-#[strum_discriminants(derive(Hash,Serialize,Deserialize))]
+#[strum_discriminants(derive(Hash, Serialize, Deserialize))]
 pub enum ActionDetail {
-  Unknown,
-  None,
-  Probing,
-  Pending(Vec<PendingDetail>),
-  Initializing,
-  Done
+    Unknown,
+    None,
+    Probing,
+    Pending(Vec<PendingDetail>),
+    Initializing,
+    Done,
 }
 impl ActionDetail {
     pub fn state(&self) -> Action {
         self.clone().into()
     }
 }
-
 
 
 impl Default for ActionDetail {
@@ -151,7 +146,7 @@ impl Panic {
 
 /// The results of a `Status Probe` which may contain a `Status` or a `StatusErr`
 /// if for some reason the probe fails
-#[derive(Clone,Debug,Serialize,Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Probe<S> {
     Ok(S),
     Unreachable,
@@ -160,31 +155,31 @@ pub enum Probe<S> {
 
 /// stores a variety of Report each of which should be able to generate a colorful terminal
 /// message (and maybe in the future as HTML)
-#[derive(Clone,Debug, EnumDiscriminants,Serialize, Deserialize)]
+#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ReportType))]
-#[strum_discriminants(derive(Hash,Serialize,Deserialize))]// information explaining why the StatusItem is in a [ActionDetail::Pending] state
-pub enum Report{
+#[strum_discriminants(
+    derive(Hash, Serialize, Deserialize)
+)] // information explaining why the StatusItem is in a [ActionDetail::Pending] state
+pub enum Report {
     Pending(PendingDetail)
 }
 
 
 /// information explaining why the StatusItem is in a [ActionDetail::Pending] state
-#[derive(Clone,Debug, EnumDiscriminants,Serialize, Deserialize)]
+#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(Pending))]
-#[strum_discriminants(derive(Hash,Serialize,Deserialize))]
-pub enum PendingDetail{
+#[strum_discriminants(derive(Hash, Serialize, Deserialize))]
+pub enum PendingDetail {
     /// describe a `prerequisite` that must be satisfied before [Phase::Pending]
-    PreReq{ },
-    ActionRequest(ActionRequest)
+    PreReq {},
+    ActionRequest(ActionRequest),
 }
 
 
-#[derive(Error,Clone,Debug,Serialize,Deserialize)]
-pub enum StatusErr {
-
-}
+#[derive(Error, Clone, Debug, Serialize, Deserialize)]
+pub enum StatusErr {}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ActionRequest {

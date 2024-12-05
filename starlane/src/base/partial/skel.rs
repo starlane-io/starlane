@@ -15,13 +15,13 @@ pub trait VolumeConfig: config::PartialConfig {
 }
 
 #[async_trait::async_trait]
-pub trait Mounts: partial::Partial<Config: MountsConfig+Clone> {
-   type Volume: Volume;
-   fn volumes(&self) -> Vec<Self::Volume>;
+pub trait Mounts: partial::Partial<Config: MountsConfig + Clone> {
+    type Volume: Volume;
+    fn volumes(&self) -> Vec<Self::Volume>;
 }
 
 #[async_trait::async_trait]
-pub trait Volume: partial::Partial<Config : VolumeConfig+Clone> { }
+pub trait Volume: partial::Partial<Config: VolumeConfig + Clone> {}
 
 
 

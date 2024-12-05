@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 pub mod mesh {
-
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -11,7 +10,6 @@ pub mod mesh {
 }
 
 pub mod portal {
-
     use serde::{Deserialize, Serialize};
 
     use crate::space::fail::{ext, http, resource};
@@ -26,7 +24,6 @@ pub mod portal {
 }
 
 pub mod http {
-
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,7 +33,6 @@ pub mod http {
 }
 
 pub mod resource {
-
     use serde::{Deserialize, Serialize};
 
     use crate::space::fail::{BadCoercion, BadRequest, Conditional, Messaging};
@@ -74,7 +70,6 @@ pub mod resource {
 }
 
 pub mod ext {
-
     use serde::{Deserialize, Serialize};
 
     use crate::space::fail::{BadRequest, Conditional};

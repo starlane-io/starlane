@@ -334,7 +334,7 @@ where
                 interchange.clone(),
                 star_tx,
             )
-            .await?;
+                .await?;
             stars.insert(star_point.clone(), star_api);
         }
 
@@ -527,7 +527,7 @@ where
                             .ok_or(format!("could not find star: {}", key.to_string()).into())
                             .cloned(),
                     )
-                    .unwrap_or_default();
+                        .unwrap_or_default();
                 }
                 #[cfg(test)]
                 MachineCall::GetRegistry(rtn) => {

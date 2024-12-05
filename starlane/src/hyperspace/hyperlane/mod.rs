@@ -481,8 +481,7 @@ impl Hyperlane {
                                     }
                                 }
                             }
-                        } else {
-                        }
+                        } else {}
                     }
                 }
             });
@@ -570,11 +569,11 @@ impl HyperwayInterchange {
                             Ok(to) => match hyperways.get(&to) {
                                 None => {
                                     logger.warn(
-                                            format!("wave is addressed to hyperway that this interchagne does not have from: {} to: {} ",
-                                                    wave.from().to_string(),
-                                                    wave.to().to_string()
-                                            )
-                                        );
+                                        format!("wave is addressed to hyperway that this interchagne does not have from: {} to: {} ",
+                                                wave.from().to_string(),
+                                                wave.to().to_string()
+                                        )
+                                    );
                                 }
                                 Some(hyperway) => {
                                     hyperway.outbound.send(wave).await;
@@ -598,7 +597,7 @@ impl HyperwayInterchange {
                                     "hyperway {} not found",
                                     stub.remote.to_string()
                                 )
-                                .into()));
+                                    .into()));
                             }
                             Some(hyperway) => {
                                 let endpoint = hyperway.hyperway_endpoint_far(init_wave).await;
@@ -1479,8 +1478,8 @@ impl HyperClient {
                     exchanger,
                     logger.clone(),
                 )
-                .await
-                .unwrap_or_default();
+                    .await
+                    .unwrap_or_default();
             });
         }
 
@@ -1710,7 +1709,7 @@ impl HyperClientRunner {
                             Duration::from_secs(30),
                             runner.factory.create(details_tx.clone()),
                         )
-                        .await,
+                            .await,
                     ) {
                         Ok(Ok(ext)) => {
                             runner.ext.replace(ext);
@@ -2109,14 +2108,14 @@ pub mod test_util {
                 Some(less_exchanger.clone()),
                 logger.clone(),
             )
-            .unwrap();
+                .unwrap();
             let logger = push_loc!((logger, Point::from_str("fae-client").unwrap()));
             let fae_client = HyperClient::new_with_exchanger(
                 self.fae_factory,
                 Some(fae_exchanger.clone()),
                 logger,
             )
-            .unwrap();
+                .unwrap();
 
             let mut less_rx = less_client.rx();
             let mut fae_rx = fae_client.rx();
@@ -2208,14 +2207,14 @@ pub mod test_util {
                 Some(less_exchanger.clone()),
                 logger.clone(),
             )
-            .unwrap();
+                .unwrap();
             let logger = push_loc!((logger.clone(), Point::from_str("fae-client").unwrap()));
             let fae_client = HyperClient::new_with_exchanger(
                 self.fae_factory,
                 Some(fae_exchanger.clone()),
                 logger,
             )
-            .unwrap();
+                .unwrap();
 
             let mut less_rx = less_client.rx();
             let mut fae_rx = fae_client.rx();
@@ -2381,9 +2380,9 @@ pub mod test {
             Duration::from_secs(5u64),
             hyperway.outbound.rx(None).await.recv(),
         )
-        .await
-        .unwrap()
-        .unwrap();
+            .await
+            .unwrap()
+            .unwrap();
 
         let wave = hello_wave();
         let wave_id = wave.id().clone();
@@ -2392,9 +2391,9 @@ pub mod test {
             Duration::from_secs(5u64),
             hyperway.inbound.rx(None).await.recv(),
         )
-        .await
-        .unwrap()
-        .unwrap();
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(wave.id(), wave_id);
     }
 

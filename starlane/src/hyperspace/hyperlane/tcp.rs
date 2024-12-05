@@ -64,7 +64,7 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
         let certs = rustls_pemfile::certs(&mut BufReader::new(
             &mut std::fs::File::open(ca_file).expect("cert file"),
         ))
-        .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
         /*        let private_key =
                    rustls_pemfile::private_key(&mut BufReader::new(&mut File::open(key_file)?))?
                        .unwrap();
@@ -262,7 +262,7 @@ impl FrameMuxer {
                 "remote did not indicate Ok. expected: 'Ok' encountered '{}'",
                 result
             )
-            .into()));
+                .into()));
         }
 
         Ok(Self::new(stream, logger))

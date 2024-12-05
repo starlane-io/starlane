@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use crate::base;
 use base::foundation;
 
@@ -24,7 +23,7 @@ use base::foundation;
 ///
 ///
 
-pub trait FoundationConfig: foundation::config::FoundationConfig<DependencyConfig=dyn DependencyConfig<MountsConfig=concrete::partial::mounts::MountsConfig,ProviderConfig=dyn ProviderConfig>> { }
+pub trait FoundationConfig: foundation::config::FoundationConfig<DependencyConfig=dyn DependencyConfig<MountsConfig=concrete::partial::mounts::MountsConfig, ProviderConfig=dyn ProviderConfig>> {}
 
 pub trait DependencyConfig: foundation::config::DependencyConfig<ProviderConfig=dyn ProviderConfig> {
     type MountsConfig: partial::MountsConfig;
@@ -35,8 +34,8 @@ pub trait DependencyConfig: foundation::config::DependencyConfig<ProviderConfig=
 pub trait ProviderConfig: foundation::config::ProviderConfig {}
 
 pub trait Foundation: foundation::Foundation {}
-pub trait Dependency: foundation::Dependency<Config=dyn DependencyConfig<MountsConfig=concrete::partial::mounts::MountsConfig>,Provider=dyn Provider> {}
-pub trait Provider: foundation::Provider<Config = dyn ProviderConfig> {}
+pub trait Dependency: foundation::Dependency<Config=dyn DependencyConfig<MountsConfig=concrete::partial::mounts::MountsConfig>, Provider=dyn Provider> {}
+pub trait Provider: foundation::Provider<Config=dyn ProviderConfig> {}
 
 pub mod partial {
     mod my {
@@ -48,6 +47,7 @@ pub mod partial {
     use base::foundation;
     use base::partial;
     use partial::skel as mount;
+
 
     /// we create this trait just in case we need to custom traits for this partial with this feature
     pub trait Partial: partial::Partial {}
@@ -83,6 +83,7 @@ pub mod concrete {
     use crate::base;
     use crate::base::err::BaseErr;
     use crate::base::foundation::kind::FoundationKind;
+    use crate::base::foundation::skel::concrete::partial::mounts;
     use crate::base::foundation::status::{Status, StatusDetail};
     use crate::base::foundation::Provider;
     use crate::base::kind::{DependencyKind, Kind};
@@ -92,7 +93,6 @@ pub mod concrete {
     use serde::{Deserialize, Serialize};
     use std::sync::Arc;
     use tokio::sync::watch::Receiver;
-    use crate::base::foundation::skel::concrete::partial::mounts;
 
     ///  reference the above a [`my`] implementation ...
     mod my {
@@ -107,7 +107,7 @@ pub mod concrete {
     impl foundation::config::FoundationConfig for FoundationConfig {}
 
     impl base::config::FoundationConfig for FoundationConfig {
-        type DependencyConfig = dyn my::DependencyConfig<ProviderConfig = dyn my::ProviderConfig, MountsConfig=mounts::MountsConfig>;
+        type DependencyConfig = dyn my::DependencyConfig<ProviderConfig=dyn my::ProviderConfig, MountsConfig=mounts::MountsConfig>;
 
         fn kind(&self) -> FoundationKind {
             todo!()
@@ -185,23 +185,21 @@ pub mod concrete {
     /// `keycloak`, `s3`, `kafka` ...  and of course instead of one custom dependency variant
     /// multiple implementations can and should be implemented for this Foundation
     pub mod my_dependency {
+        use super::my;
+        use crate::base::err::BaseErr;
+        use crate::base::foundation::skel::concrete::partial::mounts;
+        use crate::base::foundation::status::Status;
+        use crate::base::foundation::LiveService;
+        use crate::base::kind::{DependencyKind, Kind, ProviderKind};
+        use crate::base::{config, foundation};
+        use crate::space::progress::Progress;
+        use serde::{Deserialize, Serialize};
         use std::collections::HashMap;
         use std::sync::Arc;
-        use serde::{Deserialize, Serialize};
         use tokio::sync::watch::Receiver;
-        use crate::base::err::BaseErr;
-        use crate::base::{config, foundation};
-        use crate::base::foundation::LiveService;
-        use crate::base::foundation::skel::concrete::partial::mounts;
-        use crate::base::foundation::status::{Status, StatusDetail};
-        use crate::base::kind::{DependencyKind, Kind, ProviderKind};
-        use crate::space::progress::Progress;
-        use super::my;
 
-        #[derive(Clone,Serialize,Deserialize)]
-        pub struct DependencyConfig {
-
-        }
+        #[derive(Clone, Serialize, Deserialize)]
+        pub struct DependencyConfig {}
 
         impl config::DependencyConfig for DependencyConfig {
             type ProviderConfig = dyn my::ProviderConfig;
@@ -280,27 +278,29 @@ pub mod concrete {
         /// providers in [foundation::skel::concrete::my_dependency]... this is because all
         /// Foundation resources must have uniform trait bounds meaning that traits defined
         /// at the foundation level are defining the `final` interface...
-        pub trait Provider: my::Provider { }
+        pub trait Provider: my::Provider {}
 
 
         /// [super::my_provider] follows the same pattern as [`super::my_provider`] except in this case it is for
         /// [crate::base::foundation::Provider] variants
         pub mod my_provider {
-            use std::sync::Arc;
-            use serde::{Deserialize, Serialize};
-            use tokio::sync::watch::Receiver;
+            use super::my;
             use crate::base::err::BaseErr;
             use crate::base::foundation;
-            use crate::base::foundation::LiveService;
             use crate::base::foundation::status::Status;
+            use crate::base::foundation::LiveService;
             use crate::base::kind::ProviderKind;
             use crate::space::parse::CamelCase;
             use crate::space::progress::Progress;
-            use super::my;
-            mod dependency { pub use super::super::*; }
+            use serde::{Deserialize, Serialize};
+            use std::sync::Arc;
+            use tokio::sync::watch::Receiver;
+            mod dependency {
+                pub use super::super::*;
+            }
 
-            #[derive(Clone,Serialize,Deserialize)]
-            pub struct ProviderConfig { }
+            #[derive(Clone, Serialize, Deserialize)]
+            pub struct ProviderConfig {}
 
             impl crate::base::foundation::skel::ProviderConfig for ProviderConfig {}
 
@@ -349,8 +349,6 @@ pub mod concrete {
             }
 
             impl dependency::Provider for Provider {}
-
-
         }
     }
 
@@ -360,8 +358,8 @@ pub mod concrete {
             use super::my;
             use crate::base::err::BaseErr;
             use crate::base::foundation::status::Status;
-            use crate::base::{foundation, partial};
             use crate::base::partial::skel as root;
+            use crate::base::partial;
             use serde::{Deserialize, Serialize};
             use tokio::sync::watch::Receiver;
 

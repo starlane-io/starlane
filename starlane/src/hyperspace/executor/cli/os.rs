@@ -1,8 +1,7 @@
-use crate::hyperspace::executor::cli::{CliErr, CliIn, CliOut, HostEnv};
+use crate::hyperspace::executor::cli::{CliErr, CliIn, CliOut};
 use crate::hyperspace::executor::{ExeConf, Executor};
 use crate::hyperspace::host::{ExeStub, Host, HostCli, Proc};
 use async_trait::async_trait;
-use std::env;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::process::Stdio;

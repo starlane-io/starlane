@@ -4,7 +4,6 @@ use crate::hyperspace::driver::{
 };
 use crate::hyperspace::hyperspace::platform::Platform;
 use crate::hyperspace::hyperspace::star::HyperStarSkel;
-use once_cell::sync::Lazy;
 use crate::space::artifact::ArtRef;
 use crate::space::config::bind::BindConfig;
 use crate::space::kind::{BaseKind, Kind};
@@ -14,6 +13,7 @@ use crate::space::selector::KindSelector;
 use crate::space::util::log;
 use crate::space::wave::core::CoreBounce;
 use crate::space::wave::exchange::asynch::{DirectedHandler, RootInCtx};
+use once_cell::sync::Lazy;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -32,7 +32,7 @@ fn base_bind() -> BindConfig {
     }
     "#,
     ))
-    .unwrap()
+        .unwrap()
 }
 
 pub struct CliDriverFactory {

@@ -4,7 +4,6 @@ pub mod dialect;
 use crate::hyperspace::executor::cli::os::CliOsExecutor;
 use crate::hyperspace::host::err::HostErr;
 use crate::hyperspace::host::Host;
-use crate::hyperspace::service::ServiceErr;
 use async_trait::async_trait;
 
 #[async_trait]
@@ -43,7 +42,7 @@ impl ExeConf {
 
     pub fn create<D>(&self) -> Result<D, HostErr>
     where
-        D: TryFrom<CliOsExecutor, Error = HostErr>,
+        D: TryFrom<CliOsExecutor, Error=HostErr>,
     {
         match self {
             ExeConf::Host(host) => Ok(host.create::<D>()?.try_into()?),

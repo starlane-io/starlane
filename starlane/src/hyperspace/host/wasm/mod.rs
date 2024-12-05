@@ -68,7 +68,7 @@ impl WasmHost {
     }
     pub async fn execute<I, Arg>(&mut self, args: I) -> Result<OsProcess, HostErr>
     where
-        I: IntoIterator<Item = Arg>,
+        I: IntoIterator<Item=Arg>,
         Arg: AsRef<[u8]>,
     {
         self.execute_with_data(args, &[]).await
@@ -80,7 +80,7 @@ impl WasmHost {
         stdin: &[u8],
     ) -> Result<OsProcess, HostErr>
     where
-        I: IntoIterator<Item = Arg>,
+        I: IntoIterator<Item=Arg>,
         Arg: AsRef<[u8]>,
     {
         let mut builder = WasiEnv::builder("wasm program").args(args);
@@ -138,7 +138,7 @@ impl WasmHost {
         stdin: Pipe,
     ) -> Result<OsProcess, HostErr>
     where
-        I: IntoIterator<Item = Arg>,
+        I: IntoIterator<Item=Arg>,
         Arg: AsRef<[u8]>,
     {
         let mut builder = WasiEnv::builder("wasm program").args(args);

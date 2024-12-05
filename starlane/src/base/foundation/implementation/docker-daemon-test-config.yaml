@@ -3,20 +3,20 @@ foundation:
   registry:
     provider: Postgres::Registry
   dependencies:
-  - kind: Postgres
-    image: "postgres:17"
-    # this is the data dir in the container image
-    volumes:
-    - data_dir: "/data"
+    - kind: Postgres
+      image: "postgres:17"
+      # this is the data dir in the container image
+      volumes:
+        - data_dir: "/data"
 
-    providers:
-     - kind: Registry
-       description: "Starlane can't do anything without a registry..."
-       # if seed is specified in config space it
-       # cannot be overwritten # by Settings
-       seed: "${REPO}/seeds/postgres/registry/registry.sql"
-       # just any old database...
-     - kind: Database
+      providers:
+        - kind: Registry
+          description: "Starlane can't do anything without a registry..."
+          # if seed is specified in config space it
+          # cannot be overwritten # by Settings
+          seed: "${REPO}/seeds/postgres/registry/registry.sql"
+          # just any old database...
+        - kind: Database
 
 
 ---
@@ -30,13 +30,13 @@ platform:
   data_dir: $HOME/starlane/$context/data
   cache_dir: $HOME/starlane/$context/cache
   dependencies:
-  - kind: Postgres
-    volumes:
-    - database_dir: $HOME/starlane/data/postgres
-    username: postgres
-    password: ${secret:postgres:password}
-    providers:
-  - kind: Registry
-    dbname: registry
-  - kind: Database
-    dbname: my_database
+    - kind: Postgres
+      volumes:
+        - database_dir: $HOME/starlane/data/postgres
+      username: postgres
+      password: ${secret:postgres:password}
+      providers:
+    - kind: Registry
+      dbname: registry
+    - kind: Database
+      dbname: my_database

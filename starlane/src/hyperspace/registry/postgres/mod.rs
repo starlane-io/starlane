@@ -226,8 +226,8 @@ impl RegistryApi for PostgresRegistry {
         let scorch = sqlx::query_as::<Postgres, CanScorch>(
             "SELECT count(*) FROM reset_mode WHERE mode=('Scorch')",
         )
-        .fetch_one(&mut *trans)
-        .await?;
+            .fetch_one(&mut *trans)
+            .await?;
 
         if !scorch.can() {
             let err = "database has scorch guard enabled.  To change this: 'INSERT INTO reset_mode VALUES ('Scorch')'";
@@ -271,9 +271,9 @@ impl RegistryApi for PostgresRegistry {
         let count = sqlx::query_as::<Postgres, Count>(
             "SELECT count(*) as count from particles WHERE point=$1",
         )
-        .bind(params.point.clone())
-        .fetch_one(&mut *trans)
-        .await?;
+            .bind(params.point.clone())
+            .fetch_one(&mut *trans)
+            .await?;
 
         if count.0 > 0 {
             // returning ok on Override for now which is the expected behavior but not the desired
@@ -288,7 +288,7 @@ impl RegistryApi for PostgresRegistry {
             }
         }
 
-        let statement = format!("INSERT INTO particles (point,point_segment,base,sub,provider,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.provider),opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
+        let statement = format!("INSERT INTO particles (point,point_segment,base,sub,provider,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.provider), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
         trans.execute(statement.as_str()).await?;
 
         for (_, property_mod) in registration.properties.iter() {
@@ -443,10 +443,10 @@ impl RegistryApi for PostgresRegistry {
         let sequence = sqlx::query_as::<Postgres, Sequence>(
             "SELECT DISTINCT sequence FROM particles WHERE parent=$1 AND point_segment=$2",
         )
-        .bind(parent.to_string())
-        .bind(point_segment.to_string())
-        .fetch_one(&mut *trans)
-        .await?;
+            .bind(parent.to_string())
+            .bind(point_segment.to_string())
+            .fetch_one(&mut *trans)
+            .await?;
         trans.commit().await?;
 
         Ok(sequence.0)
@@ -460,7 +460,7 @@ impl RegistryApi for PostgresRegistry {
             .to_string();
 
         let mut conn = self.ctx.acquire().await?;
-        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut *conn).await?;
+        let properties = sqlx::query_as::<Postgres, LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(&mut *conn).await?;
         let mut map = HashMap::new();
         for p in properties {
             map.insert(p.key.clone(), p.into());
@@ -483,12 +483,12 @@ impl RegistryApi for PostgresRegistry {
         let mut record = sqlx::query_as::<Postgres, PostgresParticleRecord>(
             "SELECT DISTINCT * FROM particles as r WHERE parent=$1 AND point_segment=$2",
         )
-        .bind(parent.to_string())
-        .bind(point_segment.clone())
-        .fetch_one(&mut *conn)
-        .await?;
+            .bind(parent.to_string())
+            .bind(point_segment.clone())
+            .fetch_one(&mut *conn)
+            .await?;
         let mut record: ParticleRecord = record.into();
-        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut *conn).await?;
+        let properties = sqlx::query_as::<Postgres, LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(&mut *conn).await?;
         let mut map = HashMap::new();
         for p in properties {
             map.insert(p.key.clone(), p.into());
@@ -726,23 +726,23 @@ impl RegistryApi for PostgresRegistry {
                     .bind(access_grant.on_point.query_root().to_string())
                     .bind(access_grant.on_point.clone().to_string())
                     .bind(access_grant.to_point.clone().to_string())
-                    .bind(access_grant.by_particle.to_string()).execute(& mut *conn).await?;
+                    .bind(access_grant.by_particle.to_string()).execute(&mut *conn).await?;
             }
             AccessGrantKind::Privilege(privilege) => {
                 sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('priv',$1,$2,$3,$4,(SELECT id FROM particles WHERE point=$5))")
-                    .bind(privilege.to_string() )
+                    .bind(privilege.to_string())
                     .bind(access_grant.on_point.query_root().to_string())
                     .bind(access_grant.on_point.clone().to_string())
                     .bind(access_grant.to_point.clone().to_string())
-                    .bind(access_grant.by_particle.to_string()).execute(& mut *conn).await?;
+                    .bind(access_grant.by_particle.to_string()).execute(&mut *conn).await?;
             }
             AccessGrantKind::PermissionsMask(mask) => {
                 sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('perm',$1,$2,$3,$4,(SELECT id FROM particles WHERE point=$5))")
-                    .bind(mask.to_string() )
+                    .bind(mask.to_string())
                     .bind(access_grant.on_point.query_root().to_string())
                     .bind(access_grant.on_point.clone().to_string())
                     .bind(access_grant.to_point.clone().to_string())
-                    .bind(access_grant.by_particle.to_string() ).execute(& mut *conn).await?;
+                    .bind(access_grant.by_particle.to_string()).execute(&mut *conn).await?;
             }
         }
 
@@ -765,11 +765,11 @@ impl RegistryApi for PostgresRegistry {
         let has_owner = sqlx::query_as::<Postgres, Owner>(
             "SELECT count(*) > 0 as owner FROM particles WHERE point=$1 AND owner=$2",
         )
-        .bind(on.to_string())
-        .bind(to.to_string())
-        .fetch_one(&mut *conn)
-        .await?
-        .0;
+            .bind(on.to_string())
+            .bind(to.to_string())
+            .fetch_one(&mut *conn)
+            .await?
+            .0;
 
         if *HYPERUSER == *to {
             if has_owner {
@@ -793,7 +793,7 @@ impl RegistryApi for PostgresRegistry {
         let mut permissions = Permissions::none();
         let mut level_ands: Vec<Vec<PermissionsMask>> = vec![];
         loop {
-            let mut access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(traversal.to_string() ).fetch_all(& mut *conn).await?;
+            let mut access_grants = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(traversal.to_string()).fetch_all(&mut *conn).await?;
             let mut access_grants: Vec<AccessGrant> = access_grants
                 .into_iter()
                 .map(|a| a.into())
@@ -941,7 +941,7 @@ impl RegistryApi for PostgresRegistry {
         let mut conn = self.ctx.acquire().await?;
         for on in selection.list {
             let on: Point = (*on).try_into()?;
-            let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut *conn).await?;
+            let access_grants = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(on.to_string()).fetch_all(&mut *conn).await?;
             let mut access_grants: Vec<IndexedAccessGrant> =
                 access_grants.into_iter().map(|a| a.into()).collect();
 
@@ -966,7 +966,7 @@ impl RegistryApi for PostgresRegistry {
 
     async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), RegErr> {
         let mut conn = self.ctx.acquire().await?;
-        let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.id=$1 AND particles.id=access_grants.by_particle").bind(id ).fetch_one(& mut *conn).await?.into();
+        let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.id=$1 AND particles.id=access_grants.by_particle").bind(id).fetch_one(&mut *conn).await?.into();
         let access = self.access(to, &access_grant.by_particle).await?;
         if access.has_full() {
             let mut trans = conn.begin().await?;
@@ -977,7 +977,7 @@ impl RegistryApi for PostgresRegistry {
             trans.commit().await?;
             Ok(())
         } else {
-            Err(RegErr::Msg(format!("'{}' could not revoked grant {} because it does not have full access (super or owner) on {}", to.to_string(), id, access_grant.by_particle.to_string() ).to_string()))
+            Err(RegErr::Msg(format!("'{}' could not revoked grant {} because it does not have full access (super or owner) on {}", to.to_string(), id, access_grant.by_particle.to_string()).to_string()))
         }
     }
 }

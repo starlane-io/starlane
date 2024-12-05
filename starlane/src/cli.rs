@@ -1,19 +1,19 @@
 use crate::env::STARLANE_HOME;
+use crate::hyperspace::driver::control::{ControlCliSession, ControlClient};
 use crate::hyperspace::hyperlane::tcp::HyperlaneTcpClient;
 use crate::hyperspace::hyperlane::HyperwayEndpointFactory;
-use clap::clap_derive::{Args, Subcommand};
-use clap::Parser;
-use crate::hyperspace::driver::control::{ControlCliSession, ControlClient};
-use starlane_primitive_macros::logger;
 use crate::space::command::{CmdTransfer, RawCommand};
 use crate::space::err::SpaceErr;
 use crate::space::hyper::Knock;
+use crate::space::parse::util::new_span;
 use crate::space::parse::util::result;
 use crate::space::parse::{upload_blocks, SkewerCase};
 use crate::space::point::Point;
-use crate::space::parse::util::new_span;
 use crate::space::substance::Substance;
 use crate::space::wave::core::ReflectedCore;
+use clap::clap_derive::{Args, Subcommand};
+use clap::Parser;
+use starlane_primitive_macros::logger;
 use std::fs::File;
 use std::io::{Cursor, Read, Seek, Write};
 use std::path::Path;
@@ -265,7 +265,7 @@ impl Session {
 }
 
 fn zip_dir<T>(
-    it: impl Iterator<Item = DirEntry>,
+    it: impl Iterator<Item=DirEntry>,
     prefix: &str,
     writer: T,
     method: zip::CompressionMethod,

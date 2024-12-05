@@ -654,7 +654,7 @@ impl TryFrom<ReflectedCore> for Surface {
                     "expecting Surface received {}",
                     substance.kind().to_string()
                 )
-                .into()),
+                    .into()),
             }
         }
     }

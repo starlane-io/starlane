@@ -1,5 +1,4 @@
 use crate::space::err::{ParseErrs, PrintErr};
-use crate::space::loc::Uuid;
 use crate::space::parse::Env;
 use crate::space::wasm::Timestamp;
 use crate::space::wave::core::http2::HttpMethod;

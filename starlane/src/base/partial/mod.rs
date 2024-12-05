@@ -1,3 +1,4 @@
+use crate::base::foundation::status::Status;
 /// `Partials` are generic definitions that can be inherited by `common` and `foundation`
 /// definitions.  Whereas a `common` definition describes the abstract traits of a particular
 /// resource a `partial` defines traits that may apply to multiple `common` or `foundation`
@@ -13,26 +14,20 @@
 
 use downcast_rs::{impl_downcast, Downcast, DowncastSync};
 use tokio::sync::watch;
-use crate::base::foundation::status::Status;
 
 /// The partial starter template
 pub mod skel;
 pub mod config;
 
 
-
-
-
-
-
 /// trait for a partial that has a status
 #[async_trait]
-pub trait Partial: Downcast{
-    type Config: config::PartialConfig+?Sized;
-   fn status(&self) -> Status {
-       self.status_watcher().borrow().clone()
-   }
-   fn status_watcher(&self) -> watch::Receiver<Status>;
+pub trait Partial: Downcast {
+    type Config: config::PartialConfig + ?Sized;
+    fn status(&self) -> Status {
+        self.status_watcher().borrow().clone()
+    }
+    fn status_watcher(&self) -> watch::Receiver<Status>;
 }
 
 impl_downcast!(Partial assoc Config);

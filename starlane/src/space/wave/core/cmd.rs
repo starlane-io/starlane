@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::space::util::ValueMatcher;
-use crate::space::wave::core::hyper::HypMethod;
 
 #[derive(
     Debug,

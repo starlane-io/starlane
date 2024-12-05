@@ -11,7 +11,7 @@ use crate::space::parse::{
     ResolverErr,
 };
 use crate::space::selector::{
-    PointHierarchy, PointHierarchyOpt, PointKindSeg, PointKindSegOpt, Selector,
+    PointHierarchyOpt, PointKindSegOpt, Selector,
 };
 use crate::space::util::ToResolved;
 use crate::space::wave::{Agent, Recipients, ToRecipients};
@@ -104,7 +104,7 @@ impl TryInto<RouteSeg> for RouteSegVar {
                 var.trace.range,
                 var.trace.extra,
             )
-            .into()),
+                .into()),
             RouteSegVar::Remote => Ok(RouteSeg::Remote),
         }
     }
@@ -443,21 +443,21 @@ impl TryInto<PointSegCtx> for PointSegVar {
                 trace.range,
                 trace.extra,
             )
-            .into()),
+                .into()),
             PointSegVar::Pop(trace) => Err(ParseErrs::from_range(
                 "point pop not available in this context",
                 "point pop not available",
                 trace.range,
                 trace.extra,
             )
-            .into()),
+                .into()),
             PointSegVar::Var(var) => Err(ParseErrs::from_range(
                 "variable substitution not available in this context",
                 "var subst not available",
                 var.trace.range,
                 var.trace.extra,
             )
-            .into()),
+                .into()),
         }
     }
 }
@@ -480,14 +480,14 @@ impl TryInto<PointSeg> for PointSegCtx {
                 trace.range,
                 trace.extra,
             )
-            .into()),
+                .into()),
             PointSegCtx::Pop(trace) => Err(ParseErrs::from_range(
                 "point pop not available in this context",
                 "point pop not available",
                 trace.range,
                 trace.extra,
             )
-            .into()),
+                .into()),
         }
     }
 }
@@ -700,7 +700,7 @@ impl ToResolved<PointCtx> for PointVar {
                                 "variables not available in this context '{}'",
                                 var.name.clone()
                             )
-                            .as_str(),
+                                .as_str(),
                             "Not Available",
                             var.trace.range.clone(),
                             var.trace.extra.clone(),
@@ -764,7 +764,7 @@ impl ToResolved<PointCtx> for PointVar {
                                     "variables not available in this context '{}'",
                                     var.name.clone()
                                 )
-                                .as_str(),
+                                    .as_str(),
                                 "Not Available",
                                 var.trace.range.clone(),
                                 var.trace.extra.clone(),
@@ -840,7 +840,7 @@ impl ToResolved<Point> for PointCtx {
                             trace.range.clone(),
                             trace.extra.clone(),
                         )
-                        .into());
+                            .into());
                     }
                     point = match env.point_or() {
                         Ok(point) => point.clone(),
@@ -851,7 +851,7 @@ impl ToResolved<Point> for PointCtx {
                                 trace.range.clone(),
                                 trace.extra.clone(),
                             )
-                            .into());
+                                .into());
                         }
                     };
                 }
@@ -875,12 +875,12 @@ impl ToResolved<Point> for PointCtx {
                                 "Too many point pops. working point was: '{}'",
                                 env.point_or().unwrap().to_string()
                             )
-                            .as_str(),
+                                .as_str(),
                             "too many point pops",
                             trace.range.clone(),
                             trace.extra.clone(),
                         )
-                        .into());
+                            .into());
                     }
                 }
                 PointSegCtx::FilesystemRootDir => {
@@ -1142,7 +1142,7 @@ impl Point {
             .expect("expected first segment")
             .is_normalized()
         {
-            return Err(format!("absolute point paths cannot begin with '..' (reference parent segment) because there is no working point segment: '{}'",self.to_string()).into());
+            return Err(format!("absolute point paths cannot begin with '..' (reference parent segment) because there is no working point segment: '{}'", self.to_string()).into());
         }
 
         let mut segments = vec![];
@@ -1155,7 +1155,7 @@ impl Point {
                             "'..' too many pop segments directives: out of parents: '{}'",
                             self.to_string()
                         )
-                        .into());
+                            .into());
                     }
                 }
             }
@@ -1324,7 +1324,7 @@ impl Point {
                     PointSegKind::File
                 )))?
             } else {
-                Err(ParseErrs::from(format!("cannot push a non FileSystem PointSegment '{0}' onto a point until after the FileSystemRoot ':/' segment has been pushed",segment.kind())))?
+                Err(ParseErrs::from(format!("cannot push a non FileSystem PointSegment '{0}' onto a point until after the FileSystemRoot ':/' segment has been pushed", segment.kind())))?
             }
         }
     }

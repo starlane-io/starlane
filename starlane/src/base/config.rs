@@ -1,21 +1,20 @@
-use std::hash::Hash;
-use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
-use downcast_rs::{impl_downcast, Downcast, DowncastSync};
 use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::Provider;
 use crate::base::kind::{DependencyKind, Kind, ProviderKind};
 use crate::base::partial::skel;
 use crate::space::parse::CamelCase;
+use downcast_rs::{impl_downcast, Downcast, DowncastSync};
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::ops::{Deref, DerefMut};
 
 pub trait Config
 
 {
     type Err: Into<BaseErr>;
-    type PlatformConfig: PlatformConfig+?Sized;
-    type FoundationConfig: FoundationConfig+?Sized;
+    type PlatformConfig: PlatformConfig + ?Sized;
+    type FoundationConfig: FoundationConfig + ?Sized;
 
     fn foundation(&self) -> Self::FoundationConfig;
     fn platform(&self) -> Self::FoundationConfig;
@@ -23,7 +22,7 @@ pub trait Config
 
 
 pub trait FoundationConfig: DowncastSync {
-    type DependencyConfig:  DependencyConfig+?Sized;
+    type DependencyConfig: DependencyConfig + ?Sized;
 
     fn kind(&self) -> FoundationKind;
 
@@ -37,7 +36,7 @@ pub trait FoundationConfig: DowncastSync {
 }
 
 pub trait DependencyConfig: DowncastSync {
-    type ProviderConfig: ProviderConfig+?Sized;
+    type ProviderConfig: ProviderConfig + ?Sized;
 
     fn kind(&self) -> &DependencyKind;
 
@@ -46,8 +45,7 @@ pub trait DependencyConfig: DowncastSync {
 
 pub trait ProviderConfigSrc
 {
-
-    type Config: ProviderConfig+?Sized;
+    type Config: ProviderConfig + ?Sized;
 
 
     fn providers(&self) -> Result<HashMap<CamelCase, &Self::Config>, BaseErr>;
@@ -56,11 +54,14 @@ pub trait ProviderConfigSrc
 }
 
 
-pub enum ProviderMode<C,U> where C: provider::mode::create::ProviderConfig, U: provider::mode::utilize::ProviderConfig {
+pub enum ProviderMode<C, U>
+where
+    C: provider::mode::create::ProviderConfig,
+    U: provider::mode::utilize::ProviderConfig,
+{
     Create(C),
-    Utilize(U)
+    Utilize(U),
 }
-
 
 
 pub mod provider {
@@ -74,15 +75,13 @@ pub mod provider {
             /// will want to Create the Provision (potentially meaning: downloading, instancing, credential setup,  initializing...etc.)
             /// and then will want to [`Utilize`] the Provision (potentially meaning: authenticating via the same credentials supplied from
             /// [`Create`], connecting to the same port that was set up etc.
-            pub trait ProviderConfig: my::ProviderConfig+utilize::ProviderConfig { }
+            pub trait ProviderConfig: my::ProviderConfig + utilize::ProviderConfig {}
         }
 
-        pub mod utilize{
+        pub mod utilize {
             use super::my;
-            pub trait ProviderConfig: my::ProviderConfig{
-            }
+            pub trait ProviderConfig: my::ProviderConfig {}
         }
-
     }
 }
 
@@ -225,15 +224,12 @@ pub mod default {
     pub type FoundationConfig = Arc<dyn super::FoundationConfig<DependencyConfig=DependencyConfig>>;
     pub type DependencyConfig = Arc<dyn super::DependencyConfig<ProviderConfig=ProviderConfig>>;
 
-    pub type ProviderConfig= Arc<dyn super::ProviderConfig>;
-
+    pub type ProviderConfig = Arc<dyn super::ProviderConfig>;
 }
 
 /// this is the super trait of [`foundation::config::FoundationConfig`] and [`platform::config::PlatformConfig`]
-pub trait BaseConfig  {
-
-    type DependencyConfig: DependencyConfig<ProviderConfig:ProviderConfig>;
-
+pub trait BaseConfig {
+    type DependencyConfig: DependencyConfig<ProviderConfig: ProviderConfig>;
 }
 
 /// see: [skel]

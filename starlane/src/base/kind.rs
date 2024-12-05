@@ -1,15 +1,15 @@
-use derive_name::Name;
-use std::fmt::{Debug, Display};
-use std::hash::Hash;
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use nom::sequence::tuple;
-use nom::bytes::complete::tag;
-use serde_with_macros::DeserializeFromStr;
 use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
-use crate::space::parse::{camel_case, CamelCase};
 use crate::space::parse::util::{new_span, result};
+use crate::space::parse::{camel_case, CamelCase};
+use derive_name::Name;
+use nom::bytes::complete::tag;
+use nom::sequence::tuple;
+use serde::{Deserialize, Serialize};
+use serde_with_macros::DeserializeFromStr;
+use std::fmt::{Debug, Display};
+use std::hash::Hash;
+use std::str::FromStr;
 
 pub const FOUNDATION: &'static str = "config";
 pub const DEPENDENCY: &'static str = "core";
@@ -96,7 +96,7 @@ impl IKind for DependencyKind {
 }
 
 impl FromStr for ProviderKind {
-    type Err=BaseErr;
+    type Err = BaseErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let i = new_span(s);
@@ -181,8 +181,8 @@ impl From<&ProviderKind> for &str {
 
 pub trait IKind
 where
-    for<'z> Self:
-        Name + Debug + Clone + Eq + PartialEq + Display + Hash + Serialize + Deserialize<'z>,
+        for<'z> Self:
+Name + Debug + Clone + Eq + PartialEq + Display + Hash + Serialize + Deserialize<'z>,
 {
     fn category(&self) -> &'static str;
 

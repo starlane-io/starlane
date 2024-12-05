@@ -37,8 +37,7 @@ pub trait TraversalLayer {
                     self.deliver_reflected(traversal.unwrap_reflected()).await?;
                 }
                 return Ok(());
-            } else {
-            }
+            } else {}
         }
 
         if traversal.is_directed() && traversal.dir == TraversalDirection::Fabric {

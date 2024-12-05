@@ -458,7 +458,7 @@ fn test_mechtron() -> Result<(), OldStarErr> {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-       let reflect = cli.exec("create hello-goodbye<Mechtron>{ +config=repo:hello-goodbye:1.0.0:/config/hello-goodbye.mech-old }")
+        let reflect = cli.exec("create hello-goodbye<Mechtron>{ +config=repo:hello-goodbye:1.0.0:/config/hello-goodbye.mech-old }")
             .await
             .unwrap();
 

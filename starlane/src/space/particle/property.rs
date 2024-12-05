@@ -186,7 +186,7 @@ impl PropertiesConfig {
                     self.kind.to_string(),
                     req
                 )
-                .into());
+                    .into());
             }
         }
 
@@ -204,11 +204,11 @@ impl PropertiesConfig {
                             self.kind.to_string(),
                             key
                         )
-                        .into());
+                            .into());
                     }
                     match def.source {
                         PropertySource::CoreReadOnly => {
-                            return Err(format!("{} property '{}' is flagged CoreReadOnly and cannot be set within the Mesh",self.kind.to_string(), key).into());
+                            return Err(format!("{} property '{}' is flagged CoreReadOnly and cannot be set within the Mesh", self.kind.to_string(), key).into());
                         }
                         _ => {}
                     }
@@ -235,14 +235,14 @@ impl PropertiesConfig {
                     }
                     match def.source {
                         PropertySource::CoreReadOnly => {
-                            return Err(format!("property '{}' is flagged CoreReadOnly and cannot be set within the Mesh",key).into());
+                            return Err(format!("property '{}' is flagged CoreReadOnly and cannot be set within the Mesh", key).into());
                         }
                         _ => {}
                     }
                 }
                 PropertyMod::UnSet(_) => {
                     if !def.mutable {
-                        return Err(format!("property '{}' is immutable and cannot be changed after particle creation",key).into());
+                        return Err(format!("property '{}' is immutable and cannot be changed after particle creation", key).into());
                     }
                     if def.required {
                         return Err(
@@ -266,7 +266,7 @@ impl PropertiesConfig {
                         "property '{}' is flagged CoreSecret and cannot be read within the Mesh",
                         key
                     )
-                    .into());
+                        .into());
                 }
                 _ => {}
             }

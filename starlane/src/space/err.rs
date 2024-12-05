@@ -20,7 +20,6 @@ use crate::space::parse::util::SpanExtra;
 use crate::space::artifact::asynch::ArtErr;
 use crate::space::command::direct::create::KindTemplate;
 use crate::space::kind::BaseKind;
-use crate::space::parse::model::Subst;
 use crate::space::parse::ResolverErr;
 use crate::space::point::PointSegKind;
 use crate::space::substance::{Substance, SubstanceErr, SubstanceKind};
@@ -29,7 +28,6 @@ use crate::space::wave::core::{Method, ReflectedCore};
 use serde::{Deserialize, Serialize};
 use strum::{IntoEnumIterator, ParseError};
 use thiserror::Error;
-use tokio::sync::SetError;
 /*
 #[macro_export]
 macro_rules! err {
@@ -71,7 +69,8 @@ pub enum SpaceErr {
     ExpectingWildcardInPointTemplate(String),
     #[error("cannot push to terminal '{0}' PointSegment.")]
     PointPushTerminal(PointSegKind),
-    #[error("cannot push a non FileSystem PointSegment '{0}' onto a point until after the FileSystemRoot ':/' segment has been pushed")]
+    #[error("cannot push a non FileSystem PointSegment '{0}' onto a point until after the FileSystemRoot ':/' segment has been pushed"
+    )]
     PointPushNoFileRoot(PointSegKind),
     #[error("expected '{kind}' : '{expected}' found: '{found}'")]
     Expected {
@@ -79,9 +78,11 @@ pub enum SpaceErr {
         expected: String,
         found: String,
     },
-    #[error("the root logger is not available. This probably means that the RootLogger initialization is not happening soon enough.")]
+    #[error("the root logger is not available. This probably means that the RootLogger initialization is not happening soon enough."
+    )]
     RootLoggerNotInt,
-    #[error("the root logger has already been initialized therefore another RootLogger cannot be created.")]
+    #[error("the root logger has already been initialized therefore another RootLogger cannot be created."
+    )]
     RootLoggerAlreadyInit,
     #[error("{0}")]
     Anyhow(#[from] Arc<anyhow::Error>),
@@ -1109,7 +1110,6 @@ pub trait HyperSpatialError: SpatialError {}
 
 #[cfg(test)]
 pub mod test {
-
     #[test]
     pub fn compile() {}
 }

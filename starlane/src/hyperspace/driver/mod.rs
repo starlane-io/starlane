@@ -490,7 +490,7 @@ impl Drivers {
                 factory.clone(),
                 status_tx,
             )
-            .await;
+                .await;
 
             let (rtn, mut rtn_rx) = oneshot::channel();
             self.status_listen(Some(rtn)).await;
@@ -1100,7 +1100,7 @@ impl TraversalLayer for ParticleOuter {
         } else {
             match &self.particle.inner {
                 ParticleSphereInner::Router(router) => {
-                    router.traverse(reflect.wrap() ).await;
+                    router.traverse(reflect.wrap()).await;
                     Ok(())
                 }
                 ParticleSphereInner::Handler(_) => {

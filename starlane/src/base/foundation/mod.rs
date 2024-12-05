@@ -1,3 +1,5 @@
+use crate::base;
+use crate::base::err::BaseErr;
 /// # FOUNDATION
 ///
 /// A ['Foundation'] provides abstracted control over the services and dependencies that drive Starlane.
@@ -28,27 +30,6 @@
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::status::{Phase, Status, StatusDetail};
 use crate::base::foundation::util::CreateProxy;
-use crate::hyperspace::platform::PlatformConfig;
-use crate::space::parse::CamelCase;
-use crate::space::progress::Progress;
-use base::registry;
-use downcast_rs::{impl_downcast, Downcast, DowncastSync};
-use futures::TryFutureExt;
-use itertools::Itertools;
-use once_cell::sync::Lazy;
-use serde;
-use serde::de::{MapAccess, Visitor};
-use serde::{de, Deserialize, Deserializer, Serialize};
-use serde_yaml::Value;
-use std::fmt::{Debug, Display};
-use std::future::Future;
-use std::hash::Hash;
-use std::ops::{Deref, DerefMut};
-use std::str::FromStr;
-use std::sync::Arc;
-use tokio::sync::watch::Receiver;
-use crate::base;
-use crate::base::err::BaseErr;
 /// # FOUNDATION
 ///
 /// A ['Foundation'] provides abstracted control over the services and dependencies that drive Starlane.
@@ -77,6 +58,25 @@ use crate::base::err::BaseErr;
 /// There is one special core that the Foundation must manage which is the [`Foundation::registry`]
 /// the Starlane Registry is the only required core from the vanilla Starlane installation
 use crate::base::kind::{DependencyKind, IKind, Kind, ProviderKind};
+use crate::hyperspace::platform::PlatformConfig;
+use crate::space::parse::CamelCase;
+use crate::space::progress::Progress;
+use base::registry;
+use downcast_rs::{impl_downcast, Downcast, DowncastSync};
+use futures::TryFutureExt;
+use itertools::Itertools;
+use once_cell::sync::Lazy;
+use serde;
+use serde::de::{MapAccess, Visitor};
+use serde::{de, Deserialize, Deserializer, Serialize};
+use serde_yaml::Value;
+use std::fmt::{Debug, Display};
+use std::future::Future;
+use std::hash::Hash;
+use std::ops::{Deref, DerefMut};
+use std::str::FromStr;
+use std::sync::Arc;
+use tokio::sync::watch::Receiver;
 
 //pub mod proxy;
 
@@ -114,12 +114,11 @@ pub trait Types {
 /// ['Foundation'] is an abstraction for managing infrastructure.
 #[async_trait]
 pub trait Foundation: Downcast + Sync + Send {
-
     /// [`Foundation::Config`] should be a `concrete` implementation of [`base::config::FoundationConfig`]
-    type Config: base::config::FoundationConfig+?Sized;
+    type Config: base::config::FoundationConfig + ?Sized;
 
     /// [`Foundation::Dependency`] Should be [`Dependency`] or a custom `trait` that implements [`Dependency`] ... it should not be a concrete implementation
-    type Dependency: Dependency+?Sized;
+    type Dependency: Dependency + ?Sized;
 
     /// [`Foundation::Provider`] Should be [`Provider`] or a custom `trait` that implements [`Provider`] ... it should not be a concrete implementation
     type Provider: Provider + ?Sized;
@@ -131,7 +130,7 @@ pub trait Foundation: Downcast + Sync + Send {
     fn status(&self) -> Status;
 
 
-    async fn status_detail(&self) -> Result<StatusDetail,BaseErr>;
+    async fn status_detail(&self) -> Result<StatusDetail, BaseErr>;
 
     fn status_watcher(&self) -> Arc<tokio::sync::watch::Receiver<Status>>;
 
@@ -161,9 +160,9 @@ impl_downcast!(Foundation assoc Config, Dependency, Provider);
 /// start the service whereas a Provider in this example would represent an individual Database
 #[async_trait]
 pub trait Dependency: Downcast + Send + Sync {
-    type Config: base::config::DependencyConfig+?Sized;
+    type Config: base::config::DependencyConfig + ?Sized;
 
-    type Provider: Provider+?Sized;
+    type Provider: Provider + ?Sized;
 
     fn kind(&self) -> DependencyKind;
 
@@ -173,7 +172,7 @@ pub trait Dependency: Downcast + Send + Sync {
 
     fn status_watcher(&self) -> Arc<tokio::sync::watch::Receiver<Status>>;
 
-       /// perform any downloads for the Dependency
+    /// perform any downloads for the Dependency
     async fn download(&self, progress: Progress) -> Result<(), BaseErr>;
 
     /// install the dependency
@@ -186,7 +185,7 @@ pub trait Dependency: Downcast + Send + Sync {
     /// returns a LiveService which will keep the service alive until
     /// LiveService handle gets dropped
     async fn start(&self, progress: Progress)
-        -> Result<LiveService<DependencyKind>, BaseErr>;
+                   -> Result<LiveService<DependencyKind>, BaseErr>;
 
     /// return a [`Provider`] which can create instances from this [`Dependency`]
     fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<Self::Provider>>, BaseErr>;
@@ -275,7 +274,7 @@ where
         self.status()
     }
 
-    async fn status_detail(&self) -> Result<StatusDetail,BaseErr> {
+    async fn status_detail(&self) -> Result<StatusDetail, BaseErr> {
         todo!()
     }
 
@@ -318,21 +317,21 @@ where
 {
     type Proxy = F;
 
-    fn proxy(&self) -> Result<Self::Proxy, BaseErr>  {
-     todo!()
+    fn proxy(&self) -> Result<Self::Proxy, BaseErr> {
+        todo!()
     }
 }
 
 pub mod default {
     use crate::base;
-    pub type Provider = Box<dyn super::Provider<Config =base::config::default::ProviderConfig>>;
+    pub type Provider = Box<dyn super::Provider<Config=base::config::default::ProviderConfig>>;
     pub type Dependency =
-        Box<dyn super::Dependency<Config =base::config::default::DependencyConfig, Provider = Provider>>;
+    Box<dyn super::Dependency<Config=base::config::default::DependencyConfig, Provider=Provider>>;
     pub type Foundation = Box<
         dyn super::Foundation<
-            Config =base::config::default::FoundationConfig,
-            Dependency = Dependency,
-            Provider = Provider,
+            Config=base::config::default::FoundationConfig,
+            Dependency=Dependency,
+            Provider=Provider,
         >,
     >;
 }

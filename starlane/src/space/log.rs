@@ -101,7 +101,7 @@ pub async fn push_scope<F, R, O>(mut f: F, mark: LogMark) -> Result<O, anyhow::E
 where
     F: FnMut() -> R,
     F: Copy + Send + Sync + 'static,
-    R: Future<Output = Result<O, anyhow::Error>>,
+    R: Future<Output=Result<O, anyhow::Error>>,
     O: Sized + Send + Sync,
 {
     if STACK.try_with(|v| {}).is_ok() {}
@@ -182,7 +182,7 @@ impl Display for Log {
             self.level.to_string(),
             self.payload.to_string()
         )
-        .to_string();
+            .to_string();
         write!(f, "{}", str)
     }
 }
@@ -1242,7 +1242,7 @@ pub trait AsLogMark {
 
  */
 
-macro_rules! log{
+macro_rules! log {
     ($($args: expr),*) => {
 
         STACK.try_with( |logger| {
@@ -1437,5 +1437,5 @@ impl ToString for Loc {
 }
 
 use crate::base::foundation::kind::FoundationKind;
-pub use starlane_primitive_macros::logger;
 use crate::base::kind::DependencyKind;
+pub use starlane_primitive_macros::logger;

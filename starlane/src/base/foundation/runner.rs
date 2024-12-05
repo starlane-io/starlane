@@ -1,24 +1,27 @@
+use crate::base;
+use crate::base::config::ProviderConfig;
+use crate::base::config::{Config, DependencyConfig, FoundationConfig};
 use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::status::{Phase, PhaseDetail, Status};
 use crate::base::foundation::util::SerMap;
+use crate::base::kind::{DependencyKind, Kind, ProviderKind};
+use crate::base::{foundation, registry};
 use crate::space::parse::CamelCase;
 use crate::space::point::Point;
 use crate::space::progress::Progress;
+use md5::digest::FixedOutput;
 use starlane_primitive_macros::logger;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use md5::digest::FixedOutput;
 use tokio::sync::watch::Receiver;
 use wasmer_wasix::virtual_fs::Upcastable;
-use crate::base;
-use crate::base::config::{Config, DependencyConfig, FoundationConfig};
-use crate::base::{foundation, registry};
-use crate::base::kind::{DependencyKind, Kind, ProviderKind};
-use crate::base::config::ProviderConfig;
 
-enum Call<F> where F: foundation::Foundation {
+enum Call<F>
+where
+    F: foundation::Foundation,
+{
     Synchronize {
         progress: Progress,
         rtn: tokio::sync::oneshot::Sender<Result<Status, BaseErr>>,
@@ -37,14 +40,20 @@ enum Call<F> where F: foundation::Foundation {
     _Phantom(PhantomData<F>),
 }
 
-struct FoundationTx<F> where F: foundation::Foundation {
+struct FoundationTx<F>
+where
+    F: foundation::Foundation,
+{
     phantom: PhantomData<F>,
     config: base::config::default::FoundationConfig,
     call_tx: tokio::sync::mpsc::Sender<Call<F>>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
-impl <F> FoundationTx<F> where F: foundation::Foundation{
+impl<F> FoundationTx<F>
+where
+    F: foundation::Foundation,
+{
     fn new(
         config: base::config::default::FoundationConfig,
         call_tx: tokio::sync::mpsc::Sender<Call<F>>,
@@ -54,13 +63,16 @@ impl <F> FoundationTx<F> where F: foundation::Foundation{
             config,
             call_tx,
             status,
-            phantom: PhantomData::default()
+            phantom: PhantomData::default(),
         }
     }
 }
 
 #[async_trait]
-impl <F> foundation::Foundation for FoundationTx<F> where F: foundation::Foundation {
+impl<F> foundation::Foundation for FoundationTx<F>
+where
+    F: foundation::Foundation,
+{
     type Config = F::Config;
     type Dependency = ();
     type Provider = ();
@@ -131,7 +143,10 @@ impl<K, C> Wrapper<K, C> {
     }
 }
 
-enum DepCall<D> where D: foundation::Dependency {
+enum DepCall<D>
+where
+    D: foundation::Dependency,
+{
     Download {
         progress: Progress,
         rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
@@ -153,16 +168,22 @@ enum DepCall<D> where D: foundation::Dependency {
         rtn: tokio::sync::oneshot::Sender<Result<D::Provider, BaseErr>>,
     },
     ProviderCall(ProvWrapper<D::Provider>),
-    _Phantom(PhantomData<D>)
+    _Phantom(PhantomData<D>),
 }
 
-struct DependencyTx<F> where F: foundation::Foundation {
+struct DependencyTx<F>
+where
+    F: foundation::Foundation,
+{
     config: <<F as foundation::Foundation>::Dependency as foundation::Dependency>::Config,
     call_tx: tokio::sync::mpsc::Sender<DepCall<F>>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
-impl <F> DependencyTx<F> where F: foundation::Foundation {
+impl<F> DependencyTx<F>
+where
+    F: foundation::Foundation,
+{
     fn new(
         config: F::Dependency::Config,
         call_tx: tokio::sync::mpsc::Sender<DepCall<F>>,
@@ -177,7 +198,10 @@ impl <F> DependencyTx<F> where F: foundation::Foundation {
 }
 
 #[async_trait]
-impl <F> foundation::Dependency for DependencyTx<F> where F: foundation::Foundation {
+impl<F> foundation::Dependency for DependencyTx<F>
+where
+    F: foundation::Foundation,
+{
     type Config = F::Config;
     type Provider = F::Provider;
 
@@ -237,7 +261,10 @@ impl <F> foundation::Dependency for DependencyTx<F> where F: foundation::Foundat
     }
 }
 
-enum ProviderCall<P> where P: Provider {
+enum ProviderCall<P>
+where
+    P: Provider,
+{
     Initialize {
         progress: Progress,
         rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
@@ -249,13 +276,19 @@ enum ProviderCall<P> where P: Provider {
     _Phantom(PhantomData<P>),
 }
 
-struct ProviderTx<P> where P: Provider {
+struct ProviderTx<P>
+where
+    P: Provider,
+{
     config: P::Config,
     call_tx: tokio::sync::mpsc::Sender<ProviderCall<P>>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
-impl <P> ProviderTx<P> where P: Provider{
+impl<P> ProviderTx<P>
+where
+    P: Provider,
+{
     fn new(
         config: Arc<dyn ProviderConfig>,
         call_tx: tokio::sync::mpsc::Sender<ProviderCall<P>>,
@@ -270,7 +303,10 @@ impl <P> ProviderTx<P> where P: Provider{
 }
 
 #[async_trait]
-impl <P> Provider for ProviderTx<P> where P: Provider {
+impl<P> Provider for ProviderTx<P>
+where
+    P: Provider,
+{
     type Config = P::Config;
 
     fn kind(&self) -> &ProviderKind {
@@ -304,14 +340,20 @@ impl <P> Provider for ProviderTx<P> where P: Provider {
     }
 }
 
-struct Runner<F> where F: Foundation {
+struct Runner<F>
+where
+    F: Foundation,
+{
     call_rx: tokio::sync::mpsc::Receiver<Call<F>>,
     call_tx: tokio::sync::mpsc::Sender<Call<F>>,
     foundation: F,
     runners: HashMap<DependencyKind, DependencyRunner<Self>>,
 }
 
-impl <F> Runner<F> where F: Foundation{
+impl<F> Runner<F>
+where
+    F: Foundation,
+{
     fn new(foundation: F) -> impl Foundation {
         let (call_tx, call_rx) = tokio::sync::mpsc::channel(64);
         let config = foundation.config().clone();
@@ -392,13 +434,19 @@ impl <F> Runner<F> where F: Foundation{
     }
 }
 
-struct DependencyRunner<F> where F: Foundation{
+struct DependencyRunner<F>
+where
+    F: Foundation,
+{
     dependency: F::Dependency,
     runners: HashMap<ProviderKind, ProviderRunner<F>>,
     call_tx: tokio::sync::mpsc::Sender<Call<F::Dependency>>,
 }
 
-impl <F> DependencyRunner<F> where F: Foundation{
+impl<F> DependencyRunner<F>
+where
+    F: Foundation,
+{
     fn new(dependency: F::Dependency, call_tx: tokio::sync::mpsc::Sender<Call<F>>) -> Self {
         Self {
             dependency,
@@ -490,12 +538,18 @@ impl <F> DependencyRunner<F> where F: Foundation{
     }
 }
 
-struct ProviderRunner<F> where F: Foundation {
+struct ProviderRunner<F>
+where
+    F: Foundation,
+{
     provider: F::Provider,
     foundation_call_tx: tokio::sync::mpsc::Sender<Call<F>>,
 }
 
-impl <F> ProviderRunner<F> where F: Foundation  {
+impl<F> ProviderRunner<F>
+where
+    F: Foundation,
+{
     fn new(
         provider: F::Provider,
         foundation_call_tx: tokio::sync::mpsc::Sender<Call<F>>,
@@ -506,7 +560,7 @@ impl <F> ProviderRunner<F> where F: Foundation  {
         }
     }
 
-    fn proxy(&self) -> Box<dyn Provider<Config=F::Provider::Config>>  {
+    fn proxy(&self) -> Box<dyn Provider<Config=F::Provider::Config>> {
         let kind = self.kind().clone();
         let (prov_call_tx, mut prov_call_rx) = tokio::sync::mpsc::channel(64);
         let foundation_call_tx = self.foundation_call_tx.clone();

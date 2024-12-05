@@ -24,7 +24,7 @@ use crate::space::err::report::{Label, Report, ReportKind};
 use crate::space::err::ParseErrs;
 use crate::space::kind::{
     ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, Specific, StarSub,
-    Sub, SubKind, UserBaseSubKind,
+    Sub, UserBaseSubKind,
 };
 use crate::space::loc::StarKey;
 use crate::space::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, Version};
@@ -61,19 +61,13 @@ use crate::space::wave::core::{Method, MethodPattern};
 use anyhow::Context;
 use core::fmt;
 use core::fmt::Display;
+use derive_name::Name;
 use model::{
     BindScope, BindScopeKind, Block, BlockKind, Chunk, DelimitedBlockKind, LexBlock,
     LexParentScope, LexRootScope, LexScope, LexScopeSelector, MechtronScope, NestedBlockKind,
     PipelineSegmentVar, PipelineVar, RootScopeSelector, RouteScope, ScopeFilterDef,
     ScopeFiltersDef, Spanned, Subst, TerminatedBlockKind, TextType, VarParser,
 };
-use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Formatter;
-use std::ops::{Deref, RangeFrom, RangeTo};
-use std::str::FromStr;
-use std::sync::Arc;
-use derive_name::Name;
 //use ariadne::{Label, Report, ReportKind};
 use nom::branch::alt;
 use nom::bytes::complete::{is_a, is_not};
@@ -100,6 +94,12 @@ use nom_supreme::ParserExt;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with_macros::{DeserializeFromStr, SerializeDisplay};
+use std::collections::HashMap;
+use std::convert::{TryFrom, TryInto};
+use std::fmt::Formatter;
+use std::ops::{Deref, RangeFrom, RangeTo};
+use std::str::FromStr;
+use std::sync::Arc;
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
 
@@ -450,7 +450,7 @@ pub fn fs_trailing<I: Span>(input: I) -> Res<I, I> {
         recognize(tag(":")),
         context("point:version:root_not_trailing", cut(tag("/"))),
     ))(input)
-    .map(|(next, (rtn, _))| (next, rtn))
+        .map(|(next, (rtn, _))| (next, rtn))
 }
 
 // version end of segment
@@ -487,17 +487,17 @@ pub fn space_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
             peek(lowercase1).context(PrimitiveErrCtx::Lower.into()),
             space_chars,
         ))
-        .context(PrimitiveErrCtx::Domain.into()),
+            .context(PrimitiveErrCtx::Domain.into()),
         mesh_eos.context(
             PrimitiveErrCtx::Brace(BraceErrCtx {
                 kind: BraceKindErrCtx::Curly,
                 side: BraceSideErrCtx::Open,
             })
-            .into(),
+                .into(),
         ),
     )
-    .context(PointSegErrCtx::Space.into()))(input)
-    .map(|(next, space)| (next, PointSeg::Space(space.to_string())))
+        .context(PointSegErrCtx::Space.into()))(input)
+        .map(|(next, space)| (next, PointSeg::Space(space.to_string())))
 }
 
 pub fn base_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
@@ -505,7 +505,7 @@ pub fn base_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
         peek(lowercase1).context(PrimitiveErrCtx::Lower.into()),
         cut(pair(rec_skewer, mesh_eos)),
     )(input)
-    .map(|(next, (base, _))| (next, PointSeg::Base(base.to_string())))
+        .map(|(next, (base, _))| (next, PointSeg::Base(base.to_string())))
 }
 
 pub fn version_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
@@ -513,7 +513,7 @@ pub fn version_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
         peek(digit1),
         context("point:version_segment", cut(tuple((version, ver_eos)))),
     )(input)
-    .map(|(next, (version, _))| (next, PointSeg::Version(version)))
+        .map(|(next, (version, _))| (next, PointSeg::Version(version)))
 }
 
 pub fn dir_pop<I: Span>(input: I) -> Res<I, PointSegVar> {
@@ -536,7 +536,7 @@ pub fn filesystem_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
             cut(alt((dir_point_segment, file_point_segment))),
         ),
     ))(input)
-    .map(|(next, (_, seg))| (next, seg))
+        .map(|(next, (_, seg))| (next, seg))
 }
 
 pub fn dir_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
@@ -569,7 +569,7 @@ pub fn point_var<I: Span>(input: I) -> Res<I, PointVar> {
         "point",
         tuple((alt((root_point_var, point_non_root_var)), eop)),
     )(input.clone())
-    .map(|(next, (point, _))| (next, point))
+        .map(|(next, (point, _))| (next, point))
 }
 
 /*
@@ -624,7 +624,7 @@ fn var<I: Span, O>(input: I) -> Res<I, VarVal<O>> {
                 .context(BraceErrCtx::new(BraceKindErrCtx::Curly, BraceSideErrCtx::Close).into()),
         )),
     )(input)
-    .map(|(next, (_, var))| (next, VarVal::Var(var)))
+        .map(|(next, (_, var))| (next, VarVal::Var(var)))
 }
 
 #[cfg(test)]
@@ -817,14 +817,14 @@ pub fn root_point_var<I: Span>(input: I) -> Res<I, PointVar> {
             tag("ROOT"),
         )),
     )(input)
-    .map(|(next, (route, _))| {
-        let route = route.unwrap_or(RouteSegVar::This);
-        let point = PointVar {
-            route,
-            segments: vec![],
-        };
-        (next, point)
-    })
+        .map(|(next, (route, _))| {
+            let route = route.unwrap_or(RouteSegVar::This);
+            let point = PointVar {
+                route,
+                segments: vec![],
+            };
+            (next, point)
+        })
 }
 
 pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
@@ -848,37 +848,37 @@ pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
             eop,
         )),
     )(input)
-    .map(
-        |(next, (route, space, mut bases, version, filesystem, _))| {
-            let route = route.unwrap_or(RouteSegVar::This);
-            let mut segments = vec![];
-            let mut bases: Vec<PointSegVar> = bases;
-            segments.push(space);
-            segments.append(&mut bases);
-            match version {
-                None => {}
-                Some(version) => {
-                    segments.push(version);
+        .map(
+            |(next, (route, space, mut bases, version, filesystem, _))| {
+                let route = route.unwrap_or(RouteSegVar::This);
+                let mut segments = vec![];
+                let mut bases: Vec<PointSegVar> = bases;
+                segments.push(space);
+                segments.append(&mut bases);
+                match version {
+                    None => {}
+                    Some(version) => {
+                        segments.push(version);
+                    }
                 }
-            }
 
-            if let Option::Some((fsroot, mut dirs, file, _)) = filesystem {
-                let mut dirs: Vec<PointSegVar> = dirs
-                    .into_iter()
-                    .map(|i| PointSegVar::Dir(i.to_string()))
-                    .collect();
-                segments.push(fsroot);
-                segments.append(&mut dirs);
-                if let Some(file) = file {
-                    segments.push(file);
+                if let Option::Some((fsroot, mut dirs, file, _)) = filesystem {
+                    let mut dirs: Vec<PointSegVar> = dirs
+                        .into_iter()
+                        .map(|i| PointSegVar::Dir(i.to_string()))
+                        .collect();
+                    segments.push(fsroot);
+                    segments.append(&mut dirs);
+                    if let Some(file) = file {
+                        segments.push(file);
+                    }
                 }
-            }
 
-            let point = PointVar { route, segments };
+                let point = PointVar { route, segments };
 
-            (next, point)
-        },
-    )
+                (next, point)
+            },
+        )
 }
 
 pub fn consume_point(input: &str) -> Result<Point, ParseErrs> {
@@ -1074,41 +1074,41 @@ pub fn point_kind_hierarchy<I: Span>(input: I) -> Res<I, PointHierarchy> {
         many0(terminated(dir_point_kind_segment, tag("/"))),
         opt(file_point_kind_segment),
     ))(input)
-    .map(
-        |(next, (route_seg, space, mut bases, version, file_root, mut dirs, file))| {
-            let mut segments: Vec<PointKindSeg> = vec![];
-            segments.push(space);
-            segments.append(&mut bases);
-            match version {
-                None => {}
-                Some(version) => {
-                    segments.push(version);
+        .map(
+            |(next, (route_seg, space, mut bases, version, file_root, mut dirs, file))| {
+                let mut segments: Vec<PointKindSeg> = vec![];
+                segments.push(space);
+                segments.append(&mut bases);
+                match version {
+                    None => {}
+                    Some(version) => {
+                        segments.push(version);
+                    }
                 }
-            }
 
-            let route_seg = match route_seg {
-                None => RouteSeg::Local,
-                Some(route_seg) => route_seg,
-            };
+                let route_seg = match route_seg {
+                    None => RouteSeg::Local,
+                    Some(route_seg) => route_seg,
+                };
 
-            if file_root.is_some() {
-                segments.push(PointKindSeg {
-                    segment: PointSeg::FsRootDir,
-                    kind: Kind::FileStore,
-                });
-            }
+                if file_root.is_some() {
+                    segments.push(PointKindSeg {
+                        segment: PointSeg::FsRootDir,
+                        kind: Kind::FileStore,
+                    });
+                }
 
-            segments.append(&mut dirs);
+                segments.append(&mut dirs);
 
-            if let Some(file) = file {
-                segments.push(file);
-            }
+                if let Some(file) = file {
+                    segments.push(file);
+                }
 
-            let point = PointHierarchy::new(route_seg, segments);
+                let point = PointHierarchy::new(route_seg, segments);
 
-            (next, point)
-        },
-    )
+                (next, point)
+            },
+        )
 }
 
 pub fn asterisk<T: Span>(input: T) -> Res<T, T>
@@ -1524,7 +1524,16 @@ pub fn consume_path<I: Span>(input: I) -> Res<I, I> {
     all_consuming(path)(input)
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, SerializeDisplay, DeserializeFromStr, derive_name::Name)]
+#[derive(
+    Debug,
+    Clone,
+    Eq,
+    PartialEq,
+    Hash,
+    SerializeDisplay,
+    DeserializeFromStr,
+    derive_name::Name
+)]
 pub struct CamelCase {
     string: String,
 }
@@ -1858,7 +1867,7 @@ pub fn base_point_segment_wildcard<I: Span>(input: I) -> Res<I, PointTemplateSeg
         tag(":"),
         recognize(tuple((many0(skewer), tag("%"), many0(skewer)))),
     )(input)
-    .map(|(next, base)| (next, PointTemplateSeg::Wildcard(base.to_string())))
+        .map(|(next, base)| (next, PointTemplateSeg::Wildcard(base.to_string())))
 }
 
 pub fn base_point_segment_template<I: Span>(input: I) -> Res<I, PointTemplateSeg> {
@@ -1876,7 +1885,7 @@ pub fn filepath_point_segment_wildcard<I: Span>(input: I) -> Res<I, PointTemplat
         tag("%"),
         many0(filepath_chars),
     )))(input)
-    .map(|(next, base)| (next, PointTemplateSeg::Wildcard(base.to_string())))
+        .map(|(next, base)| (next, PointTemplateSeg::Wildcard(base.to_string())))
 }
 
 pub fn filepath_point_segment_template<I: Span>(input: I) -> Res<I, PointTemplateSeg> {
@@ -2069,23 +2078,23 @@ pub fn kind_template<I: Span>(input: I) -> Res<I, KindTemplate> {
             tag(">"),
         )),
     ))(input)
-    .map(|(next, (kind, more))| {
-        let mut parts = KindTemplate {
-            base: kind,
-            sub: None,
-            specific: None,
-        };
+        .map(|(next, (kind, more))| {
+            let mut parts = KindTemplate {
+                base: kind,
+                sub: None,
+                specific: None,
+            };
 
-        match more {
-            Some((sub, specific)) => {
-                parts.sub = Option::Some(sub);
-                parts.specific = specific;
+            match more {
+                Some((sub, specific)) => {
+                    parts.sub = Option::Some(sub);
+                    parts.specific = specific;
+                }
+                None => {}
             }
-            None => {}
-        }
 
-        (next, parts)
-    })
+            (next, parts)
+        })
 }
 
 pub fn template<I: Span>(input: I) -> Res<I, TemplateVar> {
@@ -2183,23 +2192,23 @@ pub fn create<I: Span>(input: I) -> Res<I, CreateVar> {
         template,
         opt(delimited(tag("{"), set_properties, tag("}"))),
     ))(input)
-    .map(|(next, (strategy, _, template, properties))| {
-        let strategy = match strategy {
-            None => Strategy::Commit,
-            Some(strategy) => strategy,
-        };
-        let properties = match properties {
-            Some(properties) => properties,
-            None => SetProperties::new(),
-        };
-        let create = CreateVar {
-            template,
-            state: StateSrcVar::None,
-            properties,
-            strategy,
-        };
-        (next, create)
-    })
+        .map(|(next, (strategy, _, template, properties))| {
+            let strategy = match strategy {
+                None => Strategy::Commit,
+                Some(strategy) => strategy,
+            };
+            let properties = match properties {
+                Some(properties) => properties,
+                None => SetProperties::new(),
+            };
+            let create = CreateVar {
+                template,
+                state: StateSrcVar::None,
+                properties,
+                strategy,
+            };
+            (next, create)
+        })
 }
 
 pub fn set<I: Span>(input: I) -> Res<I, SetVar> {
@@ -2216,15 +2225,15 @@ pub fn get<I: Span>(input: I) -> Res<I, GetVar> {
         point_var,
         opt(delimited(tag("{"), get_properties, tag("}"))),
     ))(input)
-    .map(|(next, (point, keys))| {
-        let op = match keys {
-            None => GetOp::State,
-            Some(keys) => GetOp::Properties(keys),
-        };
-        let get = GetVar { point, op };
+        .map(|(next, (point, keys))| {
+            let op = match keys {
+                None => GetOp::State,
+                Some(keys) => GetOp::Properties(keys),
+            };
+            let get = GetVar { point, op };
 
-        (next, get)
-    })
+            (next, get)
+        })
 }
 
 pub fn select<I: Span>(input: I) -> Res<I, SelectVar> {
@@ -2757,12 +2766,12 @@ where
 pub fn diagnose<I: Clone, O, F>(tag: &'static str, mut f: F) -> impl FnMut(I) -> Res<I, O>
 where
     I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
+    + InputLength
+    + InputTake
+    + Compare<&'static str>
+    + InputIter
+    + Clone
+    + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     I: ToString,
     F: nom::Parser<I, O, SpaceTree<I>>,
@@ -2874,19 +2883,19 @@ where
 pub fn seg_delim<I: Span>(input: I) -> Res<I, PointSegDelim>
 where
     I: ToString
-        + Clone
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + InputTakeAtPosition,
+    + Clone
+    + InputLength
+    + InputTake
+    + Compare<&'static str>
+    + InputIter
+    + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar + Clone,
 {
     alt((
         value(PointSegDelim::File, tag("/")),
         value(PointSegDelim::Mesh, tag(":")),
     ))(input)
-    .map(|(next, delim)| (next, delim))
+        .map(|(next, delim)| (next, delim))
 }
 
 // end of segment
@@ -2963,15 +2972,15 @@ where
 pub fn ispan<'a, I: Clone, O, F>(mut f: F) -> impl FnMut(I) -> Res<I, Spanned<I, O>>
 where
     I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
+    + InputLength
+    + InputTake
+    + Compare<&'static str>
+    + InputIter
+    + Clone
+    + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     F: nom::Parser<I, O, SpaceTree<I>>,
-    O: Clone + FromStr<Err = ParseErrs>,
+    O: Clone + FromStr<Err=ParseErrs>,
 {
     move |input: I| {
         let (next, element) = f.parse(input.clone())?;
@@ -3004,7 +3013,7 @@ pub fn access_grant_kind<I: Span>(input: I) -> Res<I, AccessGrantKind> {
         ),
         alt((access_grant_kind_perm, access_grant_kind_priv)),
     ))(input)
-    .map(|(next, (_, kind))| (next, kind))
+        .map(|(next, (_, kind))| (next, kind))
 }
 
 pub fn access_grant_kind_priv<I: Span>(input: I) -> Res<I, AccessGrantKind> {
@@ -3012,7 +3021,7 @@ pub fn access_grant_kind_priv<I: Span>(input: I) -> Res<I, AccessGrantKind> {
         tag("priv"),
         context("access_grant:priv", tuple((space1, privilege))),
     ))(input)
-    .map(|(next, (_, (_, privilege)))| (next, AccessGrantKindDef::Privilege(privilege)))
+        .map(|(next, (_, (_, privilege)))| (next, AccessGrantKindDef::Privilege(privilege)))
 }
 
 pub fn access_grant_kind_perm<I: Span>(input: I) -> Res<I, AccessGrantKind> {
@@ -3020,7 +3029,7 @@ pub fn access_grant_kind_perm<I: Span>(input: I) -> Res<I, AccessGrantKind> {
         tag("perm"),
         context("access_grant:perm", tuple((space1, permissions_mask))),
     ))(input)
-    .map(|(next, (_, (_, perms)))| (next, AccessGrantKindDef::PermissionsMask(perms)))
+        .map(|(next, (_, (_, perms)))| (next, AccessGrantKindDef::PermissionsMask(perms)))
 }
 
 pub fn privilege<I: Span>(input: I) -> Res<I, Privilege> {
@@ -3044,11 +3053,11 @@ pub fn permissions_mask<I: Span>(input: I) -> Res<I, PermissionsMask> {
             permissions,
         )),
     )(input)
-    .map(|(next, (kind, permissions))| {
-        let mask = PermissionsMask { kind, permissions };
+        .map(|(next, (kind, permissions))| {
+            let mask = PermissionsMask { kind, permissions };
 
-        (next, mask)
-    })
+            (next, mask)
+        })
 }
 
 pub fn permissions<I: Span>(input: I) -> Res<I, Permissions> {
@@ -3056,10 +3065,10 @@ pub fn permissions<I: Span>(input: I) -> Res<I, Permissions> {
         "permissions",
         tuple((child_perms, tag("-"), particle_perms)),
     )(input)
-    .map(|(next, (child, _, particle))| {
-        let permissions = Permissions { child, particle };
-        (next, permissions)
-    })
+        .map(|(next, (child, _, particle))| {
+            let permissions = Permissions { child, particle };
+            (next, permissions)
+        })
 }
 
 pub fn child_perms<I: Span>(input: I) -> Res<I, ChildPerms> {
@@ -3074,14 +3083,14 @@ pub fn child_perms<I: Span>(input: I) -> Res<I, ChildPerms> {
             fail,
         )),
     )(input)
-    .map(|(next, (create, select, delete))| {
-        let block = ChildPerms {
-            create,
-            select,
-            delete,
-        };
-        (next, block)
-    })
+        .map(|(next, (create, select, delete))| {
+            let block = ChildPerms {
+                create,
+                select,
+                delete,
+            };
+            (next, block)
+        })
 }
 
 pub fn particle_perms<I: Span>(input: I) -> Res<I, ParticlePerms> {
@@ -3093,14 +3102,14 @@ pub fn particle_perms<I: Span>(input: I) -> Res<I, ParticlePerms> {
             alt((value(false, char('x')), value(true, char('X')))),
         )),
     )(input)
-    .map(|(next, (read, write, execute))| {
-        let block = ParticlePerms {
-            read,
-            write,
-            execute,
-        };
-        (next, block)
-    })
+        .map(|(next, (read, write, execute))| {
+            let block = ParticlePerms {
+                read,
+                write,
+                execute,
+            };
+            (next, block)
+        })
 }
 
 /*
@@ -3117,12 +3126,12 @@ pub fn none<I: Span, O, E>(input: I) -> IResult<I, Option<O>, E> {
 pub fn some<I: Span, O, F>(mut f: F) -> impl FnMut(I) -> Res<I, Option<O>>
 where
     I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
+    + InputLength
+    + InputTake
+    + Compare<&'static str>
+    + InputIter
+    + Clone
+    + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     I: ToString,
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
@@ -3140,12 +3149,12 @@ where
 pub fn lex_block_alt<I: Span>(kinds: Vec<BlockKind>) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
+    + InputLength
+    + InputTake
+    + Compare<&'static str>
+    + InputIter
+    + Clone
+    + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     I: ToString,
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
@@ -3179,12 +3188,12 @@ where
 pub fn lex_block<I: Span>(kind: BlockKind) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
+    + InputLength
+    + InputTake
+    + Compare<&'static str>
+    + InputIter
+    + Clone
+    + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     I: ToString,
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
@@ -3207,12 +3216,12 @@ pub fn lex_terminated_block<I: Span>(
 ) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
+    + InputLength
+    + InputTake
+    + Compare<&'static str>
+    + InputIter
+    + Clone
+    + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     I: ToString,
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
@@ -3224,15 +3233,15 @@ where
             recognize(many0(satisfy(|c| c != kind.as_char()))),
             tag(kind.tag()),
         )(input)
-        .map(|(next, content)| {
-            let block = LexBlock {
-                kind: BlockKind::Terminated(kind),
-                content,
-                data: (),
-            };
+            .map(|(next, content)| {
+                let block = LexBlock {
+                    kind: BlockKind::Terminated(kind),
+                    content,
+                    data: (),
+                };
 
-            (next, block)
-        })
+                (next, block)
+            })
     }
 }
 
@@ -3241,12 +3250,12 @@ where
 pub fn lex_nested_block<I: Span>(kind: NestedBlockKind) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
+    + InputLength
+    + InputTake
+    + Compare<&'static str>
+    + InputIter
+    + Clone
+    + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     I: ToString,
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
@@ -3309,12 +3318,12 @@ pub fn lex_delimited_block<I: Span>(
 ) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
+    + InputLength
+    + InputTake
+    + Compare<&'static str>
+    + InputIter
+    + Clone
+    + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     I: ToString,
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
@@ -3350,12 +3359,12 @@ fn block_open<I: Span>(input: I) -> Res<I, NestedBlockKind> {
 fn any_soround_lex_block<I: Span>(input: I) -> Res<I, LexBlock<I>>
 where
     I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
+    + InputLength
+    + InputTake
+    + Compare<&'static str>
+    + InputIter
+    + Clone
+    + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     I: ToString,
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
@@ -3399,7 +3408,7 @@ where
                 true
             }
         })(input)
-        .map(|(next, _)| (next, ()))
+            .map(|(next, _)| (next, ()))
     }
 }
 
@@ -3489,14 +3498,14 @@ pub fn lex_scope<I: Span>(input: I) -> Res<I, LexScope<I>> {
             lex_scope_pipeline_step_and_block,
         )),
     )(input)
-    .map(|(next, (_, selector, _, (pipeline_step, block)))| {
-        let scope = LexScope {
-            selector,
-            pipeline_step,
-            block,
-        };
-        (next, scope)
-    })
+        .map(|(next, (_, selector, _, (pipeline_step, block)))| {
+            let scope = LexScope {
+                selector,
+                pipeline_step,
+                block,
+            };
+            (next, scope)
+        })
 }
 
 pub fn lex_scoped_block_kind<I: Span>(input: I) -> Res<I, BlockKind> {
@@ -3528,7 +3537,7 @@ pub fn lex_scope_pipeline_step_and_block<I: Span>(input: I) -> Res<I, (Option<I>
             multispace1,
             lex_block(BlockKind::Nested(NestedBlockKind::Curly)),
         ))(input)
-        .map(|(next, (step, _, block))| (next, (Some(step), block))),
+            .map(|(next, (step, _, block))| (next, (Some(step), block))),
         BlockKind::Terminated(_) => {
             lex_block(BlockKind::Terminated(TerminatedBlockKind::Semicolon))(input)
                 .map(|(next, block)| (next, (None, block)))
@@ -3551,16 +3560,16 @@ pub fn lex_sub_scope_selectors_and_filters_and_block<I: Span>(input: I) -> Res<I
             ]),
         )),
     ))(input)
-    .map(|(next, content)| {
-        (
-            next,
-            LexBlock {
-                kind: BlockKind::Partial,
-                content,
-                data: (),
-            },
-        )
-    })
+        .map(|(next, content)| {
+            (
+                next,
+                LexBlock {
+                    kind: BlockKind::Partial,
+                    content,
+                    data: (),
+                },
+            )
+        })
 }
 
 pub fn root_scope<I: Span>(input: I) -> Res<I, LexRootScope<I>> {
@@ -3576,10 +3585,10 @@ pub fn root_scope<I: Span>(input: I) -> Res<I, LexRootScope<I>> {
             ),
         )),
     )(input)
-    .map(|(next, (selector, _, _, block))| {
-        let scope = LexRootScope::new(selector, block);
-        (next, scope)
-    })
+        .map(|(next, (selector, _, _, block))| {
+            let scope = LexRootScope::new(selector, block);
+            (next, scope)
+        })
 }
 
 pub fn lex_scopes<I: Span>(input: I) -> Result<Vec<LexScope<I>>, ParseErrs> {
@@ -3603,10 +3612,10 @@ pub fn lex_scopes<I: Span>(input: I) -> Result<Vec<LexScope<I>>, ParseErrs> {
                 multispace0,
             ))),
         )(input)
-        .map(|(next, scopes)| {
-            let scopes: Vec<LexScope<I>> = scopes.into_iter().map(|scope| scope.1).collect();
-            (next, scopes)
-        }),
+            .map(|(next, scopes)| {
+                let scopes: Vec<LexScope<I>> = scopes.into_iter().map(|scope| scope.1).collect();
+                (next, scopes)
+            }),
     )
 }
 
@@ -3642,7 +3651,7 @@ pub fn next_stacked_name<I: Span>(input: I) -> Res<I, (I, Option<I>)> {
             )),
         ),
     )
-    .map(|(next, (_, (_, (name, children), _)))| (next, (name, children)))
+        .map(|(next, (_, (_, (name, children), _)))| (next, (name, children)))
     {
         Ok((next, (name, children))) => return Ok((next, (name, children))),
         Err(_) => {}
@@ -3715,12 +3724,12 @@ where
     &'static str: FindToken<<I as InputTakeAtPosition>::Item>,
 
     I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
+    + InputLength
+    + InputTake
+    + Compare<&'static str>
+    + InputIter
+    + Clone
+    + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar + Copy,
     I: ToString,
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
@@ -3755,12 +3764,12 @@ where
     &'static str: FindToken<<I as InputTakeAtPosition>::Item>,
 
     I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
+    + InputLength
+    + InputTake
+    + Compare<&'static str>
+    + InputIter
+    + Clone
+    + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     I: ToString,
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
@@ -3813,10 +3822,10 @@ pub fn scope_filter<I: Span>(input: I) -> Res<I, ScopeFilterDef<I>> {
         ),
         tag(")"),
     )(input)
-    .map(|(next, (name, args))| {
-        let filter = ScopeFilterDef { name, args };
-        (next, filter)
-    })
+        .map(|(next, (name, args))| {
+            let filter = ScopeFilterDef { name, args };
+            (next, filter)
+        })
 }
 
 pub fn scope_name<I>(input: I) -> Res<I, I>
@@ -3840,7 +3849,7 @@ pub fn root_scope_selector<I: Span>(input: I) -> Res<I, RootScopeSelector<I, Spa
             ),
         )),
     )(input)
-    .map(|(next, (name, version))| (next, RootScopeSelector { version, name }))
+        .map(|(next, (name, version))| (next, RootScopeSelector { version, name }))
 }
 
 pub fn scope_version<I: Span>(input: I) -> Res<I, Spanned<I, Version>> {
@@ -3852,7 +3861,7 @@ pub fn scope_version<I: Span>(input: I) -> Res<I, Spanned<I, Version>> {
             context("scope-selector-version-closing-tag", tag(")")),
         )),
     )(input)
-    .map(|((next, (_, version, _)))| (next, version))
+        .map(|((next, (_, version, _)))| (next, version))
 }
 
 /*
@@ -3895,7 +3904,7 @@ pub fn scope_selector_name<I: Span>(input: I) -> Res<I, I> {
             ),
         ),
     )(input)
-    .map(|(next, name)| (next, name))
+        .map(|(next, name)| (next, name))
 }
 
 pub fn root_scope_selector_name<I: Span>(input: I) -> Res<I, I> {
@@ -3903,7 +3912,7 @@ pub fn root_scope_selector_name<I: Span>(input: I) -> Res<I, I> {
         "root-scope-selector-name",
         pair((peek(alpha1)), alphanumeric1),
     )(input)
-    .map(|(next, (_, name))| (next, name))
+        .map(|(next, (_, name))| (next, name))
 }
 
 pub fn lex_root_scope<I: Span>(span: I) -> Result<LexRootScope<I>, ParseErrs> {
@@ -4261,11 +4270,11 @@ pub mod model {
                             "unknown MessageKind: {} valid message kinds: Ext, Http, Cmd or *",
                             selector.name.to_string()
                         )
-                        .as_str(),
+                            .as_str(),
                         "unknown message kind",
                         selector.name,
                     )
-                    .into());
+                        .into());
                 }
             };
 
@@ -4324,11 +4333,11 @@ pub mod model {
                                         "invalid Hyp method '{}'.  Hyp should be CamelCase",
                                         selector.name.to_string()
                                     )
-                                    .as_str(),
+                                        .as_str(),
                                     "invalid Hyp",
                                     selector.name,
                                 )
-                                .into())
+                                    .into())
                             }
                         }
                     }
@@ -4341,11 +4350,11 @@ pub mod model {
                                         "invalid Cmd method '{}'.  Cmd should be CamelCase",
                                         selector.name.to_string()
                                     )
-                                    .as_str(),
+                                        .as_str(),
                                     "invalid Cmd",
                                     selector.name,
                                 )
-                                .into())
+                                    .into())
                             }
                         }
                     }
@@ -4358,21 +4367,21 @@ pub mod model {
                                         "invalid Ext method '{}'.  Ext should be CamelCase",
                                         selector.name.to_string()
                                     )
-                                    .as_str(),
+                                        .as_str(),
                                     "invalid Ext",
                                     selector.name,
                                 )
-                                .into())
+                                    .into())
                             }
                         }
                     }
                     MethodKind::Http => {
-                        match result(value_pattern( wrapped_http_method)(selector.name.clone())) {
-                                Ok(r) => r,
-                                Err(_) => {
-                                    return Err(ParseErrs::from_loc_span(format!("invalid Http Pattern '{}'.  Http should be camel case 'Get' and a valid Http method", selector.name.to_string()).as_str(), "invalid Http method", selector.name ).into())
-                                }
+                        match result(value_pattern(wrapped_http_method)(selector.name.clone())) {
+                            Ok(r) => r,
+                            Err(_) => {
+                                return Err(ParseErrs::from_loc_span(format!("invalid Http Pattern '{}'.  Http should be camel case 'Get' and a valid Http method", selector.name.to_string()).as_str(), "invalid Http method", selector.name).into())
                             }
+                        }
                     }
                 },
             };
@@ -4566,9 +4575,9 @@ pub mod model {
     pub type MethodScopeSelector = ScopeSelectorDef<ValuePattern<Method>, Regex>;
     pub type RouteScopeSelectorAndFilters = ScopeSelectorAndFiltersDef<RouteScopeSelector, String>;
     pub type MessageScopeSelectorAndFilters =
-        ScopeSelectorAndFiltersDef<MessageScopeSelector, String>;
+    ScopeSelectorAndFiltersDef<MessageScopeSelector, String>;
     pub type MethodScopeSelectorAndFilters =
-        ScopeSelectorAndFiltersDef<MethodScopeSelector, String>;
+    ScopeSelectorAndFiltersDef<MethodScopeSelector, String>;
 
     /*    pub type ValuePatternScopeSelectorAndFilters =
            ScopeSelectorAndFiltersDef<ValuePatternScopeSelector, String>;
@@ -5275,7 +5284,7 @@ pub fn command_line<I: Span>(input: I) -> Res<I, CommandVar> {
         opt(tag(";")),
         multispace0,
     ))(input)
-    .map(|(next, (_, command, _, _, _))| (next, command))
+        .map(|(next, (_, command, _, _, _))| (next, command))
 }
 
 pub fn script_line<I: Span>(input: I) -> Res<I, CommandVar> {
@@ -5375,7 +5384,7 @@ pub fn port<I: Span>(input: I) -> Res<I, Surface> {
 }
 
 pub type SurfaceSelectorVal =
-    SurfaceSelectorDef<PointSegKindHop, VarVal<Topic>, VarVal<ValuePattern<Layer>>>;
+SurfaceSelectorDef<PointSegKindHop, VarVal<Topic>, VarVal<ValuePattern<Layer>>>;
 pub type SurfaceSelectorCtx = SurfaceSelectorDef<PointSegKindHop, Topic, ValuePattern<Layer>>;
 pub type SurfaceSelector = SurfaceSelectorDef<PointSegKindHop, Topic, ValuePattern<Layer>>;
 
@@ -5433,22 +5442,22 @@ pub mod cmd_test {
         command, create_command, point_selector, publish_command, script, upload_blocks, CamelCase,
     };
     /*
-    #[mem]
-    pub async fn test2() -> Result<(),Error>{
-        let input = "? xreate localhost<Space>";
-        let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
-        match x {
-            Ok(_) => {}
-            Err(err) => {
-                println!("err: {}", err.to_string())
+        #[mem]
+        pub async fn test2() -> Result<(),Error>{
+            let input = "? xreate localhost<Space>";
+            let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
+            match x {
+                Ok(_) => {}
+                Err(err) => {
+                    println!("err: {}", err.to_string())
+                }
             }
+
+
+            Ok(())
         }
 
-
-        Ok(())
-    }
-
-     */
+         */
 
     //    #[test]
     pub fn test() -> Result<(), ParseErrs> {
@@ -5835,18 +5844,18 @@ pub fn specific_selector<I: Span>(input: I) -> Res<I, SpecificSelector> {
         tag(":"),
         delimited(tag("("), version_req, tag(")")),
     ))(input)
-    .map(
-        |(next, (provider, _, vendor, _, product, _, variant, _, version))| {
-            let specific = SpecificSelector {
-                provider,
-                vendor,
-                product,
-                variant,
-                version,
-            };
-            (next, specific)
-        },
-    )
+        .map(
+            |(next, (provider, _, vendor, _, product, _, variant, _, version))| {
+                let specific = SpecificSelector {
+                    provider,
+                    vendor,
+                    product,
+                    variant,
+                    version,
+                };
+                (next, specific)
+            },
+        )
 }
 
 pub fn rec_domain_pattern<I: Span>(input: I) -> Res<I, Pattern<I>> {
@@ -5880,28 +5889,28 @@ pub fn kind_lex<I: Span>(input: I) -> Res<I, KindLex> {
             tag(">"),
         )),
     ))(input)
-    .map(|(next, (kind, rest))| {
-        let mut rtn = KindLex {
-            base: kind,
-            sub: Option::None,
-            specific: Option::None,
-        };
+        .map(|(next, (kind, rest))| {
+            let mut rtn = KindLex {
+                base: kind,
+                sub: Option::None,
+                specific: Option::None,
+            };
 
-        match rest {
-            Some((sub, specific)) => {
-                rtn.sub = Option::Some(sub);
-                match specific {
-                    Some(specific) => {
-                        rtn.specific = Option::Some(specific);
+            match rest {
+                Some((sub, specific)) => {
+                    rtn.sub = Option::Some(sub);
+                    match specific {
+                        Some(specific) => {
+                            rtn.specific = Option::Some(specific);
+                        }
+                        None => {}
                     }
-                    None => {}
                 }
+                None => {}
             }
-            None => {}
-        }
 
-        (next, rtn)
-    })
+            (next, rtn)
+        })
 }
 
 pub fn kind_parts<I: Span>(input: I) -> Res<I, KindParts> {
@@ -5913,28 +5922,28 @@ pub fn kind_parts<I: Span>(input: I) -> Res<I, KindParts> {
             tag(">"),
         )),
     ))(input)
-    .map(|(next, (base, rest))| {
-        let mut rtn = KindParts {
-            base,
-            sub: Option::None,
-            specific: Option::None,
-        };
+        .map(|(next, (base, rest))| {
+            let mut rtn = KindParts {
+                base,
+                sub: Option::None,
+                specific: Option::None,
+            };
 
-        match rest {
-            Some((sub, specific)) => {
-                rtn.sub = Option::Some(sub);
-                match specific {
-                    Some(specific) => {
-                        rtn.specific = Option::Some(specific);
+            match rest {
+                Some((sub, specific)) => {
+                    rtn.sub = Option::Some(sub);
+                    match specific {
+                        Some(specific) => {
+                            rtn.specific = Option::Some(specific);
+                        }
+                        None => {}
                     }
-                    None => {}
                 }
+                None => {}
             }
-            None => {}
-        }
 
-        (next, rtn)
-    })
+            (next, rtn)
+        })
 }
 
 pub fn delim_kind<I: Span>(input: I) -> Res<I, Kind> {
@@ -6252,28 +6261,28 @@ pub fn kind_selector<I: Span>(input: I) -> Res<I, KindSelector> {
         )),
         tag(">"),
     )(input)
-    .map(|(next, (kind, sub_kind_and_specific))| {
-        let (sub, specific): (SubKindSelector, ValuePattern<SpecificSelector>) =
-            match sub_kind_and_specific {
-                None => (SubKindSelector::Always, ValuePattern::Always),
-                Some((sub, specific)) => {
-                    let specific = match specific {
-                        None => ValuePattern::Always,
-                        Some(s) => s,
-                    };
+        .map(|(next, (kind, sub_kind_and_specific))| {
+            let (sub, specific): (SubKindSelector, ValuePattern<SpecificSelector>) =
+                match sub_kind_and_specific {
+                    None => (SubKindSelector::Always, ValuePattern::Always),
+                    Some((sub, specific)) => {
+                        let specific = match specific {
+                            None => ValuePattern::Always,
+                            Some(s) => s,
+                        };
 
-                    (sub, specific)
-                }
+                        (sub, specific)
+                    }
+                };
+
+            let tks = KindSelector {
+                base: kind,
+                sub,
+                specific,
             };
 
-        let tks = KindSelector {
-            base: kind,
-            sub,
-            specific,
-        };
-
-        (next, tks)
-    })
+            (next, tks)
+        })
 }
 
 fn space_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
@@ -6402,45 +6411,45 @@ pub fn point_selector<I: Span>(input: I) -> Res<I, Selector> {
             opt(preceded(tag(":/"), tuple((many0(dir_hop), opt(file_hop))))),
         )),
     )(input)
-    .map(
-        |(next, (space_hop, base_hops, version_hop, filesystem_hops))| {
-            let mut hops = vec![];
-            hops.push(space_hop);
-            for base_hop in base_hops {
-                hops.push(base_hop);
-            }
-            if let Option::Some(version_hop) = version_hop {
-                hops.push(version_hop);
-            }
-            if let Some((dir_hops, file_hop)) = filesystem_hops {
-                // first push the filesystem root
-                hops.push(PointSegKindHop {
-                    inclusive: false,
-                    segment_selector: PointSegSelector::Exact(ExactPointSeg::PointSeg(
-                        PointSeg::FsRootDir,
-                    )),
-                    kind_selector: KindSelector {
-                        base: KindBaseSelector::Exact(BaseKind::File),
-                        sub: SubKindSelector::Always,
-                        specific: ValuePattern::Always,
-                    },
-                });
-                for dir_hop in dir_hops {
-                    hops.push(dir_hop);
+        .map(
+            |(next, (space_hop, base_hops, version_hop, filesystem_hops))| {
+                let mut hops = vec![];
+                hops.push(space_hop);
+                for base_hop in base_hops {
+                    hops.push(base_hop);
                 }
-                if let Some(file_hop) = file_hop {
-                    hops.push(file_hop);
+                if let Option::Some(version_hop) = version_hop {
+                    hops.push(version_hop);
                 }
-            }
+                if let Some((dir_hops, file_hop)) = filesystem_hops {
+                    // first push the filesystem root
+                    hops.push(PointSegKindHop {
+                        inclusive: false,
+                        segment_selector: PointSegSelector::Exact(ExactPointSeg::PointSeg(
+                            PointSeg::FsRootDir,
+                        )),
+                        kind_selector: KindSelector {
+                            base: KindBaseSelector::Exact(BaseKind::File),
+                            sub: SubKindSelector::Always,
+                            specific: ValuePattern::Always,
+                        },
+                    });
+                    for dir_hop in dir_hops {
+                        hops.push(dir_hop);
+                    }
+                    if let Some(file_hop) = file_hop {
+                        hops.push(file_hop);
+                    }
+                }
 
-            let rtn = Selector {
-                hops,
-                always: false,
-            };
+                let rtn = Selector {
+                    hops,
+                    always: false,
+                };
 
-            (next, rtn)
-        },
-    )
+                (next, rtn)
+            },
+        )
 }
 
 pub fn point_and_kind<I: Span>(input: I) -> Res<I, PointKindVar> {
@@ -6475,18 +6484,18 @@ pub fn specific<I: Span>(input: I) -> Res<I, Specific> {
         tag(":"),
         version,
     ))(input)
-    .map(
-        |(next, (provider, _, vendor, _, product, _, variant, _, version))| {
-            let specific = Specific {
-                provider,
-                vendor,
-                product,
-                variant,
-                version,
-            };
-            (next, specific)
-        },
-    )
+        .map(
+            |(next, (provider, _, vendor, _, product, _, variant, _, version))| {
+                let specific = Specific {
+                    provider,
+                    vendor,
+                    product,
+                    variant,
+                    version,
+                };
+                (next, specific)
+            },
+        )
 }
 
 pub fn args<T>(i: T) -> Res<T, T>
@@ -6582,19 +6591,19 @@ pub fn primitive_def<I: Span>(input: I) -> Res<I, PayloadType2Def<PointVar>> {
         opt(preceded(tag("~"), opt(format))),
         opt(preceded(tag("~"), call_with_config)),
     ))(input)
-    .map(|(next, (primitive, format, verifier))| {
-        (
-            next,
-            PayloadType2Def {
-                primitive,
-                format: match format {
-                    Some(Some(format)) => Some(format),
-                    _ => Option::None,
+        .map(|(next, (primitive, format, verifier))| {
+            (
+                next,
+                PayloadType2Def {
+                    primitive,
+                    format: match format {
+                        Some(Some(format)) => Some(format),
+                        _ => Option::None,
+                    },
+                    verifier,
                 },
-                verifier,
-            },
-        )
-    })
+            )
+        })
 }
 
 pub fn payload<I: Span>(input: I) -> Res<I, SubstanceKind> {
@@ -6630,13 +6639,13 @@ pub fn ext_call<I: Span>(input: I) -> Res<I, CallKind> {
         delimited(tag("Ext<"), ext_method, tag(">")),
         opt(subst_path),
     ))(input)
-    .map(|(next, (method, path))| {
-        let path = match path {
-            None => subst(filepath_chars)(new_span("/")).unwrap().1.stringify(),
-            Some(path) => path.stringify(),
-        };
-        (next, CallKind::Ext(ExtCall::new(method, path)))
-    })
+        .map(|(next, (method, path))| {
+            let path = match path {
+                None => subst(filepath_chars)(new_span("/")).unwrap().1.stringify(),
+                Some(path) => path.stringify(),
+            };
+            (next, CallKind::Ext(ExtCall::new(method, path)))
+        })
 }
 
 pub fn http_call<I: Span>(input: I) -> Res<I, CallKind> {
@@ -6644,13 +6653,13 @@ pub fn http_call<I: Span>(input: I) -> Res<I, CallKind> {
         delimited(tag("Http<"), http_method, tag(">")),
         opt(subst_path),
     ))(input)
-    .map(|(next, (method, path))| {
-        let path = match path {
-            None => subst(filepath_chars)(new_span("/")).unwrap().1.stringify(),
-            Some(path) => path.stringify(),
-        };
-        (next, CallKind::Http(HttpCall::new(method, path)))
-    })
+        .map(|(next, (method, path))| {
+            let path = match path {
+                None => subst(filepath_chars)(new_span("/")).unwrap().1.stringify(),
+                Some(path) => path.stringify(),
+            };
+            (next, CallKind::Http(HttpCall::new(method, path)))
+        })
 }
 
 pub fn call_kind<I: Span>(input: I) -> Res<I, CallKind> {
@@ -6706,13 +6715,13 @@ pub fn range<I: Span>(input: I) -> Res<I, NumRange> {
         opt(alt((digit_range, exact_range))),
         multispace0,
     )(input)
-    .map(|(next, range)| {
-        let range = match range {
-            Some(range) => range,
-            None => NumRange::Any,
-        };
-        (next, range)
-    })
+        .map(|(next, range)| {
+            let range = match range {
+                Some(range) => range,
+                None => NumRange::Any,
+            };
+            (next, range)
+        })
 }
 
 pub fn primitive_data_struct<I: Span>(input: I) -> Res<I, SubstanceTypePatternDef<PointVar>> {
@@ -6728,12 +6737,12 @@ pub fn array_data_struct<I: Span>(input: I) -> Res<I, SubstanceTypePatternDef<Po
             context("array", delimited(tag("["), range, tag("]"))),
         )),
     )(input)
-    .map(|(next, (primitive, range))| {
-        (
-            next,
-            SubstanceTypePatternDef::List(ListPattern { primitive, range }),
-        )
-    })
+        .map(|(next, (primitive, range))| {
+            (
+                next,
+                SubstanceTypePatternDef::List(ListPattern { primitive, range }),
+            )
+        })
 }
 
 pub fn map_entry_pattern_any<I: Span>(input: I) -> Res<I, ValuePattern<MapEntryPatternVar>> {
@@ -6784,26 +6793,26 @@ pub fn map_pattern_params<I: Span>(input: I) -> Res<I, MapPatternVar> {
         multispace0,
         opt(allowed_map_entry_pattern),
     ))(input)
-    .map(|(next, (required, _, allowed))| {
-        let mut required_map = HashMap::new();
-        match required {
-            Option::Some(required) => {
-                for require in required {
-                    required_map.insert(require.key, require.payload);
+        .map(|(next, (required, _, allowed))| {
+            let mut required_map = HashMap::new();
+            match required {
+                Option::Some(required) => {
+                    for require in required {
+                        required_map.insert(require.key, require.payload);
+                    }
                 }
+                Option::None => {}
             }
-            Option::None => {}
-        }
 
-        let allowed = match allowed {
-            Some(allowed) => allowed,
-            None => ValuePattern::Never,
-        };
+            let allowed = match allowed {
+                Some(allowed) => allowed,
+                None => ValuePattern::Never,
+            };
 
-        let con = MapPatternVar::new(required_map, allowed);
+            let con = MapPatternVar::new(required_map, allowed);
 
-        (next, con)
-    })
+            (next, con)
+        })
 }
 
 pub fn format<I: Span>(input: I) -> Res<I, SubstanceFormat> {
@@ -6833,15 +6842,15 @@ pub fn map_pattern<I: Span>(input: I) -> Res<I, MapPatternVar> {
             tag("}"),
         )),
     ))(input)
-    .map(|(next, (_, entries))| {
-        let mut entries = entries;
-        let con = match entries {
-            None => MapPatternVar::any(),
-            Some(con) => con,
-        };
+        .map(|(next, (_, entries))| {
+            let mut entries = entries;
+            let con = match entries {
+                None => MapPatternVar::any(),
+                Some(con) => con,
+            };
 
-        (next, con)
-    })
+            (next, con)
+        })
 }
 
 pub fn value_constrained_map_pattern<I: Span>(input: I) -> Res<I, ValuePattern<MapPatternVar>> {
@@ -6968,19 +6977,19 @@ pub fn payload_structure_with_validation<I: Span>(input: I) -> Res<I, SubstanceP
         opt(preceded(tag("~"), opt(format))),
         opt(preceded(tag("~"), call_with_config)),
     ))(input)
-    .map(|(next, (data, format, verifier))| {
-        (
-            next,
-            SubstancePatternVar {
-                structure: data,
-                format: match format {
-                    Some(Some(format)) => Some(format),
-                    _ => Option::None,
+        .map(|(next, (data, format, verifier))| {
+            (
+                next,
+                SubstancePatternVar {
+                    structure: data,
+                    format: match format {
+                        Some(Some(format)) => Some(format),
+                        _ => Option::None,
+                    },
+                    validator: verifier,
                 },
-                validator: verifier,
-            },
-        )
-    })
+            )
+        })
 }
 
 pub fn consume_payload_structure<I: Span>(input: I) -> Res<I, SubstanceTypePatternVar> {
@@ -7000,7 +7009,7 @@ pub fn payload_pattern<I: Span>(input: I) -> Res<I, ValuePattern<SubstancePatter
         "@payload-pattern",
         value_pattern(payload_structure_with_validation),
     )(input)
-    .map(|(next, payload_pattern)| (next, payload_pattern))
+        .map(|(next, payload_pattern)| (next, payload_pattern))
 }
 
 pub fn payload_filter_block_empty<I: Span>(input: I) -> Res<I, PatternBlockVar> {
@@ -7064,7 +7073,7 @@ pub fn request_payload_filter_block<I: Span>(input: I) -> Res<I, PayloadBlockVar
         )),
         multispace0,
     ))(input)
-    .map(|(next, (_, block, _))| (next, PayloadBlockVar::DirectPattern(block)))
+        .map(|(next, (_, block, _))| (next, PayloadBlockVar::DirectPattern(block)))
 }
 
 pub fn response_payload_filter_block<I: Span>(input: I) -> Res<I, PayloadBlockVar> {
@@ -7084,7 +7093,7 @@ pub fn response_payload_filter_block<I: Span>(input: I) -> Res<I, PayloadBlockVa
             tag("]"),
         ),
     )(input)
-    .map(|(next, (_, block, _))| (next, PayloadBlockVar::ReflectPattern(block)))
+        .map(|(next, (_, block, _))| (next, PayloadBlockVar::ReflectPattern(block)))
 }
 
 pub fn rough_pipeline_step<I: Span>(input: I) -> Res<I, I> {
@@ -7140,7 +7149,7 @@ where
         },
         ErrorKind::AlphaNumeric,
     )
-    .map(|(next, comment)| (next, TextType::NoComment(comment)))
+        .map(|(next, comment)| (next, TextType::NoComment(comment)))
 }
 
 pub fn comment<T: Span>(i: T) -> Res<T, TextType<T>>
@@ -7155,7 +7164,7 @@ where
         },
         ErrorKind::AlphaNumeric,
     )
-    .map(|(next, comment)| (next, TextType::Comment(comment)))
+        .map(|(next, comment)| (next, TextType::Comment(comment)))
 }
 
 pub fn bind_config(src: &str) -> Result<BindConfig, ParseErrs> {
@@ -7206,9 +7215,9 @@ pub fn doc(src: &str) -> Result<Document, ParseErrs> {
                     Label::new(
                         lex_root_scope.selector.version.span.location_offset()
                             ..lex_root_scope.selector.version.span.location_offset()
-                                + lex_root_scope.selector.version.span.len(),
+                            + lex_root_scope.selector.version.span.len(),
                     )
-                    .with_message("Unsupported Bind Config Version"),
+                        .with_message("Unsupported Bind Config Version"),
                 )
                 .finish();
             Err(ParseErrs::from_report(report, lex_root_scope.block.content.extra.clone()).into())
@@ -7230,9 +7239,9 @@ pub fn doc(src: &str) -> Result<Document, ParseErrs> {
                     Label::new(
                         lex_root_scope.selector.version.span.location_offset()
                             ..lex_root_scope.selector.version.span.location_offset()
-                                + lex_root_scope.selector.version.span.len(),
+                            + lex_root_scope.selector.version.span.len(),
                     )
-                    .with_message("Unsupported Bind Config Version"),
+                        .with_message("Unsupported Bind Config Version"),
                 )
                 .finish();
             Err(ParseErrs::from_report(report, lex_root_scope.block.content.extra.clone()).into())
@@ -7249,9 +7258,9 @@ pub fn doc(src: &str) -> Result<Document, ParseErrs> {
                 Label::new(
                     lex_root_scope.selector.name.location_offset()
                         ..lex_root_scope.selector.name.location_offset()
-                            + lex_root_scope.selector.name.len(),
+                        + lex_root_scope.selector.name.len(),
                 )
-                .with_message("Unrecognized Config Kind"),
+                    .with_message("Unrecognized Config Kind"),
             )
             .finish();
         Err(ParseErrs::from_report(report, lex_root_scope.block.content.extra.clone()).into())
@@ -7294,15 +7303,15 @@ where
         opt(tag(";")),
         multispace0,
     ))(input)
-    .map(|(next, (_, _, k, _, _, _, v, _, _, _))| {
-        (
-            next,
-            Assignment {
-                key: k.to_string(),
-                value: v.to_string(),
-            },
-        )
-    })
+        .map(|(next, (_, _, k, _, _, _, v, _, _, _))| {
+            (
+                next,
+                Assignment {
+                    key: k.to_string(),
+                    value: v.to_string(),
+                },
+            )
+        })
 }
 
 #[derive(Clone)]
@@ -7330,7 +7339,7 @@ fn semantic_mechtron_scope<I: Span>(scope: LexScope<I>) -> Result<MechtronScope,
                         scope.selector.name.location_offset()
                             ..scope.selector.name.location_offset() + scope.selector.name.len(),
                     )
-                    .with_message("Unrecognized Selector"),
+                        .with_message("Unrecognized Selector"),
                 )
                 .finish();
             Err(ParseErrs::from_report(report, scope.block.content.extra().clone()).into())
@@ -7381,7 +7390,7 @@ fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, ParseEr
                         scope.selector.name.location_offset()
                             ..scope.selector.name.location_offset() + scope.selector.name.len(),
                     )
-                    .with_message("Unrecognized Selector"),
+                        .with_message("Unrecognized Selector"),
                 )
                 .finish();
             Err(ParseErrs::from_report(report, scope.block.content.extra().clone()).into())
@@ -7469,25 +7478,25 @@ pub fn pipeline_step_var<I: Span>(input: I) -> Res<I, PipelineStepVar> {
             context("pipeline:step:exit", cut(tag(">"))),
         )),
     )(input)
-    .map(|(next, (entry, block_and_exit, _))| {
-        let mut blocks = vec![];
-        let exit = match block_and_exit {
-            None => entry.clone(),
-            Some((block, exit)) => {
-                blocks.push(block);
-                exit
-            }
-        };
+        .map(|(next, (entry, block_and_exit, _))| {
+            let mut blocks = vec![];
+            let exit = match block_and_exit {
+                None => entry.clone(),
+                Some((block, exit)) => {
+                    blocks.push(block);
+                    exit
+                }
+            };
 
-        (
-            next,
-            PipelineStepVar {
-                entry,
-                exit,
-                blocks,
-            },
-        )
-    })
+            (
+                next,
+                PipelineStepVar {
+                    entry,
+                    exit,
+                    blocks,
+                },
+            )
+        })
 }
 
 pub fn core_pipeline_stop<I: Span>(input: I) -> Res<I, PipelineStopVar> {
@@ -7499,7 +7508,7 @@ pub fn core_pipeline_stop<I: Span>(input: I) -> Res<I, PipelineStopVar> {
             tag("))"),
         ),
     )(input)
-    .map(|(next, _)| (next, PipelineStopVar::Core))
+        .map(|(next, _)| (next, PipelineStopVar::Core))
 }
 
 pub fn return_pipeline_stop<I: Span>(input: I) -> Res<I, PipelineStopVar> {
@@ -7531,7 +7540,7 @@ pub fn pipeline_stop_var<I: Span>(input: I) -> Res<I, PipelineStopVar> {
             )),
         ),
     )(input)
-    .map(|(next, (_, pipeline_stop))| (next, pipeline_stop))
+        .map(|(next, (_, pipeline_stop))| (next, pipeline_stop))
 }
 
 pub fn consume_pipeline_step<I: Span>(input: I) -> Res<I, PipelineStepVar> {
@@ -7550,7 +7559,7 @@ pub fn pipeline_segment<I: Span>(input: I) -> Res<I, PipelineSegmentVar> {
         pipeline_stop_var,
         multispace0,
     ))(input)
-    .map(|(next, (_, step, _, stop, _))| (next, PipelineSegmentVar { step, stop }))
+        .map(|(next, (_, step, _, stop, _))| (next, PipelineSegmentVar { step, stop }))
 }
 
 pub fn pipeline<I: Span>(input: I) -> Res<I, PipelineVar> {
@@ -7558,7 +7567,7 @@ pub fn pipeline<I: Span>(input: I) -> Res<I, PipelineVar> {
         "pipeline",
         many0(delimited(multispace0, pipeline_segment, multispace0)),
     )(input)
-    .map(|(next, segments)| (next, PipelineVar { segments }))
+        .map(|(next, segments)| (next, PipelineVar { segments }))
 }
 
 pub fn consume_pipeline<I: Span>(input: I) -> Res<I, PipelineVar> {
@@ -7607,7 +7616,7 @@ pub fn var_chunk<I: Span>(input: I) -> Res<I, Chunk<I>> {
                 .context(BraceErrCtx::new(BraceKindErrCtx::Curly, BraceSideErrCtx::Close).into()),
         )),
     )(input)
-    .map(|(next, variable_name)| (next, Chunk::Var(variable_name)))
+        .map(|(next, variable_name)| (next, Chunk::Var(variable_name)))
 }
 
 pub fn route_attribute(input: &str) -> Result<RouteSelector, ParseErrs> {
@@ -7666,7 +7675,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
             "extra",
             next,
         )
-        .into());
+            .into());
     }
 
     let mut names = lex_route.names.clone();
@@ -7738,7 +7747,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
                     "path regex error",
                     i.clone(),
                 )
-                .into());
+                    .into());
             }
         },
     };

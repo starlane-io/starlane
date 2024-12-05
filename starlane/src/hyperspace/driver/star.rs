@@ -411,7 +411,7 @@ impl Star {
                         self.skel.kind.to_string(),
                         assign.details.stub.kind.to_string()
                     ))
-                    .into()))?;
+                        .into()))?;
             }
 
             self.skel
@@ -528,7 +528,7 @@ impl Star {
                                 ctx.wave().history(),
                                 search.clone(),
                             )
-                            .await,
+                                .await,
                         ));
                     }
                 }
@@ -601,7 +601,7 @@ impl StarWrangles {
                     "star must be able to wrangle at least one {}",
                     kind.to_string()
                 )
-                .into());
+                    .into());
             }
         }
         Ok(())

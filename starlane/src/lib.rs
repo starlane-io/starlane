@@ -1,16 +1,13 @@
 #![allow(warnings)]
 
-shadow!(build);
-
 //#![feature(hasher_prefixfree_extras)]
 #[macro_use]
 extern crate async_trait;
+extern crate core;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
-extern crate starlane_macros;
-
-extern crate core;
+extern crate starlane_macros;shadow!(build);
 
 use once_cell::sync::Lazy;
 use shadow_rs::shadow;

@@ -1,6 +1,5 @@
 use ::core::borrow::Borrow;
-use ::core::fmt::{write, Display, Formatter};
-use anyhow::anyhow;
+use ::core::fmt::{Display, Formatter};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ops;
@@ -50,10 +49,10 @@ pub enum WaveKind {
     Ripple, // Broadcast
     Echo,   // Broadcast Response
     Signal, // Notification
-            /*
-            Photon, // Ack
-                   Reverb,  // Ack
-                  */
+    /*
+    Photon, // Ack
+           Reverb,  // Ack
+          */
 }
 
 impl WaveKind {
@@ -839,7 +838,7 @@ where
 
     pub fn require_body<B>(self) -> Result<B, SpaceErr>
     where
-        B: TryFrom<Substance, Error = SpaceErr>,
+        B: TryFrom<Substance, Error=SpaceErr>,
     {
         match B::try_from(self.body.clone()) {
             Ok(body) => Ok(body),
@@ -986,7 +985,7 @@ impl PingCore {
 
     pub fn require_body<B>(self) -> Result<B, SpaceErr>
     where
-        B: TryFrom<Substance, Error = SpaceErr>,
+        B: TryFrom<Substance, Error=SpaceErr>,
     {
         match B::try_from(self.clone().core.body) {
             Ok(body) => Ok(body),
@@ -3272,7 +3271,7 @@ pub enum Bounce<W> {
 impl<W> Bounce<W> {
     pub fn to_core_bounce(self) -> CoreBounce
     where
-        W: TryInto<ReflectedCore, Error = SpaceErr>,
+        W: TryInto<ReflectedCore, Error=SpaceErr>,
     {
         match self {
             Bounce::Absorbed => Bounce::Absorbed,

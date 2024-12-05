@@ -236,7 +236,7 @@ impl<V> TryInto<Variable> for VarVal<V> {
 
 impl<V> ToResolved<V> for VarVal<V>
 where
-    V: FromStr<Err = ParseErrs>,
+    V: FromStr<Err=ParseErrs>,
 {
     fn to_resolved(self, env: &Env) -> Result<V, ParseErrs> {
         match self {
@@ -254,14 +254,14 @@ where
                             trace.range,
                             trace.extra,
                         )
-                        .into()),
+                            .into()),
                         ResolverErr::NotFound => Err(ParseErrs::from_range(
                             format!("variable '{}' not found", var.unwrap().to_string()).as_str(),
                             "not found",
                             trace.range,
                             trace.extra,
                         )
-                        .into()),
+                            .into()),
                     }
                 }
             },

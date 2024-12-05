@@ -8,11 +8,12 @@
 use crate::base;
 use base::foundation;
 
-pub trait Dependency: foundation::Dependency<Config:DependencyConfig, Provider: Provider> { }
-pub trait Provider: foundation::Provider<Config: ProviderConfig>{ }
 
-pub trait DependencyConfig: foundation::config::DependencyConfig { }
-pub trait ProviderConfig: foundation::config::ProviderConfig { }
+pub trait Dependency: foundation::Dependency<Config: DependencyConfig, Provider: Provider> {}
+pub trait Provider: foundation::Provider<Config: ProviderConfig> {}
+
+pub trait DependencyConfig: foundation::config::DependencyConfig {}
+pub trait ProviderConfig: foundation::config::ProviderConfig {}
 
 /// instead of the [foundation::skel::concrete] where the traits defs end and the real
 /// implementation begins, when defining a [`common`] for a child resource (Dependency or Provider),
@@ -49,43 +50,42 @@ pub trait ProviderConfig: foundation::config::ProviderConfig { }
 /// ````
 ///
 pub mod dependency {
-    pub mod my { pub use super::super::*; }
+    pub mod my {
+        pub use super::super::*;
+    }
 
-    pub mod provider {
+    pub mod provider {}
+}
+/*
+pub mod provider {
+use super::my;
+
+pub mod mode {
+    use crate::base::foundation;
+
+    use super::my;
+    pub mod create {
+        use super::my;
+        use super::utilize;
+        ///  [`Create`] mode must also [`Utilize`] mode's properties since the foundation
+        /// will want to Create the Provision (potentially meaning: downloading, instancing, credential setup,  initializing...etc.)
+        /// and then will want to [`Utilize`] the Provision (potentially meaning: authenticating via the same credentials supplied from
+        /// [`Create`], connecting to the same port that was set up etc.
+        pub trait ProviderConfig: my::ProviderConfig + crate::base::config::provider::mode::utilize::ProviderConfig {}
+    }
+
+    pub mod utilize {
+        use super::my;
+        /// provide any necessary configuration properties to use this Provider after it has been created... etc.
+        pub trait ProviderConfig: my::ProviderConfig{
+
+        }
 
     }
 
 }
-    /*
-pub mod provider {
-    use super::my;
-
-    pub mod mode {
-        use crate::base::foundation;
-
-        use super::my;
-        pub mod create {
-            use super::my;
-            use super::utilize;
-            ///  [`Create`] mode must also [`Utilize`] mode's properties since the foundation
-            /// will want to Create the Provision (potentially meaning: downloading, instancing, credential setup,  initializing...etc.)
-            /// and then will want to [`Utilize`] the Provision (potentially meaning: authenticating via the same credentials supplied from
-            /// [`Create`], connecting to the same port that was set up etc.
-            pub trait ProviderConfig: my::ProviderConfig + crate::base::config::provider::mode::utilize::ProviderConfig {}
-        }
-
-        pub mod utilize {
-            use super::my;
-            /// provide any necessary configuration properties to use this Provider after it has been created... etc.
-            pub trait ProviderConfig: my::ProviderConfig{
-
-            }
-
-        }
-
-    }
-    }
-     */
+}
+ */
 
 
 /*

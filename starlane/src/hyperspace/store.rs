@@ -1,8 +1,8 @@
 use crate::hyperspace::err::StarErr;
 use crate::hyperspace::hyperspace::err::HyperErr;
 use crate::hyperspace::hyperspace::platform::Platform;
-use itertools::Itertools;
 use crate::space::substance::Substance;
+use itertools::Itertools;
 use std::path::PathBuf;
 
 #[async_trait]
@@ -35,7 +35,7 @@ impl LocalFileStore
 {
     pub fn new<B>(root: B) -> Self
     where
-        B: Into<PathBuf>
+        B: Into<PathBuf>,
     {
         let root = root.into();
         Self {

@@ -1,12 +1,12 @@
-use thiserror::Error;
-use std::sync::Arc;
-use std::fmt::Display;
-use serde_yaml::Value;
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::status::ActionRequest;
 use crate::base::kind::{DependencyKind, IKind, Kind, ProviderKind};
 use crate::space::err::ParseErrs;
 use crate::space::substance::Call;
+use serde_yaml::Value;
+use std::fmt::Display;
+use std::sync::Arc;
+use thiserror::Error;
 
 impl BaseErr {
     pub fn kind<'z>(kind: &impl IKind) -> BaseErrBuilder<'z> {
@@ -185,7 +185,8 @@ impl BaseErr {
 pub enum BaseErr {
     #[error("{0}")]
     ActionRequired(ActionRequest),
-    #[error("Foundation State is unknown when calling Foundation::{0} ... platform should call Foundation::synchronize() first. ")]
+    #[error("Foundation State is unknown when calling Foundation::{0} ... platform should call Foundation::synchronize() first. "
+    )]
     UnknownState(String),
     #[error("[{id}] -> PANIC! <{kind}> error message: '{msg}'")]
     Panic {
@@ -226,7 +227,8 @@ pub enum BaseErr {
     BaseError { kind: FoundationKind, msg: String },
     #[error("[{kind}] Error: '{msg}'")]
     DepErr { kind: DependencyKind, msg: String },
-    #[error("Action Required: {cat}: {kind} cannot {action} without user help.  Additional Info: '{summary}'")]
+    #[error("Action Required: {cat}: {kind} cannot {action} without user help.  Additional Info: '{summary}'"
+    )]
     UserActionRequired {
         cat: String,
         kind: String,
@@ -235,19 +237,22 @@ pub enum BaseErr {
     },
     #[error("[{kind}] Error: '{msg}'")]
     ProviderErr { kind: ProviderKind, msg: String },
-    #[error("error converting config args for core: '{kind}' serialization err: '{err}' from config: '{config}'")]
+    #[error("error converting config args for core: '{kind}' serialization err: '{err}' from config: '{config}'"
+    )]
     DepConfErr {
         kind: DependencyKind,
         err: String,
         config: String,
     },
-    #[error("error converting config args for provider: '{kind}' serialization err: '{err}' from config: '{config}'")]
+    #[error("error converting config args for provider: '{kind}' serialization err: '{err}' from config: '{config}'"
+    )]
     ProvConfErr {
         kind: ProviderKind,
         err: Arc<serde_yaml::Error>,
         config: String,
     },
-    #[error("illegal attempt to change config after it has already been initialized.  Foundation can only be initialized once")]
+    #[error("illegal attempt to change config after it has already been initialized.  Foundation can only be initialized once"
+    )]
     FoundationAlreadyCreated,
     #[error("Foundation Runner call sender err (this could be fatal) caused by: {0}")]
     FoundationRunnerMpscSendErr(Arc<tokio::sync::mpsc::error::SendError<Call>>),

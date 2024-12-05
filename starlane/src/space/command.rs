@@ -28,7 +28,7 @@ pub mod common {
 
     use serde::{Deserialize, Serialize};
 
-    use crate::space::err::{ParseErrs, SpaceErr};
+    use crate::space::err::ParseErrs;
     use crate::space::loc::Variable;
     use crate::space::substance::{Bin, Substance};
 

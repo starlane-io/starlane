@@ -149,7 +149,7 @@ pub fn config() -> Result<Option<StarlaneConfig>, HypErr> {
         true => {
             let config = std::fs::read_to_string(file.clone())?;
 
-            let mut config: StarlaneConfig  = serde_yaml::from_str(config.as_str()).map_err(|err| anyhow!("starlane config found: '{}' yet Starlane encountered an error when attempting to process the config: '{}'", config_path(), err))?;
+            let mut config: StarlaneConfig = serde_yaml::from_str(config.as_str()).map_err(|err| anyhow!("starlane config found: '{}' yet Starlane encountered an error when attempting to process the config: '{}'", config_path(), err))?;
             config.context = context();
 
             Ok(Some(config))
@@ -209,7 +209,7 @@ pub fn load_global_settings() -> Result<GlobalSettings, anyhow::Error> {
                     global_settings_path(),
                     err
                 )
-                .to_string()
+                    .to_string()
             )
         })
         .unwrap_or(GlobalSettings::default()))

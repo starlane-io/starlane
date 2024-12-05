@@ -2,9 +2,6 @@
 #![feature()]
 
 
-shadow!(build);
-
-
 #[macro_use]
 extern crate async_trait;
 #[macro_use]
@@ -12,7 +9,8 @@ extern crate clap;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
-extern crate starlane_macros;
+extern crate starlane_macros;shadow!(build);
+
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
@@ -27,7 +25,7 @@ pub mod install;
 #[cfg(feature = "cli")]
 pub mod cli;
 
-#[cfg(feature="server")]
+#[cfg(feature = "server")]
 pub mod env;
 #[cfg(feature = "server")]
 pub mod server;
@@ -37,14 +35,20 @@ pub mod hyperspace;
 
 pub mod base;
 
-pub use crate::hyperspace::platform::Platform;
-use crate::hyperspace::shutdown::shutdown;
 use crate::cli::{Cli, Commands, ContextCmd};
 use crate::env::{
     config_exists, context, context_dir, ensure_global_settings, save_global_settings, set_context,
     STARLANE_HOME,
 };
+pub use crate::hyperspace::platform::Platform;
+use crate::hyperspace::shutdown::shutdown;
 use crate::install::{Console, StarlaneTheme};
+use crate::server::Starlane;
+use crate::space::err::PrintErr;
+use crate::space::loc::ToBaseKind;
+use crate::space::log::push_scope;
+use crate::space::parse::SkewerCase;
+use crate::space::particle::Status;
 use anyhow::{anyhow, ensure};
 use clap::Parser;
 use cliclack::log::{error, success};
@@ -55,12 +59,8 @@ use crossterm::style::{Color, Print, ResetColor, SetBackgroundColor, SetForegrou
 use lerp::Lerp;
 use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
+use shadow_rs::shadow;
 use starlane_primitive_macros::{create_mark, ToBase};
-use crate::space::loc::ToBaseKind;
-use crate::space::err::PrintErr;
-use crate::space::log::push_scope;
-use crate::space::parse::SkewerCase;
-use crate::space::particle::Status;
 use std::any::Any;
 use std::fmt::Display;
 use std::fs::File;
@@ -70,13 +70,11 @@ use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
 use std::{io, process};
-use shadow_rs::shadow;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::FileOptions;
-use crate::server::Starlane;
 /*
 let config = Default::default();
 
@@ -314,7 +312,8 @@ async fn run() -> Result<(), anyhow::Error> {
         }
 
         Ok(())
-    };
+    }
+    ;
 
     match runner(&console).await {
         Ok(_) => {}
@@ -323,7 +322,7 @@ async fn run() -> Result<(), anyhow::Error> {
                 "starlane halted due to an error: {}",
                 err.to_string()
             ))
-            .unwrap_or_default();
+                .unwrap_or_default();
 
             console.outro("runner failed").unwrap();
             console.newlines(3);
@@ -504,7 +503,7 @@ async fn cli() -> Result<(), SpaceErr> {
  */
 
 pub fn zip_dir<T>(
-    it: impl Iterator<Item = DirEntry>,
+    it: impl Iterator<Item=DirEntry>,
     prefix: &str,
     writer: T,
     method: zip::CompressionMethod,

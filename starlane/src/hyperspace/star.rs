@@ -796,13 +796,13 @@ impl HyperStar {
                                         ) {
                                             Ok(_) => {}
                                             Err(err) => {
-                                                skel.logger.error(format!("could not create Bridge for remote connection: {} because {}", stub.key.to_string(), err.to_string()) );
+                                                skel.logger.error(format!("could not create Bridge for remote connection: {} because {}", stub.key.to_string(), err.to_string()));
                                                 skel.status_tx.send(Status::Fatal).await;
                                             }
                                         }
                                     }
                                     Err(err) => {
-                                        skel.logger.error(format!("could not create endpoint factory for remote connection: {} because {}", stub.key.to_string(), err.to_string()) );
+                                        skel.logger.error(format!("could not create endpoint factory for remote connection: {} because {}", stub.key.to_string(), err.to_string()));
                                         skel.status_tx.send(Status::Fatal).await;
                                     }
                                 }
@@ -1790,8 +1790,7 @@ async fn shard_ripple_by_location(
             let mut ripple = ripple.clone();
             ripple.variant.to = recipients;
             map.insert(star, ripple);
-        } else {
-        }
+        } else {}
     }
     Ok(map)
 }
@@ -2003,7 +2002,8 @@ impl SmartLocator {
 pub enum StarErr {
     #[error("caused by '{0}'")]
     SpaceErr(#[source] SpaceErr),
-    #[error("cannot create_in_star in star {point} for parent point {parent} since it is not a point within this star")]
+    #[error("cannot create_in_star in star {point} for parent point {parent} since it is not a point within this star"
+    )]
     PointNotInStar { point: Point, parent: Point },
     #[error("star expected Root to be already provisioned")]
     ExpectedRootProvisioned,
@@ -2017,15 +2017,18 @@ pub enum StarErr {
     TransportSignalExceededMaxHops,
     #[error("attempt to forward a transport on a non forwarding star")]
     AttemptToForwardATransportOnANonForwardingStar,
-    #[error("star needs to send a transport to a non-adjacent star yet does not have any adjacent forwarders")]
+    #[error("star needs to send a transport to a non-adjacent star yet does not have any adjacent forwarders"
+    )]
     MissingAdjacentForwarder,
-    #[error("attempt to send wave {wave} to layer {layer} that the recipient Kind {kind} does not have in its traversal plan")]
+    #[error("attempt to send wave {wave} to layer {layer} that the recipient Kind {kind} does not have in its traversal plan"
+    )]
     TraversalPlanNotFound {
         wave: WaveId,
         layer: Layer,
         kind: Kind,
     },
-    #[error("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")]
+    #[error("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent"
+    )]
     UnprovisionedMultiPortRipple,
     #[error("could not find assign kind '{0}' to self")]
     CouldNotAssignToSelf(Kind),

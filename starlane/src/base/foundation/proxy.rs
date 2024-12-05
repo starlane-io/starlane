@@ -1,24 +1,30 @@
-use std::ops::Deref;
-use std::sync::Arc;
-use tokio::sync::watch::Receiver;
 use crate::base::config::Config;
-use crate::base::foundation;
 use crate::base::config::ProviderConfig;
 use crate::base::err::BaseErr;
+use crate::base::foundation;
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::proxy::sealed::ProxySealed;
 use crate::base::foundation::status::Status;
 use crate::base::kind::DependencyKind;
 use crate::hyperspace::reg::Registry;
 use crate::space::progress::Progress;
+use std::ops::Deref;
+use std::sync::Arc;
+use tokio::sync::watch::Receiver;
 
-pub trait Proxy<T>: Deref<Target = T> { }
+pub trait Proxy<T>: Deref<Target=T> {}
 
-pub struct Foundation<F> where F: foundation::Foundation{
-    orig: Box<dyn foundation::Foundation<Config=F::Config, Dependency=F::Dependency, Provider=F::Provider>>
+pub struct Foundation<F>
+where
+    F: foundation::Foundation,
+{
+    orig: Box<dyn foundation::Foundation<Config=F::Config, Dependency=F::Dependency, Provider=F::Provider>>,
 }
 
-impl <F> Deref for Foundation<F> where F: foundation::Foundation {
+impl<F> Deref for Foundation<F>
+where
+    F: foundation::Foundation,
+{
     type Target = Arc<dyn foundation::Foundation<Config=F::Config, Dependency=F::Dependency, Provider=F::Provider>>;
 
     fn deref(&self) -> &Self::Target {
@@ -27,13 +33,15 @@ impl <F> Deref for Foundation<F> where F: foundation::Foundation {
 }
 
 
-impl <F> foundation::Foundation for Foundation<F> where F: foundation::Foundation {
+impl<F> foundation::Foundation for Foundation<F>
+where
+    F: foundation::Foundation,
+{
     type Config = F::Config;
     type Dependency = F::Dependency;
     type Provider = F::Provider;
 
-    fn kind(&self) -> FoundationKind {
-    }
+    fn kind(&self) -> FoundationKind {}
 
     fn config(&self) -> Self::Config {
         todo!()
@@ -63,7 +71,6 @@ impl <F> foundation::Foundation for Foundation<F> where F: foundation::Foundatio
         todo!()
     }
 }
-
 
 
 pub(crate) mod sealed {
