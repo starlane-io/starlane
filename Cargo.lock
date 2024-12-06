@@ -4706,6 +4706,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "space2"
+version = "0.3.21"
+
+[[package]]
 name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5002,8 +5006,99 @@ dependencies = [
  "serde_yaml",
  "shadow-rs",
  "sqlx",
+ "starlane-base",
+ "starlane-hyperspace",
  "starlane-macros",
- "starlane-primitive-macros",
+ "starlane-space",
+ "strum",
+ "strum_macros",
+ "tempdir",
+ "termsize",
+ "text-to-ascii-art",
+ "text_io",
+ "textwrap",
+ "thiserror 1.0.65",
+ "thiserror-context",
+ "tls-api-rustls",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+ "tracing",
+ "tracing-attributes",
+ "tracing-core",
+ "tracing-subscriber",
+ "typetag",
+ "url",
+ "uuid",
+ "validator",
+ "walkdir",
+ "wasmer",
+ "wasmer-compiler-singlepass",
+ "wasmer-wasix",
+ "webpki-roots 0.26.6",
+ "zip 0.6.6",
+]
+
+[[package]]
+name = "starlane-base"
+version = "0.3.21"
+dependencies = [
+ "anyhow",
+ "ariadne",
+ "ascii",
+ "async-recursion",
+ "async-trait",
+ "atty",
+ "bincode",
+ "bollard",
+ "chrono",
+ "clap",
+ "cliclack",
+ "colored",
+ "console",
+ "convert_case",
+ "crossterm",
+ "ctrlc",
+ "dashmap 5.5.3",
+ "derive-name",
+ "derive_builder 0.20.2",
+ "dirs",
+ "downcast-rs",
+ "dyn-clone",
+ "enum-ordinalize",
+ "erased-serde",
+ "futures",
+ "inventory",
+ "itertools 0.13.0",
+ "lazy_static",
+ "lerp",
+ "md-5",
+ "nom",
+ "nom-supreme",
+ "nom_locate",
+ "once_cell",
+ "oneshot",
+ "path-clean",
+ "port_check",
+ "postgresql_embedded",
+ "quinn",
+ "rcgen",
+ "regex",
+ "remote-trait-object",
+ "rustls 0.23.15",
+ "rustls-pemfile",
+ "rustyline",
+ "semver",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "serde_with",
+ "serde_with_macros",
+ "serde_yaml",
+ "shadow-rs",
+ "sqlx",
+ "starlane-macros",
+ "starlane-space",
  "strum",
  "strum_macros",
  "tempdir",
@@ -5092,7 +5187,6 @@ dependencies = [
  "shadow-rs",
  "sqlx",
  "starlane-macros",
- "starlane-primitive-macros",
  "starlane-space",
  "strum",
  "strum_macros",
@@ -5141,17 +5235,6 @@ dependencies = [
  "strum_macros",
  "syn 1.0.109",
  "uuid",
-]
-
-[[package]]
-name = "starlane-primitive-macros"
-version = "0.3.21"
-dependencies = [
- "prettyplease",
- "proc-macro-crate 3.2.0",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -5213,7 +5296,6 @@ dependencies = [
  "shadow-rs",
  "sqlx",
  "starlane-macros",
- "starlane-primitive-macros",
  "strum",
  "strum_macros",
  "tempdir",

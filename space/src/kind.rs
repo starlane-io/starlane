@@ -4,7 +4,7 @@ use core::str::FromStr;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-
+use crate::command::direct::create::KindTemplate;
 use crate::err::{ParseErrs, PrintErr};
 use crate::loc::{
     ProvisionAffinity, StarKey, ToBaseKind, Version, CONTROL_WAVE_TRAVERSAL_PLAN,
@@ -834,7 +834,7 @@ impl TryInto<SpecificSelector> for Specific {
 #[cfg(test)]
 pub mod test {
     use crate::err::{ParseErrs, PrintErr};
-    use crate::kind::FileSubKind;
+    use crate::kind::{FileSubKind, Kind, StarSub};
     use crate::parse::util::{new_span, result};
     use crate::parse::{
         file_point_kind_segment,
@@ -842,7 +842,6 @@ pub mod test {
     };
     use crate::selector::{KindSelector, PointHierarchy};
     use crate::util::ValueMatcher;
-    use crate::{Kind, StarSub};
     use nom::combinator::all_consuming;
     use std::str::FromStr;
 

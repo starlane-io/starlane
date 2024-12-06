@@ -1,0 +1,7 @@
+Bind(version=1.0.0) {
+
+       Route<Hyp<Init>> -> (()) => &;
+
+       Route<Hyp<Assign>> -> (()) => &;
+
+    }

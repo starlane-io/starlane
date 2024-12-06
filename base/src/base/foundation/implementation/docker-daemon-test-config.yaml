@@ -1,0 +1,42 @@
+foundation:
+  kind: DockerDaemon
+  registry:
+    provider: Postgres::Registry
+  dependencies:
+    - kind: Postgres
+      image: "postgres:17"
+      # this is the data dir in the container image
+      volumes:
+        - data_dir: "/data"
+
+      providers:
+        - kind: Registry
+          description: "Starlane can't do anything without a registry..."
+          # if seed is specified in config space it
+          # cannot be overwritten # by Settings
+          seed: "${REPO}/seeds/postgres/registry/registry.sql"
+          # just any old database...
+        - kind: Database
+
+
+---
+# this Platform configuration is not used to configure the Foundation
+
+# the end user for Starlane should configure the settings in the StarlaneConfig
+# which should have been written by the Starlane Installer.
+# The Settings configuration in this document does supply the default values for the installer
+
+platform:
+  data_dir: $HOME/main/$context/data
+  cache_dir: $HOME/main/$context/cache
+  dependencies:
+    - kind: Postgres
+      volumes:
+        - database_dir: $HOME/main/data/postgres
+      username: postgres
+      password: ${secret:postgres:password}
+      providers:
+    - kind: Registry
+      dbname: registry
+    - kind: Database
+      dbname: my_database

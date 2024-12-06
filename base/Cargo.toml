@@ -1,5 +1,5 @@
 [package]
-name = "starlane-space"
+name = "starlane-base"
 
 description = """
 Starlane -- An Orchestration and Infrastructure Framework for WebAssembly Components (https://starlane.io)
@@ -10,6 +10,7 @@ Apis (WebAssembly & external programs meant to provide custom behaviors in Starl
 This package references the `starlane-space` package and reuses of it to run the infrastructure and
 it also contains mechanisms (Drivers) for extending the Starlane Type system
 """
+
 
 version.workspace = true
 edition.workspace = true
@@ -24,6 +25,7 @@ repository.workspace = true
 [features]
 full = ["server"]
 default = ["hyperspace"]
+#server=["space","service","hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dependency:threadpool", "dependency:oneshot", "dependency:anyhow", "dependency:virtual-fs"]
 server = ["space", "service", "hyperspace", "hyperlane", "hyperlane-tcp", "cli", "dep:oneshot", "dep:anyhow", "dep:bollard"]
 cli = ["dep:text_io", "dep:clap", "dep:walkdir", "parse"]
 hypererr = []
@@ -31,6 +33,8 @@ hyperspace = ["dep:futures", "dep:dashmap", "dep:semver", "parse", "dep:zip", "h
 hyperlane = ["hypererr"]
 hyperlane-tcp = ["hyperlane", "dep:rcgen", "rustls", "dep:tokio-rustls", "dep:tls-api-rustls"]
 hyperlane-quic = ["hyperlane", "dep:rcgen", "rustls", "dep:quinn"]
+#postgres=[ "dependency:sqlx","dependency:serde","dependency:async-recursion" ]
+#postgres-embedded=[ "postgres", "dependency:postgresql_embedded" ]
 parse = ["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
 rustls = ["dep:rustls", "dep:rcgen", "rustls-pemfile", "dep:tokio-rustls"]
 driver = ["hyperspace"]
@@ -42,6 +46,8 @@ wasm = []
 
 
 [dependencies]
+
+starlane-space = { workspace = true  }
 starlane-macros = { workspace = true, version = "0.3.21" }
 
 thiserror = { workspace = true }
@@ -158,3 +164,8 @@ shadow-rs = { workspace = true }
 name = "starlane"
 path = "src/lib.rs"
 
+
+[[bin]]
+name = "starlane"
+doc = false
+path = "src/main.rs"

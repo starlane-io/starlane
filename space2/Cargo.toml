@@ -1,0 +1,16 @@
+[package]
+name = "space2"
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+description.workspace = true
+
+[dependencies]
+
+[lib]
+name = "space2"
+path = "src/lib.rs"

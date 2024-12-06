@@ -1946,7 +1946,7 @@ pub mod test {
 impl Default for PgRegistryConfig {
     fn default() -> Self {
         let database = Database::new(
-            "starlane".to_string(),
+            "main".to_string(),
             "public".to_string(),
             PostgresClusterConfig::default(),
         );
