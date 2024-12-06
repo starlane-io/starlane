@@ -1,6 +1,7 @@
+use alloc::string::{String, ToString};
+use core::str::FromStr;
+use crate::err::ParseErrs;
 use crate::schema::case::Version;
-use std::fmt::Formatter;
-use std::str::FromStr;
 
 
 impl ToString for Version {
@@ -20,9 +21,10 @@ impl TryInto<semver::Version> for Version {
 impl FromStr for Version {
     type Err = ParseErrs;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let version = semver::Version::from_str(s)?;
-        Ok(Self { version })
+    fn from_str(_s: &str) -> Result<Self, Self::Err> {
+//        let version = semver::Version::from_str(s)?;
+        todo!()
+//        Ok(Self { version })
     }
 }
 
@@ -30,8 +32,10 @@ impl FromStr for Version {
 
 #[cfg(feature="serde")]
 mod serde {
-    use std::fmt::Formatter;
-    use std::str::FromStr;
+    use alloc::string::ToString;
+    use core::fmt;
+    use core::fmt::Formatter;
+    use core::str::FromStr;
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
     use serde::de::Visitor;
     use crate::schema::case::Version;
@@ -50,7 +54,7 @@ mod serde {
     impl<'de> Visitor<'de> for VersionVisitor {
         type Value = Version;
 
-        fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
             formatter.write_str("SemVer version")
         }
 

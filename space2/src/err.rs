@@ -1,6 +1,23 @@
+use core::fmt::{Display, Formatter};
+use thiserror::Error;
 
-pub struct SpaceErr {
+#[derive(Error,Debug)]
+pub struct SpaceErr { }
 
+impl Display for SpaceErr {
+    fn fmt(&self, _: &mut Formatter<'_>) -> core::fmt::Result {
+        todo!()
+    }
+}
+
+#[derive(Error,Debug)]
+pub struct ParseErrs { }
+
+
+impl Display for ParseErrs {
+    fn fmt(&self, _: &mut Formatter<'_>) -> core::fmt::Result {
+        todo!()
+    }
 }
 
 

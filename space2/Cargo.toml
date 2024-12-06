@@ -16,6 +16,7 @@ std = ["alloc"]
 default = ["std"]
 #docsrs = []
 serde = ["dep:serde","dep:serde_with_macros"]
+parse= []
 
 
 [package.metadata.docs.rs]
@@ -34,6 +35,8 @@ miette = { workspace = true }
 ## serde
 serde_with_macros = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+num = "0.4.3"
+serde_derive = "1.0.210"
 
 [lib]
 name = "space2"
