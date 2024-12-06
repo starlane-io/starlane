@@ -4791,6 +4791,8 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_with_macros",
+ "strum",
+ "strum_macros",
  "thiserror 1.0.65",
 ]
 

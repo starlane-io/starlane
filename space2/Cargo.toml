@@ -31,6 +31,8 @@ semver = { workspace = true }
 eyre = { workspace = true }
 thiserror= { workspace = true }
 miette = { workspace = true }
+strum = { workspace = true }
+strum_macros= { workspace = true }
 
 ## serde
 serde_with_macros = { workspace = true, optional = true }

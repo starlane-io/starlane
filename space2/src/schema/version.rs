@@ -1,6 +1,6 @@
 use alloc::string::{String, ToString};
 use core::str::FromStr;
-use crate::err::ParseErrs;
+use crate::err::SpaceErr;
 use crate::schema::case::Version;
 
 
@@ -11,7 +11,7 @@ impl ToString for Version {
 }
 
 impl TryInto<semver::Version> for Version {
-    type Error = ParseErrs;
+    type Error = SpaceErr;
 
     fn try_into(self) -> Result<semver::Version, Self::Error> {
         Ok(self.version)
@@ -19,7 +19,7 @@ impl TryInto<semver::Version> for Version {
 }
 
 impl FromStr for Version {
-    type Err = ParseErrs;
+    type Err = SpaceErr;
 
     fn from_str(_s: &str) -> Result<Self, Self::Err> {
 //        let version = semver::Version::from_str(s)?;
