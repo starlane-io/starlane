@@ -57,6 +57,9 @@ async-trait = "0.1.83"
 futures = {version = "0.3.21", default-features = true }
 dashmap = "5.3.4"
 semver = { version="1.0.10", features=['serde'] }
+eyre = "0.6.12"
+miette = "7.4.0"
+
 itertools = "0.13.0"
 
 serde = "1.0.69"
