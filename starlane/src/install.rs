@@ -1,18 +1,11 @@
-use crate::hyperspace::database::Database;
 
 use crate::env::{
     config, config_path, config_save, context, context_dir, Enviro, GlobalMode, StdEnviro,
     STARLANE_GLOBAL_SETTINGS, STARLANE_HOME,
 };
 use starlane::base::foundation::Foundation;
-use crate::hyperspace::reg::PgRegistryConfig;
-< < < < < < < Updated upstream
-use crate::hyperspace::registry::postgres::embed::PgEmbedSettings;
-use crate::server::StarlaneConfig;
-== == == =
-use crate::hyperspace::registry::postgres::embed::PostgresClusterConfig;
+
 use crate::server::{Starlane, StarlaneConfig};
-> > > > > > > Stashed changes
 use crate::hyperspace::shutdown::shutdown;
 use crate::{env, COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION};
 use anyhow::anyhow;
@@ -39,7 +32,7 @@ use std::time::Duration;
 use std::{io, thread};
 use text_to_ascii_art::to_art;
 use textwrap::Options;
-use starlane::base::foundation::implementation::docker_daemon_foundation::DockerDaemonFoundation;
+//use starlane::base::foundation::implementation::docker_daemon_foundation::DockerDaemonFoundation;
 
 #[tokio::main]
 pub async fn install(edit: bool) -> Result<(), anyhow::Error> {
@@ -173,6 +166,8 @@ impl StandaloneInstaller {
         Self { console }
     }
     async fn start(self) -> Result<(), anyhow::Error> {
+        todo!();
+        /*
         let mut spinner = self.console.spinner();
         spinner.start("starting Standalone installer");
         self.console.long_delay();
@@ -225,9 +220,12 @@ impl StandaloneInstaller {
         bar.stop("postgres download complete");
         spinner.stop("local postgres registry created.");
         Ok(())
+
+         */
     }
 }
 
+/*
 pub struct DbConfigurator {
     pub console: Console,
     pub config: Database<PostgresClusterConfig>,
@@ -358,6 +356,8 @@ password: {password}
         }
     }
 }
+
+ */
 
 #[derive(Clone)]
 pub struct Console {
