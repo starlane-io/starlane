@@ -33,9 +33,6 @@ impl <E> Matcher for E where E: PartialEq<E>+Display{
 
 
 
-
-
-
 #[derive(Debug, Clone, strum_macros::Display,strum_macros::IntoStaticStr)]
 pub enum Pattern<P> where P: Matcher {
     /// [Pattern::Always] will match anything

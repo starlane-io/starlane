@@ -4,6 +4,9 @@ use thiserror::Error;
 
 pub use eyre::eyre as err;
 
+
+pub type ParseErrs = eyre::Error;
+
 #[derive(Error,Clone, Debug, EnumDiscriminants)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ErrKind))]

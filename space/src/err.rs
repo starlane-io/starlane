@@ -38,6 +38,7 @@ macro_rules! err {
 
  */
 
+
 #[derive(Debug, Clone, Error)]
 pub enum SpaceErr {
     #[error("{status}: {message}")]
