@@ -14,8 +14,7 @@ use crate::parse::util::result;
 use crate::parse::{particle_perms, permissions, permissions_mask, privilege};
 use crate::point::Point;
 use crate::selector::{PointHierarchy, Selector};
-use crate::wave::ScopeGrant;
-use crate::Agent;
+use crate::wave::{Agent, ScopeGrant};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Access {

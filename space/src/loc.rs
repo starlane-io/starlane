@@ -11,6 +11,7 @@ use serde::de::{Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::err::{ParseErrs, SpaceErr};
+use crate::kind::BaseKind;
 use crate::log::Trackable;
 use crate::parse::util::result;
 use crate::parse::util::{new_span, Trace, Tw};
@@ -19,7 +20,6 @@ use crate::particle::traversal::TraversalPlan;
 use crate::point::{Point, PointSeg, PointSegKind, PointSegPairDef, RouteSeg};
 use crate::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
 use crate::wave::{Recipients, ToRecipients};
-use crate::{BaseKind, SpaceErr};
 
 pub static CENTRAL: Lazy<Point> = Lazy::new(|| StarKey::central().to_point());
 pub static GLOBAL_LOGGER: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::logger").unwrap());

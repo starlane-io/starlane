@@ -44,7 +44,7 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 /// #[handler]
 // /// impl MyHandler {
 // ///     /// the route attribute captures an ExtMethod implementing a custom `MyNameIs`
-// ///     /// notice that the InCtx will accept any valid main::substance::Substance
+// ///     /// notice that the InCtx will accept any valid substance::Substance
 // ///     #[route("Ext<MyNameIs>")]
 // ///     pub async fn hello(&self, ctx: InCtx<'_, Text>) -> Result<String, SpaceErr> {
 // ///         /// also we can return any Substance in our Reflected wave
@@ -440,7 +440,7 @@ pub fn to_space_err(item: TokenStream) -> TokenStream {
 }
 
 fn crt_name() -> TokenStream2 {
-    let found_crate = crate_name("main").expect("my-crate is present in `Cargo.toml`");
+    let found_crate = crate_name("starlane_space").expect("my-crate is present in `Cargo.toml`");
 
     let crt = match found_crate {
         FoundCrate::Itself => quote!(crate),

@@ -9,6 +9,7 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use async_trait::async_trait;
 
 pub static BUILTIN_FETCHER: Lazy<Arc<BuiltinArtifactFetcher>> = Lazy::new(|| {
     let mut builder = BuiltinArtifactFetcherBuilder::new();

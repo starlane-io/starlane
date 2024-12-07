@@ -6,7 +6,6 @@ use std::ops::{Deref, DerefMut};
 use crate::parse::util::Tw;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use starlane_primitive_macros::Autobox;
 use thiserror::Error;
 
 use crate::command::{Command, RawCommand};
@@ -28,6 +27,7 @@ use crate::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::wave::{PongCore, Wave};
 use crate::particle::{Details, Status, Stub};
 use url::Url;
+use starlane_macros::{Autobox, ToSubstance};
 
 #[derive(
     Debug,
@@ -81,8 +81,8 @@ pub enum SubstanceKind {
     Eq,
     PartialEq,
     strum_macros::Display,
-    starlane_primitive_macros::Autobox,
-    starlane_primitive_macros::ToSubstance,
+    starlane_macros::Autobox,
+    starlane_macros::ToSubstance,
 )]
 #[non_exhaustive]
 pub enum Substance {
@@ -311,7 +311,7 @@ impl Substance {
     Eq,
     PartialEq,
     Autobox,
-    starlane_primitive_macros::ToSubstance,
+    ToSubstance,
 )]
 pub enum LogSubstance {
     Log(Log),

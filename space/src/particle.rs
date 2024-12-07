@@ -6,7 +6,7 @@ use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
 use crate::err::{ParseErrs, SpaceErr};
-use crate::kind::{Kind, KindParts};
+use crate::kind::{BaseKind, Kind, KindParts};
 use crate::parse::util::{new_span, result, Span};
 use crate::parse::{parse_alpha1_str, point_and_kind, Env, Res};
 use crate::point::{Point, PointCtx, PointVar};

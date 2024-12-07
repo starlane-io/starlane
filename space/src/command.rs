@@ -10,7 +10,9 @@ use direct::read::{Read, ReadCtx, ReadVar};
 use direct::select::{SelectCtx, SelectVar};
 use direct::set::{Set, SetCtx, SetVar};
 use direct::write::{Write, WriteCtx, WriteVar};
-
+use starlane_macros::Autobox;
+use crate::command::direct::delete::Delete;
+use crate::command::direct::select::Select;
 use crate::err::ParseErrs;
 use crate::parse::util::{new_span, result, Trace};
 use crate::parse::{command_line, Env};

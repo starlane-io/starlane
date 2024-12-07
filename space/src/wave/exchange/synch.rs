@@ -8,7 +8,9 @@ use crate::wave::exchange::{
 use crate::wave::{Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, FromReflectedAggregate, Handling, PongCore, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave, Scope, Wave, WaveVariantDef};
 use std::borrow::Cow;
 use std::sync::Arc;
+use starlane_macros::log_span;
 use crate::err::SpaceErr;
+use crate::substance::{Substance, ToSubstance};
 
 pub trait ExchangeRouter: Send + Sync {
     fn route(&self, wave: Wave);

@@ -4,12 +4,13 @@ use std::ops::Deref;
 
 use validator::validate_email;
 
-use crate::command::common::PropertyMod;
+use crate::command::common::{PropertyMod, SetProperties};
 use crate::parse::SkewerCase;
 use crate::point::Point;
-use crate::{Kind, SetProperties, SpaceErr};
 use serde::Deserialize;
 use serde::Serialize;
+use crate::err::SpaceErr;
+use crate::kind::Kind;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PropertyDef {
