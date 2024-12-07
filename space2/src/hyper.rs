@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 
-
-
 use starlane_primitive_macros::Autobox;
 
 use crate::command::common::StateSrc;
@@ -23,13 +21,13 @@ use crate::wave::{
 };
 use crate::Agent;
 
-#[derive(Debug, Clone,   Eq, PartialEq, strum_macros::Display)]
+#[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
     Create,
     Restore,
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Location {
     Central,
     Nowhere,
@@ -61,13 +59,13 @@ impl Location {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ParticleRecord {
     pub details: Details,
     pub location: ParticleLocation,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ParticleLocation {
     pub star: Option<Point>,
     pub host: Option<Point>,
@@ -144,7 +142,7 @@ impl Into<Stub> for ParticleRecord {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Provision {
     pub point: Point,
     pub state: StateSrc,
@@ -183,14 +181,14 @@ impl Into<DirectedCore> for Provision {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Assign {
     pub kind: AssignmentKind,
     pub details: Details,
     pub state: StateSrc,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HostCmd {
     pub kind: AssignmentKind,
     pub details: Details,
@@ -241,7 +239,7 @@ impl Assign {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, strum_macros::Display, Autobox)]
+#[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display, Autobox)]
 pub enum HyperSubstance {
     // I don't really like having a HyperSubstance::Empty, but sometimes HypMethod
     // seems to dictate a Hyp Substance (even in the case of HypMethod::Init)
@@ -271,16 +269,7 @@ impl HyperSubstance {
     }
 }
 
-#[derive(
-    Debug,
-    Clone,
-
-
-    Eq,
-    PartialEq,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
+#[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display, strum_macros::EnumString)]
 #[non_exhaustive]
 pub enum HyperSubstanceKind {
     Empty,
@@ -305,14 +294,14 @@ impl Into<SubstanceKind> for HyperSubstanceKind {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Search {
     Star(StarKey),
     StarKind(StarSub),
     Kinds,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Discovery {
     pub star_kind: StarSub,
     pub hops: u16,
@@ -320,7 +309,7 @@ pub struct Discovery {
     pub kinds: HashSet<KindSelector>,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Discoveries {
     pub vec: Vec<Discovery>,
 }
@@ -378,18 +367,18 @@ impl Into<DirectedCore> for Assign {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, strum_macros::Display, Autobox)]
+#[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display, Autobox)]
 pub enum HyperEvent {
     Created(Created),
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Created {
     pub point: Point,
     pub kind: KindParts,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, strum_macros::Display, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display, Hash)]
 pub enum InterchangeKind {
     Singleton,
     DefaultControl,
@@ -398,13 +387,13 @@ pub enum InterchangeKind {
     Star(StarKey),
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, strum_macros::Display, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display, Hash)]
 pub enum ControlPattern {
     Any,
     Star(Point),
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Knock {
     pub kind: InterchangeKind,
     pub auth: Box<Substance>,
@@ -443,7 +432,7 @@ impl Into<WaveVariantDef<PingCore>> for Knock {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Greet {
     pub surface: Surface,
     pub agent: Agent,

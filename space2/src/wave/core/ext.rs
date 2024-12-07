@@ -4,7 +4,6 @@ use std::ops::Deref;
 use nom::combinator::all_consuming;
 use regex::Regex;
 
-
 use crate::parse::util::{new_span, result};
 
 use crate::err::SpaceErr;
@@ -16,7 +15,7 @@ use crate::wave::core::http2::StatusCode;
 use crate::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore};
 use url::Url;
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ExtMethod {
     string: String,
 }
@@ -86,7 +85,7 @@ impl Deref for ExtMethod {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ExtDirected {
     pub method: ExtMethod,
 
@@ -110,7 +109,7 @@ impl Default for ExtDirected {
 impl ExtDirected {
     pub fn new<M>(method: M) -> Result<Self, SpaceErr>
     where
-        M: TryInto<ExtMethod, Error=SpaceErr>,
+        M: TryInto<ExtMethod, Error = SpaceErr>,
     {
         Ok(ExtDirected {
             method: method.try_into()?,

@@ -46,7 +46,7 @@ impl Tks for KindParts {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct KindParts {
     pub base: BaseKind,
     pub sub: Option<CamelCase>,
@@ -104,17 +104,7 @@ impl KindParts {
     }
 }
 
-#[derive(
-    Debug,
-    Clone,
-
-
-    Eq,
-    PartialEq,
-    Hash,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display, strum_macros::EnumString)]
 pub enum BaseKind {
     Root,
     Space,
@@ -176,7 +166,7 @@ impl BaseKind {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash, strum_macros::Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum Sub {
     None,
     Database(DatabaseSubKind),
@@ -199,17 +189,7 @@ impl Sub {
     }
 }
 
-#[derive(
-    Debug,
-    Clone,
-
-
-    Eq,
-    PartialEq,
-    Hash,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display, strum_macros::EnumString)]
 pub enum SubKind {
     None,
     Database,
@@ -289,7 +269,7 @@ impl TryFrom<CamelCase> for BaseKind {
 /// Kind defines the behavior and properties of a Particle.  Each particle has a Kind.
 /// At minimum a Kind must have a BaseKind, it can also have a SubKind and a Specific.
 /// A Particle's complete Kind definition is used to match it with a Driver in the HyperVerse
-#[derive(Debug, Clone,   Eq, PartialEq, Hash, strum_macros::Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum Kind {
     Root,
     Space,
@@ -530,8 +510,6 @@ pub trait Tks {
     Eq,
     PartialEq,
     Hash,
-
-
     strum_macros::Display,
     strum_macros::EnumString,
     strum_macros::EnumIter,
@@ -600,22 +578,12 @@ impl Into<Option<String>> for StarSub {
     }
 }
 
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-
-
-    strum_macros::Display,
-    strum_macros::EnumIter,
-)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, strum_macros::Display, strum_macros::EnumIter)]
 pub enum UserBaseSubKindBase {
     OAuth,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash,   strum_macros::Display)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum UserBaseSubKind {
     #[strum(to_string = "OAuth<{0}>")]
     OAuth(Specific),
@@ -653,8 +621,6 @@ impl Into<Option<String>> for UserBaseSubKind {
     Eq,
     PartialEq,
     Hash,
-
-
     strum_macros::Display,
     strum_macros::EnumString,
     strum_macros::EnumIter,
@@ -688,8 +654,6 @@ impl Into<Option<String>> for FileSubKind {
     Eq,
     PartialEq,
     Hash,
-
-
     strum_macros::Display,
     strum_macros::EnumString,
     strum_macros::EnumIter,
@@ -720,7 +684,7 @@ impl Into<Option<String>> for ArtifactSubKind {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash,   strum_macros::Display)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum DatabaseSubKind {
     #[strum(to_string = "Relational<{0}>")]
     Relational(Specific),
@@ -752,7 +716,7 @@ impl Into<Option<String>> for DatabaseSubKind {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash,  Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize)]
 pub struct StarStub {
     pub key: StarKey,
     pub kind: StarSub,
@@ -780,7 +744,7 @@ impl StarStub {
 /// `mechtronhub.com:postgres.org:postgres:gis:8.0.0`
 /// And the above would be embedde into the appropriate Base Kind and Sub Kind:
 /// `<Database<Rel<mechtronhub.com:postgres.org:postgres:gis:8.0.0>>>`
-#[derive(Debug, Clone, Eq, PartialEq,   Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Specific {
     pub provider: Domain,
     pub vendor: Domain,
@@ -836,10 +800,7 @@ pub mod test {
     use crate::err::{ParseErrs, PrintErr};
     use crate::kind::{FileSubKind, Kind, StarSub};
     use crate::parse::util::{new_span, result};
-    use crate::parse::{
-        file_point_kind_segment,
-        point_kind_hierarchy,
-    };
+    use crate::parse::{file_point_kind_segment, point_kind_hierarchy};
     use crate::selector::{KindSelector, PointHierarchy};
     use crate::util::ValueMatcher;
     use nom::combinator::all_consuming;

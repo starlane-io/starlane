@@ -1,13 +1,11 @@
 use std::str::FromStr;
 
-
-
 use crate::parse::util::new_span;
 
 use crate::err::ParseErrs;
 use crate::parse::consume_path;
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Path {
     string: String,
 }

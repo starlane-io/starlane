@@ -20,7 +20,7 @@ use crate::selector::{
     VersionReq,
 };
 use crate::util::ValuePattern;
-use crate::KindTemplate;
+use crate::Kindsdempddlate;
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {

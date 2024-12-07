@@ -6,8 +6,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::str::FromStr;
 
-
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct MechtronConfig {
     pub wasm: Point,
     pub name: String,

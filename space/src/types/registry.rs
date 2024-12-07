@@ -5,13 +5,17 @@ use async_trait::async_trait;
 
 pub type Registry = Arc<dyn TypeRegistry>;
 
+
+
 /// A Registry component interface for accessing Metadata about types including: `BindConfig`, `defined subtypes`
 #[async_trait]
 pub trait TypeRegistry: Send + Sync {
-    async fn select<'a>(&'a self, selector: &'a Selector) -> Result<Cursor, RegErr>;
+   async fn select<'a>( &'a self, selector: &'a Selector) -> Result<Cursor,RegErr>;
 }
 
-pub struct Cursor {}
+
+pub struct Cursor {
+}
 
 pub struct RegistryWrapper {
     registry: Registry,
@@ -22,6 +26,12 @@ impl RegistryWrapper {
         Self { registry }
     }
 }
+
+
+
+
+
+
 
 pub mod err {
     use crate::point::Point;
@@ -49,7 +59,7 @@ pub mod err {
         ExpectedEmbeddedRegistry,
     }
 
-    impl From<&str> for RegErr {
+   impl From<&str> for RegErr {
         fn from(err: &str) -> Self {
             Self::Msg(err.to_string())
         }
@@ -65,6 +75,7 @@ pub mod err {
         pub fn dupe() -> Self {
             Self::Dupe
         }
+
 
         pub fn expected_parent(point: &Point) -> Self {
             Self::ExpectedParent(point.clone())

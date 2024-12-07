@@ -1,18 +1,6 @@
-
-
 use crate::util::ValueMatcher;
 
-#[derive(
-    Debug,
-    Clone,
-
-
-    Eq,
-    PartialEq,
-    Hash,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display, strum_macros::EnumString)]
 pub enum CmdMethod {
     Init,
     Read,

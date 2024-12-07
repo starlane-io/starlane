@@ -1,4 +1,3 @@
-
 //! #
 
 // no_std structure was copied from serde:
@@ -6,7 +5,6 @@
 // Show which crate feature enables conditionally compiled APIs in documentation.
 #![cfg_attr(docsrs, feature(doc_cfg, rustdoc_internals))]
 #![cfg_attr(docsrs, allow(internal_features))]
-
 #![cfg_attr(feature = "unstable", feature(never_type))]
 #![allow(unknown_lints, bare_trait_objects, deprecated)]
 // Ignored clippy and clippy_pedantic lints
@@ -57,7 +55,6 @@ clippy::must_use_candidate,
 // Restrictions
 #![deny(clippy::question_mark_used)]
 // Rustc lints.
-
 #![deny(missing_docs, unused_imports)]
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -73,7 +70,7 @@ use once_cell::unsync::Lazy;
 /// crates. This avoids elaborate import wrangling having to happen in every
 /// module.
 ///
-#[allow(missing_docs, unused_imports,warnings)]
+#[allow(missing_docs, unused_imports, warnings)]
 pub(crate) mod lib {
     mod core {
         #[cfg(not(feature = "std"))]
@@ -196,30 +193,25 @@ pub(crate) mod lib {
     pub use self::core::num::Saturating;
 }
 
-
 pub mod types;
 
 pub mod schema;
 
 pub mod err;
 
-pub mod test;
-pub mod point;
 mod data;
 mod matching;
-
-
-
+pub mod point;
+pub mod test;
 
 pub mod artifact;
-pub mod asynch;
 pub mod command;
 pub mod config;
 pub mod fail;
 pub mod frame;
 pub mod hyper;
 pub mod kind;
-#[cfg(feature="parse")]
+#[cfg(feature = "parse")]
 pub mod parse;
 
 pub mod particle;
@@ -238,9 +230,9 @@ pub mod substance;
 pub mod util;
 pub mod wasm;
 
+mod env;
 pub mod prelude;
 pub mod progress;
-
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());

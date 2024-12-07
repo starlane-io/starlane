@@ -5430,13 +5430,13 @@ pub mod cmd_test {
     use core::str::FromStr;
 
     use crate::command::{Command, CommandVar};
+    use crate::command::direct::create::KindTemplate;
     use crate::err::ParseErrs;
-    use crate::kind::Kind;
+    use crate::kind::{BaseKind, Kind};
     use crate::parse::util::{new_span, result};
     use crate::point::{PointSeg, RouteSeg};
     use crate::selector::{PointHierarchy, PointKindSeg};
     use crate::util::ToResolved;
-    use crate::{BaseKind, KindTemplate};
 
     use crate::parse::{
         command, create_command, point_selector, publish_command, script, upload_blocks, CamelCase,

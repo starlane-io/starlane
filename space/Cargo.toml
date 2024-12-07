@@ -24,6 +24,7 @@ repository.workspace = true
 [features]
 full = ["server"]
 default = ["hyperspace"]
+std = []
 server = ["space", "service", "hyperspace", "hyperlane", "hyperlane-tcp", "cli", "dep:oneshot", "dep:anyhow", "dep:bollard"]
 cli = ["dep:text_io", "dep:clap", "dep:walkdir", "parse"]
 hypererr = []

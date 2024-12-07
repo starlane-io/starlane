@@ -5,7 +5,7 @@ use nom::bytes::complete::tag;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
-use crate::err::ParseErrs;
+use crate::err::{ParseErrs, SpaceErr};
 use crate::kind::{Kind, KindParts};
 use crate::parse::util::{new_span, result, Span};
 use crate::parse::{parse_alpha1_str, point_and_kind, Env, Res};
@@ -14,7 +14,6 @@ use crate::substance::Substance;
 use crate::util::ToResolved;
 use crate::wave::core::http2::StatusCode;
 use crate::wave::core::ReflectedCore;
-use crate::{BaseKind, SpaceErr};
 
 pub mod property;
 pub mod traversal;

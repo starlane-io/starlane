@@ -1,5 +1,2 @@
-
-
-
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct Schema();

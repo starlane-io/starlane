@@ -1,21 +1,9 @@
-
-
 use crate::err::SpaceErr;
 use crate::substance::{FormErrs, Substance};
 use crate::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore};
 use url::Url;
 
-#[derive(
-    Debug,
-    Clone,
-
-
-    strum_macros::Display,
-    strum_macros::EnumString,
-    Eq,
-    PartialEq,
-    Hash,
-)]
+#[derive(Debug, Clone, strum_macros::Display, strum_macros::EnumString, Eq, PartialEq, Hash)]
 pub enum HttpMethod {
     Options,
     Get,
@@ -34,7 +22,7 @@ impl Default for HttpMethod {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct HttpRequest {
     pub method: HttpMethod,
     pub headers: HeaderMap,
@@ -88,7 +76,7 @@ impl TryFrom<DirectedCore> for HttpRequest {
         }
     }
 }
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct StatusCode {
     pub code: u16,
 }

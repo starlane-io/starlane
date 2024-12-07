@@ -4,10 +4,9 @@ use thiserror::Error;
 
 pub use eyre::eyre as err;
 
-
 pub type ParseErrs = eyre::Error;
 
-#[derive(Error,Clone, Debug, EnumDiscriminants)]
+#[derive(Error, Clone, Debug, EnumDiscriminants)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ErrKind))]
 #[strum_discriminants(derive(Hash))]
@@ -21,14 +20,7 @@ pub enum ErrStrata {
     Agent,
 }
 
-
-
-pub struct SpaceErr {
-
-}
-
-
-
+pub struct SpaceErr {}
 
 impl Display for ErrStrata {
     fn fmt(&self, _: &mut Formatter<'_>) -> core::fmt::Result {
@@ -36,10 +28,7 @@ impl Display for ErrStrata {
     }
 }
 
-
-
-
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 mod serde {
     use crate::schema::case::Version;
     use serde::de::Visitor;

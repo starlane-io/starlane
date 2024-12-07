@@ -3,12 +3,9 @@ use std::convert::TryInto;
 
 use regex::Regex;
 
-
 use crate::err::{ParseErrs, SpaceErr};
 use crate::loc::Topic;
-use crate::parse::model::{
-    BindScope, MethodScope, PipelineSegmentDef, RouteScope, ScopeFilters,
-};
+use crate::parse::model::{BindScope, MethodScope, PipelineSegmentDef, RouteScope, ScopeFilters};
 use crate::parse::{bind_config, Env};
 use crate::point::{Point, PointCtx, PointVar};
 use crate::selector::PayloadBlockDef;
@@ -17,7 +14,7 @@ use crate::util::{ToResolved, ValueMatcher, ValuePattern};
 use crate::wave::core::MethodPattern;
 use crate::wave::DirectedWave;
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum WaveDirection {
     Direct,
     Reflect,
@@ -88,7 +85,7 @@ impl TryFrom<Vec<u8>> for BindConfig {
 
 pub struct Cursor {}
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ConfigScope<T, E> {
     pub scope_type: T,
     pub elements: Vec<E>,

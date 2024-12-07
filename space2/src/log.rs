@@ -101,7 +101,7 @@ pub async fn push_scope<F, R, O>(mut f: F, mark: LogMark) -> Result<O, anyhow::E
 where
     F: FnMut() -> R,
     F: Copy + Send + Sync + 'static,
-    R: Future<Output=Result<O, anyhow::Error>>,
+    R: Future<Output = Result<O, anyhow::Error>>,
     O: Sized + Send + Sync,
 {
     if STACK.try_with(|v| {}).is_ok() {}
@@ -144,7 +144,7 @@ extern "C" {
 
 
  */
-#[derive(Debug, Clone,   Eq, PartialEq, strum_macros::Display)]
+#[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display)]
 pub enum Level {
     Trace,
     Debug,
@@ -159,7 +159,7 @@ impl Default for Level {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Builder)]
+#[derive(Debug, Clone, Eq, PartialEq, Builder)]
 pub struct Log {
     #[builder(default)]
     pub loc: Loc,
@@ -182,7 +182,7 @@ impl Display for Log {
             self.level.to_string(),
             self.payload.to_string()
         )
-            .to_string();
+        .to_string();
         write!(f, "{}", str)
     }
 }
@@ -201,7 +201,7 @@ pub trait SpanEvent {
 
  */
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SpanEvent {
     pub loc: Loc,
     pub span: Uuid,
@@ -226,7 +226,7 @@ impl SpanEvent {
 
 pub type TrailSpanId = Uuid;
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LogSpan {
     pub id: TrailSpanId,
     pub loc: Loc,
@@ -291,14 +291,14 @@ impl LogSpan {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PointlessLog {
     timestamp: Timestamp,
     message: String,
     level: Level,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum LogPayload {
     Message(String),
     Json(Value),
@@ -1110,7 +1110,7 @@ impl Tracker {
 pub type Track = TrackDef<String>;
 pub type TrackRegex = TrackDef<Regex>;
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct TrackDef<R> {
     selector: Selector,
     stop: R,
@@ -1259,7 +1259,7 @@ macro_rules! log {
     }
 }
 
-#[derive(Debug, Clone, Builder,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Builder, Eq, PartialEq, Hash)]
 pub struct LogMark {
     pub package: String,
     pub file: String,
@@ -1277,7 +1277,7 @@ impl Default for LogMark {
         create_mark!()
     }
 }
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Loc {
     None,
     Point(Point),

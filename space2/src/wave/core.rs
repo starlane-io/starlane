@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-
 use starlane_primitive_macros::Autobox;
 use thiserror::__private::AsDisplay;
 
@@ -32,7 +31,7 @@ impl From<Result<ReflectedCore, SpaceErr>> for ReflectedCore {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ReflectedCore {
     pub headers: HeaderMap,
     pub status: StatusCode,
@@ -260,17 +259,7 @@ impl TryInto<http::Response<Bin>> for ReflectedCore {
 
  */
 
-#[derive(
-    Debug,
-    Clone,
-
-
-    Eq,
-    PartialEq,
-    Autobox,
-    strum_macros::EnumString,
-    strum_macros::Display,
-)]
+#[derive(Debug, Clone, Eq, PartialEq, Autobox, strum_macros::EnumString, strum_macros::Display)]
 pub enum Method {
     #[strum(to_string = "Hyp<{0}>")]
     Hyp(HypMethod),
@@ -397,7 +386,7 @@ impl Into<DirectedCore> for Method {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DirectedCore {
     pub headers: HeaderMap,
     pub method: Method,
@@ -654,7 +643,7 @@ impl TryFrom<ReflectedCore> for Surface {
                     "expecting Surface received {}",
                     substance.kind().to_string()
                 )
-                    .into()),
+                .into()),
             }
         }
     }
@@ -662,16 +651,7 @@ impl TryFrom<ReflectedCore> for Surface {
 
 pub type CoreBounce = Bounce<ReflectedCore>;
 
-#[derive(
-    Debug,
-    Clone,
-
-
-    strum_macros::Display,
-    strum_macros::EnumString,
-    Eq,
-    PartialEq,
-)]
+#[derive(Debug, Clone, strum_macros::Display, strum_macros::EnumString, Eq, PartialEq)]
 pub enum MethodKind {
     Hyp,
     Cmd,

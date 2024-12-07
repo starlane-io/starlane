@@ -6,7 +6,6 @@ use std::str::FromStr;
 
 use nom::combinator::all_consuming;
 
-
 use crate::parse::util::new_span;
 
 use crate::err::ParseErrs;
@@ -17,7 +16,7 @@ use crate::selector::{PointHierarchy, Selector};
 use crate::wave::ScopeGrant;
 use crate::Agent;
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Access {
     Super,
     Owner,
@@ -79,7 +78,7 @@ impl Access {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Privileges {
     Full,
     Enumerated(EnumeratedPrivileges),
@@ -156,7 +155,7 @@ impl ops::BitOr<&Privilege> for Privileges {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct EnumeratedPrivileges {
     set: HashSet<String>,
 }
@@ -202,7 +201,7 @@ impl EnumeratedPrivileges {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Privilege {
     Full,
     Single(String),
@@ -226,7 +225,7 @@ impl FromStr for Privilege {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct EnumeratedAccess {
     pub permissions: Permissions,
     pub privileges: Privileges,
@@ -274,7 +273,7 @@ impl EnumeratedAccess {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PermissionsMask {
     pub kind: PermissionsMaskKind,
     pub permissions: Permissions,
@@ -298,7 +297,7 @@ impl ToString for PermissionsMask {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Permissions {
     pub child: ChildPerms,
     pub particle: ParticlePerms,
@@ -344,7 +343,7 @@ impl ToString for Permissions {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ChildPerms {
     pub create: bool,
     pub select: bool,
@@ -407,7 +406,7 @@ impl ToString for ChildPerms {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ParticlePerms {
     pub read: bool,
     pub write: bool,
@@ -479,13 +478,13 @@ impl ToString for ParticlePerms {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PermissionsMaskKind {
     Or,
     And,
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct AccessGrantDef<Priv, PermMask, PointSelector, Point> {
     pub kind: AccessGrantKindDef<Priv, PermMask>,
     pub on_point: PointSelector,
@@ -514,7 +513,7 @@ impl GrantTo {
 pub type AccessGrant = AccessGrantDef<Privilege, PermissionsMask, Selector, Point>;
 pub type AccessGrantKind = AccessGrantKindDef<Privilege, PermissionsMask>;
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum AccessGrantKindDef<Priv, PermMask> {
     Super,
     Privilege(Priv),

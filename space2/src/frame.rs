@@ -3,7 +3,6 @@ use core::str::FromStr;
 use nom::AsBytes;
 use semver::Version;
 
-
 use crate::err::SpaceErr;
 use crate::hyper::Knock;
 use crate::wave::{PingCore, PongCore, Wave};
@@ -57,7 +56,7 @@ impl From<semver::Version> for PrimitiveFrame {
     }
 }
 
-#[derive(Debug, Clone,   strum_macros::Display)]
+#[derive(Debug, Clone, strum_macros::Display)]
 pub enum CloseReason {
     Done,
     Error(String),

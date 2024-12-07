@@ -17,7 +17,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum HttpMethodPattern {
     Always,
     Never,
@@ -55,7 +55,7 @@ impl ToString for HttpMethodPattern {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq,  Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
 pub enum OptSelector<S> {
     Some,
     None,
@@ -273,7 +273,7 @@ impl<S> DerefMut for SelectorSet<S> {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum ValuePattern<T> {
     Always,
     Never,
@@ -403,7 +403,7 @@ impl PartialEq<String> for RegexMatcher {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct StringMatcher {
     pub pattern: String,
 }

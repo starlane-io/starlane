@@ -1,20 +1,17 @@
+use alloc::string::ToString;
+use core::ops::Deref;
 use core::str::FromStr;
-use std::ops::Deref;
 
 use crate::config::mechtron::MechtronConfig;
 use crate::particle::{Details, Stub};
 use crate::point::Point;
-use crate::BindConfig;
-
-use starlane_primitive_macros::Autobox;
 
 pub mod bind;
 pub mod mechtron;
 
 use crate::err::ParseErrs;
-use crate::parse::doc;
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone)]
 pub enum PortalKind {
     Mechtron,
     Portal,
@@ -29,13 +26,13 @@ impl ToString for PortalKind {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Info {
     pub stub: Stub,
     pub kind: PortalKind,
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone)]
 pub struct PortalConfig {
     pub max_payload_size: u32,
     pub init_timeout: u64,
@@ -54,7 +51,7 @@ impl Default for PortalConfig {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PointConfig<Body> {
     pub point: Point,
     pub body: Body,
@@ -68,7 +65,7 @@ impl<Body> Deref for PointConfig<Body> {
     }
 }
 
-#[derive(Autobox)]
+#[derive(strum_macros::EnumString)]
 pub enum Document {
     BindConfig(BindConfig),
     MechtronConfig(MechtronConfig),
@@ -103,7 +100,7 @@ impl AsRef<str> for DocKind {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ParticleConfigBody {
     pub details: Details,
 }

@@ -10,7 +10,6 @@ use direct::read::{Read, ReadCtx, ReadVar};
 use direct::select::{SelectCtx, SelectVar};
 use direct::set::{Set, SetCtx, SetVar};
 use direct::write::{Write, WriteCtx, WriteVar};
-use starlane_primitive_macros::Autobox;
 
 use crate::err::ParseErrs;
 use crate::parse::util::{new_span, result, Trace};
@@ -18,7 +17,6 @@ use crate::parse::{command_line, Env};
 use crate::substance::{Bin, ChildSubstance};
 use crate::util::ToResolved;
 use crate::wave::core::cmd::CmdMethod;
-use crate::{Delete, Select};
 
 pub mod common {
     use std::collections::hash_map::Iter;
@@ -360,7 +358,7 @@ pub mod direct {
         use std::convert::TryInto;
         use std::sync::atomic::{AtomicU64, Ordering};
         use std::sync::Arc;
-
+        use async_trait::async_trait;
         use crate::command::common::{SetProperties, StateSrc, StateSrcVar};
         use crate::command::Command;
         use crate::err::{ParseErrs, SpaceErr};

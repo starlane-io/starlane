@@ -29,16 +29,7 @@ use crate::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::wave::{PongCore, Wave};
 use url::Url;
 
-#[derive(
-    Debug,
-    Clone,
-
-
-    Eq,
-    PartialEq,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
+#[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display, strum_macros::EnumString)]
 #[non_exhaustive]
 pub enum SubstanceKind {
     Empty,
@@ -76,8 +67,6 @@ pub enum SubstanceKind {
 #[derive(
     Debug,
     Clone,
-
-
     Eq,
     PartialEq,
     strum_macros::Display,
@@ -116,7 +105,7 @@ pub enum Substance {
     Log(LogSubstance),
     Err(SubstanceErr),
 }
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SubstanceErr(pub String);
 
 impl ToString for SubstanceErr {
@@ -171,7 +160,7 @@ pub trait ToSubstance<S> {
 
 pub trait ChildSubstance {}
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Token {
     data: String,
 }
@@ -303,16 +292,7 @@ impl Substance {
     }
 }
 
-#[derive(
-    Debug,
-    Clone,
-
-
-    Eq,
-    PartialEq,
-    Autobox,
-    starlane_primitive_macros::ToSubstance,
-)]
+#[derive(Debug, Clone, Eq, PartialEq, Autobox, starlane_primitive_macros::ToSubstance)]
 pub enum LogSubstance {
     Log(Log),
     Span(LogSpan),
@@ -331,7 +311,7 @@ impl TryInto<HashMap<String, Substance>> for Substance {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SubstanceMap {
     pub map: HashMap<String, Substance>,
 }
@@ -379,7 +359,7 @@ impl SubstanceMap {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Error)]
+#[derive(Debug, Clone, Eq, PartialEq, Error)]
 pub struct FormErrs {
     map: HashMap<String, String>,
 }
@@ -437,7 +417,7 @@ impl Deref for FormErrs {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SubstanceList {
     pub list: Vec<Box<Substance>>,
 }
@@ -471,7 +451,7 @@ impl DerefMut for SubstanceList {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ListPattern {
     pub primitive: SubstanceKind,
     pub range: NumRange,
@@ -498,7 +478,7 @@ impl ListPattern {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum NumRange {
     MinMax { min: usize, max: usize },
     Exact(usize),
@@ -508,7 +488,7 @@ pub enum NumRange {
 pub type SubstanceTypePatternCtx = SubstanceTypePatternDef<PointCtx>;
 pub type SubstanceTypePatternVar = SubstanceTypePatternDef<PointVar>;
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SubstanceTypePatternDef<Pnt> {
     Empty,
     Primitive(SubstanceKind),
@@ -616,7 +596,7 @@ pub type SubstancePatternVar = SubstancePatternDef<PointVar>;
 pub type SubstancePatternCtx = SubstancePatternDef<PointCtx>;
 pub type SubstancePattern = SubstancePatternDef<Point>;
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SubstancePatternDef<Pnt> {
     pub structure: SubstanceTypePatternDef<Pnt>,
     pub format: Option<SubstanceFormat>,
@@ -698,7 +678,7 @@ impl<Pnt> ValueMatcher<Substance> for SubstancePatternDef<Pnt> {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CallWithConfigDef<Pnt> {
     pub call: CallDef<Pnt>,
     pub config: Option<Pnt>,
@@ -801,13 +781,13 @@ impl ToResolved<Call> for CallVar {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CallDef<Pnt> {
     pub point: Pnt,
     pub kind: CallKind,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CallKind {
     Cmd(CmdCall),
     Hyp(HypCall),
@@ -842,7 +822,7 @@ impl ToString for Call {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ExtCall {
     pub path: Subst<Tw<String>>,
     pub method: ExtMethod,
@@ -860,7 +840,7 @@ impl ToString for ExtCall {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CmdCall {
     pub path: Subst<Tw<String>>,
     pub method: CmdMethod,
@@ -878,7 +858,7 @@ impl ToString for CmdCall {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HypCall {
     pub path: Subst<Tw<String>>,
     pub method: HypMethod,
@@ -896,7 +876,7 @@ impl ToString for HypCall {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HttpCall {
     pub path: Subst<Tw<String>>,
 
@@ -936,16 +916,7 @@ impl ToString for CallKind {
     }
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Eq,
-    PartialEq,
-    strum_macros::Display,
-    strum_macros::EnumString,
-
-
-)]
+#[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display, strum_macros::EnumString)]
 pub enum SubstanceFormat {
     #[strum(serialize = "json")]
     Json,
@@ -957,7 +928,7 @@ pub type MapPattern = MapPatternDef<Point>;
 pub type MapPatternCtx = MapPatternDef<PointCtx>;
 pub type MapPatternVar = MapPatternDef<PointVar>;
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct MapPatternDef<Pnt> {
     pub required: HashMap<String, ValuePattern<SubstancePatternDef<Pnt>>>,
     pub allowed: ValuePattern<SubstancePatternDef<Pnt>>,
@@ -1031,13 +1002,13 @@ impl<Pnt> MapPatternDef<Pnt> {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct SubstanceRef<PAYLOAD_CLAIM, PAYLOAD_PATTERN> {
     pub claim: PAYLOAD_CLAIM,
     pub pattern: PAYLOAD_PATTERN,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct MultipartForm {
     data: String,
 }

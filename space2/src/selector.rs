@@ -4,8 +4,6 @@ use std::ops::Deref;
 
 use nom::combinator::all_consuming;
 
-
-
 use crate::err::ParseErrs;
 use crate::err::SpaceErr;
 use crate::kind::{BaseKind, Kind, KindParts, Specific, SubKind};
@@ -36,7 +34,7 @@ pub type PointSelector = Selector;
 
 pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, SpecificSelector>;
 pub type KindSelectorVar =
-KindSelectorDef<VarVal<KindBaseSelector>, VarVal<SubKindSelector>, VarVal<SpecificSelector>>;
+    KindSelectorDef<VarVal<KindBaseSelector>, VarVal<SubKindSelector>, VarVal<SpecificSelector>>;
 
 impl PartialEq<Kind> for KindSelector {
     fn eq(&self, kind: &Kind) -> bool {
@@ -44,7 +42,7 @@ impl PartialEq<Kind> for KindSelector {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct KindSelectorDef<GenericKindSelector, GenericSubKindSelector, SpecificSelector> {
     pub base: GenericKindSelector,
     pub sub: GenericSubKindSelector,
@@ -133,7 +131,7 @@ impl KindSelector {
         }
     }
 }
-#[derive(Debug, Clone,   Eq, PartialEq, Hash, strum_macros::Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum SubKindSelector {
     #[strum(to_string = "")]
     None,
@@ -198,7 +196,7 @@ impl ValueMatcher<Option<SubKind>> for SubKindSelector {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct SelectorDef<Hop> {
     /// this is a temporary hack which will hopefully not be necessary when types 2.0 become available
     pub(crate) always: bool,
@@ -570,7 +568,7 @@ impl FromStr for VersionReq {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum PointSegSelector {
     InclusiveAny,       // +:*  // includes Root if it's the first segment
     InclusiveRecursive, // +:** // includes Root if its the first segment
@@ -580,7 +578,7 @@ pub enum PointSegSelector {
     Version(VersionReq),
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum PointSegSelectorVar {
     InclusiveAny,       // +:*  // includes Root if it's the first segment
     InclusiveRecursive, // +:** // includes Root if it's the first segment
@@ -593,7 +591,7 @@ pub enum PointSegSelectorVar {
     Pop(Trace),
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum PointSegSelectorCtx {
     /// +:*  // includes Root if it's the first segment
     InclusiveAny,
@@ -678,7 +676,7 @@ impl ToString for PointSegSelector {
 
 pub type KeySegment = String;
 
-#[derive(Debug, Clone, Eq, PartialEq,   Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum ExactPointSeg {
     PointSeg(PointSeg),
     Version(Version),
@@ -742,7 +740,7 @@ impl FromStr for SpecificSelector {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct SpecificSelectorDef<
     ProviderSelector,
     VendorSelector,
@@ -867,7 +865,7 @@ pub struct MapEntryPatternDef<Pnt> {
     pub payload: ValuePattern<SubstancePatternDef<Pnt>>,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct HopDef<Segment, KindSelector> {
     pub inclusive: bool,
     pub segment_selector: Segment,
@@ -927,7 +925,7 @@ impl ToString for PointSegKindHop {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Pattern<P> {
     Always,
     Exact(P),
@@ -974,7 +972,7 @@ where
 
     pub fn convert<To>(self) -> Result<Pattern<To>, SpaceErr>
     where
-        P: TryInto<To, Error=SpaceErr> + Eq + PartialEq,
+        P: TryInto<To, Error = SpaceErr> + Eq + PartialEq,
     {
         Ok(match self {
             Pattern::Always => Pattern::Always,
@@ -995,7 +993,7 @@ where
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum EmptyPattern<P> {
     Any,
     Pattern(P),
@@ -1026,7 +1024,7 @@ where
 
     pub fn convert<To>(self) -> Result<EmptyPattern<To>, SpaceErr>
     where
-        P: TryInto<To, Error=SpaceErr> + Eq + PartialEq,
+        P: TryInto<To, Error = SpaceErr> + Eq + PartialEq,
     {
         Ok(match self {
             EmptyPattern::Any => EmptyPattern::Any,
@@ -1055,7 +1053,7 @@ where
         }
     }
 }
-#[derive(Debug, Clone,   Eq, PartialEq, Hash, strum_macros::Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum KindBaseSelector {
     #[strum(to_string = "*")]
     Always,
@@ -1076,7 +1074,7 @@ impl KindBaseSelector {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PortHierarchy {
     pub topic: Topic,
     pub layer: Layer,
@@ -1253,7 +1251,7 @@ impl Into<PointKindSegOpt> for PointKindSeg {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone,  Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize)]
 pub struct PointKindSegDef<K> {
     pub segment: PointSeg,
     pub kind: K,
@@ -1298,12 +1296,12 @@ impl ToResolved<PayloadBlockCtx> for PayloadBlockVar {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct UploadBlock {
     pub name: String,
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct CreateBlock {
     pub payload: Substance,
 }

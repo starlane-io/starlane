@@ -32,27 +32,17 @@ use url::Url;
 pub mod core;
 pub mod exchange;
 
-#[derive(
-    Debug,
-    Clone,
-
-
-    Eq,
-    PartialEq,
-    Hash,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display, strum_macros::EnumString)]
 pub enum WaveKind {
     Ping,   // Request
     Pong,   // Response
     Ripple, // Broadcast
     Echo,   // Broadcast Response
     Signal, // Notification
-    /*
-    Photon, // Ack
-           Reverb,  // Ack
-          */
+            /*
+            Photon, // Ack
+                   Reverb,  // Ack
+                  */
 }
 
 impl WaveKind {
@@ -88,7 +78,7 @@ pub type Pong = WaveVariantDef<PongCore>;
 pub type Echo = WaveVariantDef<EchoCore>;
 pub type Signal = WaveVariantDef<SignalCore>;
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum WaveDef<T>
 where
     T: ToRecipients + Clone,
@@ -575,7 +565,7 @@ where
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct WaveId {
     uuid: Uuid,
     kind: WaveKind,
@@ -697,7 +687,7 @@ pub trait Reflectable<R> {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct DirectWaveStub {
     pub id: WaveId,
     pub agent: Agent,
@@ -716,7 +706,7 @@ impl Into<WaitTime> for &DirectWaveStub {
 pub type Ripple = RippleCoreDef<Recipients>;
 pub type SingularRipple = RippleCoreDef<Surface>;
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RippleCoreDef<T: ToRecipients + Clone> {
     pub to: T,
     pub core: DirectedCore,
@@ -785,7 +775,7 @@ impl WaveVariantDef<Ripple> {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum BounceBacks {
     None,
     Single,
@@ -838,7 +828,7 @@ where
 
     pub fn require_body<B>(self) -> Result<B, SpaceErr>
     where
-        B: TryFrom<Substance, Error=SpaceErr>,
+        B: TryFrom<Substance, Error = SpaceErr>,
     {
         match B::try_from(self.body.clone()) {
             Ok(body) => Ok(body),
@@ -867,7 +857,7 @@ where
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SignalCore {
     pub to: Surface,
     pub core: DirectedCore,
@@ -903,7 +893,7 @@ impl DerefMut for SignalCore {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PingCore {
     pub to: Surface,
     pub core: DirectedCore,
@@ -985,7 +975,7 @@ impl PingCore {
 
     pub fn require_body<B>(self) -> Result<B, SpaceErr>
     where
-        B: TryFrom<Substance, Error=SpaceErr>,
+        B: TryFrom<Substance, Error = SpaceErr>,
     {
         match B::try_from(self.clone().core.body) {
             Ok(body) => Ok(body),
@@ -994,7 +984,7 @@ impl PingCore {
     }
 }
 
-#[derive( Deserialize)]
+#[derive(Deserialize)]
 pub struct WaveXtra<V> {
     pub wave: WaveVariantDef<V>,
     pub session: Session,
@@ -1594,7 +1584,7 @@ impl FromReflectedAggregate for Echoes {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct EchoCore {
     /// this is meant to be the intended request recipient, which may not be the point responding
     /// to this message in the case it was intercepted and filtered at some point
@@ -1662,7 +1652,7 @@ impl EchoCore {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PongCore {
     /// this is meant to be the intended request recipient, which may not be the point responding
     /// to this message in the case it was intercepted and filtered at some point
@@ -1841,7 +1831,7 @@ impl Trackable for DirectedWave {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum DirectedWaveDef<T>
 where
     T: ToRecipients + Clone,
@@ -2278,7 +2268,7 @@ impl DirectedWave {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ReflectedWave {
     Pong(WaveVariantDef<PongCore>),
     Echo(WaveVariantDef<EchoCore>),
@@ -2423,7 +2413,7 @@ impl ReflectedWave {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Recipients {
     Single(Surface),
     Multi(Vec<Surface>),
@@ -2577,24 +2567,24 @@ impl Recipients {
 
 pub type IpAddr = String;
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Origin {
     Ip(IpAddr),
     Point(Point),
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Crypt<S> {
     pub payload: S,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SessionId {
     pub origin: Crypt<Origin>,
     pub uuid: Uuid,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct WaveVariantDef<V> {
     pub id: WaveId,
     pub session: Option<SessionId>,
@@ -3010,7 +3000,7 @@ impl<V> DerefMut for WaveVariantDef<V> {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Agent {
     Anonymous,
     HyperUser,
@@ -3033,7 +3023,7 @@ impl Default for Agent {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Session {
     pub id: Uuid,
     pub attributes: HashMap<String, String>,
@@ -3053,7 +3043,7 @@ impl Session {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Scope {
     Full,
     None,
@@ -3150,26 +3140,26 @@ impl Default for Scope {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ScopeGrant {
     pub on: Selector,
     pub kind: ScopeGrantKind,
     pub aspect: ScopeGrantAspect,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum ScopeGrantKind {
     Or,
     And,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum ScopeGrantAspect {
     Perm(Permissions),
     Priv(Privilege),
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Handling {
     pub kind: HandlingKind,
     pub priority: Priority,
@@ -3177,7 +3167,7 @@ pub struct Handling {
     pub wait: WaitTime,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HandlingKind {
     Durable,   // Mesh will guarantee delivery eventually once Request call has returned
     Queued,    // Slower but more reliable delivery, message can be lost if a star crashes, etc
@@ -3195,7 +3185,7 @@ impl Default for Handling {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum WaitTime {
     High,
     Med,
@@ -3208,7 +3198,7 @@ impl Default for WaitTime {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Retries {
     None,
     Max,
@@ -3222,7 +3212,7 @@ impl Default for Retries {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Priority {
     Hyper,
     Super,
@@ -3237,7 +3227,7 @@ impl Default for Priority {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Karma {
     Hyper,
     Super,
@@ -3253,7 +3243,7 @@ impl Default for Karma {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Urgency {
     High,
     Low,
@@ -3271,7 +3261,7 @@ pub enum Bounce<W> {
 impl<W> Bounce<W> {
     pub fn to_core_bounce(self) -> CoreBounce
     where
-        W: TryInto<ReflectedCore, Error=SpaceErr>,
+        W: TryInto<ReflectedCore, Error = SpaceErr>,
     {
         match self {
             Bounce::Absorbed => Bounce::Absorbed,
@@ -3297,7 +3287,7 @@ pub enum BounceProto {
     Reflected(ReflectedProto),
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum ReflectedAggregate {
     None,
     Single(ReflectedWave),
@@ -3369,7 +3359,7 @@ impl Deref for Delivery {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HyperWave {
     point: Point,
     wave: Wave,

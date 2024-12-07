@@ -1,9 +1,6 @@
-
-
 pub mod mesh {
 
-
-    #[derive(Debug, Clone,  Deserialize)]
+    #[derive(Debug, Clone, Deserialize)]
     pub enum Fail {
         Error(String),
     }
@@ -11,10 +8,9 @@ pub mod mesh {
 
 pub mod portal {
 
-
     use crate::fail::{ext, http, resource};
 
-    #[derive(Debug, Clone,  Deserialize)]
+    #[derive(Debug, Clone, Deserialize)]
     pub enum Fail {
         Error(String),
         Resource(resource::Fail),
@@ -25,8 +21,7 @@ pub mod portal {
 
 pub mod http {
 
-
-    #[derive(Debug, Clone,  Deserialize)]
+    #[derive(Debug, Clone, Deserialize)]
     pub struct Error {
         pub message: String,
     }
@@ -34,11 +29,10 @@ pub mod http {
 
 pub mod resource {
 
-
     use crate::fail::{BadCoercion, BadRequest, Conditional, Messaging};
     use crate::point::Point;
 
-    #[derive(Debug, Clone,  Deserialize)]
+    #[derive(Debug, Clone, Deserialize)]
     pub enum Fail {
         Create(Create),
         Update(Update),
@@ -48,7 +42,7 @@ pub mod resource {
         Messaging(Messaging),
     }
 
-    #[derive(Debug, Clone,  Deserialize)]
+    #[derive(Debug, Clone, Deserialize)]
     pub enum Create {
         AddressAlreadyInUse(String),
         WrongParentResourceType { expected: String, found: String },
@@ -56,12 +50,12 @@ pub mod resource {
         InvalidProperty { expected: String, found: String },
     }
 
-    #[derive(Debug, Clone,  Deserialize)]
+    #[derive(Debug, Clone, Deserialize)]
     pub enum Update {
         Immutable,
     }
 
-    #[derive(Debug, Clone,  Deserialize)]
+    #[derive(Debug, Clone, Deserialize)]
     pub enum Select {
         WrongAddress { required: Point, found: Point },
         BadSelectRouting { required: String, found: String },
@@ -71,10 +65,9 @@ pub mod resource {
 
 pub mod ext {
 
-
     use crate::fail::{BadRequest, Conditional};
 
-    #[derive(Debug, Clone,  Deserialize)]
+    #[derive(Debug, Clone, Deserialize)]
     pub enum Fail {
         Error(String),
         BadRequest(BadRequest),
@@ -82,7 +75,7 @@ pub mod ext {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum BadRequest {
     NotFound(NotFound),
     Bad(Bad),
@@ -90,24 +83,24 @@ pub enum BadRequest {
     Wrong(Wrong),
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct BadCoercion {
     pub from: String,
     pub into: String,
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Conditional {
     Timeout(Timeout),
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Timeout {
     pub waited: i32,
     pub message: String,
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum NotFound {
     Any,
     ResourceType(String),
@@ -117,7 +110,7 @@ pub enum NotFound {
     Key(String),
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Bad {
     ResourceType(String),
     Kind(String),
@@ -126,7 +119,7 @@ pub enum Bad {
     Key(String),
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Identifier {
     ResourceType,
     Kind,
@@ -135,24 +128,24 @@ pub enum Identifier {
     Key,
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Illegal {
     Immutable,
     EmptyToFieldOnMessage,
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Wrong {
     pub received: String,
     pub expected: String,
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Messaging {
     RequestReplyExchangesRequireOneAndOnlyOneRecipient,
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Fail {
     Mesh(mesh::Fail),
     Resource(resource::Fail),

@@ -5,9 +5,7 @@ use crate::loc::{
     GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT,
 };
 
-use crate::selector::{
-    PointHierarchyOpt, PointKindSegOpt, Selector,
-};
+use crate::selector::{PointHierarchyOpt, PointKindSegOpt, Selector};
 use crate::util::ToResolved;
 use crate::wave::{Agent, Recipients, ToRecipients};
 use crate::{ANONYMOUS, HYPERUSER};
@@ -18,7 +16,7 @@ use nom::combinator::all_consuming;
 use std::path::PathBuf;
 use thiserror::__private::AsDisplay;
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum RouteSeg {
     This,
     Local,
@@ -45,7 +43,7 @@ impl RouteSegQuery for RouteSeg {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum RouteSegVar {
     This,
     Local,
@@ -99,7 +97,7 @@ impl TryInto<RouteSeg> for RouteSegVar {
                 var.trace.range,
                 var.trace.extra,
             )
-                .into()),
+            .into()),
             RouteSegVar::Remote => Ok(RouteSeg::Remote),
         }
     }
@@ -167,7 +165,7 @@ impl ToString for RouteSeg {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash, strum_macros::Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum PointSegKind {
     Root,
     Space,
@@ -341,7 +339,7 @@ impl PointSegQuery for PointSegVar {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum PointSegCtx {
     Root,
     Space(String),
@@ -354,7 +352,7 @@ pub enum PointSegCtx {
     Pop(Trace),
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum PointSegVar {
     Root,
     Space(String),
@@ -438,21 +436,21 @@ impl TryInto<PointSegCtx> for PointSegVar {
                 trace.range,
                 trace.extra,
             )
-                .into()),
+            .into()),
             PointSegVar::Pop(trace) => Err(ParseErrs::from_range(
                 "point pop not available in this context",
                 "point pop not available",
                 trace.range,
                 trace.extra,
             )
-                .into()),
+            .into()),
             PointSegVar::Var(var) => Err(ParseErrs::from_range(
                 "variable substitution not available in this context",
                 "var subst not available",
                 var.trace.range,
                 var.trace.extra,
             )
-                .into()),
+            .into()),
         }
     }
 }
@@ -475,14 +473,14 @@ impl TryInto<PointSeg> for PointSegCtx {
                 trace.range,
                 trace.extra,
             )
-                .into()),
+            .into()),
             PointSegCtx::Pop(trace) => Err(ParseErrs::from_range(
                 "point pop not available in this context",
                 "point pop not available",
                 trace.range,
                 trace.extra,
             )
-                .into()),
+            .into()),
         }
     }
 }
@@ -497,7 +495,7 @@ impl PointSegCtx {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum PointSeg {
     Root,
     Space(String),
@@ -569,7 +567,7 @@ impl ToString for PointSeg {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum PointSegDelim {
     Empty,
     Mesh,
@@ -586,7 +584,7 @@ impl ToString for PointSegDelim {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct PointSegPairDef<Seg> {
     pub delim: PointSegDelim,
     pub seg: Seg,
@@ -695,7 +693,7 @@ impl ToResolved<PointCtx> for PointVar {
                                 "variables not available in this context '{}'",
                                 var.name.clone()
                             )
-                                .as_str(),
+                            .as_str(),
                             "Not Available",
                             var.trace.range.clone(),
                             var.trace.extra.clone(),
@@ -759,7 +757,7 @@ impl ToResolved<PointCtx> for PointVar {
                                     "variables not available in this context '{}'",
                                     var.name.clone()
                                 )
-                                    .as_str(),
+                                .as_str(),
                                 "Not Available",
                                 var.trace.range.clone(),
                                 var.trace.extra.clone(),
@@ -835,7 +833,7 @@ impl ToResolved<Point> for PointCtx {
                             trace.range.clone(),
                             trace.extra.clone(),
                         )
-                            .into());
+                        .into());
                     }
                     point = match env.point_or() {
                         Ok(point) => point.clone(),
@@ -846,7 +844,7 @@ impl ToResolved<Point> for PointCtx {
                                 trace.range.clone(),
                                 trace.extra.clone(),
                             )
-                                .into());
+                            .into());
                         }
                     };
                 }
@@ -870,12 +868,12 @@ impl ToResolved<Point> for PointCtx {
                                 "Too many point pops. working point was: '{}'",
                                 env.point_or().unwrap().to_string()
                             )
-                                .as_str(),
+                            .as_str(),
                             "too many point pops",
                             trace.range.clone(),
                             trace.extra.clone(),
                         )
-                            .into());
+                        .into());
                     }
                 }
                 PointSegCtx::FilesystemRootDir => {
@@ -927,7 +925,7 @@ impl TryFrom<&str> for Point {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PointDef<Route, Seg> {
     pub route: Route,
     pub segments: Vec<Seg>,
@@ -1150,7 +1148,7 @@ impl Point {
                             "'..' too many pop segments directives: out of parents: '{}'",
                             self.to_string()
                         )
-                            .into());
+                        .into());
                     }
                 }
             }

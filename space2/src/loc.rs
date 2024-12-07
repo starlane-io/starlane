@@ -9,7 +9,6 @@ use nom::combinator::all_consuming;
 use once_cell::sync::Lazy;
 use serde::de::{Error, Visitor};
 
-
 use crate::err::ParseErrs;
 use crate::log::Trackable;
 use crate::parse::util::result;
@@ -79,7 +78,7 @@ pub trait ToBaseKind {
     fn to_base(&self) -> BaseKind;
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Uuid {
     uuid: String,
 }
@@ -117,7 +116,7 @@ impl ToString for Uuid {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash, strum_macros::Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum ProvisionAffinity {
     Local,
     Wrangle,
@@ -203,7 +202,7 @@ impl FromStr for Version {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Variable {
     pub name: VarCase,
     pub trace: Trace,
@@ -236,7 +235,7 @@ impl<V> TryInto<Variable> for VarVal<V> {
 
 impl<V> ToResolved<V> for VarVal<V>
 where
-    V: FromStr<Err=ParseErrs>,
+    V: FromStr<Err = ParseErrs>,
 {
     fn to_resolved(self, env: &Env) -> Result<V, ParseErrs> {
         match self {
@@ -254,14 +253,14 @@ where
                             trace.range,
                             trace.extra,
                         )
-                            .into()),
+                        .into()),
                         ResolverErr::NotFound => Err(ParseErrs::from_range(
                             format!("variable '{}' not found", var.unwrap().to_string()).as_str(),
                             "not found",
                             trace.range,
                             trace.extra,
                         )
-                            .into()),
+                        .into()),
                     }
                 }
             },
@@ -284,7 +283,7 @@ pub trait PointSegment {}
 
 pub type PointSegPair = PointSegPairDef<PointSeg>;
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Topic {
     None,
     Not,
@@ -334,16 +333,7 @@ impl ValueMatcher<Topic> for Topic {
 }
 
 #[derive(
-    Debug,
-    Clone,
-
-
-    Eq,
-    PartialEq,
-    Hash,
-    strum_macros::Display,
-    strum_macros::EnumString,
-    Ordinalize,
+    Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display, strum_macros::EnumString, Ordinalize,
 )]
 #[repr(u8)]
 pub enum Layer {
@@ -382,7 +372,7 @@ impl Default for Topic {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Surface {
     pub point: Point,
     pub layer: Layer,
@@ -447,7 +437,7 @@ impl ToString for Surface {
     }
 }
 
-#[derive(Clone,  Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct SurfaceSelector {
     pub point: ValuePattern<Point>,
     pub topic: ValuePattern<Topic>,
@@ -550,7 +540,7 @@ pub trait ToSurface {
 pub type MachineName = String;
 pub type ConstellationName = String;
 
-#[derive(PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Clone,  Deserialize)]
+#[derive(PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Clone, Deserialize)]
 pub struct StarKey {
     pub constellation: ConstellationName,
     pub name: String,

@@ -4,9 +4,9 @@ use std::ops::Deref;
 use crate::config::mechtron::MechtronConfig;
 use crate::particle::{Details, Stub};
 use crate::point::Point;
-use crate::BindConfig;
 use serde::{Deserialize, Serialize};
-use starlane_primitive_macros::Autobox;
+use starlane_macros::Autobox;
+use crate::config::bind::BindConfig;
 
 pub mod bind;
 pub mod mechtron;

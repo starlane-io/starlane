@@ -9,9 +9,7 @@ use crate::parse::SkewerCase;
 use crate::point::Point;
 use crate::{Kind, SetProperties, SpaceErr};
 
-
-
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PropertyDef {
     //pub pattern: Box<dyn PropertyPattern>,
     pub required: bool,
@@ -121,7 +119,7 @@ impl PropertyPattern for EmailPattern {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PropertySource {
     Shell,
     Core,
@@ -129,7 +127,7 @@ pub enum PropertySource {
     CoreSecret,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PropertiesConfig {
     pub properties: HashMap<String, PropertyDef>,
     pub kind: Kind,
@@ -186,7 +184,7 @@ impl PropertiesConfig {
                     self.kind.to_string(),
                     req
                 )
-                    .into());
+                .into());
             }
         }
 
@@ -204,7 +202,7 @@ impl PropertiesConfig {
                             self.kind.to_string(),
                             key
                         )
-                            .into());
+                        .into());
                     }
                     match def.source {
                         PropertySource::CoreReadOnly => {
@@ -266,7 +264,7 @@ impl PropertiesConfig {
                         "property '{}' is flagged CoreSecret and cannot be read within the Mesh",
                         key
                     )
-                        .into());
+                    .into());
                 }
                 _ => {}
             }
@@ -298,7 +296,7 @@ impl PropertiesConfig {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum PropertyPermit {
     Read,
     Write,

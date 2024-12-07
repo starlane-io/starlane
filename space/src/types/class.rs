@@ -5,15 +5,10 @@ use alloc::string::ToString;
 use core::str::FromStr;
 use strum_macros::EnumDiscriminants;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
+#[derive(Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(Variant))]
-#[strum_discriminants(derive(
-    Hash,
-    strum_macros::EnumString,
-    strum_macros::ToString,
-    strum_macros::IntoStaticStr
-))]
+#[strum_discriminants(derive(Hash,strum_macros::EnumString,strum_macros::ToString,strum_macros::IntoStaticStr))]
 pub enum Class {
     Root,
     Platform,
@@ -66,7 +61,7 @@ impl FromStr for Class {
     type Err = eyre::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        fn ext(s: &str) -> Result<Class, eyre::Error> {
+        fn ext( s: &str ) -> Result<Class,eyre::Error> {
             Ok(Class::_Ext(CamelCase::from_str(s)?.into()))
         }
 
@@ -74,12 +69,14 @@ impl FromStr for Class {
             /// this Ok match is actually an Error!
             Ok(Variant::_Ext) => ext(s),
             Ok(variant) => ext(variant.into()),
-            Err(_) => ext(s),
+            Err(_) => ext(s)
         }
     }
 }
 
-impl private::Variant for Class {}
+impl private::Variant for Class {
+
+}
 
 impl From<CamelCase> for Class {
     fn from(src: CamelCase) -> Self {
@@ -100,11 +97,20 @@ impl Into<CamelCase> for Class {
     }
 }
 
+
 impl Into<Cat> for Class {
     fn into(self) -> Cat {
         Cat::Class
     }
 }
+
+
+
+
+
+
+
+
 
 #[cfg(feature = "parse")]
 mod parse {

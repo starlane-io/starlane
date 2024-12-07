@@ -1,7 +1,6 @@
 use crate::log::LogAppender;
 
-
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Timestamp {
     pub millis: i64,
 }

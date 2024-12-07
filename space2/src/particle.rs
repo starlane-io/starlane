@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use nom::bytes::complete::tag;
 use nom::combinator::all_consuming;
 
-
 use crate::err::ParseErrs;
 use crate::kind::{Kind, KindParts};
 use crate::parse::util::{new_span, result, Span};
@@ -19,22 +18,13 @@ use crate::{BaseKind, SpaceErr};
 pub mod property;
 pub mod traversal;
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct StatusUpdate {
     pub from: Point,
     pub status: Status,
 }
 
-#[derive(
-    Debug,
-    Clone,
-
-
-    Eq,
-    PartialEq,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
+#[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display, strum_macros::EnumString)]
 pub enum Status {
     /// initial status or when status cannot be determined
     Unknown,
@@ -104,7 +94,7 @@ impl From<Status> for ReflectedCore {
             Status::Resuming => 205u16,
             Status::Done => 200u16,
         })
-            .unwrap_or(StatusCode::fail());
+        .unwrap_or(StatusCode::fail());
 
         let body = Substance::Status(status);
         let status = code;
@@ -116,7 +106,7 @@ impl From<Status> for ReflectedCore {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Code {
     Ok,
     Error(i32),
@@ -133,7 +123,7 @@ impl ToString for Code {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Progress {
     pub step: u16,
     pub total: u16,
@@ -155,20 +145,20 @@ pub fn status<I: Span>(input: I) -> Res<I, Status> {
 
 pub type Properties = HashMap<String, Property>;
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Property {
     pub key: String,
     pub value: String,
     pub locked: bool,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Archetype {
     pub kind: KindParts,
     pub properties: Properties,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Details {
     pub stub: Stub,
     pub properties: Properties,
@@ -189,7 +179,7 @@ impl Details {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Stub {
     pub point: Point,
     pub kind: Kind,
@@ -215,13 +205,13 @@ impl Stub {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Particle {
     pub stub: Stub,
     pub state: Box<Substance>,
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Particle2 {
     pub stub: Stub,
     pub state: Substance,
@@ -282,13 +272,13 @@ pub mod particle {
      */
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash,  Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Deserialize)]
 pub struct Watch {
     pub point: Point,
     pub aspect: Aspect,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash,   strum_macros::Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum Aspect {
     Log,
     State,
@@ -300,7 +290,7 @@ pub type PointKind = PointKindDef<Point>;
 pub type PointKindCtx = PointKindDef<PointCtx>;
 pub type PointKindVar = PointKindDef<PointVar>;
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PointKindDef<Pnt> {
     pub point: Pnt,
     pub kind: Kind,
@@ -355,7 +345,7 @@ impl FromStr for PointKind {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct AddressAndType {
     pub point: Point,
     pub resource_type: BaseKind,

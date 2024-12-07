@@ -4,7 +4,6 @@ use crate::schema::case::Version;
 use alloc::string::{String, ToString};
 use core::str::FromStr;
 
-
 impl ToString for Version {
     fn to_string(&self) -> String {
         self.version.to_string()
@@ -28,9 +27,7 @@ impl FromStr for Version {
     }
 }
 
-
-
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 mod serde {
     use crate::schema::case::Version;
     use alloc::string::ToString;
@@ -38,7 +35,6 @@ mod serde {
     use core::fmt::Formatter;
     use core::str::FromStr;
     use serde::de::Visitor;
-
 
     impl Serialize for Version {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -80,5 +76,4 @@ mod serde {
             deserializer.deserialize_str(VersionVisitor)
         }
     }
-
 }

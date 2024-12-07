@@ -3,14 +3,7 @@ use alloc::string::String;
 use core::fmt;
 use core::ops::Deref;
 
-#[derive(
-    Debug,
-    Clone,
-    Eq,
-    PartialEq,
-    Hash,
-    derive_name::Name
-)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, derive_name::Name)]
 pub struct CamelCase(String);
 
 impl CamelCase {
@@ -39,10 +32,6 @@ pub struct DomainCase {
     string: String,
 }
 
-
-
-
-
 impl fmt::Display for DomainCase {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(self.string.as_str())
@@ -67,10 +56,6 @@ pub struct VarCase {
     string: String,
 }
 
-
-
-
-
 impl fmt::Display for VarCase {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(self.string.as_str())
@@ -84,10 +69,6 @@ impl Deref for VarCase {
         &self.string
     }
 }
-
-
-
-
 
 impl fmt::Display for SkewerCase {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -103,9 +84,6 @@ impl Deref for SkewerCase {
     }
 }
 
-
-
-
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Version {
     pub version: semver::Version,
@@ -119,10 +97,8 @@ impl Deref for Version {
     }
 }
 
-
-
-#[cfg(not(feature="parse"))]
-mod from_str{
+#[cfg(not(feature = "parse"))]
+mod from_str {
     use crate::schema::case::err::CaseErr;
     use crate::schema::case::CamelCase;
     use alloc::string::ToString;
@@ -133,14 +109,13 @@ mod from_str{
         type Err = CaseErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
-            if  s.is_case(Case::UpperCamel) {
+            if s.is_case(Case::UpperCamel) {
                 Ok(CamelCase(s.to_string()))
             } else {
                 Err(CaseErr::exp_camel(s))
             }
         }
     }
-
 
     #[cfg(test)]
     mod test {
@@ -155,14 +130,10 @@ mod from_str{
             assert!(CamelCase::from_str("NoUnder_Scores").is_err());
             assert!(CamelCase::from_str("Forget It").is_err());
         }
-
     }
-
-
 }
 
-
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 mod serde {
     use crate::schema::case::{SkewerCase, VarCase};
 
@@ -215,7 +186,7 @@ mod serde {
     }
 }
 
-#[cfg(feature="parse")]
+#[cfg(feature = "parse")]
 mod parse {
     use crate::schema::case::{CamelCase, DomainCase, SkewerCase, VarCase};
     use core::str::FromStr;
@@ -259,7 +230,6 @@ mod parse {
         }
     }
 
-
     impl FromStr for DomainCase {
         type Err = ParseErrs;
 
@@ -278,29 +248,26 @@ mod parse {
             })
         }
     }
-
-
 }
 pub mod err {
     use alloc::string::{String, ToString};
     use strum_macros::EnumDiscriminants;
     use thiserror::Error;
 
-    #[derive(Error,Debug,EnumDiscriminants,strum_macros::IntoStaticStr)]
-   #[strum_discriminants(vis(pub))]
-   #[strum_discriminants(name(ErrKind))]
-   #[strum_discriminants(derive(Hash,strum_macros::EnumString))]
-   pub enum CaseErr {
+    #[derive(Error, Debug, EnumDiscriminants, strum_macros::IntoStaticStr)]
+    #[strum_discriminants(vis(pub))]
+    #[strum_discriminants(name(ErrKind))]
+    #[strum_discriminants(derive(Hash, strum_macros::EnumString))]
+    pub enum CaseErr {
         #[error("expecting: camel case value (CamelCase); found: `{0}`")]
         ExpectingUpperCamel(String),
         #[error(transparent)]
-        VersionErr(#[from] semver::Error)
-   }
+        VersionErr(#[from] semver::Error),
+    }
 
-
-  impl CaseErr  {
-      pub fn exp_camel(src: impl ToString) -> Self {
-          Self::ExpectingUpperCamel(src.to_string())
-      }
-  }
+    impl CaseErr {
+        pub fn exp_camel(src: impl ToString) -> Self {
+            Self::ExpectingUpperCamel(src.to_string())
+        }
+    }
 }

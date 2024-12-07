@@ -1,7 +1,5 @@
 use core::str::FromStr;
 
-
-
 use direct::create::{Create, CreateCtx, CreateVar};
 use direct::delete::{DeleteCtx, DeleteVar};
 use direct::get::{Get, GetCtx, GetVar};
@@ -17,20 +15,25 @@ use crate::util::ToResolved;
 use crate::wave::core::cmd::CmdMethod;
 
 pub mod common {
-
-
     use crate::err::ParseErrs;
     use crate::loc::Variable;
     use crate::substance::{Bin, Substance};
+    use alloc::boxed::Box;
+    use alloc::string::String;
+    use alloc::vec;
+    use alloc::vec::Vec;
+    use core::ops::{Deref, DerefMut};
+    use core::option::Iter;
+    use derive_builder::export::core::collections::HashMap;
 
-    #[derive(Debug, Clone,   Eq, PartialEq, strum_macros::Display)]
+    #[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display)]
     pub enum StateSrcVar {
         None,
         FileRef(String),
         Var(Variable),
     }
 
-    #[derive(Debug, Clone,   Eq, PartialEq, strum_macros::Display)]
+    #[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display)]
     pub enum StateSrc {
         None,
         Subst(Box<Substance>),
@@ -65,7 +68,7 @@ pub mod common {
         }
     }
 
-    #[derive(Debug, Clone,   Eq, PartialEq)]
+    #[derive(Debug, Clone, Eq, PartialEq)]
     pub enum PropertyMod {
         Set {
             key: String,
@@ -91,7 +94,7 @@ pub mod common {
         }
     }
 
-    #[derive(Debug, Clone,   Eq, PartialEq)]
+    #[derive(Debug, Clone, Eq, PartialEq)]
     pub struct SetProperties {
         pub map: HashMap<String, PropertyMod>,
     }
@@ -141,14 +144,14 @@ pub mod common {
         }
     }
 
-    #[derive(Debug, Clone,   Eq, PartialEq, strum_macros::Display)]
+    #[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display)]
     pub enum SetLabel {
         Set(String),
         SetValue { key: String, value: String },
         Unset(String),
     }
 
-    #[derive(Debug, Clone,   Eq, PartialEq)]
+    #[derive(Debug, Clone, Eq, PartialEq)]
     pub struct SetRegistry {
         pub labels: Vec<SetLabel>,
     }
@@ -180,15 +183,16 @@ pub mod direct {
     //    use http::status::InvalidStatusCode;
     //    use http::{HeaderMap, Request, StatusCode, Uri};
 
-
     use crate::command::direct::create::Create;
     use crate::command::direct::get::Get;
     use crate::command::direct::select::Select;
     use crate::command::direct::set::Set;
     use crate::command::direct::write::Write;
     use crate::util::ValueMatcher;
+    use alloc::format;
+    use alloc::string::{String, ToString};
 
-    #[derive(Debug, Clone,  Deserialize)]
+    #[derive(Debug, Clone)]
     pub enum Cmd {
         Create(Create),
         Select(Select),
@@ -217,16 +221,7 @@ pub mod direct {
         }
     }
 
-    #[derive(
-        Debug,
-        Clone,
-        Eq,
-        PartialEq,
-        strum_macros::Display,
-        strum_macros::EnumString,
-
-
-    )]
+    #[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display, strum_macros::EnumString)]
     pub enum CmdKind {
         Create,
         Select,
@@ -254,10 +249,8 @@ pub mod direct {
 
     pub mod set {
 
-
         use crate::command::common::SetProperties;
         use crate::err::ParseErrs;
-        use crate::parse::Env;
         use crate::point::{Point, PointCtx, PointVar};
         use crate::util::ToResolved;
 
@@ -265,7 +258,7 @@ pub mod direct {
         pub type SetCtx = SetDef<PointCtx>;
         pub type SetVar = SetDef<PointVar>;
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub struct SetDef<Pnt> {
             pub point: Pnt,
             pub properties: SetProperties,
@@ -298,18 +291,17 @@ pub mod direct {
     }
 
     pub mod get {
-
-
         use crate::err::ParseErrs;
-        use crate::parse::Env;
         use crate::point::{Point, PointCtx, PointVar};
         use crate::util::ToResolved;
+        use alloc::string::String;
+        use alloc::vec::Vec;
 
         pub type Get = GetDef<Point>;
         pub type GetCtx = GetDef<PointCtx>;
         pub type GetVar = GetDef<PointVar>;
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub struct GetDef<Pnt> {
             pub point: Pnt,
             pub op: GetOp,
@@ -340,7 +332,7 @@ pub mod direct {
             }
         }
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub enum GetOp {
             State,
             Properties(Vec<String>),
@@ -348,6 +340,9 @@ pub mod direct {
     }
 
     pub mod create {
+        use alloc::boxed::Box;
+        use alloc::format;
+        use alloc::string::{String, ToString};
         use std::convert::TryInto;
         use std::sync::atomic::{AtomicU64, Ordering};
         use std::sync::Arc;
@@ -388,7 +383,7 @@ pub mod direct {
         pub type TemplateCtx = TemplateDef<PointTemplateCtx>;
         pub type TemplateVar = TemplateDef<PointTemplateVar>;
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub struct TemplateDef<Pnt> {
             pub point: Pnt,
             pub kind: KindTemplate,
@@ -430,7 +425,7 @@ pub mod direct {
             }
         }
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub struct KindTemplate {
             pub base: BaseKind,
             pub sub: Option<CamelCase>,
@@ -482,13 +477,13 @@ pub mod direct {
             }
         }
 
-        #[derive(Debug, Clone,  Deserialize)]
+        #[derive(Debug, Clone, Deserialize)]
         pub enum Require {
             File(String),
             Auth(String),
         }
 
-        #[derive(Debug, Clone,  Deserialize)]
+        #[derive(Debug, Clone, Deserialize)]
         pub enum Fulfillment {
             File { name: String, content: Bin },
             Complete,
@@ -567,7 +562,7 @@ pub mod direct {
             }
         }
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub struct CreateDef<Pnt, StateSrc> {
             pub template: TemplateDef<PointTemplateDef<Pnt>>,
             pub properties: SetProperties,
@@ -611,7 +606,7 @@ pub mod direct {
             }
         }
 
-        #[derive(Debug, Clone,   Eq, PartialEq, strum_macros::Display)]
+        #[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display)]
         pub enum Strategy {
             Commit,
             Ensure,
@@ -646,7 +641,7 @@ pub mod direct {
         pub type PointTemplateCtx = PointTemplateDef<PointCtx>;
         pub type PointTemplateVar = PointTemplateDef<PointVar>;
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub struct PointTemplateDef<Pnt> {
             pub parent: Pnt,
             pub child_segment_template: PointSegTemplate,
@@ -679,7 +674,7 @@ pub mod direct {
             }
         }
 
-        #[derive(Debug, Clone, strum_macros::Display,   Eq, PartialEq)]
+        #[derive(Debug, Clone, strum_macros::Display, Eq, PartialEq)]
         pub enum PointSegTemplate {
             Exact(String),
             Pattern(String), // must have a '%'
@@ -690,8 +685,6 @@ pub mod direct {
     pub mod select {
         use std::convert::{TryFrom, TryInto};
 
-
-
         use crate::err::{ParseErrs, SpaceErr};
         use crate::parse::Env;
         use crate::particle::Stub;
@@ -700,7 +693,7 @@ pub mod direct {
         use crate::substance::{MapPattern, Substance, SubstanceList};
         use crate::util::ToResolved;
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub enum SelectIntoSubstance {
             Stubs,
             Points,
@@ -739,7 +732,7 @@ pub mod direct {
             }
         }
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub struct SelectDef<Hop> {
             pub pattern: SelectorDef<Hop>,
             pub properties: PropertiesPattern,
@@ -747,7 +740,7 @@ pub mod direct {
             pub kind: SelectKind,
         }
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub enum SelectKind {
             Initial,
             SubSelect {
@@ -858,7 +851,6 @@ pub mod direct {
 
     pub mod delete {
 
-
         use crate::command::direct::select::{Select, SelectIntoSubstance};
         use crate::err::ParseErrs;
         use crate::parse::Env;
@@ -875,7 +867,7 @@ pub mod direct {
             }
         }
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub struct DeleteDef<Hop> {
             pub selector: SelectorDef<Hop>,
         }
@@ -892,8 +884,6 @@ pub mod direct {
     pub mod write {
         use std::convert::TryInto;
 
-
-
         use crate::err::ParseErrs;
         use crate::parse::Env;
         use crate::point::{Point, PointCtx, PointVar};
@@ -904,7 +894,7 @@ pub mod direct {
         pub type WriteCtx = WriteDef<PointCtx>;
         pub type WriteVar = WriteDef<PointVar>;
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub struct WriteDef<Pnt> {
             pub point: Pnt,
             pub payload: Substance,
@@ -931,7 +921,6 @@ pub mod direct {
 
     pub mod read {
 
-
         use crate::err::ParseErrs;
         use crate::parse::Env;
         use crate::point::{Point, PointCtx, PointVar};
@@ -942,7 +931,7 @@ pub mod direct {
         pub type ReadCtx = ReadDef<PointCtx>;
         pub type ReadVar = ReadDef<PointVar>;
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub struct ReadDef<Pnt> {
             pub point: Pnt,
             pub payload: Substance,
@@ -970,17 +959,15 @@ pub mod direct {
     pub mod query {
         use std::convert::TryInto;
 
-
-
         use crate::err::SpaceErr;
         use crate::selector::PointHierarchy;
 
-        #[derive(Debug, Clone,   Eq, PartialEq)]
+        #[derive(Debug, Clone, Eq, PartialEq)]
         pub enum Query {
             PointHierarchy,
         }
 
-        #[derive(Debug, Clone,  Deserialize)]
+        #[derive(Debug, Clone, Deserialize)]
         pub enum QueryResult {
             PointHierarchy(PointHierarchy),
         }
@@ -1005,7 +992,7 @@ pub mod direct {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq, Autobox)]
+#[derive(Debug, Clone, Eq, PartialEq, Autobox)]
 pub enum Command {
     Create(Create),
     Delete(Delete),
@@ -1096,13 +1083,13 @@ impl ToResolved<Command> for CommandCtx {
     }
 }
 
-#[derive(Debug, Clone,  Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct CommandTemplate {
     pub line: String,
     pub transfers: Vec<Trace>,
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RawCommand {
     pub line: String,
     pub transfers: Vec<CmdTransfer>,
@@ -1126,7 +1113,7 @@ impl ToString for RawCommand {
     }
 }
 
-#[derive(Debug, Clone,   Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CmdTransfer {
     pub id: String,
     pub content: Bin,

@@ -1,8 +1,8 @@
+use crate::config::Document;
+use crate::point::Point;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::ops::Deref;
-use crate::config::Document;
-use crate::point::Point;
 
 #[cfg(feature = "tokio")]
 pub mod asynch;
