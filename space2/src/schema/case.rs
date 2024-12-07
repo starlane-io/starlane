@@ -126,18 +126,17 @@ mod from_str{
     use alloc::string::ToString;
     use core::str::FromStr;
     use convert_case::{Case, Casing};
-    use crate::err::ErrStrata;
     use crate::schema::case::CamelCase;
+    use crate::schema::case::err::CaseErr;
 
     impl FromStr for CamelCase {
-        type Err = ErrStrata;
+        type Err = CaseErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
-            if s == s.to_case(Case::Camel) {
+            if  s.is_case(Case::UpperCamel) {
                 Ok(CamelCase(s.to_string()))
             } else {
-                todo!()
-//                Err(SpaceErr::Agent)
+                Err(CaseErr::exp_camel(s))
             }
         }
     }
@@ -150,7 +149,7 @@ mod from_str{
 
         #[test]
         pub fn check_camel_case() {
-            CamelCase::from_str("CorrectStyle").unwrap();
+            assert!(CamelCase::from_str("CorrectStyle").is_ok());
             assert!(CamelCase::from_str("_Bad").is_err());
             assert!(CamelCase::from_str("badLowercaseFirstCharacter").is_err());
             assert!(CamelCase::from_str("NoUnder_Scores").is_err());
@@ -293,13 +292,13 @@ pub mod err {
    #[strum_discriminants(derive(Hash,strum_macros::EnumString))]
    pub enum CaseErr {
         #[error("expecting: camel case value (CamelCase); found: `{0}`")]
-        NotCamelCase(String),
+        ExpectingUpperCamel(String),
    }
 
 
   impl CaseErr  {
-      pub fn not_camel(src: impl ToString) -> Self {
-          Self::NotCamelCase(src.to_string())
+      pub fn exp_camel(src: impl ToString) -> Self {
+          Self::ExpectingUpperCamel(src.to_string())
       }
   }
 }

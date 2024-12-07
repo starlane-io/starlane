@@ -5,18 +5,13 @@ use crate::schema::case::CamelCase;
 use crate::types::specific::Specific;
 
 mod class;
-mod schema;
 mod data;
 mod specific;
 mod config;
 mod authority;
+mod schema;
 
-
-
-
-
-
-    /// this is most
+/// this is most
     #[derive(Clone,Debug,Eq,PartialEq,Hash)]
     pub(crate) struct ExactDef<T> where T: Typical+Into<Cat>
     {
@@ -49,7 +44,7 @@ mod authority;
 
 pub mod meta {
     use crate::types::data::Data;
-    use crate::types::{Typical};
+    use crate::types::Typical;
     use crate::types::schema::Schema;
 
 
@@ -67,7 +62,7 @@ pub mod meta {
     }
 
 }
-pub(crate) trait Typical: Clone {
+pub(crate) trait Typical {
     fn category(&self) -> Cat;
 }
 
