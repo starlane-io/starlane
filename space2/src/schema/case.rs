@@ -282,8 +282,6 @@ mod parse {
 
 
 }
-
-
 pub mod err {
     use alloc::string::{String, ToString};
     use strum_macros::EnumDiscriminants;
@@ -304,5 +302,4 @@ pub mod err {
           Self::NotCamelCase(src.to_string())
       }
   }
-
 }

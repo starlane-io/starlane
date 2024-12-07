@@ -5,8 +5,7 @@ use crate::schema::case::CamelCase;
 use crate::types;
 use crate::types::{Cat, Typical};
 
-
-#[derive(Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display,strum_macros::IntoStaticStr)]
+#[derive(Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(Variant))]
 #[strum_discriminants(derive(Hash,strum_macros::EnumString,strum_macros::ToString,strum_macros::IntoStaticStr))]
@@ -58,11 +57,6 @@ pub enum Class {
     _Ext(CamelCase),
 }
 
-impl Into<Cat> for Class {
-    fn into(self) -> Cat {
-        Cat::Class
-    }
-}
 impl FromStr for Class {
     type Err = eyre::Error;
 
@@ -74,16 +68,11 @@ impl FromStr for Class {
         match Variant::from_str(s) {
             /// this Ok match is actually an Error!
             Ok(Variant::_Ext) => ext(s),
-            /// we can't convert a [Variant] into a [Class],
-            /// but we can convert it into a string and parse as [CamelCase] which should not
-            /// fail since this `src` has already been identified as a builtin
-            Ok(variant) => ext(variant.to_string().as_str()),
+            Ok(variant) => ext(variant.into()),
             Err(_) => ext(s)
         }
     }
 }
-
-
 
 
 impl types::Variant for Class {
@@ -92,7 +81,8 @@ impl types::Variant for Class {
 
 impl From<CamelCase> for Class {
     fn from(src: CamelCase) -> Self {
-        Self::_Ext(src)
+        /// it should not be possible for this to fail
+        Self::from_str(src.as_str()).unwrap()
     }
 }
 
@@ -106,12 +96,21 @@ impl Typical for Class {
 
 
 
-
 impl Into<CamelCase> for Class {
     fn into(self) -> CamelCase {
-        todo!()
+        CamelCase::from_str(self.to_string().as_str()).unwrap()
     }
 }
+
+
+impl Into<Cat> for Class {
+    fn into(self) -> Cat {
+        Cat::Class
+    }
+}
+
+
+
 
 
 

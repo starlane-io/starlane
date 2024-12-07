@@ -1,10 +1,11 @@
+use alloc::string::ToString;
 use core::str::FromStr;
 use strum_macros::EnumDiscriminants;
 use crate::schema::case::CamelCase;
 use crate::types;
 use crate::types::{Cat, Typical};
 
-#[derive(Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display,strum_macros::IntoStaticStr)]
+#[derive(Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(Variant))]
 #[strum_discriminants(derive(Hash,strum_macros::EnumString,strum_macros::ToString,strum_macros::IntoStaticStr))]
@@ -13,7 +14,6 @@ pub(super) enum Data {
     #[strum(to_string = "{0}")]
     _Ext(CamelCase)
 }
-
 
 
 impl FromStr for Data {
@@ -40,7 +40,8 @@ impl types::Variant for Data {
 
 impl From<CamelCase> for Data {
     fn from(src: CamelCase) -> Self {
-        Self::_Ext(src)
+        /// it should not be possible for this to fail
+        Self::from_str(src.as_str()).unwrap()
     }
 }
 
@@ -56,7 +57,7 @@ impl Typical for Data {
 
 impl Into<CamelCase> for Data {
     fn into(self) -> CamelCase {
-        todo!()
+        CamelCase::from_str(self.to_string().as_str()).unwrap()
     }
 }
 
