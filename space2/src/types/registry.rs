@@ -1,7 +1,7 @@
-use alloc::sync::Arc;
-use async_trait::async_trait;
 use crate::types::registry::err::RegErr;
 use crate::types::select::Selector;
+use alloc::sync::Arc;
+use async_trait::async_trait;
 
 pub type Registry = Arc<dyn TypeRegistry>;
 
@@ -34,9 +34,9 @@ impl RegistryWrapper {
 
 
 pub mod err {
+    use crate::point::Point;
     use alloc::string::{String, ToString};
     use thiserror::Error;
-    use crate::point::Point;
 
     #[derive(Error, Debug)]
     pub enum RegErr {

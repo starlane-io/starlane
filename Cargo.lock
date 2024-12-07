@@ -4789,6 +4789,7 @@ dependencies = [
  "eyre",
  "miette",
  "num",
+ "once_cell",
  "semver",
  "serde",
  "serde_derive",
@@ -4796,6 +4797,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "thiserror 1.0.65",
+ "tokio",
 ]
 
 [[package]]

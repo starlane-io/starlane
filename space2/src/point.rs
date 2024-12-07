@@ -14,11 +14,11 @@ use crate::{ANONYMOUS, HYPERUSER};
 use core::str::FromStr;
 use md5::{Digest, Md5};
 use nom::combinator::all_consuming;
-use serde::{Deserialize, Serialize};
+
 use std::path::PathBuf;
 use thiserror::__private::AsDisplay;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
 pub enum RouteSeg {
     This,
     Local,
@@ -45,7 +45,7 @@ impl RouteSegQuery for RouteSeg {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
 pub enum RouteSegVar {
     This,
     Local,
@@ -167,7 +167,7 @@ impl ToString for RouteSeg {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
+#[derive(Debug, Clone,   Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum PointSegKind {
     Root,
     Space,
@@ -341,7 +341,7 @@ impl PointSegQuery for PointSegVar {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
 pub enum PointSegCtx {
     Root,
     Space(String),
@@ -354,7 +354,7 @@ pub enum PointSegCtx {
     Pop(Trace),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
 pub enum PointSegVar {
     Root,
     Space(String),
@@ -497,7 +497,7 @@ impl PointSegCtx {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
 pub enum PointSeg {
     Root,
     Space(String),
@@ -569,7 +569,7 @@ impl ToString for PointSeg {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone,  Deserialize)]
 pub enum PointSegDelim {
     Empty,
     Mesh,
@@ -586,7 +586,7 @@ impl ToString for PointSegDelim {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone,  Deserialize)]
 pub struct PointSegPairDef<Seg> {
     pub delim: PointSegDelim,
     pub seg: Seg,
@@ -927,7 +927,7 @@ impl TryFrom<&str> for Point {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone,   Eq, PartialEq, Hash)]
 pub struct PointDef<Route, Seg> {
     pub route: Route,
     pub segments: Vec<Seg>,

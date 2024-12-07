@@ -65,6 +65,9 @@ clippy::must_use_candidate,
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+use crate::point::Point;
+use core::str::FromStr;
+use once_cell::unsync::Lazy;
 
 /// A facade around all the types we need from the `std`, `core`, and `alloc`
 /// crates. This avoids elaborate import wrangling having to happen in every
@@ -207,3 +210,52 @@ mod matching;
 
 
 
+
+pub mod artifact;
+pub mod asynch;
+pub mod command;
+pub mod config;
+pub mod fail;
+pub mod frame;
+pub mod hyper;
+pub mod kind;
+#[cfg(feature="parse")]
+pub mod parse;
+
+pub mod particle;
+pub mod wave;
+
+#[cfg(feature = "kind2")]
+pub mod kind2;
+
+pub mod loc;
+pub mod log;
+pub mod path;
+pub mod security;
+pub mod selector;
+pub mod settings;
+pub mod substance;
+pub mod util;
+pub mod wasm;
+
+pub mod prelude;
+pub mod progress;
+
+
+pub static VERSION: Lazy<semver::Version> =
+    Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
+
+pub static HYPERUSER: Lazy<Point> =
+    Lazy::new(|| Point::from_str("hyperspace:users:hyperuser").expect("point"));
+pub static ANONYMOUS: Lazy<Point> =
+    Lazy::new(|| Point::from_str("hyperspace:users:anonymous").expect("point"));
+
+#[cfg(test)]
+pub mod test {
+    use crate::VERSION;
+
+    #[test]
+    pub fn test_version() {
+        println!("{}", VERSION.to_string());
+    }
+}

@@ -1,8 +1,8 @@
-use alloc::string::{String, ToString};
-use core::str::FromStr;
 use crate::err::ErrStrata;
 use crate::schema::case::err::CaseErr;
 use crate::schema::case::Version;
+use alloc::string::{String, ToString};
+use core::str::FromStr;
 
 
 impl ToString for Version {
@@ -32,13 +32,13 @@ impl FromStr for Version {
 
 #[cfg(feature="serde")]
 mod serde {
+    use crate::schema::case::Version;
     use alloc::string::ToString;
     use core::fmt;
     use core::fmt::Formatter;
     use core::str::FromStr;
-    use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
     use serde::de::Visitor;
-    use crate::schema::case::Version;
+
 
     impl Serialize for Version {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

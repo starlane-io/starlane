@@ -1,9 +1,9 @@
+use crate::schema::case::CamelCase;
+use crate::types::private;
+use crate::types::Cat;
 use alloc::string::ToString;
 use core::str::FromStr;
 use strum_macros::EnumDiscriminants;
-use crate::schema::case::CamelCase;
-use crate::types::Cat;
-use crate::types::private;
 
 #[derive(Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display)]
 #[strum_discriminants(vis(pub))]

@@ -23,7 +23,9 @@ pub enum ErrStrata {
 
 
 
+pub struct SpaceErr {
 
+}
 
 
 
@@ -39,9 +41,9 @@ impl Display for ErrStrata {
 
 #[cfg(feature="serde")]
 mod serde {
+    use crate::schema::case::Version;
+    use serde::de::Visitor;
+
     use std::fmt::Formatter;
     use std::str::FromStr;
-    use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-    use serde::de::Visitor;
-    use crate::schema::case::Version;
 }

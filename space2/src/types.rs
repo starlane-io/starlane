@@ -1,8 +1,8 @@
+use crate::data;
 use alloc::string::{String, ToString};
+use specific::Specific;
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
-use crate::data;
-use specific::Specific;
 
 mod config;
 pub mod select;
@@ -62,8 +62,8 @@ pub mod meta {
 }
 
 pub(crate) mod private {
-    use alloc::string::ToString;
     use crate::schema::case::CamelCase;
+    use alloc::string::ToString;
 
     pub(crate) trait Typical {
         fn category(&self) -> super::Cat;

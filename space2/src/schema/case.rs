@@ -1,7 +1,7 @@
+use crate::lib::fmt::Formatter;
 use alloc::string::String;
 use core::fmt;
 use core::ops::Deref;
-use crate::lib::fmt::{Formatter};
 
 #[derive(
     Debug,
@@ -123,11 +123,11 @@ impl Deref for Version {
 
 #[cfg(not(feature="parse"))]
 mod from_str{
-    use alloc::string::ToString;
-    use core::str::FromStr;
-    use convert_case::{Case, Casing};
-    use crate::schema::case::CamelCase;
     use crate::schema::case::err::CaseErr;
+    use crate::schema::case::CamelCase;
+    use alloc::string::ToString;
+    use convert_case::{Case, Casing};
+    use core::str::FromStr;
 
     impl FromStr for CamelCase {
         type Err = CaseErr;
@@ -144,8 +144,8 @@ mod from_str{
 
     #[cfg(test)]
     mod test {
-        use core::str::FromStr;
         use crate::schema::case::CamelCase;
+        use core::str::FromStr;
 
         #[test]
         pub fn check_camel_case() {
@@ -217,8 +217,8 @@ mod serde {
 
 #[cfg(feature="parse")]
 mod parse {
-    use core::str::FromStr;
     use crate::schema::case::{CamelCase, DomainCase, SkewerCase, VarCase};
+    use core::str::FromStr;
     impl FromStr for SkewerCase {
         type Err = ParseErrs;
 
@@ -286,7 +286,7 @@ pub mod err {
     use strum_macros::EnumDiscriminants;
     use thiserror::Error;
 
-   #[derive(Error,Debug,EnumDiscriminants,strum_macros::IntoStaticStr)]
+    #[derive(Error,Debug,EnumDiscriminants,strum_macros::IntoStaticStr)]
    #[strum_discriminants(vis(pub))]
    #[strum_discriminants(name(ErrKind))]
    #[strum_discriminants(derive(Hash,strum_macros::EnumString))]

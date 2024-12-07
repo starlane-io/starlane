@@ -1,5 +1,5 @@
-use alloc::boxed::Box;
 use crate::schema::case::{DomainCase, SkewerCase, Version};
+use alloc::boxed::Box;
 
 /// [SpecificDef] defines the structure of a [Specific].
 /// it is defined with generics in order to promote reuse for implementations such as the
