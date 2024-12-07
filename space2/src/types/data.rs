@@ -2,8 +2,7 @@ use alloc::string::ToString;
 use core::str::FromStr;
 use strum_macros::EnumDiscriminants;
 use crate::schema::case::CamelCase;
-use crate::types;
-use crate::types::{Cat, Typical};
+use crate::types::{private, Cat};
 
 #[derive(Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
@@ -14,7 +13,6 @@ pub(super) enum Data {
     #[strum(to_string = "{0}")]
     _Ext(CamelCase)
 }
-
 
 impl FromStr for Data {
     type Err = eyre::Error;
@@ -33,10 +31,7 @@ impl FromStr for Data {
     }
 }
 
-
-impl types::Variant for Data {
-
-}
+impl private::Variant for Data { }
 
 impl From<CamelCase> for Data {
     fn from(src: CamelCase) -> Self {
@@ -47,7 +42,7 @@ impl From<CamelCase> for Data {
 
 
 
-impl Typical for Data {
+impl private::Typical for Data {
     fn category(&self) -> Cat {
         Cat::Data
     }

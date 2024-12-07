@@ -286,13 +286,15 @@ pub mod err {
     use strum_macros::EnumDiscriminants;
     use thiserror::Error;
 
-    #[derive(Error,Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::IntoStaticStr)]
+   #[derive(Error,Debug,EnumDiscriminants,strum_macros::IntoStaticStr)]
    #[strum_discriminants(vis(pub))]
    #[strum_discriminants(name(ErrKind))]
    #[strum_discriminants(derive(Hash,strum_macros::EnumString))]
    pub enum CaseErr {
         #[error("expecting: camel case value (CamelCase); found: `{0}`")]
         ExpectingUpperCamel(String),
+        #[error(transparent)]
+        VersionErr(#[from] semver::Error)
    }
 
 

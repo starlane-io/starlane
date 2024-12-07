@@ -1,7 +1,6 @@
 use alloc::string::{String, ToString};
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
-use crate::schema::case::CamelCase;
 use crate::types::specific::Specific;
 
 mod class;
@@ -11,15 +10,12 @@ mod config;
 mod authority;
 mod schema;
 
-/// this is most
     #[derive(Clone,Debug,Eq,PartialEq,Hash)]
-    pub(crate) struct ExactDef<T> where T: Typical+Into<Cat>
+    pub(crate) struct ExactDef<T> where T: private::Typical+Into<Cat>
     {
         specific: Specific,
         variant: T
     }
-
-
 
     #[derive(Clone,Debug,Error)]
     pub enum TypeErr {
@@ -44,7 +40,7 @@ mod schema;
 
 pub mod meta {
     use crate::types::data::Data;
-    use crate::types::Typical;
+    use crate::types::private::Typical;
     use crate::types::schema::Schema;
 
 
@@ -62,16 +58,20 @@ pub mod meta {
     }
 
 }
-pub(crate) trait Typical {
-    fn category(&self) -> Cat;
+
+pub(crate) mod private {
+    use alloc::string::ToString;
+    use crate::schema::case::CamelCase;
+
+    pub(crate) trait Typical {
+        fn category(&self) -> super::Cat;
+    }
+    /// a `Variant` is a unique `Type` in a within a `Category`
+    /// `Data` & `Class` categories and their enum variants ... i.e. [Data::Raw],[Class::_Ext]
+    /// are the actual `Type` `Variants`
+    /// Variants are always CamelCase
+    pub(crate) trait Variant: Typical+Clone+ToString+From<CamelCase>+Into<CamelCase> {}
 }
-
-/// a `Variant` is a unique `Type` in a within a `Category`
-/// `Data` & `Class` categories and their enum variants ... i.e. [Data::Raw],[Class::_Ext]
-/// are the actual `Type` `Variants`
-/// Variants are always CamelCase
-pub(crate) trait Variant: Typical+Clone+ToString+From<CamelCase>+Into<CamelCase> {}
-
 
 
 #[derive(Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants)]
@@ -83,11 +83,6 @@ pub enum Exact {
     Class(ExactDef<class::Class>),
 }
 
-impl Typical for Exact {
-    fn category(&self) -> Cat {
-        self.into()
-    }
-}
 
 
 /*
