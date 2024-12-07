@@ -74,7 +74,6 @@ impl FromStr for Class {
     }
 }
 
-
 impl private::Variant for Class {
 
 }

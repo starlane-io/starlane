@@ -8,7 +8,7 @@ use crate::types::{private, Cat};
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(Variant))]
 #[strum_discriminants(derive(Hash,strum_macros::EnumString,strum_macros::ToString,strum_macros::IntoStaticStr))]
-pub(super) enum Data {
+pub(crate) enum Data {
     Raw,
     #[strum(to_string = "{0}")]
     _Ext(CamelCase)

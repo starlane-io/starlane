@@ -1,16 +1,18 @@
 use alloc::string::{String, ToString};
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
-use crate::types::specific::Specific;
+use crate::data;
+use specific::Specific;
 
-mod class;
-mod data;
-mod specific;
 mod config;
-mod authority;
-mod schema;
+pub mod select;
 
-    #[derive(Clone,Debug,Eq,PartialEq,Hash)]
+mod schema;
+pub mod specific;
+mod class;
+pub mod registry;
+
+#[derive(Clone,Debug,Eq,PartialEq,Hash)]
     pub(crate) struct ExactDef<T> where T: private::Typical+Into<Cat>
     {
         specific: Specific,
@@ -39,7 +41,7 @@ mod schema;
 
 
 pub mod meta {
-    use crate::types::data::Data;
+    use crate::data::Data;
     use crate::types::private::Typical;
     use crate::types::schema::Schema;
 

@@ -24,6 +24,7 @@ pub enum ErrStrata {
 
 
 
+
 impl Display for ErrStrata {
     fn fmt(&self, _: &mut Formatter<'_>) -> core::fmt::Result {
         todo!()

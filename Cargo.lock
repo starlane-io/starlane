@@ -4782,6 +4782,7 @@ dependencies = [
 name = "space2"
 version = "0.3.21"
 dependencies = [
+ "async-trait",
  "convert_case",
  "derive-name",
  "derive_builder 0.20.2",
