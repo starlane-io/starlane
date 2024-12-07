@@ -1,3 +1,4 @@
+use crate::log;
 use crate::loc::{Surface, ToPoint, ToSurface};
 use crate::log::{Logger, Trackable, Tracker};
 use crate::particle::traversal::Traversal;

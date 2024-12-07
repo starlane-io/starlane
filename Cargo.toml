@@ -15,7 +15,7 @@ description="The Workspace package for Starlane.  What to see: './space' contain
 [workspace]
 default-run = "starlane"
 resolver = "2"
-members = ["main", "space", "hyperspace", "base","macros", "space2"]
+members = ["main", "space", "hyperspace", "base","macros"]
 
 
 #members = [
@@ -27,7 +27,7 @@ exclude = [ ]
 [workspace.dependencies]
 
 starlane-space = { package="starlane-space", path="./space"}
-space2 = { path="./space2"}
+#$space2 = { path="./space2"}
 starlane-base = { package="starlane-base", path="./base"}
 starlane-hyperspace = { package="starlane-hyperspace", path="./hyperspace"}
 starlane-macros = { package="starlane-macros", path= "macros", version = "0.3.20" }

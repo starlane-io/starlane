@@ -1,17 +1,16 @@
-use alloc::string::{String, ToString};
+#![cfg(feature="types2")]
+
+use specific::Specific;
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
-use crate::kind::Specific;
 
-//pub mod select;
+pub mod select;
 
-mod class;
+pub mod class;
+
 pub mod registry;
-
+mod schema;
 pub mod specific;
-
-
-
 pub mod data;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -41,11 +40,30 @@ pub enum DefSrc {
     Ext,
 }
 
+pub mod meta {
+    use crate::types::data::Data;
+    use crate::types::private::Typical;
+    use crate::types::schema::Schema;
 
+    /// information about the type
+    #[derive(Clone, Debug)]
+    pub struct Meta<T>
+    where
+        T: Typical,
+    {
+        exact: T,
+        defs: Defs,
+    }
+
+    #[derive(Clone, Debug)]
+    struct Defs {
+        data: Data,
+        schema: Schema,
+    }
+}
 
 pub(crate) mod private {
-    use crate::schema::case::CamelCase;
-    use alloc::string::ToString;
+    use crate::parse::CamelCase;
 
     pub(crate) trait Typical {
         fn category(&self) -> super::Cat;
@@ -54,10 +72,7 @@ pub(crate) mod private {
     /// `Data` & `Class` categories and their enum variants ... i.e. [Data::Raw],[Class::_Ext]
     /// are the actual `Type` `Variants`
     /// Variants are always CamelCase
-    pub(crate) trait Variant:
-        Typical + Clone + ToString + From<CamelCase> + Into<CamelCase>
-    {
-    }
+    pub(crate) trait Variant: Typical + Clone + ToString + From<CamelCase> + Into<CamelCase> { }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants)]

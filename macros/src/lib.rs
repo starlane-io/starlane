@@ -15,7 +15,7 @@ use syn::parse_quote::ParseQuote;
 use syn::spanned::Spanned;
 use syn::{parse_macro_input, Attribute, Data, DeriveInput, Expr, ExprTuple, File, FnArg, GenericArgument, ImplItem, ItemImpl, LitStr, PathArguments, PathSegment, ReturnType, Type, Visibility};
 
-/// This macro will auto implement the `#crt::space::wave::exchange::asynch::DirectedHandler` trait.
+/// This macro will auto implement the `#crt::wave::exchange::asynch::DirectedHandler` trait.
 /// In order to finalize the core a `#[handler]` attribute must also be specified
 /// above one of the impls.
 #[proc_macro_derive(DirectedHandler)]
@@ -28,13 +28,13 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 /// To implement:
 /// ```
 ///
-/// use #crt::space::err::SpaceErr;
-/// use #crt::space::hyper::HyperSubstance;
-/// use #crt::space::log::PointLogger;
-/// use #crt::space::substance::Substance;
-/// use #crt::space::substance::Substance::Text;
-/// use #crt::space::wave::core::ReflectedCore;
-/// use #crt::space::exchange::asynch::InCtx;
+/// use #crt::err::SpaceErr;
+/// use #crt::hyper::HyperSubstance;
+/// use #crt::log::PointLogger;
+/// use #crt::substance::Substance;
+/// use #crt::substance::Substance::Text;
+/// use #crt::wave::core::ReflectedCore;
+/// use #crt::exchange::asynch::InCtx;
 ///
 /// #[derive(DirectedHandler)]
 /// pub struct MyHandler {
@@ -90,7 +90,7 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
                 let route_selector = attr.to_token_stream().to_string();
                 static_selector_keys.push(selector_ident.clone());
                 let static_selector = quote! {
-                    static ref #selector_ident : #crt::space::config::bind::RouteSelector = #crt::space::parse::route_attribute(#route_selector).unwrap();
+                    static ref #selector_ident : #crt::config::bind::RouteSelector = #crt::parse::route_attribute(#route_selector).unwrap();
                 };
                 static_selectors.push(static_selector);
             //println!(" ~~ ROUTE {}", attr.tokens.to_string() );
@@ -128,18 +128,18 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
     };
 
     let selector = match _async {
-        true => quote! {#crt::space::wave::exchange::asynch::DirectedHandlerSelector},
-        false => quote! {#crt::space::wave::exchange::synch::DirectedHandlerSelector},
+        true => quote! {#crt::wave::exchange::asynch::DirectedHandlerSelector},
+        false => quote! {#crt::wave::exchange::synch::DirectedHandlerSelector},
     };
 
     let handler = match _async {
-        true => quote! {#crt::space::wave::exchange::asynch::DirectedHandler},
-        false => quote! {#crt::space::wave::exchange::synch::DirectedHandler},
+        true => quote! {#crt::wave::exchange::asynch::DirectedHandler},
+        false => quote! {#crt::wave::exchange::synch::DirectedHandler},
     };
 
     let root_ctx = match _async {
-        true => quote! {#crt::space::wave::exchange::asynch::RootInCtx},
-        false => quote! {#crt::space::wave::exchange::synch::RootInCtx},
+        true => quote! {#crt::wave::exchange::asynch::RootInCtx},
+        false => quote! {#crt::wave::exchange::synch::RootInCtx},
     };
 
     let _await = match _async {
@@ -159,8 +159,8 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
 
     let rtn = quote! {
         impl #generics #selector for #self_ty #where_clause{
-              fn select<'a>( &self, select: &'a #crt::space::wave::RecipientSelector<'a>, ) -> Result<&dyn #handler, ()> {
-                if select.wave.core().method == #crt::space::wave::core::Method::Cmd(#crt::space::wave::core::cmd::CmdMethod::Bounce) {
+              fn select<'a>( &self, select: &'a #crt::wave::RecipientSelector<'a>, ) -> Result<&dyn #handler, ()> {
+                if select.wave.core().method == #crt::wave::core::Method::Cmd(#crt::wave::core::cmd::CmdMethod::Bounce) {
                     return Ok(self);
                 }
                 #(
@@ -174,13 +174,13 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
 
         #_async_trait
         impl #generics #handler for #self_ty #where_clause{
-            #_async fn handle( &self, ctx: #root_ctx) -> #crt::space::wave::core::CoreBounce {
+            #_async fn handle( &self, ctx: #root_ctx) -> #crt::wave::core::CoreBounce {
                 #(
                     if #static_selector_keys.is_match(&ctx.wave).is_ok() {
                        return self.#idents( ctx )#_await;
                     }
                 )*
-                if ctx.wave.core().method == #crt::space::wave::core::Method::Cmd(#crt::space::wave::core::cmd::CmdMethod::Bounce) {
+                if ctx.wave.core().method == #crt::wave::core::Method::Cmd(#crt::wave::core::cmd::CmdMethod::Bounce) {
                     return self.bounce(ctx)#_await;
                 }
                 ctx.not_found().into()
@@ -256,13 +256,13 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     let root_ctx = match input.sig.asyncness {
-        None => quote! {#crt::space::space::wave::exchange::synch::RootInCtx},
-        Some(_) => quote! {#crt::space::wave::exchange::asynch::RootInCtx},
+        None => quote! {#crt::wave::exchange::synch::RootInCtx},
+        Some(_) => quote! {#crt::wave::exchange::asynch::RootInCtx},
     };
 
     let in_ctx = match input.sig.asyncness {
-        None => quote! {#crt::space::wave::exchange::synch::InCtx},
-        Some(_) => quote! {#crt::space::wave::exchange::asynch::InCtx},
+        None => quote! {#crt::wave::exchange::synch::InCtx},
+        Some(_) => quote! {#crt::wave::exchange::asynch::InCtx},
     };
 
     let __async = match input.sig.asyncness {
@@ -276,15 +276,15 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
     let item = ctx.item;
 
     let expanded = quote! {
-      #__async fn #ident( &self, mut ctx: #root_ctx ) -> #crt::space::wave::core::CoreBounce {
+      #__async fn #ident( &self, mut ctx: #root_ctx ) -> #crt::wave::core::CoreBounce {
           let ctx: #in_ctx<'_,#item> = match ctx.push::<#item>() {
               Ok(ctx) => ctx,
               Err(err) => {
                     if ctx.wave.is_signal() {
-                      return #crt::space::wave::core::CoreBounce::Absorbed;
+                      return #crt::wave::core::CoreBounce::Absorbed;
                     }
                     else {
-                      return #crt::space::wave::core::CoreBounce::Reflected(err.into());
+                      return #crt::wave::core::CoreBounce::Reflected(err.into());
                     }
               }
           };
@@ -353,7 +353,7 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
     let crt = crt_name();
     match output {
         ReturnType::Default => {
-            quote! {#crt::space::wave::Bounce::Absorbed}
+            quote! {#crt::wave::Bounce::Absorbed}
         }
         ReturnType::Type(_, path) => {
             if let Type::Path(path) = &**path {
@@ -364,18 +364,18 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
                             let arg = brackets.args.first().unwrap();
                             if "Substance" == arg.to_token_stream().to_string().as_str() {
                                 quote! {
-                                 use #crt::space::err::CoreReflector;
+                                 use #crt::err::CoreReflector;
                                  match result {
-                                     Ok(rtn) => #crt::space::wave::core::CoreBounce::Reflected(starlane::wave::core::ReflectedCore::ok_body(rtn)),
-                                     Err(err) => #crt::space::wave::core::CoreBounce::Reflected(err.as_reflected_core())
+                                     Ok(rtn) => #crt::wave::core::CoreBounce::Reflected(starlane::wave::core::ReflectedCore::ok_body(rtn)),
+                                     Err(err) => #crt::wave::core::CoreBounce::Reflected(err.as_reflected_core())
                                  }
                                 }
                             } else {
                                 quote! {
-                                 use #crt::space::err::CoreReflector;
+                                 use #crt::err::CoreReflector;
                                  match result {
-                                     Ok(rtn) => #crt::space::wave::core::CoreBounce::Reflected(rtn.into()),
-                                     Err(err) => #crt::space::wave::core::CoreBounce::Reflected(err.as_reflected_core())
+                                     Ok(rtn) => #crt::wave::core::CoreBounce::Reflected(rtn.into()),
+                                     Err(err) => #crt::wave::core::CoreBounce::Reflected(err.as_reflected_core())
                                  }
                                 }
                             }
@@ -385,7 +385,7 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
                     }
                     "Bounce" => {
                         quote! {
-                            let rtn : #crt::space::wave::core::CoreBounce = result.to_core_bounce();
+                            let rtn : #crt::wave::core::CoreBounce = result.to_core_bounce();
                             rtn
                         }
                     }
@@ -396,7 +396,7 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
                     }
                     "ReflectedCore" => {
                         quote! {
-                           #crt::space::wave::core::CoreBounce::Reflected(result)
+                           #crt::wave::core::CoreBounce::Reflected(result)
                         }
                     }
                     what => {
@@ -430,9 +430,9 @@ pub fn to_space_err(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
     let ident = &input.ident;
     let rtn = quote! {
-       impl #crt::space::err::ToSpaceErr for #ident {
-            fn to_space_err(&self) -> #crt::space::err::SpaceErr {
-                #crt::space::err::SpaceErr::to_space_err(&self.to_string())
+       impl #crt::err::ToSpaceErr for #ident {
+            fn to_space_err(&self) -> #crt::err::SpaceErr {
+                #crt::err::SpaceErr::to_space_err(&self.to_string())
             }
         }
     };
@@ -440,6 +440,8 @@ pub fn to_space_err(item: TokenStream) -> TokenStream {
 }
 
 fn crt_name() -> TokenStream2 {
+    quote!(starlane_space)
+    /*
     let found_crate = crate_name("starlane_space").expect("my-crate is present in `Cargo.toml`");
 
     let crt = match found_crate {
@@ -449,6 +451,8 @@ fn crt_name() -> TokenStream2 {
         }
     };
     crt
+
+     */
 }
 
 #[cfg(test)]
@@ -862,7 +866,7 @@ pub fn push_loc(tokens: TokenStream) -> TokenStream {
 
     let rtn = quote! {
         {
-    let mut builder = #crt::space::log::LogMarkBuilder::default();
+    let mut builder = #crt::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -880,7 +884,7 @@ pub fn log_span(tokens: TokenStream) -> TokenStream {
     let input = parse_macro_input!(tokens as Expr);
     let rtn = quote! {
         {
-    let mut builder = #crt::space::log::LogMarkBuilder::default();
+    let mut builder = #crt::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -895,7 +899,7 @@ pub fn log_span(tokens: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn logger(item: TokenStream) -> TokenStream {
     let crt = crt_name();
-    let log_pack = quote!(#crt::space::log);
+    let log_pack = quote!(#crt::log);
 
     let loc = if !item.is_empty() {
         let expr = parse_macro_input!(item as Expr);
@@ -925,7 +929,7 @@ pub fn push_mark(_item: TokenStream) -> TokenStream {
     let logger = parse_macro_input!(_item as Expr);
     let rtn = quote! {
         {
-    let mut builder = #crt::space::log::LogMarkBuilder::default();
+    let mut builder = #crt::log::LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
@@ -944,7 +948,7 @@ pub fn create_mark(_item: TokenStream) -> TokenStream {
     let rtn = quote! {
             {
     println!("CARGO_PKG_NAME: {}", env!("CARGO_PKG_NAME"));
-        let mut builder = #crt::space::log::LogMarkBuilder::default();
+        let mut builder = #crt::log::LogMarkBuilder::default();
         builder.package(env!("CARGO_PKG_NAME").to_string());
         builder.file(file!().to_string());
         builder.line(line!().to_string());
@@ -967,9 +971,9 @@ pub fn warn(_item: TokenStream) -> TokenStream {
     {
         use starlane_primitive_macros::mark;
         use starlane_primitive_macros::create_mark;
-        use #crt::space::log::Log;
-        use #crt::space::log::LOGGER;
-        use #crt::space::log::root_logger;
+        use #crt::log::Log;
+        use #crt::log::LOGGER;
+        use #crt::log::root_logger;
 
         // need to push_mark somewhere around here...
         LOGGER.try_with(|logger| {

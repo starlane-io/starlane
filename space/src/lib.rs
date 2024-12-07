@@ -1,6 +1,14 @@
+#![allow(warnings)]
+
 use std::str::FromStr;
 use once_cell::sync::Lazy;
 use crate::point::Point;
+
+
+// so macros will work
+extern crate self as starlane_space;
+
+
 #[allow(missing_docs, unused_imports,warnings)]
 pub(crate) mod lib {
     mod core {
@@ -152,6 +160,8 @@ pub mod wasm;
 
 pub mod prelude;
 pub mod progress;
+
+pub mod types;
 
 #[cfg(test)]
 pub mod test;

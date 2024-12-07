@@ -199,7 +199,6 @@ pub mod schema;
 
 pub mod err;
 
-mod data;
 mod matching;
 pub mod point;
 pub mod test;
