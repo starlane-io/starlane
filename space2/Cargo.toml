@@ -27,12 +27,15 @@ rustdoc-args = ["--generate-link-to-definition"]
 [dependencies]
 derive-name = { workspace = true }
 derive_builder = { workspace = true }
+convert_case = { workspace = true }
 semver = { workspace = true }
 eyre = { workspace = true }
 thiserror= { workspace = true }
 miette = { workspace = true }
 strum = { workspace = true }
 strum_macros= { workspace = true }
+#heck = { workspace = true }
+
 
 ## serde
 serde_with_macros = { workspace = true, optional = true }

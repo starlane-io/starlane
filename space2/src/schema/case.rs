@@ -1,6 +1,7 @@
 use alloc::string::String;
 use core::fmt;
 use core::ops::Deref;
+use strum_macros::EnumDiscriminants;
 use crate::lib::fmt::{Display, Formatter};
 
 #[derive(
@@ -11,19 +12,17 @@ use crate::lib::fmt::{Display, Formatter};
     Hash,
     derive_name::Name
 )]
-pub struct CamelCase {
-    string: String,
-}
+pub struct CamelCase(String);
 
 impl CamelCase {
     pub fn as_str(&self) -> &str {
-        self.string.as_str()
+        self.0.as_str()
     }
 }
 
 impl Display for CamelCase {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.string.as_str())
+        f.write_str(self.as_str())
     }
 }
 
@@ -31,11 +30,12 @@ impl Deref for CamelCase {
     type Target = String;
 
     fn deref(&self) -> &Self::Target {
-        &self.string
+        &self.0
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
+
 pub struct DomainCase {
     string: String,
 }
@@ -118,6 +118,49 @@ impl Deref for Version {
     fn deref(&self) -> &Self::Target {
         &self.version
     }
+}
+
+
+
+#[cfg(not(feature="parse"))]
+mod from_str{
+    use alloc::string::ToString;
+    use core::str::FromStr;
+    use convert_case::{Case, Casing};
+    use crate::err::ErrStrata;
+    use crate::schema::case::CamelCase;
+
+    impl FromStr for CamelCase {
+        type Err = ErrStrata;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            if s == s.to_case(Case::Camel) {
+                Ok(CamelCase(s.to_string()))
+            } else {
+                todo!()
+//                Err(SpaceErr::Agent)
+            }
+        }
+    }
+
+
+    #[cfg(test)]
+    mod test {
+        use core::str::FromStr;
+        use crate::schema::case::CamelCase;
+
+        #[test]
+        pub fn check_camel_case() {
+            CamelCase::from_str("CorrectStyle").unwrap();
+            assert!(CamelCase::from_str("_Bad").is_err());
+            assert!(CamelCase::from_str("badLowercaseFirstCharacter").is_err());
+            assert!(CamelCase::from_str("NoUnder_Scores").is_err());
+            assert!(CamelCase::from_str("Forget It").is_err());
+        }
+
+    }
+
+
 }
 
 
@@ -237,6 +280,24 @@ mod parse {
             })
         }
     }
+
+
+}
+
+
+pub mod err {
+    use strum_macros::EnumDiscriminants;
+    use thiserror::Error;
+    use crate::schema::case::CamelCase;
+
+    #[derive(Error,Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display,strum_macros::IntoStaticStr)]
+   #[strum_discriminants(vis(pub))]
+   #[strum_discriminants(name(ErrKind))]
+   #[strum_discriminants(derive(Hash,strum_macros::EnumString))]
+   pub enum CaseErr {
+        #[strum_discriminants("expecting: camel case value (CamelCase); found: `{0}`")]
+        NotCamelCase(#[from] CamelCase),
+   }
 
 
 }

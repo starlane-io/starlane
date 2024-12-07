@@ -1,4 +1,5 @@
 use crate::schema::case::CamelCase;
+use crate::types::{Cat, Typical};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Class {
@@ -45,24 +46,25 @@ pub enum Class {
     FileStore,
     Directory,
     File,
-
     _Ext(CamelCase),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-enum HyperClass {
-    Driver,
+impl Typical for Class {
+    fn category(&self) -> Cat {
+        Cat::Class
+    }
 }
+
 
 #[cfg(feature = "parse")]
 mod parse {
-    use crate::err::SpaceErr;
+    use crate::err::ErrStrata;
     use crate::schema::case::CamelCase;
     use crate::types::class::Class;
     use core::str::FromStr;
 
     impl FromStr for Class {
-        type Err = SpaceErr;
+        type Err = ErrStrata;
 
         fn from_str(src: &str) -> Result<Self, Self::Err> {
             Ok(Self(CamelCase::from_str(src)?))

@@ -74,6 +74,8 @@ text_io = "0.1.12"
 clap = "4.5.17"
 walkdir = "2.3.2"
 
+heck = "0.5.0"
+
 
 # space
 ariadne = "0.1.5"
