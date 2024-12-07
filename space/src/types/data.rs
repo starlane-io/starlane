@@ -1,8 +1,8 @@
-use crate::schema::case::CamelCase;
 use crate::types::{private, Cat};
-use alloc::string::ToString;
 use core::str::FromStr;
 use strum_macros::EnumDiscriminants;
+use crate::parse::CamelCase;
+use crate::types::private::KindDef;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
@@ -13,7 +13,7 @@ use strum_macros::EnumDiscriminants;
     strum_macros::ToString,
     strum_macros::IntoStaticStr
 ))]
-pub(crate) enum Data {
+pub enum Data {
     Raw,
     #[strum(to_string = "{0}")]
     _Ext(CamelCase),
@@ -62,6 +62,8 @@ impl Into<Cat> for Data {
         Cat::Data
     }
 }
+
+pub type DataKind = KindDef<Data>;
 
 /*
 #[cfg(feature="parse")]

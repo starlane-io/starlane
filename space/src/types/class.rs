@@ -1,14 +1,15 @@
-use crate::schema::case::CamelCase;
 use crate::types::private;
 use crate::types::Cat;
-use alloc::string::ToString;
 use core::str::FromStr;
+use serde::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
+use crate::parse::CamelCase;
+use crate::types::private::KindDef;
 
-#[derive(Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display)]
+#[derive(Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display,Serialize,Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(Variant))]
-#[strum_discriminants(derive(Hash,strum_macros::EnumString,strum_macros::ToString,strum_macros::IntoStaticStr))]
+#[strum_discriminants(derive(Hash,strum_macros::EnumString,strum_macros::ToString,strum_macros::IntoStaticStr,Serialize,Deserialize))]
 pub enum Class {
     Root,
     Platform,
@@ -25,7 +26,7 @@ pub enum Class {
     /// Providing new functionality that the core Starlane binary did not ship with.
     ///
     /// In particular Providers are meant to install WebAssembly Components, Drivers for new
-    /// Classes, 3rd party software implementations... etc;
+    /// Classes, 3rd party software implementations... etc.
     ///
     Provider,
     /// meaning the [Host] of an execution environment, VM, Wasm host
@@ -104,26 +105,31 @@ impl Into<Cat> for Class {
     }
 }
 
+pub type Kind = KindDef<Class>;
+
+#[derive(Clone,Debug)]
+pub struct Meta<R> where R: Clone {
+    kind: Kind,
+    bind: R,
+}
 
 
 
-
-
-
-
-
-#[cfg(feature = "parse")]
+//#[cfg(feature = "parse")]
+/*
 mod parse {
-    use crate::err::ErrStrata;
-    use crate::schema::case::CamelCase;
     use crate::types::class::Class;
     use core::str::FromStr;
+    use crate::err::SpaceErr;
+    use crate::parse::CamelCase;
 
     impl FromStr for Class {
-        type Err = ErrStrata;
+        type Err = SpaceErr;
 
         fn from_str(src: &str) -> Result<Self, Self::Err> {
             Ok(Self(CamelCase::from_str(src)?))
         }
     }
 }
+
+ */

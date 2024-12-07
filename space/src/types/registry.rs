@@ -1,7 +1,7 @@
+use std::sync::Arc;
 use crate::types::registry::err::RegErr;
-use crate::types::select::Selector;
-use alloc::sync::Arc;
 use async_trait::async_trait;
+use crate::selector::SpecificSelector;
 
 pub type Registry = Arc<dyn TypeRegistry>;
 
@@ -10,7 +10,7 @@ pub type Registry = Arc<dyn TypeRegistry>;
 /// A Registry component interface for accessing Metadata about types including: `BindConfig`, `defined subtypes`
 #[async_trait]
 pub trait TypeRegistry: Send + Sync {
-   async fn select<'a>( &'a self, selector: &'a Selector) -> Result<Cursor,RegErr>;
+   async fn select_specific<'a>(&'a self, selector: &'a SpecificSelector) -> Result<Cursor,RegErr>;
 }
 
 
