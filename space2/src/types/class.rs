@@ -1,7 +1,15 @@
+use alloc::string::ToString;
+use core::str::FromStr;
+use strum_macros::EnumDiscriminants;
 use crate::schema::case::CamelCase;
+use crate::types;
 use crate::types::{Cat, Typical};
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+
+#[derive(Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display,strum_macros::IntoStaticStr)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(Variant))]
+#[strum_discriminants(derive(Hash,strum_macros::EnumString,strum_macros::ToString,strum_macros::IntoStaticStr))]
 pub enum Class {
     Root,
     Platform,
@@ -46,14 +54,68 @@ pub enum Class {
     FileStore,
     Directory,
     File,
+    #[strum(to_string = "{0}")]
     _Ext(CamelCase),
 }
+
+impl Into<Cat> for Class {
+    fn into(self) -> Cat {
+        Cat::Class
+    }
+}
+impl FromStr for Class {
+    type Err = eyre::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        fn ext( s: &str ) -> Result<Class,eyre::Error> {
+            Ok(Class::_Ext(CamelCase::from_str(s)?.into()))
+        }
+
+        match Variant::from_str(s) {
+            /// this Ok match is actually an Error!
+            Ok(Variant::_Ext) => ext(s),
+            /// we can't convert a [Variant] into a [Class],
+            /// but we can convert it into a string and parse as [CamelCase] which should not
+            /// fail since this `src` has already been identified as a builtin
+            Ok(variant) => ext(variant.to_string().as_str()),
+            Err(_) => ext(s)
+        }
+    }
+}
+
+
+
+
+impl types::Variant for Class {
+
+}
+
+impl From<CamelCase> for Class {
+    fn from(src: CamelCase) -> Self {
+        Self::_Ext(src)
+    }
+}
+
+
 
 impl Typical for Class {
     fn category(&self) -> Cat {
         Cat::Class
     }
 }
+
+
+
+
+impl Into<CamelCase> for Class {
+    fn into(self) -> CamelCase {
+        todo!()
+    }
+}
+
+
+
+
 
 
 #[cfg(feature = "parse")]

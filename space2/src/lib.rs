@@ -69,7 +69,8 @@ extern crate alloc;
 /// A facade around all the types we need from the `std`, `core`, and `alloc`
 /// crates. This avoids elaborate import wrangling having to happen in every
 /// module.
-#[allow(missing_docs, unused_imports)]
+///
+#[allow(missing_docs, unused_imports,warnings)]
 pub(crate) mod lib {
     mod core {
         #[cfg(not(feature = "std"))]

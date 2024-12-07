@@ -1,8 +1,6 @@
-use alloc::string::ToString;
-use core::str::FromStr;
+use alloc::string::{String, ToString};
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
-use crate::err::ErrStrata;
 use crate::schema::case::CamelCase;
 use crate::types::specific::Specific;
 
@@ -30,9 +28,15 @@ mod authority;
 
     #[derive(Clone,Debug,Error)]
     pub enum TypeErr {
-        NotFound,
+        #[error("type unknown: '{0}'")]
+        Unknown(String)
     }
 
+   impl TypeErr {
+       pub fn unknown(src: impl ToString) -> Self {
+           Self::Unknown(src.to_string())
+       }
+   }
 
     /// meaning where does this Type definition come from
     pub enum DefSrc {
@@ -45,14 +49,14 @@ mod authority;
 
 pub mod meta {
     use crate::types::data::Data;
-    use crate::types::{Exact, Typical};
+    use crate::types::{Typical};
     use crate::types::schema::Schema;
 
 
     /// information about the type
     #[derive(Clone,Debug)]
     pub struct Meta<T> where T: Typical{
-        exact: Exact,
+        exact: T,
         defs: Defs
     }
 
@@ -63,7 +67,7 @@ pub mod meta {
     }
 
 }
-pub(crate) trait Typical {
+pub(crate) trait Typical: Clone {
     fn category(&self) -> Cat;
 }
 
@@ -71,7 +75,6 @@ pub(crate) trait Typical {
 /// `Data` & `Class` categories and their enum variants ... i.e. [Data::Raw],[Class::_Ext]
 /// are the actual `Type` `Variants`
 /// Variants are always CamelCase
-//pub(crate) trait Variant: Typical+Clone+FromStr<Err=strum::ParseError>+ToString+From<CamelCase>+Into<CamelCase> {}
 pub(crate) trait Variant: Typical+Clone+ToString+From<CamelCase>+Into<CamelCase> {}
 
 

@@ -1,8 +1,7 @@
 use alloc::string::String;
 use core::fmt;
 use core::ops::Deref;
-use strum_macros::EnumDiscriminants;
-use crate::lib::fmt::{Display, Formatter};
+use crate::lib::fmt::{Formatter};
 
 #[derive(
     Debug,
@@ -20,7 +19,7 @@ impl CamelCase {
     }
 }
 
-impl Display for CamelCase {
+impl fmt::Display for CamelCase {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
     }
@@ -44,7 +43,7 @@ pub struct DomainCase {
 
 
 
-impl Display for DomainCase {
+impl fmt::Display for DomainCase {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(self.string.as_str())
     }
@@ -72,7 +71,7 @@ pub struct VarCase {
 
 
 
-impl Display for VarCase {
+impl fmt::Display for VarCase {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(self.string.as_str())
     }
@@ -90,7 +89,7 @@ impl Deref for VarCase {
 
 
 
-impl Display for SkewerCase {
+impl fmt::Display for SkewerCase {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(self.string.as_str())
     }
@@ -286,18 +285,24 @@ mod parse {
 
 
 pub mod err {
+    use alloc::string::{String, ToString};
     use strum_macros::EnumDiscriminants;
     use thiserror::Error;
-    use crate::schema::case::CamelCase;
 
-    #[derive(Error,Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display,strum_macros::IntoStaticStr)]
+    #[derive(Error,Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::IntoStaticStr)]
    #[strum_discriminants(vis(pub))]
    #[strum_discriminants(name(ErrKind))]
    #[strum_discriminants(derive(Hash,strum_macros::EnumString))]
    pub enum CaseErr {
-        #[strum_discriminants("expecting: camel case value (CamelCase); found: `{0}`")]
-        NotCamelCase(#[from] CamelCase),
+        #[error("expecting: camel case value (CamelCase); found: `{0}`")]
+        NotCamelCase(String),
    }
 
+
+  impl CaseErr  {
+      pub fn not_camel(src: impl ToString) -> Self {
+          Self::NotCamelCase(src.to_string())
+      }
+  }
 
 }

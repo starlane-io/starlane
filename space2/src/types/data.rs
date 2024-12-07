@@ -7,7 +7,7 @@ use crate::types::{Cat, Typical};
 #[derive(Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display,strum_macros::IntoStaticStr)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(Variant))]
-#[strum_discriminants(derive(Hash,strum_macros::EnumString))]
+#[strum_discriminants(derive(Hash,strum_macros::EnumString,strum_macros::ToString,strum_macros::IntoStaticStr))]
 pub(super) enum Data {
     Raw,
     #[strum(to_string = "{0}")]
@@ -15,13 +15,20 @@ pub(super) enum Data {
 }
 
 
+
 impl FromStr for Data {
     type Err = eyre::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        fn ext( s: &str ) -> Result<Data,eyre::Error> {
+            Ok(Data::_Ext(CamelCase::from_str(s)?.into()))
+        }
+
         match Variant::from_str(s) {
-            Ok(variant) => Ok(variant.into()),
-            Err(_) => Ok(CamelCase::from_str(s)?.into())
+            /// this Ok match is actually an Error!
+            Ok(Variant::_Ext) => ext(s),
+            Ok(variant) => ext(variant.into()),
+            Err(_) => ext(s)
         }
     }
 }
@@ -46,13 +53,6 @@ impl Typical for Data {
 }
 
 
-impl FromStr for Data {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
-    }
-}
 
 impl Into<CamelCase> for Data {
     fn into(self) -> CamelCase {
@@ -61,6 +61,11 @@ impl Into<CamelCase> for Data {
 }
 
 
+impl Into<Cat> for Data {
+    fn into(self) -> Cat {
+        Cat::Data
+    }
+}
 
 
 
