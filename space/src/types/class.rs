@@ -22,6 +22,7 @@ use crate::types::private::Exact;
     strum_macros::ToString,
     strum_macros::IntoStaticStr
 ))]
+#[non_exhaustive]
 pub enum ClassKind {
 
     Root,
@@ -71,6 +72,12 @@ pub enum ClassKind {
     _Ext(CamelCase),
 }
 
+impl Into<TypeKind> for ClassKind {
+    fn into(self) -> TypeKind {
+        todo!()
+    }
+}
+
 impl private::Kind for ClassKind  {
     type Type = Class;
 
@@ -78,9 +85,6 @@ impl private::Kind for ClassKind  {
         TypeCategory::Class
     }
 
-    fn type_kind(&self) -> TypeKind {
-        TypeKind::Class(self.clone())
-    }
 
     fn factory() -> impl Fn(Exact<Self>) -> Type {
         |t| Type::Class(t)

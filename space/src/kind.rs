@@ -763,22 +763,53 @@ impl StarStub {
     }
 }
 
-/// A Specific is used to extend the Kind system in The Cosmic Initiative to a very exact level.
-/// when a Kind has a specific it is not only referencing something general like a Database,
-/// but the vendor, product and version of that database among other things.
-/// The Specific def looks like this `provider.url:vendor.url:product:variant:version`
-/// * **provider** - this is the domain name of the person or entity that provided the driver
-///                  that this specific defines
-/// * **vendor** - the vendor that provides the product which may have had nothing to do with
-///                creating the driver
-/// * **product** - the product
-/// * **variant** - many products have variation and here it is where it is specified
-/// * **version** - this is a SemVer describing the exact version of the Specific
+/// A Specific is used to associate [Type](s) with an`Exact` definition(s)
+///
+/// The Specific segment schema is designed to avoid naming collisions and follows
+/// this pattern:
+/// `provider.url:vendor.url:product:variant:product-semver:specific-semver`
+///
+/// `Segments`:
+/// * `provider`  The domain name of the person or entity that created and published the definitions
+///                and configurations that enabled `Starlane` to bind with the `product`.
+///                Remember the `provider` provides the definition (particularly the `BindConfig`
+///                required for any `Type` to be used by `Starlane`) The `provider` may or may
+///                not have anything to do with the 3rd party software itself.
+///
+/// * `vendor`     The domain name of the person or entity that produces the software regardless
+///                if he is even aware of its use to extend.
+///
+///                To illustrate the need for the two domain scopes for `provider` and `vendor`
+///                consider two cases:
+///                1) A software development company with the web domain `my-software-company.com`
+///                   publishes its in house products making him a `vendor` and he also publishes
+///                   a Starlane Specific definition for his product making him also a `provider`
+///                   In this first case the provider::vendor segments would be
+///                   `my-software-company.com:my-software-company.com`
+///
+///                2) In the second instance Red Had publishes its identity and authorization product:
+///                   `KeyCloak` making the `vendor` `redhat.com`.    Another person entirely likes
+///                   `KeyCloak` and wants to use it with `Starlane`... his domain name is `personal-site.com`
+///                   he publishes the Specific definition so `Starlane` can use `KeyCloak` to back
+///                   the `UserBase` `Class` he is the `provider` of the `Specific` definition and
+///                   decided that the best fit for identifying `KeyCloak's` vendor domain was
+///                  `redhat.com`.   In the second scenario the provider::vendor segments would look
+///                   like:
+///                   `personal-site.com:redhat.com`
+///
+/// * `product`   - ...Should be rather straightforward.  Companies may create multiple products
+///                 and therefor the product is employed to further  distinguish the `Specific`
+///
+/// * `variant`   - May not apply in every case but sometimes companies provide different variants
+///                 of a product.  For example the variants might be `Community` and `Enterprise`
+///
+/// * `product-semver`  - A semver of the product version.
+///
+/// * `specific-semver` - A semver of this `Specific` definition
 ///
 /// ## Example:
-/// `mechtronhub.com:postgres.org:postgres:gis:8.0.0`
-/// And the above would be embedde into the appropriate Base Kind and Sub Kind:
-/// `<Database<Rel<mechtronhub.com:postgres.org:postgres:gis:8.0.0>>>`
+/// `hub.starlane.io:postgres.org:postgres:gis:8.0.0:1.0.1`
+///
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct Specific {
     pub provider: Domain,

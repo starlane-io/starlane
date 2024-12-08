@@ -1,18 +1,20 @@
 #![cfg(feature="types2")]
 
 use strum_macros::EnumDiscriminants;
-use thiserror::__private::AsDisplay;
 
 mod class;
 mod schema;
 
-mod domian;
 
 pub mod registry;
 pub mod specific;
 pub mod err;
 
+pub mod domain;
 /// meaning where does this Type definition come from
+/// * [DefSrc::Builtin] indicates a definition native to Starlane
+/// * [DefSrc::Ext] indicates a definition extension defined outside of native Starlane
+///                 potentially installed by a package
 pub enum DefSrc {
     Builtin,
     Ext,
@@ -29,17 +31,16 @@ pub(crate) mod private {
     use itertools::Itertools;
     use rustls::pki_types::Der;
     use tracing::Instrument;
-    use crate::parse::{some, CamelCase};
     use crate::kind::Specific;
-    use crate::log::Level::Debug;
-    use crate::point::Point;
-    use crate::types::{err, SchemaKind, Type, TypeKind};
-    use crate::types::class::{Class, ClassKind};
-    use super::TypeCategory;
+    use crate::parse::{some, CamelCase};
+    use crate::types::class::ClassKind;
+    use super::{domain, err, SchemaKind, Type, TypeCategory, TypeKind};
 
     pub(crate) trait Kind: Clone+Into<TypeKind>{
 
         type Type;
+
+
 
         fn category(&self) -> TypeCategory;
 
@@ -48,11 +49,46 @@ pub(crate) mod private {
         }
 
         fn factory() -> impl Fn(Exact<Self>) -> Type;
-
     }
 
+    #[derive(Clone)]
+    pub(crate) struct Scoped<I> where I: Clone {
+        item: I,
+        scope: domain::DomainScope
+    }
 
+    impl <I> Scoped<I> {
+        pub fn new(item:I, scope: domain::DomainScope) -> Self {
+            Self{
+                item,
+                scope,
+            }
+        }
 
+        pub fn scope(&self) -> &domain::DomainScope {
+            &self.scope
+        }
+    }
+
+    impl <I> Deref for Scoped<I> {
+        type Target = I;
+
+        fn deref(&self) -> &Self::Target {
+            &self.item
+        }
+    }
+
+    impl <K> Into<K> for Scoped<K> where K: Kind {
+        fn into(self) -> K {
+            self.item
+        }
+    }
+
+    impl Into<Specific> for Scoped<Specific> {
+        fn into(self) -> Specific {
+            self.item
+        }
+    }
 
     pub(crate) trait Typical: Display+Into<TypeKind>+Into<Type> { }
 
@@ -194,7 +230,7 @@ pub(crate) mod private {
     }
 
 
-   /// check if Ref follows constarints4r
+   /// check if Ref follows constraints
 
     #[derive(Clone)]
     pub struct Ref<K> where K: Kind  {
@@ -206,7 +242,7 @@ pub(crate) mod private {
 
     #[derive(Clone, Debug, Eq, PartialEq, Hash, ,Serialize,Deserialize)]
     pub(crate) struct Exact<K> where K: Kind{
-        scope: DomainScope,
+        scope: domain::DomainScope,
         kind: K,
         specific: Specific,
     }
@@ -226,14 +262,25 @@ pub(crate) mod private {
 
     impl <K> Exact<K> where K: Kind
     {
-        pub fn new(kind: impl ToOwned<Owned=K>, specific: impl ToOwned<Owned=Specific> ) -> Self {
+        pub fn new(kind: impl ToOwned<Owned=K>, specific: impl ToOwned<Owned=Specific>) -> Self {
+            Self::scoped(kind,specific,Default::default())
+         }
+
+        pub fn scoped(kind: impl ToOwned<Owned=K>, specific: impl ToOwned<Owned=Specific>, scope: impl ToOwned<Owned=domain::DomainScope>) -> Self {
             let kind = kind.to_owned();
             let specific = specific.to_owned();
+            let scope = scope.to_owned();
             Self {
                 kind,
-                specific
+                specific,
+                scope
             }
         }
+
+        pub fn plus_scope(self, scope: impl ToOwned<Owned=domain::DomainScope>) -> Self {
+            Self::scoped(self.kind,self.specific,scope)
+        }
+
 
         pub fn kind(&self) -> &K{
             &self.kind
@@ -290,8 +337,6 @@ pub type PointKindDefSrc<Kind> = SrcDef<Point,Kind>;
 
 
 pub type DataPoint = PointTypeDef<Point, SchemaKind>;
-
-
 
 
 pub use schema::SchemaKind;

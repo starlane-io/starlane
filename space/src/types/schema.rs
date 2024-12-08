@@ -17,6 +17,7 @@ use crate::types::private::{KindVariantDef, Exact};
     strum_macros::ToString,
     strum_macros::IntoStaticStr
 ))]
+#[non_exhaustive]
 pub enum SchemaKind {
     Bytes,
     Text,
