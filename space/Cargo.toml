@@ -52,6 +52,7 @@ chrono = { workspace = true, features = ["serde"] }
 tokio = { workspace = true, features = ["full"] }
 tokio-util = { workspace = true }
 eyre = { workspace = true }
+indexmap = { workspace = true }
 
 async-trait = { workspace = true }
 ctrlc = { workspace = true }

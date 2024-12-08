@@ -43,7 +43,6 @@ impl FromStr for SchemaKind {
     }
 }
 
-impl private::Variant for SchemaKind {}
 
 impl From<CamelCase> for SchemaKind {
     fn from(src: CamelCase) -> Self {

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::kind::Specific;
 use crate::point::Point;
 use crate::types::class::ClassKind;
-use crate::types::private::MetaDef;
+use crate::types::private::MetaDefs;
 use crate::types::SchemaKind;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -15,8 +15,8 @@ pub struct SpecificMeta {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct TypeDefs {
-    pub schema: HashMap<SchemaKind, MetaDef<SchemaKind>>,
-    pub schema2: HashMap<ClassKind, MetaDef<ClassKind>>,
+    pub schema: HashMap<SchemaKind, MetaDefs>,
+    pub schema2: HashMap<ClassKind, MetaDefs>,
 }
 
 

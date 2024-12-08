@@ -19,22 +19,26 @@ pub enum DefSrc {
 pub(crate) mod private {
     use std::borrow::Borrow;
     use std::marker::PhantomData;
+    use std::ops::{Deref, DerefMut, Index};
     use std::str::FromStr;
+    use indexmap::IndexMap;
+    use itertools::Itertools;
+    use rustls::pki_types::Der;
     use tracing::Instrument;
     use crate::parse::CamelCase;
     use crate::kind::Specific;
+    use crate::log::Level::Debug;
     use crate::point::Point;
-    use crate::types::{err, Type};
+    use crate::types::{err, Type, TypeKind};
     use crate::types::class::Class;
+    use crate::types::err::TypeErr;
     use super::TypeCategory;
 
-    pub(crate) trait Kind: Clone+FromStr {
+    pub(crate) trait Kind: Clone+Into<TypeKind>{
 
         type Type;
 
         fn category(&self) -> TypeCategory;
-
-        fn type_kind(&self) -> super::TypeKind;
 
         fn plus_specific(self, specific: Specific) -> SpecificKind<Self> {
             SpecificKind::new(self,specific)
@@ -44,79 +48,120 @@ pub(crate) mod private {
 
     }
 
-    pub(crate) trait Typical: Into<Type> { }
 
 
-    /*
-    /// a `Variant` is a unique `Type` in a within a `Category`
-    /// `Data` & `Class` categories and their enum variants ... i.e. [Data::Raw],[ClassVariant::_Ext]
-    /// are the actual `Type` `Variants`
-    /// Variants are always CamelCase
-    pub(crate) trait Variant: Kind + Clone + ToString + From<CamelCase> + Into<CamelCase> { }
 
-     */
+    pub(crate) trait Typical: Into<TypeKind>+Into<Type> { }
 
-    #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-    pub(crate) struct KindVariantDef<T>
-    where
-        T: Kind + Into<super::TypeCategory>,
-    {
-        specific: Specific,
-        kind: T,
-    }
 
-    /// [MetaDef] stores structured references to the [SpecificKind]'s definition elements.
-    /// [Specifics] support hierarchical inheritance which is why [MetaDef] is composed of
-    /// a vector of [LayerDef]s.  [MetaDef] composites the parental layers to provide a singular
-    /// view of a [SpecificKind]'s [MetaDef] defs.
-    ///
-    #[derive(Clone)]
-    pub(crate) struct MetaDef<K> where K: Kind {
+    pub(crate) struct Meta<K> where K: Kind {
+        /// Type is built from `kind` and the specific of the last layer
         kind: K,
-        layers: Vec<Layer>
+        /// types support inheritance and their
+        /// multiple type definition layers that are composited.
+        /// Layers define inheritance in regular order.  The last
+        /// layer is the [Type] of this [Meta] composite.
+        ///
+        ///
+        defs: IndexMap<Specific,Layer>
     }
 
-    impl <K> MetaDef<K> where K: Kind{
-        pub fn new(kind: K, layers: Vec<Layer>) -> Result<Self,err::TypeErr> {
+    impl <K> Meta<K> where K: Kind {
+        pub fn new(kind: K, layers: IndexMap<Specific,Layer>) -> Result<Meta<K>,err::TypeErr> {
             if layers.is_empty() {
-                Err(err::TypeErr::empty_meta(kind.type_kind()))
+                Err(err::TypeErr::empty_meta(kind.into()))
             } else {
-                Ok(Self {
-                    kind,
-                    layers
+                Ok(Meta {
+                    kind ,
+                    defs: Default::default(),
                 })
             }
         }
 
-        pub fn specific(&self) -> & Specific {
-            & self.layers.first().unwrap().specific
+        pub fn kind(&self) -> & K{
+            &self.kind
         }
 
-        pub fn as_type(&self) -> K::Type {
-            let specific = self.layers.first().unwrap().specific.clone();
-            self.kind.clone().plus_specific(specific)
+        fn layer_by_index(&self, index: &usize ) -> Result<&Layer,err::TypeErr> {
+            self.defs.get(index).ok_or(TypeErr::meta_layer_index_out_of_bounds(self.kind.clone(), index ))
+        }
+
+        pub fn specific(&self) -> & Specific  {
+            /// it's safe to unwrap because [Meta::new] will not accept empty defs
+            self.defs.first().map(|(_,layer)| &layer.specific ).unwrap()
+        }
+
+
+        pub fn by_index<'x>(&self, index: &usize) -> Result<MetaLayerAccess<'x,K>,TypeErr> {
+            self.defs.get_index(index.clone()).ok_or(TypeErr::meta_layer_index_out_of_bounds(&self.kind,index,self.defs.len())).map(|(specific,layer)| MetaLayerAccess::new(self,layer))
+        }
+     }
+
+    pub(crate) struct MetaBuilder<T> where T: Typical{
+        typical: T,
+        defs: IndexMap<Specific,Layer>
+    }
+
+    impl <T> MetaBuilder<T> where T: Typical{
+        pub fn new(typical: T) -> MetaBuilder<T>{
+            Self {
+                typical,
+                defs: Default::default()
+            }
+        }
+
+        pub fn build(self) -> Result<Meta<T>,err::TypeErr> {
+            Meta::new(self.typical.into())
         }
     }
 
+    impl <T> Deref for MetaBuilder<T> where T: Typical {
+        type Target = IndexMap<Specific,Layer>;
 
-    pub(crate) struct Child<'y,T> where T: Kind{
-        meta: &'y MetaDef<T>,
+        fn deref(&self) -> &Self::Target {
+            & self.defs
+        }
+    }
+
+    impl <T> DerefMut for MetaBuilder<T> where T: Typical {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            & mut self.defs
+        }
+    }
+
+    /// [MetaDefs] stores structured references to the [SpecificKind]'s definition elements.
+    /// [Specifics] support hierarchical inheritance which is why [MetaDefs] is composed of
+    /// a vector of [LayerDef]s.  [MetaDefs] composites the parental layers to provide a singular
+    /// view of a [SpecificKind]'s [MetaDefs] defs.
+    ///
+    #[derive(Clone)]
+    pub(crate) struct MetaDefs {
+        layers: Vec<Layer>
+    }
+
+
+    pub(crate) struct MetaLayerAccess<'y,K> where K: Kind{
+        meta: &'y Meta<K>,
         layer: &'y Layer,
     }
 
-    impl <'y,T> Child<'y,T> where T: Kind{
-        pub fn new(meta: &'y MetaDef<T>, layer: &'y T ) -> Child<'y,T> {
+    impl <'y, K> MetaLayerAccess<'y, K> where K: Kind{
+        fn new(meta: &'y Meta<K>, layer: &'y Layer) -> MetaLayerAccess<'y, K> {
             Self {
                 meta,
                 layer
             }
         }
 
-        pub fn get_type(&'y self) -> SpecificKind<T> {
+        pub fn get_type(&'y self) -> SpecificKind<K> {
             self.meta.as_type()
         }
 
-        pub fn meta(&'y self) -> &'y MetaDef<T>  {
+        pub fn defs(&'y self) -> &'y MetaDefs {
+            & self.meta.defs
+        }
+
+        pub fn meta(&'y self) -> &'y Meta<K>  {
             self.meta
         }
 
@@ -141,13 +186,10 @@ pub(crate) mod private {
 
 
 
-
-
-
     #[derive(Clone, Debug, Eq, PartialEq, Hash, ,Serialize,Deserialize)]
     pub(crate) struct SpecificKind<K> where K: Kind{
-        specific: Specific,
         kind: K,
+        specific: Specific,
     }
 
     impl <K> Typical for SpecificKind<K> where K: Kind{
