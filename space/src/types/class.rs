@@ -1,16 +1,27 @@
-use crate::types::private;
-use crate::types::Cat;
+use crate::types::{private, DataPoint, Type, TypeKind};
+use crate::types::TypeCategory;
 use core::str::FromStr;
-use serde::{Deserialize, Serialize};
+use std::borrow::Borrow;
+use derive_builder::Builder;
 use strum_macros::EnumDiscriminants;
+use starlane_space::types::SchemaKind;
+use starlane_space::types::schema::BindConfig;
+use crate::kind::Specific;
 use crate::parse::CamelCase;
-use crate::types::private::KindDef;
+use crate::point::Point;
+use crate::types::private::SpecificKind;
 
-#[derive(Clone,Debug,Eq,PartialEq,Hash,EnumDiscriminants,strum_macros::Display,Serialize,Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
-#[strum_discriminants(name(Variant))]
-#[strum_discriminants(derive(Hash,strum_macros::EnumString,strum_macros::ToString,strum_macros::IntoStaticStr,Serialize,Deserialize))]
-pub enum Class {
+#[strum_discriminants(name(ClassType))]
+#[strum_discriminants(derive(
+    Hash,
+    strum_macros::EnumString,
+    strum_macros::ToString,
+    strum_macros::IntoStaticStr
+))]
+pub enum ClassKind {
+
     Root,
     Platform,
     Foundation,
@@ -20,7 +31,7 @@ pub enum Class {
     ///
     /// A Dependency can be `downloaded`, `installed`, `initialized` and `started` (what those
     /// phases actually mean to the Dependency itself is custom behavior)  The job of the Dependency
-    /// create the prerequisite conditions for it child [Class::Provider]s
+    /// create the prerequisite conditions for it child [ClassType::Provider]s
     Dependency,
     /// Provider `provides` something to Starlane.  Providers enable Starlane to extend itself by
     /// Providing new functionality that the core Starlane binary did not ship with.
@@ -58,60 +69,69 @@ pub enum Class {
     _Ext(CamelCase),
 }
 
-impl FromStr for Class {
+impl private::Kind for ClassKind  {
+    type Type = Class;
+
+    fn category(&self) -> TypeCategory {
+        TypeCategory::Class
+    }
+
+    fn type_kind(&self) -> TypeKind {
+        TypeKind::Class(self.clone())
+    }
+
+    fn factory() -> impl Fn(SpecificKind<Self>) -> Type {
+        |t| Type::Class(t)
+    }
+}
+
+
+impl FromStr for ClassKind {
     type Err = eyre::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        fn ext( s: &str ) -> Result<Class,eyre::Error> {
-            Ok(Class::_Ext(CamelCase::from_str(s)?.into()))
+        fn ext( s: &str ) -> Result<ClassKind,eyre::Error> {
+            Ok(ClassKind::_Ext(CamelCase::from_str(s)?.into()))
         }
 
-        match Variant::from_str(s) {
+        match ClassType::from_str(s) {
             /// this Ok match is actually an Error!
-            Ok(Variant::_Ext) => ext(s),
+            Ok(ClassType::_Ext) => ext(s),
             Ok(variant) => ext(variant.into()),
             Err(_) => ext(s)
         }
     }
 }
 
-impl private::Variant for Class {
 
-}
 
-impl From<CamelCase> for Class {
+
+
+impl From<CamelCase> for ClassType {
     fn from(src: CamelCase) -> Self {
         /// it should not be possible for this to fail
         Self::from_str(src.as_str()).unwrap()
     }
 }
 
-impl private::Typical for Class {
-    fn category(&self) -> Cat {
-        Cat::Class
-    }
-}
 
-impl Into<CamelCase> for Class {
+impl Into<CamelCase> for ClassType {
     fn into(self) -> CamelCase {
         CamelCase::from_str(self.to_string().as_str()).unwrap()
     }
 }
 
 
-impl Into<Cat> for Class {
-    fn into(self) -> Cat {
-        Cat::Class
+impl Into<TypeCategory> for ClassType {
+    fn into(self) -> TypeCategory {
+        TypeCategory::Class
     }
 }
 
-pub type Kind = KindDef<Class>;
 
-#[derive(Clone,Debug)]
-pub struct Meta<R> where R: Clone {
-    kind: Kind,
-    bind: R,
-}
+
+
+pub type Class = private::SpecificKind<ClassKind>;
 
 
 

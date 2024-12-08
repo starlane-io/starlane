@@ -1,69 +1,90 @@
-use crate::types::{private, Cat};
+use crate::types::{private, TypeCategory, SrcDef, TypeKind, Type};
 use core::str::FromStr;
 use strum_macros::EnumDiscriminants;
+use starlane_space::kind::Specific;
+use starlane_space::types::PointKindDefSrc;
 use crate::parse::CamelCase;
-use crate::types::private::KindDef;
+use crate::types::private::{KindVariantDef, SpecificKind};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
-#[strum_discriminants(name(Variant))]
+#[strum_discriminants(name(SchemaType))]
 #[strum_discriminants(derive(
     Hash,
     strum_macros::EnumString,
     strum_macros::ToString,
     strum_macros::IntoStaticStr
 ))]
-pub enum Data {
-    Raw,
+pub enum SchemaKind {
+    Bytes,
+    Text,
+    /// a `BindConfig` for a class
+    BindConfig,
     #[strum(to_string = "{0}")]
     _Ext(CamelCase),
 }
 
-impl FromStr for Data {
+impl FromStr for SchemaKind {
     type Err = eyre::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        fn ext(s: &str) -> Result<Data, eyre::Error> {
-            Ok(Data::_Ext(CamelCase::from_str(s)?.into()))
+        fn ext(s: &str) -> Result<SchemaKind, eyre::Error> {
+            Ok(SchemaKind::_Ext(CamelCase::from_str(s)?.into()))
         }
 
-        match Variant::from_str(s) {
+        match SchemaType::from_str(s) {
             /// this Ok match is actually an Error!
-            Ok(Variant::_Ext) => ext(s),
+            Ok(SchemaType::_Ext) => ext(s),
             Ok(variant) => ext(variant.into()),
             Err(_) => ext(s),
         }
     }
 }
 
-impl private::Variant for Data {}
+impl private::Variant for SchemaKind {}
 
-impl From<CamelCase> for Data {
+impl From<CamelCase> for SchemaKind {
     fn from(src: CamelCase) -> Self {
         /// it should not be possible for this to fail
         Self::from_str(src.as_str()).unwrap()
     }
 }
 
-impl private::Typical for Data {
-    fn category(&self) -> Cat {
-        Cat::Data
+impl private::Kind for SchemaKind {
+    type Type = Schema;
+
+    fn category(&self) -> TypeCategory {
+        TypeCategory::Schema
+    }
+
+    fn type_kind(&self) -> TypeKind {
+        TypeKind::Schema(self.clone())
+    }
+
+    fn factory() -> impl Fn(SpecificKind<Self>) -> Type {
+        |t| Type::Schema(t)
     }
 }
 
-impl Into<CamelCase> for Data {
+impl Into<CamelCase> for SchemaKind {
     fn into(self) -> CamelCase {
         CamelCase::from_str(self.to_string().as_str()).unwrap()
     }
 }
 
-impl Into<Cat> for Data {
-    fn into(self) -> Cat {
-        Cat::Data
+impl Into<TypeCategory> for SchemaKind {
+    fn into(self) -> TypeCategory {
+        TypeCategory::Schema
     }
 }
 
-pub type DataKind = KindDef<Data>;
+
+pub type Schema = private::SpecificKind<SchemaKind>;
+
+
+pub type BindConfigSrc = PointKindDefSrc<SchemaKind>;
+
+pub type BindConfig = SchemaKind::BindConfig;
 
 /*
 #[cfg(feature="parse")]
