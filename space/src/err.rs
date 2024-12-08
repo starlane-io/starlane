@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use bincode::ErrorKind;
-use nom::error::VerboseError;
+use nom::error::{FromExternalError, VerboseError};
 use serde::de::Error;
 use std::convert::Infallible;
 use std::fmt::{Debug, Display, Formatter};
@@ -9,6 +9,7 @@ use std::num::ParseIntError;
 use std::ops::Range;
 use std::string::FromUtf8Error;
 use std::sync::{Arc, PoisonError};
+use nom_supreme::error::BaseErrorKind;
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
@@ -28,6 +29,7 @@ use crate::wave::core::{Method, ReflectedCore};
 use serde::{Deserialize, Serialize};
 use strum::{IntoEnumIterator, ParseError};
 use thiserror::Error;
+use starlane_space::parse::SpaceTree;
 /*
 #[macro_export]
 macro_rules! err {
@@ -560,6 +562,17 @@ impl From<io::Error> for SpaceErr {
         SpaceErr::new(500, e.to_string().as_str())
     }
 }
+
+/// this is a dirty hack, but its late and I'm
+/// frustrated with this particular FromStr::from_str err...
+impl From<Report> for ParseErrs {
+    fn from(report: Report) -> Self {
+        ParseErrs::new(format!("{:?}",report))
+    }
+}
+
+
+
 
 #[derive(Debug, Clone, Error, Serialize, Deserialize)]
 pub struct ParseErrs {

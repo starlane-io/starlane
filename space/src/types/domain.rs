@@ -52,6 +52,7 @@ pub enum Segment {
 #[derive(Clone,Eq,PartialEq,Hash,Debug)]
 pub struct DomainScope(Option<Prefix>,Vec<Segment>);
 
+
 impl Default for DomainScope {
     fn default() -> Self {
         Self(None,Vec::new())
@@ -150,7 +151,8 @@ pub mod parse {
         let span = new_span(s.as_ref());
         result(domain(span))
     }
-    fn domain<I: Span>(input: I) -> Res<I, DomainScope> {
+    /// will return an empty [DomainScope]  -> `DomainScope(None,Vec:default())` if nothing is found
+    pub fn domain<I: Span>(input: I) -> Res<I, DomainScope> {
         tuple((opt(prefix), separated_list0(tag("::"), postfix_segment)))(input).map(|(input,(prefix,segments))|{
             (input, DomainScope(prefix,segments))
         })

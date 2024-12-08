@@ -31,15 +31,16 @@ pub(crate) mod private {
     use itertools::Itertools;
     use rustls::pki_types::Der;
     use tracing::Instrument;
+    use crate::err::ParseErrs;
     use crate::kind::Specific;
     use crate::parse::{some, CamelCase};
+    use crate::point::Point;
     use crate::types::class::ClassKind;
     use super::{domain, err, SchemaKind, Type, TypeCategory, TypeKind};
 
-    pub(crate) trait Kind: Clone+Into<TypeKind>{
+    pub(crate) trait Kind: Clone+Into<TypeKind>+FromStr<Err=ParseErrs>{
 
         type Type;
-
 
 
         fn category(&self) -> TypeCategory;
@@ -58,10 +59,10 @@ pub(crate) mod private {
     }
 
     impl <I> Scoped<I> {
-        pub fn new(item:I, scope: domain::DomainScope) -> Self {
+        pub fn new(scope: domain::DomainScope, item:I ) -> Self {
             Self{
-                item,
                 scope,
+                item,
             }
         }
 
@@ -248,11 +249,18 @@ pub(crate) mod private {
     }
 
     impl <K> Typical for Exact<K> where K: Kind{
+
     }
 
 
     impl <K> Into<Type> for Exact<K> where K: Kind
     {
+        fn into(self) -> Type {
+            K::factory()(self)
+        }
+    }
+
+    impl <K> Into<Type> for Exact<K> where K: Kind {
         fn into(self) -> Type {
             K::factory()(self)
         }
@@ -347,5 +355,100 @@ use crate::types::private::Kind;
 use crate::types::schema::Schema;
 
 
+pub mod parse {
+    use std::str::FromStr;
+    use ascii::AsciiChar::i;
+    use nom::branch::alt;
+    use nom::combinator::opt;
+    use nom::multi::{separated_list0, separated_list1};
+    use nom::Parser;
+    use nom::sequence::{delimited, pair, terminated, tuple};
+    use nom_supreme::parser_ext::FromStrParser;
+    use nom_supreme::ParserExt;
+    use nom_supreme::tag::complete::tag;
+    use crate::err;
+    use crate::err::report::Report;
+    use crate::parse::{camel_case, camel_case_chars, delim_kind, Res, SpaceTree};
+    use crate::parse::util::{new_span, result, Span};
+    use crate::types::private::{Exact, Kind, Scoped};
+    use crate::types::{domain::parse::domain, SchemaKind, Type};
+    use crate::types::class::{Class, ClassKind};
+    use crate::types::schema::Schema;
+
+    pub(crate) fn parse<K>(s: impl AsRef<str> ) -> Result<Scoped<K>,err::ParseErrs> where K: Kind{
+        let span = new_span(s.as_ref());
+        result(scoped(span))
+    }
+    /*
+    fn scoped<K:Kind, I: Span>(input: I) -> Res<I, Scoped<K>> where K: Kind {
+        tuple((domain,tag("::"),kind))(input).map(|(input,(domain,_,kind))|{
+            (input, Scoped::new(domain,kind))
+        })
+    }
+
+     */
+    pub fn scoped<I,F,T>( f: F) -> impl Fn(I) -> Res<I,Scoped<T>> where I: Span, F: Fn(I) -> Res<I,T>+Copy {
+        move | input | {
+            pair(or_default(terminated(domain,tag("::"))),f)(input).map(|(input,(scope,item))|(input,Scoped::new(scope,item)))
+        }
+    }
+
+    pub fn or_default<I,F,D>( f: F ) -> impl Fn(I) -> Res<I,D> where I: Span, F: Fn(I) -> Res<I,D>+Copy, D: Default {
+        move | input |  {
+            opt(f)(input).map(|(input,opt)|opt.unwrap_or_default())
+        }
+    }
+
+
+    fn kind<K:Kind,I:Span>( input: I ) -> Res<I,K> where K: Kind {
+        camel_case_chars.parse_from_str().parse(input)
+    }
+
+
+    pub fn r#type<I>( input: I)  -> Res<I,Type> where I: Span {
+        /// into Type
+        fn it<S,K>(next: S, item: Scoped<K> ) -> Res<S,Type> where S: Span{
+
+        }
+
+        alt((class,schema))(input).map(|(input,exact)|(input,exact.into()))
+    }
+    fn into_type<I,F,E,K>( f: F ) -> impl Fn(I) -> Res<I,Type> where F: Fn(I) -> Res<I,Type>+Copy, K: Kind , E: Into<Type> {
+        move |input|  {
+            f(input)
+        }
+    }
+
+
+    pub fn class_kind<I: Span>( input: I)  -> Res<I,ClassKind> {
+        camel_case_chars.parse_from_str().parse(input)
+    }
+
+
+    pub fn schema<I: Span>( input: I)  -> Res<I,Schema> {
+        camel_case_chars.parse_from_str().parse(input)
+    }
+
+
+    pub mod delim {
+        use nom::sequence::delimited;
+        use nom_supreme::tag::complete::tag;
+        use crate::parse::Res;
+        use crate::parse::util::Span;
+        use crate::types::class::Class;
+        use crate::types::private::Scoped;
+        use super::scoped;
+
+        pub fn class<I: Span>(input: I) -> Res<I,Scoped<Class>> {
+            delimited(tag("<"),scoped,tag(">"))(input)
+        }
+
+        pub fn schema<I: Span>(input: I) -> Res<I,Scoped<Class>> {
+            delimited(tag("["),scoped,tag("]"))(input)
+        }
+
+
+    }
+}
 
 
