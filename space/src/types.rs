@@ -40,7 +40,7 @@ pub(crate) mod private {
 
         fn category(&self) -> TypeCategory;
 
-        fn plus_specific(self, specific: Specific) -> SpecificKind<Self> {
+        fn plus_specific(self, specific: impl ToOwned<Owned=Specific>) -> SpecificKind<Self> {
             SpecificKind::new(self,specific)
         }
 
@@ -78,9 +78,8 @@ pub(crate) mod private {
             }
         }
 
-
         pub fn typical(&self) -> impl Typical {
-
+            self.kind.clone().plus_specific(self.specific())
         }
 
         pub fn describe(&self) -> &str{
@@ -95,7 +94,6 @@ pub(crate) mod private {
             /// it's safe to unwrap because [Meta::new] will not accept empty defs
             self.defs.first().map(|(_,layer)| layer).unwrap()
         }
-
 
         fn layer_by_index(&self, index: impl ToOwned<Owned=usize> ) -> Result<&Layer,err::TypeErr> {
             self.defs.index(index.to_owned()).ok_or(err::TypeErr::meta_layer_index_out_of_bounds(self.kind.clone(), index, self.defs.len() ))
@@ -214,7 +212,9 @@ pub(crate) mod private {
 
     impl <K> SpecificKind<K> where K: Kind
     {
-        pub fn new(kind: K, specific: Specific ) -> Self {
+        pub fn new(kind: impl ToOwned<Owned=K>, specific: impl ToOwned<Owned=Specific> ) -> Self {
+            let kind = kind.to_owned();
+            let specific = specific.to_owned();
             Self {
                 kind,
                 specific
