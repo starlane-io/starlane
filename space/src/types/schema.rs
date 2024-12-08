@@ -1,6 +1,7 @@
 use crate::types::{private, TypeCategory, SrcDef, TypeKind, Type};
 use core::str::FromStr;
 use strum_macros::EnumDiscriminants;
+use starlane_space::err::ParseErrs;
 use starlane_space::kind::Specific;
 use starlane_space::types::PointKindDefSrc;
 use crate::parse::CamelCase;
@@ -28,10 +29,10 @@ pub enum SchemaKind {
 }
 
 impl FromStr for SchemaKind {
-    type Err = eyre::Error;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        fn ext(s: &str) -> Result<SchemaKind, eyre::Error> {
+        fn ext(s: &str) -> Result<SchemaKind,ParseErrs> {
             Ok(SchemaKind::_Ext(CamelCase::from_str(s)?.into()))
         }
 

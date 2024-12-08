@@ -366,12 +366,12 @@ pub mod parse {
     use nom_supreme::parser_ext::FromStrParser;
     use nom_supreme::ParserExt;
     use nom_supreme::tag::complete::tag;
-    use crate::err;
+    use crate::{err, types};
     use crate::err::report::Report;
     use crate::parse::{camel_case, camel_case_chars, delim_kind, Res, SpaceTree};
     use crate::parse::util::{new_span, result, Span};
     use crate::types::private::{Exact, Kind, Scoped};
-    use crate::types::{domain::parse::domain, SchemaKind, Type};
+    use crate::types::{domain::parse::domain, SchemaKind, Type, TypeKind};
     use crate::types::class::{Class, ClassKind};
     use crate::types::schema::Schema;
 
@@ -405,13 +405,16 @@ pub mod parse {
     }
 
 
-    pub fn r#type<I>( input: I)  -> Res<I,Type> where I: Span {
+    pub fn type_kind<I>( input: I)  -> Res<I,Scoped<TypeKind>> where I: Span {
         /// into Type
-        fn it<S,K>(next: S, item: Scoped<K> ) -> Res<S,Type> where S: Span{
-
+        fn it<K>(res: Res<I,K> ) -> Res<I,TypeKind> where K: Into<TypeKind>{
+            res.map(|(input,kind)|(input,kind.into()))
         }
 
-        alt((class,schema))(input).map(|(input,exact)|(input,exact.into()))
+        let into = |(input,kind)| (input,kind.into());
+
+
+        alt((class_kind.map(into), schema_kind.map(into)))(input).map(|(input,exact)|(input, exact.into()))
     }
     fn into_type<I,F,E,K>( f: F ) -> impl Fn(I) -> Res<I,Type> where F: Fn(I) -> Res<I,Type>+Copy, K: Kind , E: Into<Type> {
         move |input|  {
@@ -425,7 +428,7 @@ pub mod parse {
     }
 
 
-    pub fn schema<I: Span>( input: I)  -> Res<I,Schema> {
+    pub fn schema_kind<I: Span>(input: I) -> Res<I,SchemaKind> {
         camel_case_chars.parse_from_str().parse(input)
     }
 

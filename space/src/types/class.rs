@@ -4,6 +4,7 @@ use core::str::FromStr;
 use std::borrow::Borrow;
 use derive_builder::Builder;
 use strum_macros::EnumDiscriminants;
+use starlane_space::err::ParseErrs;
 use starlane_space::types::SchemaKind;
 use starlane_space::types::schema::BindConfig;
 use crate::kind::Specific;
@@ -93,10 +94,10 @@ impl private::Kind for ClassKind  {
 
 
 impl FromStr for ClassKind {
-    type Err = eyre::Error;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        fn ext( s: &str ) -> Result<ClassKind,eyre::Error> {
+        fn ext( s: &str ) -> Result<ClassKind,ParseErrs> {
             Ok(ClassKind::_Ext(CamelCase::from_str(s)?.into()))
         }
 
