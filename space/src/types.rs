@@ -47,14 +47,14 @@ pub(crate) mod private {
     pub(crate) trait Typical: Into<Type> { }
 
 
-
-
-
+    /*
     /// a `Variant` is a unique `Type` in a within a `Category`
     /// `Data` & `Class` categories and their enum variants ... i.e. [Data::Raw],[ClassVariant::_Ext]
     /// are the actual `Type` `Variants`
     /// Variants are always CamelCase
     pub(crate) trait Variant: Kind + Clone + ToString + From<CamelCase> + Into<CamelCase> { }
+
+     */
 
     #[derive(Clone, Debug, Eq, PartialEq, Hash)]
     pub(crate) struct KindVariantDef<T>

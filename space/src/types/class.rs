@@ -15,6 +15,8 @@ use crate::types::private::SpecificKind;
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ClassType))]
 #[strum_discriminants(derive(
+    Clone,
+    Debug,
     Hash,
     strum_macros::EnumString,
     strum_macros::ToString,

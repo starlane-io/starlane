@@ -10,6 +10,8 @@ use crate::types::private::{KindVariantDef, SpecificKind};
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(SchemaType))]
 #[strum_discriminants(derive(
+    Clone,
+    Debug,
     Hash,
     strum_macros::EnumString,
     strum_macros::ToString,
