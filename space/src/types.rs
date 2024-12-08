@@ -29,13 +29,18 @@ pub(crate) mod private {
     use std::str::FromStr;
     use indexmap::IndexMap;
     use itertools::Itertools;
+    use nom::Parser;
+    use nom_supreme::ParserExt;
     use rustls::pki_types::Der;
     use tracing::Instrument;
     use crate::err::ParseErrs;
     use crate::kind::Specific;
-    use crate::parse::{some, CamelCase};
+    use crate::parse::{camel_case, camel_case_chars, some, CamelCase, Res};
+    use crate::parse::util::Span;
     use crate::point::Point;
     use crate::types::class::ClassKind;
+    use crate::types::domain::DomainScope;
+    use crate::types::parse::scoped;
     use super::{domain, err, SchemaKind, Type, TypeCategory, TypeKind};
 
     pub(crate) trait Kind: Clone+Into<TypeKind>+FromStr<Err=ParseErrs>{
@@ -45,17 +50,29 @@ pub(crate) mod private {
 
         fn category(&self) -> TypeCategory;
 
-        fn plus_specific(self, specific: impl ToOwned<Owned=Specific>) -> Exact<Self> {
-            Exact::new(self, specific)
+        fn plus(self, scope: impl ToOwned<Owned=DomainScope>, specific: impl ToOwned<Owned=Specific>) -> Exact<Self> {
+            Exact::scoped(scope,self,specific)
         }
+
+        fn parser<I>() -> impl Fn(I) -> Res<I,Self>+Copy where I:Span {
+            move |input| camel_case_chars.parse_from_str().parse(input)
+        }
+
 
         fn factory() -> impl Fn(Exact<Self>) -> Type;
     }
+
 
     #[derive(Clone)]
     pub(crate) struct Scoped<I> where I: Clone {
         item: I,
         scope: domain::DomainScope
+    }
+
+    impl <K> Scoped<K> where K: Kind {
+       pub fn plus_specific(self, specific: Specific ) -> Exact<K> {
+           K::plus(self.item,self.scope,specific )
+       }
     }
 
     impl <I> Scoped<I> {
@@ -274,7 +291,7 @@ pub(crate) mod private {
             Self::scoped(kind,specific,Default::default())
          }
 
-        pub fn scoped(kind: impl ToOwned<Owned=K>, specific: impl ToOwned<Owned=Specific>, scope: impl ToOwned<Owned=domain::DomainScope>) -> Self {
+        pub fn scoped(scope: impl ToOwned<Owned=domain::DomainScope>,kind: impl ToOwned<Owned=K>, specific: impl ToOwned<Owned=Specific> ) -> Self {
             let kind = kind.to_owned();
             let specific = specific.to_owned();
             let scope = scope.to_owned();
@@ -366,9 +383,11 @@ pub mod parse {
     use nom_supreme::parser_ext::FromStrParser;
     use nom_supreme::ParserExt;
     use nom_supreme::tag::complete::tag;
+    use wasmer_wasix::runtime::resolver::Source;
     use crate::{err, types};
     use crate::err::report::Report;
-    use crate::parse::{camel_case, camel_case_chars, delim_kind, Res, SpaceTree};
+    use crate::kind::Specific;
+    use crate::parse::{camel_case, camel_case_chars, delim_kind, specific, Res, SpaceTree};
     use crate::parse::util::{new_span, result, Span};
     use crate::types::private::{Exact, Kind, Scoped};
     use crate::types::{domain::parse::domain, SchemaKind, Type, TypeKind};
@@ -393,40 +412,42 @@ pub mod parse {
         }
     }
 
+    pub fn scoped_specific<I>(input:I) -> Res<I,Scoped<Specific>> where I: Span  {
+        scoped(specific)(input)
+    }
+
+
+    /// sprinkle in a `Specific` and let's get an `Exact`
+    pub fn exact<I,K>( specific: impl ToOwned<Owned=Specific>) -> impl Fn(I) -> Res<I,Exact<K>> where I: Span, K: Kind {
+        let specific = specific.to_owned();
+        scoped(K::parser).map(|(input,scoped):(I,Scoped<K>)|(input,scoped.plus_specific(specific)))
+    }
+
+    pub fn with_specific<I,F,K,E>( specific: impl ToOwned<Owned=Specific> ) -> impl Fn(I) -> Res<I,Exact<E>> where I: Span, K: Kind {
+        let rtn = scoped(K::parser);
+    }
+
     pub fn or_default<I,F,D>( f: F ) -> impl Fn(I) -> Res<I,D> where I: Span, F: Fn(I) -> Res<I,D>+Copy, D: Default {
         move | input |  {
             opt(f)(input).map(|(input,opt)|opt.unwrap_or_default())
         }
     }
 
-
     fn kind<K:Kind,I:Span>( input: I ) -> Res<I,K> where K: Kind {
         camel_case_chars.parse_from_str().parse(input)
     }
 
-
-    pub fn type_kind<I>( input: I)  -> Res<I,Scoped<TypeKind>> where I: Span {
-        /// into Type
-        fn it<K>(res: Res<I,K> ) -> Res<I,TypeKind> where K: Into<TypeKind>{
-            res.map(|(input,kind)|(input,kind.into()))
-        }
-
-        let into = |(input,kind)| (input,kind.into());
-
-
-        alt((class_kind.map(into), schema_kind.map(into)))(input).map(|(input,exact)|(input, exact.into()))
-    }
-    fn into_type<I,F,E,K>( f: F ) -> impl Fn(I) -> Res<I,Type> where F: Fn(I) -> Res<I,Type>+Copy, K: Kind , E: Into<Type> {
-        move |input|  {
-            f(input)
-        }
+    pub fn type_kind<I>( input: I)  -> Res<I,TypeKind> where I: Span {
+        alt((class_kind, schema_kind))(input).map(into)
     }
 
+    fn into<I,O>((input,kind):(I,impl Into<O>)) -> (I,O) {
+        (input.into(),kind.into())
+    }
 
     pub fn class_kind<I: Span>( input: I)  -> Res<I,ClassKind> {
         camel_case_chars.parse_from_str().parse(input)
     }
-
 
     pub fn schema_kind<I: Span>(input: I) -> Res<I,SchemaKind> {
         camel_case_chars.parse_from_str().parse(input)
