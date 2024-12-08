@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 use dyn_clone::clone;
 use thiserror::Error;
+use crate::kind::Specific;
 use crate::types::TypeKind;
 
 #[derive(Clone, Debug, Error)]
@@ -11,8 +12,8 @@ pub enum TypeErr {
     EmptyMeta(TypeKind),
     #[error("{kind} Meta::by_layer({tried}) index out of bounds because exceeds layers length {len}")]
     MetaLayerIndexOutOfBounds{ kind: TypeKind, tried: usize, len: usize,  },
-
-
+    #[error("specific '{specific} not found in '{search_foundation}'")]
+    SpecificNotFound{ search_location: String ,specific: Specific  },
 }
 
 impl TypeErr {
@@ -30,5 +31,11 @@ impl TypeErr {
         let tried = tried.clone();
         let len = len.to_owned();
         Self::MetaLayerIndexOutOfBounds {kind, tried, len}
+    }
+
+    pub fn specific_not_found(specific: impl ToOwned<Owned=Specific>, search_location: impl ToOwned<Owned=String>) -> Self {
+        let specific = specific.to_owned();
+        let search_location = search_location.to_owned();
+        Self::SpecificNotFound {search_location, specific}
     }
 }

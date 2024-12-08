@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use serde::{Deserialize, Serialize};
 use crate::kind::Specific;
-use crate::point::Point;
 use crate::types::class::ClassKind;
 use crate::types::private::MetaDefs;
 use crate::types::SchemaKind;

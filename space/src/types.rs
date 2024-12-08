@@ -18,6 +18,7 @@ pub enum DefSrc {
 
 pub(crate) mod private {
     use std::borrow::Borrow;
+    use std::fmt::Display;
     use std::marker::PhantomData;
     use std::ops::{Deref, DerefMut, Index};
     use std::str::FromStr;
@@ -25,13 +26,12 @@ pub(crate) mod private {
     use itertools::Itertools;
     use rustls::pki_types::Der;
     use tracing::Instrument;
-    use crate::parse::CamelCase;
+    use crate::parse::{some, CamelCase};
     use crate::kind::Specific;
     use crate::log::Level::Debug;
     use crate::point::Point;
     use crate::types::{err, Type, TypeKind};
     use crate::types::class::Class;
-    use crate::types::err::TypeErr;
     use super::TypeCategory;
 
     pub(crate) trait Kind: Clone+Into<TypeKind>{
@@ -51,7 +51,7 @@ pub(crate) mod private {
 
 
 
-    pub(crate) trait Typical: Into<TypeKind>+Into<Type> { }
+    pub(crate) trait Typical: Display+Into<TypeKind>+Into<Type> { }
 
 
     pub(crate) struct Meta<K> where K: Kind {
@@ -78,22 +78,41 @@ pub(crate) mod private {
             }
         }
 
+
+        pub fn typical(&self) -> impl Typical {
+
+        }
+
+        pub fn describe(&self) -> &str{
+            format!("Meta definitions for type '{}'", self.typical()).as_str()
+        }
+
         pub fn kind(&self) -> & K{
             &self.kind
         }
 
-        fn layer_by_index(&self, index: &usize ) -> Result<&Layer,err::TypeErr> {
-            self.defs.get(index).ok_or(TypeErr::meta_layer_index_out_of_bounds(self.kind.clone(), index ))
+        fn first(&self) -> &Layer {
+            /// it's safe to unwrap because [Meta::new] will not accept empty defs
+            self.defs.first().map(|(_,layer)| layer).unwrap()
         }
+
+
+        fn layer_by_index(&self, index: impl ToOwned<Owned=usize> ) -> Result<&Layer,err::TypeErr> {
+            self.defs.index(index.to_owned()).ok_or(err::TypeErr::meta_layer_index_out_of_bounds(self.kind.clone(), index, self.defs.len() ))
+        }
+
+        fn layer_by_specific(&self, specific: impl ToOwned<Owned=Specific> ) -> Result<&Layer,err::TypeErr> {
+            self.defs.get(specific.borrow()).ok_or(err::TypeErr::specific_not_found(specific,self.describe()))
+        }
+
 
         pub fn specific(&self) -> & Specific  {
-            /// it's safe to unwrap because [Meta::new] will not accept empty defs
-            self.defs.first().map(|(_,layer)| &layer.specific ).unwrap()
+            &self.first().specific
         }
 
 
-        pub fn by_index<'x>(&self, index: &usize) -> Result<MetaLayerAccess<'x,K>,TypeErr> {
-            self.defs.get_index(index.clone()).ok_or(TypeErr::meta_layer_index_out_of_bounds(&self.kind,index,self.defs.len())).map(|(specific,layer)| MetaLayerAccess::new(self,layer))
+        pub fn by_index<'x>(&self, index: &usize) -> Result<MetaLayerAccess<'x,K>,err::TypeErr> {
+            self.defs.get_index(index.clone()).ok_or(err::TypeErr::meta_layer_index_out_of_bounds(&self.kind,index,self.defs.len())).map(|(specific,layer)| MetaLayerAccess::new(self,layer))
         }
      }
 
@@ -111,7 +130,7 @@ pub(crate) mod private {
         }
 
         pub fn build(self) -> Result<Meta<T>,err::TypeErr> {
-            Meta::new(self.typical.into())
+            Meta::new(self.typical.into(),self.defs)
         }
     }
 
@@ -129,15 +148,6 @@ pub(crate) mod private {
         }
     }
 
-    /// [MetaDefs] stores structured references to the [SpecificKind]'s definition elements.
-    /// [Specifics] support hierarchical inheritance which is why [MetaDefs] is composed of
-    /// a vector of [LayerDef]s.  [MetaDefs] composites the parental layers to provide a singular
-    /// view of a [SpecificKind]'s [MetaDefs] defs.
-    ///
-    #[derive(Clone)]
-    pub(crate) struct MetaDefs {
-        layers: Vec<Layer>
-    }
 
 
     pub(crate) struct MetaLayerAccess<'y,K> where K: Kind{
@@ -157,9 +167,6 @@ pub(crate) mod private {
             self.meta.as_type()
         }
 
-        pub fn defs(&'y self) -> &'y MetaDefs {
-            & self.meta.defs
-        }
 
         pub fn meta(&'y self) -> &'y Meta<K>  {
             self.meta
