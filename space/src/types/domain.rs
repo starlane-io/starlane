@@ -95,6 +95,7 @@ impl FromStr for Segment {
         }
     }
 }
+#[cfg(test)]
 pub mod test {
     use crate::types::domain::{DomainScope, Prefix};
     use crate::types::domain::parse::parse;
@@ -125,6 +126,7 @@ pub mod test {
 
         let domain = DomainScope(Some(Prefix::Starlane),vec!["one","two","truee"].into());
         println!("domain: '{}'", domain.to_string());
+        assert!(false)
     }
 }
 

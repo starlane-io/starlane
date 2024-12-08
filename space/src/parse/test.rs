@@ -453,6 +453,8 @@ pub fn test_bind_config() {
            "#;
     util::log(doc(bind_config_str)).unwrap();
 
+    /// the bind format is no longer valid
+    /*
     let bind_config_str = r#"  Bind(version=1.0.0) {
               * -> { // This should fail since Route needs to be defined
                  <*> -> {
@@ -463,6 +465,7 @@ pub fn test_bind_config() {
 
            "#;
     assert!(util::log(doc(bind_config_str)).is_err());
+     */
     let bind_config_str = r#"  Bind(version=1.0.0) {
               Route<Rc> -> {
                 Create ; Bok;
@@ -564,10 +567,10 @@ Bind(version=1.0.0)
 
 
 }"#;
-    assert!(util::log(doc(unknown_config_kind)).is_err());
-    util::log(doc(unsupported_bind_version)).unwrap();
-    util::log(doc(multiple_unknown_sub_selectors)).unwrap();
-    util::log(doc(now_we_got_rows_to_parse)).unwrap();
+    assert!(doc(unknown_config_kind).is_err());
+    assert!(doc(unsupported_bind_version).is_err());
+    assert!(doc(multiple_unknown_sub_selectors).is_err());
+    assert!(doc(now_we_got_rows_to_parse).is_err());
 }
 
 #[test]

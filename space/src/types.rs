@@ -41,25 +41,25 @@ pub(crate) mod private {
     use crate::types::class::ClassKind;
     use crate::types::domain::DomainScope;
     use crate::types::parse::scoped;
-    use super::{domain, err, SchemaKind, Type, TypeCategory, TypeKind};
+    use super::{domain, err, SchemaKind, Type, TypeKind};
 
     pub(crate) trait Kind: Clone+Into<TypeKind>+FromStr<Err=ParseErrs>{
 
         type Type;
 
-
-        fn category(&self) -> TypeCategory;
+        fn category(&self) -> super::TypeCategory;
 
         fn plus(self, scope: impl ToOwned<Owned=DomainScope>, specific: impl ToOwned<Owned=Specific>) -> Exact<Self> {
             Exact::scoped(scope,self,specific)
         }
 
-        fn parser<I>() -> impl Fn(I) -> Res<I,Self>+Copy where I:Span {
+        fn parser<I>() -> impl Fn(I) -> Res<I,Self>+Copy where I:Span
+        {
             move |input| camel_case_chars.parse_from_str().parse(input)
         }
 
 
-        fn factory() -> impl Fn(Exact<Self>) -> Type;
+        fn type_kind(&self) -> TypeKind;
     }
 
 
@@ -273,15 +273,10 @@ pub(crate) mod private {
     impl <K> Into<Type> for Exact<K> where K: Kind
     {
         fn into(self) -> Type {
-            K::factory()(self)
+            self.kind.plus(self.scope,self.specific).into()
         }
     }
 
-    impl <K> Into<Type> for Exact<K> where K: Kind {
-        fn into(self) -> Type {
-            K::factory()(self)
-        }
-    }
 
 
 
@@ -393,6 +388,7 @@ pub mod parse {
     use crate::types::{domain::parse::domain, SchemaKind, Type, TypeKind};
     use crate::types::class::{Class, ClassKind};
     use crate::types::schema::Schema;
+    use crate::util::log;
 
     pub(crate) fn parse<K>(s: impl AsRef<str> ) -> Result<Scoped<K>,err::ParseErrs> where K: Kind{
         let span = new_span(s.as_ref());
@@ -408,26 +404,23 @@ pub mod parse {
      */
     pub fn scoped<I,F,T>( f: F) -> impl Fn(I) -> Res<I,Scoped<T>> where I: Span, F: Fn(I) -> Res<I,T>+Copy {
         move | input | {
-            pair(or_default(terminated(domain,tag("::"))),f)(input).map(|(input,(scope,item))|(input,Scoped::new(scope,item)))
+            pair(opt_def(terminated(domain, tag("::"))), f)(input).map(|(input,(scope,item))|(input, Scoped::new(scope, item)))
         }
     }
 
+    /// scope a specific:
+    /// `some::scope::'starlane.io'::starlane.io:uberscott.com:starlane:dev:1.3.3`   ;
     pub fn scoped_specific<I>(input:I) -> Res<I,Scoped<Specific>> where I: Span  {
         scoped(specific)(input)
     }
-
 
     /// sprinkle in a `Specific` and let's get an `Exact`
     pub fn exact<I,K>( specific: impl ToOwned<Owned=Specific>) -> impl Fn(I) -> Res<I,Exact<K>> where I: Span, K: Kind {
         let specific = specific.to_owned();
         scoped(K::parser).map(|(input,scoped):(I,Scoped<K>)|(input,scoped.plus_specific(specific)))
     }
-
-    pub fn with_specific<I,F,K,E>( specific: impl ToOwned<Owned=Specific> ) -> impl Fn(I) -> Res<I,Exact<E>> where I: Span, K: Kind {
-        let rtn = scoped(K::parser);
-    }
-
-    pub fn or_default<I,F,D>( f: F ) -> impl Fn(I) -> Res<I,D> where I: Span, F: Fn(I) -> Res<I,D>+Copy, D: Default {
+    /// scan `opt(f) -> Option<D>`  then [Option::unwrap_or_default]  to generate a [D::default] value
+    pub fn opt_def<I,F,D>(f: F ) -> impl Fn(I) -> Res<I,D> where I: Span, F: Fn(I) -> Res<I,D>+Copy, D: Default {
         move | input |  {
             opt(f)(input).map(|(input,opt)|opt.unwrap_or_default())
         }
@@ -473,6 +466,19 @@ pub mod parse {
 
 
     }
+    #[cfg(test)]
+    pub mod test{
+        use crate::parse::kind;
+        use crate::parse::util::result;
+        use crate::util::log;
+
+        #[test]
+        pub fn test() {
+            let class = log(result(kind("Database"))).unwrap();
+        }
+    }
+
+
 }
 
 

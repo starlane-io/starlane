@@ -53,6 +53,12 @@ impl From<CamelCase> for SchemaKind {
     }
 }
 
+impl Into<TypeKind> for SchemaKind {
+    fn into(self) -> TypeKind {
+        TypeKind::Schema(self)
+    }
+}
+
 impl private::Kind for SchemaKind {
     type Type = Schema;
 
@@ -60,12 +66,9 @@ impl private::Kind for SchemaKind {
         TypeCategory::Schema
     }
 
+
     fn type_kind(&self) -> TypeKind {
         TypeKind::Schema(self.clone())
-    }
-
-    fn factory() -> impl Fn(Exact<Self>) -> Type {
-        |t| Type::Schema(t)
     }
 }
 
