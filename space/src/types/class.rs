@@ -9,7 +9,7 @@ use starlane_space::types::schema::BindConfig;
 use crate::kind::Specific;
 use crate::parse::CamelCase;
 use crate::point::Point;
-use crate::types::private::SpecificKind;
+use crate::types::private::Exact;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
@@ -82,7 +82,7 @@ impl private::Kind for ClassKind  {
         TypeKind::Class(self.clone())
     }
 
-    fn factory() -> impl Fn(SpecificKind<Self>) -> Type {
+    fn factory() -> impl Fn(Exact<Self>) -> Type {
         |t| Type::Class(t)
     }
 }
@@ -133,7 +133,7 @@ impl Into<TypeCategory> for ClassType {
 
 
 
-pub type Class = private::SpecificKind<ClassKind>;
+pub type Class = private::Exact<ClassKind>;
 
 
 

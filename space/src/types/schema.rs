@@ -4,7 +4,7 @@ use strum_macros::EnumDiscriminants;
 use starlane_space::kind::Specific;
 use starlane_space::types::PointKindDefSrc;
 use crate::parse::CamelCase;
-use crate::types::private::{KindVariantDef, SpecificKind};
+use crate::types::private::{KindVariantDef, Exact};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
@@ -62,7 +62,7 @@ impl private::Kind for SchemaKind {
         TypeKind::Schema(self.clone())
     }
 
-    fn factory() -> impl Fn(SpecificKind<Self>) -> Type {
+    fn factory() -> impl Fn(Exact<Self>) -> Type {
         |t| Type::Schema(t)
     }
 }
@@ -80,7 +80,7 @@ impl Into<TypeCategory> for SchemaKind {
 }
 
 
-pub type Schema = private::SpecificKind<SchemaKind>;
+pub type Schema = private::Exact<SchemaKind>;
 
 
 pub type BindConfigSrc = PointKindDefSrc<SchemaKind>;
