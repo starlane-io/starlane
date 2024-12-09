@@ -1,12 +1,13 @@
 #![crate_type = "lib"]
 #![allow(warnings)]
 
+
 use proc_macro::TokenStream;
+use std::env::Args;
 use std::str::FromStr;
 
 use chrono::Utc;
 use proc_macro2::{Ident, Span};
-use proc_macro_crate::{crate_name, FoundCrate};
 use quote::__private::ext::RepToTokensExt;
 use quote::{format_ident, quote, ToTokens};
 use syn::__private::TokenStream2;
@@ -228,12 +229,13 @@ fn find_route_attr(attrs: &Vec<Attribute>) -> Option<Attribute> {
 #[proc_macro_attribute]
 pub fn route(attr: TokenStream, item: TokenStream ) -> TokenStream {
     item
-}
+u}
 
  */
 
 #[proc_macro_attribute]
 pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
+
     let crt = crt_name();
 
     let input = parse_macro_input!(input as syn::ImplItemMethod);
@@ -1109,3 +1111,26 @@ fn find_log_attr(attrs: &Vec<Attribute>) -> TokenStream {
     rtn.into()
 }
 
+
+mod proxy;
+
+#[proc_macro_attribute]
+pub fn proxy(attr: TokenStream, item: TokenStream,) -> TokenStream {
+    proxy::proxy(attr, item)
+}
+/*
+#[proc_macro_attribute]
+pub fn stubby(attr: TokenStream, input: TokenStream) -> TokenStream {
+
+}
+
+ */
+
+
+#[cfg(test)]
+mod test {
+    #[test]
+    pub fn test() {
+
+    }
+}

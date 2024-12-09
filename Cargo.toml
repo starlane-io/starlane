@@ -102,7 +102,6 @@ downcast-rs = "1.2.1"
 validator = "0.15.0"
 proc-macro-crate = "3.2.0"
 threadpool = "1.8.1"
-oneshot = "0.1.5"
 shadow-rs = "0.36.0"
 convert_case = "0.6.0"
 

@@ -3152,12 +3152,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
-name = "oneshot"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e296cf87e61c9cfc1a61c3c63a0f7f286ed4554e0e22be84e8a38e1d264a2a29"
-
-[[package]]
 name = "openssl"
 version = "0.10.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4998,7 +4992,6 @@ dependencies = [
  "nom-supreme",
  "nom_locate",
  "once_cell",
- "oneshot",
  "path-clean",
  "port_check",
  "postgresql_embedded",
@@ -5089,7 +5082,6 @@ dependencies = [
  "nom-supreme",
  "nom_locate",
  "once_cell",
- "oneshot",
  "path-clean",
  "port_check",
  "postgresql_embedded",
@@ -5178,7 +5170,6 @@ dependencies = [
  "nom-supreme",
  "nom_locate",
  "once_cell",
- "oneshot",
  "path-clean",
  "port_check",
  "postgresql_embedded",
@@ -5234,6 +5225,8 @@ name = "starlane-macros"
 version = "0.3.21"
 dependencies = [
  "chrono",
+ "convert_case",
+ "derive_builder 0.20.2",
  "lazy_static",
  "nom",
  "nom-supreme",
@@ -5289,7 +5282,6 @@ dependencies = [
  "nom-supreme",
  "nom_locate",
  "once_cell",
- "oneshot",
  "path-clean",
  "port_check",
  "postgresql_embedded",
