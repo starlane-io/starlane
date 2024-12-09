@@ -179,13 +179,19 @@ pub struct ProxyFactory {
 impl ProxyFactory {
 
     fn decl(&self) -> proc_macro2::TokenStream {
-        let methods: Vec<TokenStream> = self.methods.iter().map(MethodFactory::decl).collect();
-        let ident = &self.ident;
+        let methods: Vec<String> = self.methods.iter().map(MethodFactory::decl).map(|m| m.to_string()).collect();
+        let ident = &self.ident.to_string();
+
         let decl =quote!{
                enum  #ident {
                    #(#methods),*
                }
             };
+
+        let decl = "enum Mode { A, B }";
+
+        //let decl = syn::parse_str(decl.to_string().as_str()).unwrap();
+        let decl = syn::parse_str(decl).unwrap();
         decl
     }
 }
@@ -231,7 +237,7 @@ impl MethodFactory {
         let new = if args.is_empty() {
             quote!{ #proxy::#method }
         } else if args.len() == 1 {
-            let ty: Type = args.first().unwrap().clone().into();
+            let ty: Type = syn::parse2(args.first().unwrap().clone().to_token_stream()).unwrap();
             quote!{ #proxy::#method(#ty) }
         } else {
             quote!{ #proxy::#method{ #(#args),* }}
@@ -273,7 +279,7 @@ impl MethodFactory {
         let tokens: proc_macro2::TokenStream= if args.is_empty() {
             quote!{ #method }
         } else if args.len() == 1 {
-            let ty = &args.first().unwrap().ty;
+            let ty = &args.first().unwrap().ty.to_string();
             quote!{ #method(#ty) }
         } else {
             quote!{ #method{ #( #args ),* } }
