@@ -22,6 +22,7 @@ use proc_macro::TokenStream;
 use std::borrow::Borrow;
 use convert_case::{Case, Casing};
 use deluxe::HasAttributes;
+use nom_supreme::final_parser::ExtractContext;
 use quote::{format_ident, quote, ToTokens};
 use syn::{parse2, parse_macro_input, parse_quote, Attribute, FnArg, ItemMod, Meta, MetaNameValue, PatType, ReturnType, Signature, Token, TraitItem, Type};
 use syn::parse::ParseStream;
@@ -96,7 +97,7 @@ pub(crate) fn proxy(attrs: TokenStream, proxy_trait: TokenStream,) -> TokenStrea
 
 
     let decl = factory.call();
-    let tx = factory.tx();
+    let tx = factory.relay();
 
 
     let expanded = quote!{   #proxy_trait };
@@ -221,8 +222,8 @@ impl Into<Ident> for MyArg {
 ///let filter : Fn(&Vec<dyn FnArgs>) -> Vec<Arg>  =  |a: &args:Vec<FnArg>| {
 
 struct Names {
-    trait_name: Ident,
-    tx: Ident,
+    ty: Ident,
+    relay: Ident,
     call: Ident,
     runner: Ident,
 }
@@ -248,70 +249,76 @@ impl ProxyFactory {
         };
 
         let trait_name = self.ident.clone();
-        let tx =  format_ident!("{}Tx", common);
+        let relay =  format_ident!("{}Tx", common);
         let call =  format_ident!("{}Call", common);
         let runner =  format_ident!("{}Runner", common);
 
         Names {
-            trait_name,
-            tx,
+            ty: trait_name,
+            relay,
             call,
             runner,
         }
     }
 
     /// the proxy transmitter
-    fn tx(&self) -> TokenStream {
+    fn relay(&self) -> TokenStream {
 
-        let Names{ trait_name, tx, call, runner } = self.names();
-        let tx_methods =  self.methods.iter().map( |method| method.tx(&self.names()).collect::<Vec<_>>();
+        let Names{ ty, relay , call, ..} = self.names();
+        let relay_methods =  self.methods.iter().map(|method| method.relay(&self.names()).collect::<Vec<_>>();
 
         let expand= quote!{
-            pub struct #tx {
+            pub struct #relay {
                 call_tx: tokio::sync::oneshot::Sender<#call>,
             }
 
-            impl #tx {
+            impl #relay {
                 pub fn new(call_tx: tokio::sync::oneshot::Sender<#call>) -> Self {
                    Self{ call_tx }
                 }
             }
 
-            impl #trait_name for #tx {
-                #( #tx_methods )*
+            impl #ty for #relay {
+                #( #relay_methods )*
             }
         };
 
         expand.into()
     }
 
-    fn runner_handler(&self) -> TokenStream {
+    // ProxyFactory
+    fn runner(&self) -> TokenStream {
+        let Names{ ty: trait_name, relay: tx, call, runner } = self.names();
+        let tx_methods =  self.methods.iter().map( |method| method.relay(&self.names())).collect::<Vec<_>>();
 
-        let Names{ trait_name, tx, call, runner } = self.names();
-        let tx_methods =  self.methods.iter().map( |method| method.tx(&self.names())).collect::<Vec<_>>();
+
+
+        /// the handler is just another implementor of trait `trait_name`
+        let handler = &ty;
+
 
         let expand= quote!{
-            pub struct #tx {
+            struct #runner {
                 call_tx: tokio::sync::oneshot::Sender<#call>,
+                handler: Box<dyn #trait_name>,
             }
 
-            impl #tx {
-                pub fn new(call_tx: tokio::sync::oneshot::Sender<#call>) -> Self {
-                   Self{ call_tx }
-                }
+            impl #runner {
+
+                pub fn new( handler: Box<dyn #handler>) -> Box<dyn #trait_name> {}>
+
             }
 
-            impl #trait_name for #tx {
-                #( #tx_methods )*
-            }
         };
 
         expand.into()
     }
+
+
 
     /// implement the `Call` enum
     fn call(&self) -> TokenStream {
-        let Names{ trait_name, tx, call, runner } = self.names();
+        let Names{ ty: trait_name, relay: tx, call, runner } = self.names();
         let variants: Vec<TokenStream> = self.methods.iter().map(MethodFactory::call).collect();
         let ident = &self.ident.to_string();
         let decl =quote!{
@@ -361,23 +368,23 @@ impl MethodFactory {
         args
     }
 
-    fn tx(&self, names: &Names) ->  TokenStream {
-        let Names{ trait_name, tx, call, runner } = names;
+    fn relay(&self, names: &Names) ->  TokenStream {
+        let Names{call, .. } = names;
 
-        let method= &self.sig.ident;
+        let variant = &self.variant_name();
 
         //        let types = args.iter().map(MyArg::ty).collect::<Vec<_>>();
         /// first figure what args send
         let args = self.args_with_rtn();
         let constructor= if args.is_empty() {
-            quote!{ #call::#method }
+            quote!{ #call::#variant }
         } else if args.len() == 1 {
             /// we can safely [Options::unwrap] because we just confirmed 1 args
             let arg_name= args.first().map(|name| &name.ident).unwrap();
-            quote!{ #call::#method(#arg_name) }
+            quote!{ #call::#variant(#arg_name) }
         } else {
             let names = args.iter().map(|name| &name.ident).collect::<Vec<_>>();
-            quote!{ #call::#method{ #(#names),* }}
+            quote!{ #call::#variant{ #(#names),* }}
         };
 
         let (send,recv) = if self.is_async() {
@@ -430,17 +437,33 @@ impl MethodFactory {
     }
 
 
-    fn runner_handler(&self, names: &Names) ->  TokenStream {
-        let Names{ trait_name, tx, call, runner } = names;
+    fn delegate(&self, names: &Names) ->  TokenStream {
+        let Names{  call, ..} = names;
         let variant = self.variant_name();
         let args = self.args_with_rtn();
-        if args.is_empty() {
-            quote!{
-                #call::#variant  => {
+        let handler = format_ident!("self.handler");
+        let method = &self.sig.ident;
 
+        let expand =if args.is_empty() {
+            quote!{
+                #call::variant => { self}
+            }
+
+        } else if args.len()== 1 {
+            if self.has_return_type() {
+                quote!{
+                #call::#variant(rtn)  => {
                 }
             }
-        }
+
+            } else {}
+
+        } else {
+            quote!{
+                #call::#variant  => {
+                }
+            }
+        };
 
 
         let expand = quote! {
@@ -450,6 +473,51 @@ impl MethodFactory {
         };
 
         expand.into()
+    }
+
+    fn to_handler(&self, names: &Names) ->  TokenStream {
+        let Names{call, .. } = names;
+
+        let variant = &self.variant_name();
+
+        //        let types = args.iter().map(MyArg::ty).collect::<Vec<_>>();
+        /// first figure what args send
+        let args = self.args_with_rtn();
+        let constructor= if args.is_empty() {
+            quote!{ #call::#variant }
+        } else if args.len() == 1 {
+            /// we can safely [Options::unwrap] because we just confirmed 1 args
+            let arg_name= args.first().map(|name| &name.ident).unwrap();
+            quote!{ #call::#variant(#arg_name) }
+        } else {
+            let names = args.iter().map(|name| &name.ident).collect::<Vec<_>>();
+            quote!{ #call::#variant{ #(#names),* }}
+        };
+
+        let (send,recv) = if self.is_async() {
+            (quote!{call_tx.send(#constructor).await?;}, quote!{call_rx.recv().await?})
+        } else {
+            (quote!{call_tx.try_send(#constructor)?;}, quote!{call_rx.blocking_recv()?})
+        };
+
+        let sig = &self.sig.extract_context()
+        let payload = if self.return_type().is_some() {
+            quote!{
+                  #sig  {
+                    let (rtn_tx,mut rtn_rx) = #ONESHOT::channel();
+                    #send
+                    #recv
+                  }
+                }
+        } else {
+            quote!{
+                    #sig {
+                    #send
+                    }
+                }
+        };
+
+        payload.into()
     }
 
 }
