@@ -25,6 +25,7 @@ lazy_static = { workspace = true}
 #syn = { workspace = true, features = ["full"] }
 quote = { workspace = true}
 proc-macro2 = {workspace = true, feature=["proc-macro"]}
+deluxe ={ workspace = true }
 strum = { workspace = true}
 strum_macros = { workspace = true }
 regex =  { workspace = true}

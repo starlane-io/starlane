@@ -1,18 +1,50 @@
-use starlane_macros::proxy;
+
+//#![starlane_macros::silly]
+
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use starlane_macros::{proxy, route, show_streams};
+
 
 #[test]
-fn test() {
+pub fn test()
+{
 
-
-
-
-
+}
+pub struct MyStr {
+  meat_ball: bool
 }
 
 
 
-#[proxy(prefix = "Lordie")]
+#[show_streams]
+trait MyTrait {}
+
+
+#[show_streams(i_have_things_to_say)]
+trait Trait2{}
+
+
+/*
+#[proxy]
+impl MyStr {
+    pub fn weird_day(&self) -> &'static str {
+        "yikes!"
+    }
+}
+
+ */
+
+
+/*
+
+
+
+ */
+
+
+#[proxy]
 pub trait My {
-    fn some_method(&self, limits: u8) -> Result<(),()>;
-    async fn gobot(&self, stringy: &str ) -> Result<(),()>;
+  fn some_method(&self, limits: u8) -> Result<(),()> {
+  }
 }
