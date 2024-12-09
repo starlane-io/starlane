@@ -3,18 +3,15 @@
 
 
 use proc_macro::TokenStream;
-use std::env::Args;
 use std::str::FromStr;
 
-use chrono::Utc;
-use proc_macro2::{Ident, Span};
+use proc_macro2::Ident;
 use quote::__private::ext::RepToTokensExt;
 use quote::{format_ident, quote, ToTokens};
 use syn::__private::TokenStream2;
 use syn::parse::{Parse, ParseStream};
-use syn::parse_quote::ParseQuote;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Attribute, Data, DeriveInput, Expr, ExprTuple, File, FnArg, GenericArgument, ImplItem, ItemImpl, LitStr, PathArguments, PathSegment, ReturnType, Type, Visibility};
+use syn::{parse_macro_input, Attribute, Data, DeriveInput, Expr, ExprTuple, File, FnArg, GenericArgument, ImplItem, ItemImpl, LitStr, Meta, PathArguments, PathSegment, ReturnType, Type, Visibility};
 
 /// This macro will auto implement the `#crt::wave::exchange::asynch::DirectedHandler` trait.
 /// In order to finalize the core a `#[handler]` attribute must also be specified
@@ -83,9 +80,9 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
     //    let mut output = vec![];
 
     for item_impl in &impl_item.items {
-        if let ImplItem::Method(call) = item_impl {
+        if let ImplItem::Fn(call) = item_impl {
             if let Some(attr) = find_route_attr(&call.attrs) {
-                let internal = attr.tokens.to_token_stream().to_string();
+                let internal = attr.to_token_stream().to_string();
                 idents.push(format_ident!("__{}__route", call.sig.ident.clone()));
                 let selector_ident = format_ident!("__{}_{}__", impl_name, call.sig.ident);
                 let route_selector = attr.to_token_stream().to_string();
@@ -208,21 +205,7 @@ fn find_impl_type2(item_impl: &ItemImpl) -> Ident {
 }
 
 fn find_route_attr(attrs: &Vec<Attribute>) -> Option<Attribute> {
-    for attr in attrs {
-        if attr
-            .path
-            .segments
-            .last()
-            .expect("segment")
-            .to_token_stream()
-            .to_string()
-            .as_str()
-            == "route"
-        {
-            return Some(attr.clone());
-        }
-    }
-    return None;
+    find_attr("route", attrs)
 }
 
 /*
@@ -238,7 +221,7 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     let crt = crt_name();
 
-    let input = parse_macro_input!(input as syn::ImplItemMethod);
+    let input = parse_macro_input!(input as syn::ImplItemFn);
 
     //    log(route_attribute_value(attr.to_string().as_str())).expect("valid route selector");
 
@@ -1029,7 +1012,7 @@ pub fn logger_att(attr: TokenStream, item: TokenStream) -> TokenStream {
     //    let mut methods = vec![];
 
     for item_impl in &impl_item.items {
-        if let ImplItem::Method(call) = item_impl {
+        if let ImplItem::Fn(call) = item_impl {
             {
                 let (__async, __await) = match call.sig.asyncness {
                     None => (quote! {}, quote! {}),
@@ -1092,21 +1075,7 @@ fn find_impl_type(item_impl: &ItemImpl) -> Ident {
 }
 
 fn find_log_attr(attrs: &Vec<Attribute>) -> TokenStream {
-    for attr in attrs {
-        if attr
-            .path
-            .segments
-            .last()
-            .expect("segment")
-            .to_token_stream()
-            .to_string()
-            .as_str()
-            == "logger"
-        {
-            let rtn = quote!(#attr);
-            return rtn.into();
-        }
-    }
+    let logger = find_attr("logger",attrs).expect("logger attribute");
     let rtn = quote!(logger);
     rtn.into()
 }
@@ -1133,4 +1102,23 @@ mod test {
     pub fn test() {
 
     }
+}
+
+fn find_attr(name:&'static str, attrs: &Vec<Attribute>) -> Option<Attribute> {
+    for attr in attrs {
+        if let Meta::Path(path) = &attr.meta {
+           if path
+                .segments
+                .last()
+                .expect("segment")
+                .to_token_stream()
+                .to_string()
+                .as_str()
+                == name
+            {
+                return Some(attr.clone());
+            }
+        }
+    }
+    None
 }

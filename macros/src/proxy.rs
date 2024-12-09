@@ -20,10 +20,8 @@ static ONESHOT: &str = "tokio::sync::oneshot";
 use proc_macro2::Ident;
 use proc_macro::TokenStream;
 use std::borrow::Borrow;
-use std::ops::Deref;
 use quote::{format_ident, quote, ToTokens};
-use syn::{parse_macro_input, Attribute, AttributeArgs, FnArg, ImplItem, Meta, MetaNameValue, NestedMeta, PatType, ReturnType, Signature, Token, TraitItem, Type};
-use syn::parse::Parse;
+use syn::{parse_macro_input, Attribute, FnArg, PatType, ReturnType, Signature, Token, TraitItem, Type};
 use syn::punctuated::Punctuated;
 
 pub(crate) fn proxy(attrs: TokenStream, proxy_trait: TokenStream,) -> TokenStream {
@@ -34,8 +32,9 @@ pub(crate) fn proxy(attrs: TokenStream, proxy_trait: TokenStream,) -> TokenStrea
     builder.ident(r#trait.ident.into());
 
 
+    /*
     let attrs = attrs.into();
-    let attrs = parse_macro_input!(attrs as AttributeArgs);
+    let attrs = parse_macro_input!(attrs as Attribute::parse_outer);
     for attr in attrs {
         match &attr {
             NestedMeta::Meta(Meta::NameValue(MetaNameValue{ path, lit , .. })) if path.is_ident("prefix") =>  {
@@ -45,8 +44,10 @@ pub(crate) fn proxy(attrs: TokenStream, proxy_trait: TokenStream,) -> TokenStrea
         }
     }
 
+     */
+
     for item in &r#trait.items {
-        if let TraitItem::Method(method) = item {
+        if let TraitItem::Fn(method) = item {
             let mut fac= MethodFactoryBuilder::default();
             fac.sig(method.sig.clone());
         }
@@ -60,29 +61,8 @@ pub(crate) fn proxy(attrs: TokenStream, proxy_trait: TokenStream,) -> TokenStrea
 
 
 fn is_no_proxy(attr: &Vec<Attribute>) -> bool {
-    find_attr("no_proxy", attr).is_some()
+    crate::find_attr("no_proxy", attr).is_some()
 }
-
-
-fn find_attr(name:&'static str, attrs: &Vec<Attribute>) -> Option<Attribute> {
-    for attr in attrs {
-        if attr
-            .path
-            .segments
-            .last()
-            .expect("segment")
-            .to_token_stream()
-            .to_string()
-            .as_str()
-            == name
-        {
-            return Some(attr.clone());
-        }
-    }
-    return None;
-}
-
-
 
 
 #[derive(derive_builder::Builder,Clone)]
@@ -96,8 +76,8 @@ impl MethodFactory {
         self.sig.ident.clone().into()
     }
 
-    pub fn args( &self ) -> Vec<Arg> {
-        Arg::from(&self.sig.inputs)
+    pub fn args( &self ) -> Vec<MyArg> {
+        MyArg::from(&self.sig.inputs)
     }
 
     pub fn has_return_type(&self) -> bool {
@@ -123,15 +103,15 @@ impl MethodFactory {
     }
 }
 
-struct Arg {
+struct MyArg {
     pub ident: Ident,
     pub ty: TokenStream,
 }
 
-impl Arg {
+impl MyArg {
 
 
-    fn from(args:&Punctuated<FnArg, Token![,]>) -> Vec<Arg> {
+    fn from(args:&Punctuated<FnArg, Token![,]>) -> Vec<MyArg> {
 
         fn is_receiver(arg: &&FnArg) -> bool {
             let arg = *arg;
@@ -146,11 +126,11 @@ impl Arg {
             }
         }
 
-        fn from_pat( pat: &PatType ) -> Arg {
+        fn from_pat( pat: &PatType ) -> MyArg {
             let ident = format_ident!("{}",pat.pat.to_token_stream().to_string()).into();
             let ty = pat.to_token_stream().into();
 
-            Arg{
+            MyArg {
                 ident,
                 ty
             }
@@ -161,7 +141,21 @@ impl Arg {
     }
 }
 
-impl Into<Ident> for Arg {
+impl ToTokens for MyArg {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let ident = &self.ident;
+        let ty = &self.ty;
+        let ident : proc_macro2::TokenStream = quote!{#ident};
+        let ty: proc_macro2::TokenStream = format_ident!("{}",ty.to_string()).to_token_stream();
+        let ident : proc_macro2::TokenStream = format_ident!("{}",ident.to_string()).to_token_stream();
+
+
+        let arg: proc_macro2::TokenStream = quote!{#ident: #ty};
+        arg.to_tokens(tokens);
+    }
+}
+
+impl Into<Ident> for MyArg {
     fn into(self) -> Ident {
         self.ident
     }
@@ -169,14 +163,7 @@ impl Into<Ident> for Arg {
 
 
 
-impl Into<TokenStream> for Arg {
-    fn into(self) -> TokenStream {
-        let ident = self.ident;
-        let ty = self.ty;
-        let tokens = quote!{ #ident: #ty };
-        tokens.to_token_stream().into()
-    }
-}
+
 
 ///let filter : Fn(&Vec<dyn FnArgs>) -> Vec<Arg>  =  |a: &args:Vec<FnArg>| {
 
@@ -187,38 +174,36 @@ pub struct ProxyFactory {
     pub ident: Ident,
     pub methods: Vec<MethodFactory>,
     pub has_async: bool,
-
 }
 
 impl ProxyFactory {
 
-    fn decl(&self) -> TokenStream {
+    fn decl(&self) -> proc_macro2::TokenStream {
         let methods: Vec<TokenStream> = self.methods.iter().map(MethodFactory::decl).collect();
         let ident = &self.ident;
         let decl =quote!{
                enum  #ident {
                    #(#methods),*
                }
-
             };
-        decl.into()
+        decl
     }
 }
 
 
-impl From<TokenStream> for Arg{
+impl From<TokenStream> for MyArg {
     fn from(ty: TokenStream) -> Self {
         let ident = format_ident!("rtn").into();
-        Arg { ident, ty }
+        MyArg { ident, ty }
     }
 }
 
 impl MethodFactory {
 
-    fn rtn_as_arg(&self) -> Option<Arg> {
+    fn rtn_as_arg(&self) -> Option<MyArg> {
         match &self.return_type(){
             Some(ty) => {
-                Some(Arg{
+                Some(MyArg {
                     ident: format_ident!("rtn").into(),
                     ty: quote!{ #ONESHOT::Sender<#ty>}.into()
                 })
@@ -228,7 +213,7 @@ impl MethodFactory {
     }
 
 
-    fn args_with_rtn(&self) -> Vec<Arg> {
+    fn args_with_rtn(&self) -> Vec<MyArg> {
         let mut args =self.args();
         if self.has_return_type() {
             args.push(self.rtn_as_arg().unwrap());
@@ -285,7 +270,7 @@ impl MethodFactory {
     fn decl(&self) -> TokenStream {
         let method = &self.sig.ident;
         let args =  self.args_with_rtn();
-        let tokens = if args.is_empty() {
+        let tokens: proc_macro2::TokenStream= if args.is_empty() {
             quote!{ #method }
         } else if args.len() == 1 {
             let ty = &args.first().unwrap().ty;
