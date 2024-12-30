@@ -17,18 +17,16 @@ resolver = "2"
 members = ["main", "space", "hyperspace", "base","macros"]
 
 
-#members = [
-#  "main", "macros", "main-primitive-macros","mechtron"
-#  , "main-space", "ext/service/main-cli-local-filestore-service" , "ext/service/main-cli-filestore-s3-service"]
 
 exclude = [ ]
 
 [workspace.dependencies]
 
+starlane-macros = { package="starlane-macros", path= "macros", version = "0.3.20" }
 starlane-space = { package="starlane-space", path="./space"}
 starlane-base = { package="starlane-base", path="./base"}
 starlane-hyperspace = { package="starlane-hyperspace", path="./hyperspace"}
-starlane-macros = { package="starlane-macros", path= "macros", version = "0.3.20" }
+starlane = { package="starlane", path="./main"}
 
 lazy_static = "1.5.0"
 uuid = { version="1.1.2" }
@@ -38,7 +36,6 @@ tokio-util = "0.7.12"
 tokio-rustls = "0.26.0"
 
 bincode = "1.3.3"
-#sqlx = { version = "0.5.11", features = [ "runtime-tokio-rustls", "postgres", "macros", "any" ] }
 sqlx = "0.8.2"
 strum = "0.26.3"
 strum_macros = "0.26.4"
