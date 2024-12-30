@@ -11,7 +11,6 @@ authors = []
 homepage = "https://starlane.io"
 description="The Workspace package for Starlane.  What to see: './space' contains the "
 
-
 [workspace]
 default-run = "starlane"
 resolver = "2"

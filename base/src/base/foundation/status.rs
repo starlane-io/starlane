@@ -5,6 +5,7 @@ use strum_macros::EnumDiscriminants;
 use thiserror::Error;
 use crate::base::kind::Kind;
 use std::fmt::{Display, Formatter};
+use derive_builder::Builder;
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct Status {
@@ -57,13 +58,13 @@ pub enum PhaseDetail {
     None,
     Downloaded,
     Installed,
-    Initialize,
+    Initialized,
     Started,
     Ready,
 }
 
 impl PhaseDetail {
-    pub fn state(&self) -> Phase {
+    pub fn phase(&self) -> Phase {
         self.clone().into()
     }
 }
@@ -173,13 +174,13 @@ pub enum Report {
 #[strum_discriminants(derive(Hash, Serialize, Deserialize))]
 pub enum PendingDetail {
     /// describe a `prerequisite` that must be satisfied before [Phase::Pending]
-    PreReq {},
+    PreReq { },
     ActionRequest(ActionRequest),
 }
 
 
 #[derive(Error, Clone, Debug, Serialize, Deserialize)]
-pub enum StatusErr {}
+pub enum StatusErr { }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ActionRequest {
@@ -201,7 +202,7 @@ impl ActionRequest {
         self.items.push(item);
     }
 
-    pub fn print(&self) {}
+    pub fn print(&self) { }
 }
 
 impl Display for ActionRequest {
@@ -231,9 +232,10 @@ impl Display for ActionRequest {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize,Builder)]
 pub struct ActionItem {
     pub title: String,
+    #[builder(setter(into, strip_option), default)]
     pub website: Option<String>,
     pub details: String,
 }

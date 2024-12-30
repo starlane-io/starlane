@@ -1083,13 +1083,20 @@ fn find_log_attr(attrs: &Vec<Attribute>) -> TokenStream {
 }
 
 
-mod proxy;
 mod parse;
 
+/// the `proxy` macro is both broken and incomplete.
+/// For that reason it has been disabled until priority for the proxy macro increases
+/// and/or when developer resources become available to finish the proxy feature
+/// -- Scott
+/*
+mod proxy;
 #[proc_macro_attribute]
 pub fn proxy(attr: TokenStream, item: TokenStream,) -> TokenStream {
     proxy::proxy(attr, item)
 }
+
+ */
 
 
 

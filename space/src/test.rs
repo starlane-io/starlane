@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use starlane_macros::{proxy, route, show_streams};
+use starlane_macros::{ route, show_streams};
 
 
 #[test]

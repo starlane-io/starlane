@@ -2,13 +2,32 @@
 name = "starlane-space"
 
 description = """
-Starlane -- An Orchestration and Infrastructure Framework for WebAssembly Components (https://starlane.io)
+Starlane --  (https://starlane.io)
+# THE SPACE LIB
+The 'Space' lib provides basic utilities and APIs for interacting with a Starlane cluster.
+Other parts of Starlane actually build on the Space API in order to drive and control the Starlane Cluster.
+The essential point of Starlane is that it can be extended with new functionality and the Space Api
+is in most cases all that is needed to create a fully working Application.
 
-This packaged manages `HyperSpace` which provides infrastructure for `Space`
-Apis (WebAssembly & external programs meant to provide custom behaviors in Starlane),
+Features, utilties and APIs provided by the Space lib include support for:
+Configuration, Parsing, Type definitions, Access to the Starlane Registry, Access to the ArtifactCache, and much more.
 
-This package references the `starlane-space` package and reuses of it to run the infrastructure and
-it also contains mechanisms (Drivers) for extending the Starlane Type system
+Within the lib exists the Space API which is essential for Starlane to fulfill it's primary goal:
+
+'To enable developers to focus on an application's VALUE ADDING CODE by reducing or eliminating the need to struggle
+with the infrastructure code that supports the value adding code.'
+
+# THE HYPERSPACE LIB
+Space is better understood when compared to the other main Starlane lib and api 'HyperSpace'
+
+HyperSpace IS the shadow lib that magically provides the support infrastructure for the Space lib.  Within HyperSpace
+exists the 'TypeDrivers' and 'Foundation Service' code that supports 'Space'.  If there is need a developer can
+create a custom Driver in order to supply some feature aspect that Starlane doesn't presently provide... of course
+writing a Driver means writing infrastructure support code which is what we are trying to avoid.  Luckily Starlane
+provides a central artifact repository: 'https://hub.starlane.io' where 3rd parties can create new HyperSpace drivers
+which the application developer can easily install to extend his Starlane Cluster. For more info see:
+https://crates.io/crates/starlane-hyperspace
+
 """
 
 version.workspace = true
@@ -22,25 +41,6 @@ repository.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-full = ["server"]
-default = ["hyperspace"]
-std = []
-server = ["space", "service", "hyperspace", "hyperlane", "hyperlane-tcp", "cli", "dep:anyhow", "dep:bollard"]
-cli = ["dep:text_io", "dep:clap", "dep:walkdir", "parse"]
-hypererr = []
-hyperspace = ["dep:futures", "dep:dashmap", "dep:semver", "parse", "dep:zip", "hypererr", "dep:serde", "space", "dep:async-recursion", "dep:clap", "rustls"]
-hyperlane = ["hypererr"]
-hyperlane-tcp = ["hyperlane", "dep:rcgen", "rustls", "dep:tokio-rustls", "dep:tls-api-rustls"]
-hyperlane-quic = ["hyperlane", "dep:rcgen", "rustls", "dep:quinn"]
-parse = ["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
-rustls = ["dep:rustls", "dep:rcgen", "rustls-pemfile", "dep:tokio-rustls"]
-driver = ["hyperspace"]
-dialect = []
-dialect-cli = ["dialect", "dep:clap"]
-service = []
-space = ["parse", "dep:regex", "dep:validator", "dep:convert_case", "dep:serde", "dep:serde_yaml", "dep:serde_json", "dep:enum-ordinalize", "dep:ariadne", "dep:serde_urlencoded", "dep:anyhow", "dep:dashmap"]
-wasm = []
-types2=[]
 
 
 [dependencies]
