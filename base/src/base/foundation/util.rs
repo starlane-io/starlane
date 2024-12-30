@@ -5,7 +5,7 @@ use bincode::Options;
 use derive_name::Name;
 use serde::de::{DeserializeOwned, MapAccess, Visitor};
 use serde::ser::{Error, SerializeMap};
-use serde_derive::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::SerializeAs;
 use serde_yaml::{Mapping, Sequence, Value};
 use std::collections::HashMap;
@@ -382,7 +382,7 @@ where
 pub mod test {
     use derive_name::{Name, Named};
     use downcast_rs::{impl_downcast, Downcast, DowncastSync};
-    use serde_derive::{Deserialize, Serialize};
+    use serde::{Deserialize, Serialize};
     use std::fmt::Debug;
     use std::sync::Arc;
     #[test]

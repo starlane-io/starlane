@@ -1,4 +1,4 @@
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]

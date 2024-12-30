@@ -90,7 +90,7 @@ pub mod concrete {
     use crate::base::registry::Registry;
     use crate::space::progress::Progress;
     use base::foundation;
-    use serde_derive::{Deserialize, Serialize};
+    use serde::{Deserialize, Serialize};
     use std::sync::Arc;
     use tokio::sync::watch::Receiver;
 
@@ -193,7 +193,7 @@ pub mod concrete {
         use crate::base::kind::{DependencyKind, Kind, ProviderKind};
         use crate::base::{config, foundation};
         use crate::space::progress::Progress;
-        use serde_derive::{Deserialize, Serialize};
+        use serde::{Deserialize, Serialize};
         use std::collections::HashMap;
         use std::sync::Arc;
         use tokio::sync::watch::Receiver;
@@ -292,7 +292,7 @@ pub mod concrete {
             use crate::base::kind::ProviderKind;
             use crate::space::parse::CamelCase;
             use crate::space::progress::Progress;
-            use serde_derive::{Deserialize, Serialize};
+            use serde::{Deserialize, Serialize};
             use std::sync::Arc;
             use tokio::sync::watch::Receiver;
             mod dependency {
@@ -358,9 +358,9 @@ pub mod concrete {
             use super::my;
             use crate::base::err::BaseErr;
             use crate::base::foundation::status::Status;
-            use crate::base::partial;
             use crate::base::partial::skel as root;
-            use serde_derive::{Deserialize, Serialize};
+            use crate::base::partial;
+            use serde::{Deserialize, Serialize};
             use tokio::sync::watch::Receiver;
 
             #[derive(Clone, Debug, Serialize, Deserialize)]

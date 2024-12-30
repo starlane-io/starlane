@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use nom::bytes::complete::tag;
 use nom::combinator::all_consuming;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::err::{ParseErrs, SpaceErr};
 use crate::kind::{BaseKind, Kind, KindParts};

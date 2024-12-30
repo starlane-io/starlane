@@ -4,7 +4,6 @@ use crate::driver::{
 };
 use crate::hyperspace::platform::Platform;
 use crate::hyperspace::star::HyperStarSkel;
-use once_cell::sync::Lazy;
 use space::artifact::ArtRef;
 use space::config::bind::BindConfig;
 use space::kind::{BaseKind, Kind};
@@ -14,6 +13,7 @@ use space::selector::KindSelector;
 use space::util::log;
 use space::wave::core::CoreBounce;
 use space::wave::exchange::asynch::{DirectedHandler, RootInCtx};
+use once_cell::sync::Lazy;
 use std::str::FromStr;
 use std::sync::Arc;
 

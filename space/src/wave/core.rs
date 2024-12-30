@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use thiserror::__private::AsDisplay;
 
 use crate::command::Command;
-use crate::err::StatusErr;
 use crate::err::{ParseErrs, SpaceErr};
+use crate::err::StatusErr;
 use crate::loc::{Surface, ToSurface};
 use crate::substance::{FormErrs, Substance, ToSubstance};
 use crate::util::{ValueMatcher, ValuePattern};
@@ -14,8 +14,8 @@ use crate::wave::core::ext::ExtMethod;
 use crate::wave::core::http2::{HttpMethod, StatusCode};
 use crate::wave::core::hyper::HypMethod;
 use crate::wave::{Bounce, PingCore, PongCore, ToRecipients, WaveId};
-use starlane_macros::Autobox;
 use url::Url;
+use starlane_macros::Autobox;
 
 pub mod cmd;
 pub mod ext;

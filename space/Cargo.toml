@@ -62,25 +62,26 @@ ascii = { workspace = true }
 url = { workspace = true }
 serde_with_macros = { workspace = true }
 # hyper requirements
-futures = { workspace = true }
-dashmap = { workspace = true }
-semver = { workspace = true }
-serde = { workspace = true }
-rustls = { workspace = true, features = ["aws_lc_rs"] }
+futures = { workspace = true, default-features = true, optional = true }
+dashmap = { workspace = true, optional = true }
+semver = { workspace = true, features = ['serde'], optional = true }
+serde = { workspace = true, features = ['derive', 'rc'], optional = true }
+rustls = { workspace = true, optional = true, features = ["aws_lc_rs"] }
 
-ariadne = { workspace = true }
-nom = { workspace = true }
-nom-supreme = { workspace = true }
-nom_locate = { workspace = true }
-regex = { workspace = true }
-serde_json = { workspace = true }
-serde_urlencoded = { workspace = true }
-enum-ordinalize = { workspace = true }
-convert_case = { workspace = true }
-validator = { workspace = true }
+ariadne = { workspace = true, optional = true }
+nom = { workspace = true, optional = true }
+nom-supreme = { workspace = true, optional = true }
+nom_locate = { workspace = true, optional = true }
+regex = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+serde_urlencoded = { workspace = true, optional = true }
+enum-ordinalize = { workspace = true, optional = true }
+convert_case = { workspace = true, optional = true }
+validator = { workspace = true, optional = true }
 
 
-anyhow = { workspace = true }
+
+anyhow = { workspace = true, optional = true }
 cliclack = { workspace = true }
 derive_builder = { workspace = true }
 derive-name = { workspace = true }
@@ -88,9 +89,6 @@ derive-name = { workspace = true }
 #tracing = { workspace = true, features=["std","log","attributes","tracing-attributes","max_level_trace"]}
 tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-attributes", "async-await"] }
 dyn-clone = { workspace = true }
-
-md5 = {workspace = true}
-serde_derive = {workspace = true}
 
 [build-dependencies]
 shadow-rs = { workspace = true }

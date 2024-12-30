@@ -1,6 +1,7 @@
 use crate::service::{ServiceSelector, ServiceTemplate};
-use itertools::Itertools;
 use space::selector::KindSelector;
+use itertools::Itertools;
+use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]

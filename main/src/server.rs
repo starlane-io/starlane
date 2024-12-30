@@ -33,7 +33,7 @@ use crate::hyperspace::registry::err::RegErr;
 use crate::hyperspace::shutdown::panic_shutdown;
 use anyhow::anyhow;
 use port_check::is_local_ipv4_port_free;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use starlane_primitive_macros::{logger, push_loc};
 use std::collections::HashSet;
 use std::ops::Deref;

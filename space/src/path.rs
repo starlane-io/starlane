@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::parse::util::new_span;
 

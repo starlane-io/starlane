@@ -14,10 +14,6 @@ use crate::star::{
     HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
 };
 use crate::template::Templates;
-use async_trait::async_trait;
-use dashmap::DashMap;
-use futures::future::{join_all, select_all, BoxFuture};
-use futures::{FutureExt, TryFutureExt};
 use space::artifact::asynch::{ArtErr, ArtifactFetcher, Artifacts};
 use space::command::direct::create::KindTemplate;
 use space::err::{HyperSpatialError, SpaceErr, SpatialError};
@@ -35,6 +31,10 @@ use space::util::{OptSelector, ValuePattern};
 use space::wave::core::cmd::CmdMethod;
 use space::wave::exchange::asynch::Exchanger;
 use space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
+use async_trait::async_trait;
+use dashmap::DashMap;
+use futures::future::{join_all, select_all, BoxFuture};
+use futures::{FutureExt, TryFutureExt};
 use starlane_primitive_macros::{push_loc, push_mark};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;

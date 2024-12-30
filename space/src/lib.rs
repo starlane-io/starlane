@@ -1,10 +1,12 @@
 #![allow(warnings)]
 
+use std::str::FromStr;
+use once_cell::sync::Lazy;
+use crate::point::Point;
+
+
 // so macros will work
 extern crate self as starlane_space;
-use crate::point::Point;
-use once_cell::sync::Lazy;
-use std::str::FromStr;
 
 
 #[allow(missing_docs, unused_imports,warnings)]

@@ -3,10 +3,6 @@ pub mod tcp;
 #[cfg(feature = "quic")]
 pub mod quic;
 
-use async_trait::async_trait;
-use dashmap::DashMap;
-use derive_name::Name;
-use once_cell::sync::Lazy;
 use space::err::SpaceErr;
 use space::hyper::{Greet, InterchangeKind, Knock};
 use space::loc::{Layer, PointFactory, Surface, ToSurface};
@@ -20,6 +16,10 @@ use space::wave::exchange::asynch::{
 use space::wave::exchange::SetStrategy;
 use space::wave::{Agent, DirectedProto, HyperWave, Wave};
 use space::VERSION;
+use async_trait::async_trait;
+use dashmap::DashMap;
+use derive_name::Name;
+use once_cell::sync::Lazy;
 use starlane_primitive_macros::{push_loc, push_mark};
 use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
@@ -1927,8 +1927,8 @@ impl Bridge {
 #[cfg(test)]
 mod tests {
     use crate::hyperlane::HyperRouter;
-    use async_trait::async_trait;
     use space::wave::HyperWave;
+    use async_trait::async_trait;
 
     /*
     #[no_mangle]

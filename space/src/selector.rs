@@ -7,7 +7,6 @@ use serde::de::{DeserializeOwned, Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::err::ParseErrs;
-use crate::err::SpaceErr;
 use crate::kind::{BaseKind, Kind, KindParts, Specific, SubKind};
 use crate::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};
 use crate::parse::util::result;
@@ -22,6 +21,7 @@ use crate::substance::{
     SubstancePatternCtx, SubstancePatternDef,
 };
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
+use crate::err::SpaceErr;
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
 
 pub type PointSegKindHop = HopDef<PointSegSelector, KindSelector>;

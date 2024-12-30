@@ -12,6 +12,7 @@ extern crate starlane_macros;
 shadow!(build);
 
 use once_cell::sync::Lazy;
+use shadow_rs::shadow;
 use std::str::FromStr;
 
 pub static VERSION: Lazy<semver::Version> =

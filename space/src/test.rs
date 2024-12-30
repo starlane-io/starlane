@@ -2,8 +2,8 @@
 //#![starlane_macros::silly]
 
 use async_trait::async_trait;
-use serde_derive::{Deserialize, Serialize};
-use starlane_macros::{route, show_streams};
+use serde::{Deserialize, Serialize};
+use starlane_macros::{ route, show_streams};
 
 
 #[test]

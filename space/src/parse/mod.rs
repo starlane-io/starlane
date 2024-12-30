@@ -92,7 +92,7 @@ use nom_supreme::error::GenericErrorTree;
 use nom_supreme::final_parser::ExtractContext;
 use nom_supreme::ParserExt;
 use regex::Regex;
-use serde_derive::{Deserialize,  Serialize };
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with_macros::{DeserializeFromStr, SerializeDisplay};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
@@ -3944,7 +3944,7 @@ pub mod model {
     use crate::wave::{DirectedWave, SingularDirectedWave};
     use regex::Regex;
     use serde::de::Visitor;
-    use serde_derive::{Deserialize, Serialize};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use thiserror::Error;
 
     #[derive(Clone)]
@@ -5429,8 +5429,8 @@ where
 pub mod cmd_test {
     use core::str::FromStr;
 
-    use crate::command::direct::create::KindTemplate;
     use crate::command::{Command, CommandVar};
+    use crate::command::direct::create::KindTemplate;
     use crate::err::ParseErrs;
     use crate::kind::{BaseKind, Kind};
     use crate::parse::util::{new_span, result};
@@ -5442,22 +5442,22 @@ pub mod cmd_test {
         command, create_command, point_selector, publish_command, script, upload_blocks, CamelCase,
     };
     /*
-            #[mem]
-            pub async fn test2() -> Result<(),Error>{
-                let input = "? xreate localhost<Space>";
-                let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
-                match x {
-                    Ok(_) => {}
-                    Err(err) => {
-                        println!("err: {}", err.to_string())
-                    }
+        #[mem]
+        pub async fn test2() -> Result<(),Error>{
+            let input = "? xreate localhost<Space>";
+            let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
+            match x {
+                Ok(_) => {}
+                Err(err) => {
+                    println!("err: {}", err.to_string())
                 }
-
-
-                Ok(())
             }
 
-             */
+
+            Ok(())
+        }
+
+         */
 
     //    #[test]
     pub fn test() -> Result<(), ParseErrs> {

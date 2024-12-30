@@ -3,7 +3,7 @@ use std::ops::Deref;
 
 use nom::combinator::all_consuming;
 use regex::Regex;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::parse::util::{new_span, result};
 

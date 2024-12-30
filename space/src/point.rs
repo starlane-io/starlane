@@ -17,8 +17,9 @@ use crate::util::ToResolved;
 use crate::wave::{Agent, Recipients, ToRecipients};
 use crate::{ANONYMOUS, HYPERUSER};
 use core::str::FromStr;
+use md5::{Digest, Md5};
 use nom::combinator::all_consuming;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use thiserror::__private::AsDisplay;
 
@@ -1388,8 +1389,9 @@ impl Point {
 
     pub fn md5(&self) -> String {
         let mut hasher = Md5::new();
-        let digest = md5::compute(self.to_string().as_bytes());
-        format!("{:x}", digest)
+        hasher.update(self.to_string());
+        let result = hasher.finalize();
+        format!("{:x}", result)
     }
 }
 

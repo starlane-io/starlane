@@ -1,7 +1,7 @@
-use crate::selector::SpecificSelector;
+use std::sync::Arc;
 use crate::types::registry::err::RegErr;
 use async_trait::async_trait;
-use std::sync::Arc;
+use crate::selector::SpecificSelector;
 
 pub type Registry = Arc<dyn TypeRegistry>;
 

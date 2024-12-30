@@ -1,8 +1,8 @@
+use std::borrow::Borrow;
+use dyn_clone::clone;
+use thiserror::Error;
 use crate::kind::Specific;
 use crate::types::TypeKind;
-use dyn_clone::clone;
-use std::borrow::Borrow;
-use thiserror::Error;
 
 #[derive(Clone, Debug, Error)]
 pub enum TypeErr {

@@ -3,7 +3,7 @@ use crate::loc::ToSurface;
 use crate::point::Point;
 use crate::substance::Bin;
 use core::borrow::Borrow;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use std::sync::Arc;
 

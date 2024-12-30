@@ -1,11 +1,11 @@
 use crate::base::foundation::kind::FoundationKind;
-use crate::base::kind::Kind;
 use crate::space::parse::CamelCase;
-use derive_builder::Builder;
-use serde_derive::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
+use serde::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
+use crate::base::kind::Kind;
+use std::fmt::{Display, Formatter};
+use derive_builder::Builder;
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct Status {

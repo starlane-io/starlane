@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
 use crate::parse::util::Tw;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 
@@ -16,7 +16,6 @@ use crate::log::{Log, LogSpan, PointlessLog, SpanEvent};
 use crate::parse::model::Subst;
 use crate::parse::Env;
 use crate::particle::Particle;
-use crate::particle::{Details, Status, Stub};
 use crate::point::{Point, PointCtx, PointVar};
 use crate::util;
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
@@ -26,8 +25,9 @@ use crate::wave::core::http2::HttpMethod;
 use crate::wave::core::hyper::HypMethod;
 use crate::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::wave::{PongCore, Wave};
-use starlane_macros::{Autobox, ToSubstance};
+use crate::particle::{Details, Status, Stub};
 use url::Url;
+use starlane_macros::{Autobox, ToSubstance};
 
 #[derive(
     Debug,

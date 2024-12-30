@@ -1,5 +1,4 @@
 use crate::registry::err::RegErr;
-use async_trait::async_trait;
 use space::command::common::{SetProperties, SetRegistry};
 use space::command::direct::create::Strategy;
 use space::command::direct::delete::Delete;
@@ -8,11 +7,12 @@ use space::command::direct::select::{Select, SubSelect};
 use space::hyper::{ParticleLocation, ParticleRecord};
 use space::kind::Kind;
 use space::particle::{Details, Properties, Status, Stub};
-use space::point::Point;
 use space::security::{Access, AccessGrant, IndexedAccessGrant};
 use space::selector::Selector;
 use space::substance::SubstanceList;
+use async_trait::async_trait;
 use std::sync::Arc;
+use space::point::Point;
 
 pub type Registry = Arc<dyn RegistryApi>;
 

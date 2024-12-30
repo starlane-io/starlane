@@ -1,16 +1,8 @@
 use core::str::FromStr;
 
 use nom::combinator::all_consuming;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
-use crate::command::direct::delete::Delete;
-use crate::command::direct::select::Select;
-use crate::err::ParseErrs;
-use crate::parse::util::{new_span, result, Trace};
-use crate::parse::{command_line, Env};
-use crate::substance::{Bin, ChildSubstance};
-use crate::util::ToResolved;
-use crate::wave::core::cmd::CmdMethod;
 use direct::create::{Create, CreateCtx, CreateVar};
 use direct::delete::{DeleteCtx, DeleteVar};
 use direct::get::{Get, GetCtx, GetVar};
@@ -19,6 +11,14 @@ use direct::select::{SelectCtx, SelectVar};
 use direct::set::{Set, SetCtx, SetVar};
 use direct::write::{Write, WriteCtx, WriteVar};
 use starlane_macros::Autobox;
+use crate::command::direct::delete::Delete;
+use crate::command::direct::select::Select;
+use crate::err::ParseErrs;
+use crate::parse::util::{new_span, result, Trace};
+use crate::parse::{command_line, Env};
+use crate::substance::{Bin, ChildSubstance};
+use crate::util::ToResolved;
+use crate::wave::core::cmd::CmdMethod;
 
 pub mod common {
     use std::collections::hash_map::Iter;
@@ -26,7 +26,7 @@ pub mod common {
     use std::convert::{TryFrom, TryInto};
     use std::ops::{Deref, DerefMut};
 
-    use serde_derive::{Deserialize, Serialize};
+    use serde::{Deserialize, Serialize};
 
     use crate::err::ParseErrs;
     use crate::loc::Variable;
@@ -188,7 +188,7 @@ pub mod common {
 pub mod direct {
     //    use http::status::InvalidStatusCode;
     //    use http::{HeaderMap, Request, StatusCode, Uri};
-    use serde_derive::{Deserialize, Serialize};
+    use serde::{Deserialize, Serialize};
 
     use crate::command::direct::create::Create;
     use crate::command::direct::get::Get;
@@ -262,7 +262,7 @@ pub mod direct {
     }
 
     pub mod set {
-        use serde_derive::{Deserialize, Serialize};
+        use serde::{Deserialize, Serialize};
 
         use crate::command::common::SetProperties;
         use crate::err::ParseErrs;
@@ -307,7 +307,7 @@ pub mod direct {
     }
 
     pub mod get {
-        use serde_derive::{Deserialize, Serialize};
+        use serde::{Deserialize, Serialize};
 
         use crate::err::ParseErrs;
         use crate::parse::Env;
@@ -357,6 +357,10 @@ pub mod direct {
     }
 
     pub mod create {
+        use std::convert::TryInto;
+        use std::sync::atomic::{AtomicU64, Ordering};
+        use std::sync::Arc;
+        use async_trait::async_trait;
         use crate::command::common::{SetProperties, StateSrc, StateSrcVar};
         use crate::command::Command;
         use crate::err::{ParseErrs, SpaceErr};
@@ -372,11 +376,7 @@ pub mod direct {
         use crate::wave::core::ext::ExtMethod;
         use crate::wave::core::DirectedCore;
         use crate::wave::DirectedProto;
-        use async_trait::async_trait;
-        use serde_derive::{Deserialize, Serialize};
-        use std::convert::TryInto;
-        use std::sync::atomic::{AtomicU64, Ordering};
-        use std::sync::Arc;
+        use serde::{Deserialize, Serialize};
         use thiserror::__private::AsDisplay;
 
         pub enum PointTemplateSeg {
@@ -699,7 +699,7 @@ pub mod direct {
     pub mod select {
         use std::convert::{TryFrom, TryInto};
 
-        use serde_derive::{Deserialize, Serialize};
+        use serde::{Deserialize, Serialize};
 
         use crate::err::{ParseErrs, SpaceErr};
         use crate::parse::Env;
@@ -866,7 +866,7 @@ pub mod direct {
     }
 
     pub mod delete {
-        use serde_derive::{Deserialize, Serialize};
+        use serde::{Deserialize, Serialize};
 
         use crate::command::direct::select::{Select, SelectIntoSubstance};
         use crate::err::ParseErrs;
@@ -901,7 +901,7 @@ pub mod direct {
     pub mod write {
         use std::convert::TryInto;
 
-        use serde_derive::{Deserialize, Serialize};
+        use serde::{Deserialize, Serialize};
 
         use crate::err::ParseErrs;
         use crate::parse::Env;
@@ -939,7 +939,7 @@ pub mod direct {
     }
 
     pub mod read {
-        use serde_derive::{Deserialize, Serialize};
+        use serde::{Deserialize, Serialize};
 
         use crate::err::ParseErrs;
         use crate::parse::Env;
@@ -979,7 +979,7 @@ pub mod direct {
     pub mod query {
         use std::convert::TryInto;
 
-        use serde_derive::{Deserialize, Serialize};
+        use serde::{Deserialize, Serialize};
 
         use crate::err::SpaceErr;
         use crate::selector::PointHierarchy;

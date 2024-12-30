@@ -1,6 +1,6 @@
 use ::core::borrow::Borrow;
 use ::core::fmt::{Display, Formatter};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ops;
 use std::ops::{Deref, DerefMut};

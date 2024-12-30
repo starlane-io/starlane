@@ -1,9 +1,10 @@
-use crate::executor::dialect::filestore::{FileStore, FileStoreErr};
+use crate::executor::cli::os::CliOsExecutor;
+use crate::executor::cli::HostEnv;
+use crate::executor::dialect::filestore::{FileStore, FileStoreErr, FILE_STORE_ROOT};
 use crate::executor::{ExeConf, Executor};
 use crate::host::err::HostErr;
+use crate::host::{ExeStub, Host, HostCli};
 use crate::machine::MachineErr;
-use itertools::Itertools;
-use nom::AsBytes;
 use space::err::SpaceErr;
 use space::kind::Kind;
 use space::loc::ToBaseKind;
@@ -12,12 +13,15 @@ use space::point::Point;
 use space::selector::KindSelector;
 use space::util::{IdSelector, MatchSelector, OptSelector, RegexMatcher, ValueMatcher};
 use space::wave::exchange::asynch::{DirectedHandler, Router};
+use itertools::Itertools;
+use nom::AsBytes;
+use std::env;
 use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::hash::Hash;
 use std::io::Read;
 use std::ops::{Deref, DerefMut};
-use std::path::PathBuf;
+use std::path::{absolute, PathBuf};
 use std::str::FromStr;
 use strum_macros::EnumString;
 use thiserror::Error;
@@ -281,7 +285,7 @@ pub mod tests {
     use crate::executor::{ExeConf, Executor};
     use crate::host::HostCli;
     use crate::service::{
-        service_conf, Service, ServiceErr, ServiceKind, ServiceTemplate,
+        service_conf, Service, ServiceConf, ServiceErr, ServiceKind, ServiceTemplate,
     };
     use space::kind::{BaseKind, Kind};
     use space::selector::KindSelector;
