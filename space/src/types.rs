@@ -21,27 +21,27 @@ pub enum DefSrc {
 }
 
 pub(crate) mod private {
+    use super::{domain, err, SchemaKind, Type, TypeKind};
+    use crate::err::ParseErrs;
+    use crate::kind::Specific;
+    use crate::parse::util::Span;
+    use crate::parse::{camel_case, camel_case_chars, some, CamelCase, Res};
+    use crate::point::Point;
+    use crate::types::class::ClassKind;
+    use crate::types::domain::DomainScope;
+    use crate::types::parse::scoped;
+    use indexmap::IndexMap;
+    use itertools::Itertools;
+    use nom::Parser;
+    use nom_supreme::ParserExt;
+    use rustls::pki_types::Der;
     use std::borrow::Borrow;
     use std::collections::HashMap;
     use std::fmt::Display;
     use std::marker::PhantomData;
     use std::ops::{Deref, DerefMut, Index};
     use std::str::FromStr;
-    use indexmap::IndexMap;
-    use itertools::Itertools;
-    use nom::Parser;
-    use nom_supreme::ParserExt;
-    use rustls::pki_types::Der;
     use tracing::Instrument;
-    use crate::err::ParseErrs;
-    use crate::kind::Specific;
-    use crate::parse::{camel_case, camel_case_chars, some, CamelCase, Res};
-    use crate::parse::util::Span;
-    use crate::point::Point;
-    use crate::types::class::ClassKind;
-    use crate::types::domain::DomainScope;
-    use crate::types::parse::scoped;
-    use super::{domain, err, SchemaKind, Type, TypeKind};
 
     pub(crate) trait Kind: Clone+Into<TypeKind>+FromStr<Err=ParseErrs>{
 
@@ -359,36 +359,36 @@ pub type PointKindDefSrc<Kind> = SrcDef<Point,Kind>;
 pub type DataPoint = PointTypeDef<Point, SchemaKind>;
 
 
-pub use schema::SchemaKind;
-use starlane_space::kind::Specific;
 use crate::point::Point;
 use crate::types::class::{Class, ClassKind};
 use crate::types::private::Kind;
 use crate::types::schema::Schema;
+pub use schema::SchemaKind;
+use starlane_space::kind::Specific;
 
 
 pub mod parse {
-    use std::str::FromStr;
+    use crate::err::report::Report;
+    use crate::kind::Specific;
+    use crate::parse::util::{new_span, result, Span};
+    use crate::parse::{camel_case, camel_case_chars, delim_kind, specific, Res, SpaceTree};
+    use crate::types::class::{Class, ClassKind};
+    use crate::types::private::{Exact, Kind, Scoped};
+    use crate::types::schema::Schema;
+    use crate::types::{domain::parse::domain, SchemaKind, Type, TypeKind};
+    use crate::util::log;
+    use crate::{err, types};
     use ascii::AsciiChar::i;
     use nom::branch::alt;
     use nom::combinator::opt;
     use nom::multi::{separated_list0, separated_list1};
-    use nom::Parser;
     use nom::sequence::{delimited, pair, terminated, tuple};
+    use nom::Parser;
     use nom_supreme::parser_ext::FromStrParser;
-    use nom_supreme::ParserExt;
     use nom_supreme::tag::complete::tag;
+    use nom_supreme::ParserExt;
+    use std::str::FromStr;
     use wasmer_wasix::runtime::resolver::Source;
-    use crate::{err, types};
-    use crate::err::report::Report;
-    use crate::kind::Specific;
-    use crate::parse::{camel_case, camel_case_chars, delim_kind, specific, Res, SpaceTree};
-    use crate::parse::util::{new_span, result, Span};
-    use crate::types::private::{Exact, Kind, Scoped};
-    use crate::types::{domain::parse::domain, SchemaKind, Type, TypeKind};
-    use crate::types::class::{Class, ClassKind};
-    use crate::types::schema::Schema;
-    use crate::util::log;
 
     pub(crate) fn parse<K>(s: impl AsRef<str> ) -> Result<Scoped<K>,err::ParseErrs> where K: Kind{
         let span = new_span(s.as_ref());
@@ -448,13 +448,13 @@ pub mod parse {
 
 
     pub mod delim {
-        use nom::sequence::delimited;
-        use nom_supreme::tag::complete::tag;
-        use crate::parse::Res;
+        use super::scoped;
         use crate::parse::util::Span;
+        use crate::parse::Res;
         use crate::types::class::Class;
         use crate::types::private::Scoped;
-        use super::scoped;
+        use nom::sequence::delimited;
+        use nom_supreme::tag::complete::tag;
 
         pub fn class<I: Span>(input: I) -> Res<I,Scoped<Class>> {
             delimited(tag("<"),scoped,tag(">"))(input)

@@ -1,7 +1,7 @@
 #![cfg(all(test, feature = "postgres-tests"))]
 
 use once_cell::sync::Lazy;
-use serde::Serialize;
+use serde_derive::Serialize;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;

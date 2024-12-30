@@ -1,4 +1,6 @@
+use crate::err::SpaceErr;
 use crate::loc::{Surface, ToPoint};
+use crate::substance::{Substance, ToSubstance};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::{CoreBounce, ReflectedCore};
 use crate::wave::exchange::{
@@ -6,11 +8,9 @@ use crate::wave::exchange::{
     RootInCtxDef, SetStrategy,
 };
 use crate::wave::{Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, FromReflectedAggregate, Handling, PongCore, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave, Scope, Wave, WaveVariantDef};
+use starlane_macros::log_span;
 use std::borrow::Cow;
 use std::sync::Arc;
-use starlane_macros::log_span;
-use crate::err::SpaceErr;
-use crate::substance::{Substance, ToSubstance};
 
 pub trait ExchangeRouter: Send + Sync {
     fn route(&self, wave: Wave);

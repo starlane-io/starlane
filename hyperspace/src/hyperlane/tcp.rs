@@ -2,16 +2,16 @@ use crate::hyperlane::{
     HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
     HyperwayEndpointFactory,
 };
+use async_trait::async_trait;
+use rcgen::{generate_simple_self_signed, RcgenError};
+use rustls::pki_types::ServerName;
+use rustls::{RootCertStore, ServerConfig};
 use space::err::SpaceErr;
 use space::hyper::Knock;
 use space::log::Logger;
 use space::substance::Substance;
 use space::wave::{PingCore, Wave, WaveVariantDef};
 use space::VERSION;
-use async_trait::async_trait;
-use rcgen::{generate_simple_self_signed, RcgenError};
-use rustls::pki_types::ServerName;
-use rustls::{RootCertStore, ServerConfig};
 use std::io;
 use std::io::{BufReader, Read};
 use std::str::FromStr;
@@ -582,12 +582,12 @@ mod tests {
     use crate::hyperlane::test_util::{
         LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
     };
+    use anyhow::anyhow;
+    use chrono::{DateTime, Utc};
     use space::err::SpaceErr;
     use space::loc::ToSurface;
     use space::log::{LogAppender, StdOutAppender};
     use space::point::Point;
-    use anyhow::anyhow;
-    use chrono::{DateTime, Utc};
     use starlane_primitive_macros::{logger, push_loc};
     use std::str::FromStr;
     use std::sync::Arc;

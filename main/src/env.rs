@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use atty::Stream;
 use chrono::Utc;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use std::env::current_dir;
 use std::fs;
 use std::fs::File;

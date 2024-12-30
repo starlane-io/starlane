@@ -22,11 +22,14 @@ repository.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[features]
 
 
 [dependencies]
 starlane-macros = { workspace = true, version = "0.3.21" }
+starlane-space = { workspace = true }
+starlane-hyperspace= { workspace = true }
+starlane-base = { workspace = true }
+
 lazy_static = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 chrono = { workspace = true, features = ["serde"] }
@@ -35,27 +38,26 @@ async-trait = { workspace = true }
 ctrlc = { workspace = true }
 strum_macros = { workspace = true }
 #wasmer-wasix = { workspace = true }
-shadow-rs = { workspace = true, features = ["metadata"] }
 once_cell = { workspace = true }
-zip = { workspace = true, optional = true }
+zip = { workspace = true }
 dirs = { workspace = true }
-semver = { workspace = true, features = ['serde'], optional = true }
-serde = { workspace = true, features = ['derive', 'rc'], optional = true }
-rustls = { workspace = true, optional = true, features = ["aws_lc_rs"] }
+semver = { workspace = true, features = ["serde"] }
+serde = { workspace = true }
+rustls = { workspace = true, features = ["aws_lc_rs"] }
 
-clap = { workspace = true, optional = true, features = ["derive"] }
-walkdir = { workspace = true, optional = true }
-nom = { workspace = true, optional = true }
-
-
+clap = { workspace = true, features = ["derive"] }
+walkdir = { workspace = true }
+nom = { workspace = true }
 
 
 
-anyhow = { workspace = true, optional = true }
+
+
+anyhow = { workspace = true }
 rustyline = { workspace = true, features = ["with-file-history", "with-dirs"] }
 cliclack = { workspace = true }
 
-serde_yaml = { workspace = true, optional = true }
+serde_yaml = { workspace = true }
 text-to-ascii-art = { workspace = true }
 colored = { workspace = true }
 lerp = { workspace = true, features = ["derive"] }
@@ -70,9 +72,10 @@ console = { workspace = true }
 
 #tracing = { workspace = true, features=["std","log","attributes","tracing-attributes","max_level_trace"]}
 tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-attributes", "async-await"] }
+shadow-rs = { workspace = true }
+serde_with.workspace = true
 
 [build-dependencies]
-shadow-rs = { workspace = true }
 
 
 [lib]

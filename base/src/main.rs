@@ -9,7 +9,8 @@ extern crate clap;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
-extern crate starlane_macros;shadow!(build);
+extern crate starlane_macros;
+shadow!(build);
 
 
 pub static VERSION: Lazy<semver::Version> =
@@ -42,25 +43,20 @@ use crate::env::{
 };
 pub use crate::hyperspace::platform::Platform;
 use crate::hyperspace::shutdown::shutdown;
-use crate::install::{Console, StarlaneTheme};
 use crate::server::Starlane;
 use crate::space::err::PrintErr;
 use crate::space::loc::ToBaseKind;
 use crate::space::log::push_scope;
 use crate::space::parse::SkewerCase;
 use crate::space::particle::Status;
-use anyhow::{anyhow, ensure};
+use anyhow::anyhow;
 use clap::Parser;
-use cliclack::log::{error, success};
-use cliclack::{intro, outro, spinner};
 use colored::Colorize;
-use crossterm::execute;
-use crossterm::style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor, Stylize};
+use crossterm::style::Stylize;
 use lerp::Lerp;
 use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
 use shadow_rs::shadow;
-use starlane_primitive_macros::{create_mark, ToBase};
 use std::any::Any;
 use std::fmt::Display;
 use std::fs::File;
@@ -68,10 +64,7 @@ use std::io::{Read, Seek, Write};
 use std::ops::{Add, Index, Mul};
 use std::path::Path;
 use std::str::FromStr;
-use std::time::Duration;
-use std::{io, process};
 use tokio::fs::DirEntry;
-use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::FileOptions;

@@ -1,5 +1,7 @@
 use crate::reg::{Registration, RegistryApi};
 use crate::registry::err::RegErr;
+use async_trait::async_trait;
+use dashmap::DashMap;
 use space::command::common::{PropertyMod, SetProperties};
 use space::command::direct::delete::Delete;
 use space::command::direct::query::{Query, QueryResult};
@@ -10,8 +12,6 @@ use space::point::Point;
 use space::security::{Access, AccessGrant, IndexedAccessGrant};
 use space::selector::Selector;
 use space::substance::SubstanceList;
-use async_trait::async_trait;
-use dashmap::DashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::{atomic, Arc};
 

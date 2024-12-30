@@ -9,7 +9,6 @@ use std::num::ParseIntError;
 use std::ops::Range;
 use std::string::FromUtf8Error;
 use std::sync::{Arc, PoisonError};
-use nom_supreme::error::BaseErrorKind;
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
@@ -26,10 +25,9 @@ use crate::point::PointSegKind;
 use crate::substance::{Substance, SubstanceErr, SubstanceKind};
 use crate::wave::core::http2::StatusCode;
 use crate::wave::core::{Method, ReflectedCore};
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use strum::{IntoEnumIterator, ParseError};
 use thiserror::Error;
-use starlane_space::parse::SpaceTree;
 /*
 #[macro_export]
 macro_rules! err {
@@ -842,7 +840,7 @@ impl From<serde_urlencoded::ser::Error> for SpaceErr {
 }
 
 pub mod report {
-    use serde::{Deserialize, Serialize};
+    use serde_derive::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub struct Report {

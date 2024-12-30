@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use std::hash::Hash;
-use serde::{Deserialize, Serialize};
 use crate::kind::Specific;
 use crate::types::class::ClassKind;
 use crate::types::SchemaKind;
+use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::hash::Hash;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SpecificMeta {

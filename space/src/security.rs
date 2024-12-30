@@ -5,7 +5,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 
 use nom::combinator::all_consuming;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 
 use crate::parse::util::new_span;
 

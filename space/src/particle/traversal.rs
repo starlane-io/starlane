@@ -1,5 +1,3 @@
-use std::ops::{Deref, DerefMut};
-use async_trait::async_trait;
 use crate::err::SpaceErr;
 use crate::hyper::ParticleRecord;
 use crate::loc::{Layer, Surface};
@@ -9,6 +7,8 @@ use crate::wave::exchange::asynch::Exchanger;
 use crate::wave::{
     DirectedWave, PingCore, PongCore, ReflectedWave, SingularDirectedWave, Wave, WaveVariantDef,
 };
+use async_trait::async_trait;
+use std::ops::{Deref, DerefMut};
 
 #[async_trait]
 pub trait TraversalLayer {

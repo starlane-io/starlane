@@ -9,7 +9,8 @@ extern crate clap;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
-extern crate starlane_macros;shadow!(build);
+extern crate starlane_macros;
+shadow!(build);
 
 
 pub static VERSION: Lazy<semver::Version> =

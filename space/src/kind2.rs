@@ -2,7 +2,7 @@ use crate::err::SpaceErr;
 use crate::loc::Version;
 use crate::parse::{CamelCase, Domain, SkewerCase};
 use crate::selector::VersionReq;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]

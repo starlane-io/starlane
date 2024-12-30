@@ -3,7 +3,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::process;
 use std::time::Duration;
-use tokio::join;
 use tokio::task::JoinSet;
 
 static SHUTDOWN_HOOK_TX: Lazy<tokio::sync::mpsc::Sender<ShutdownCall>> = Lazy::new(|| {

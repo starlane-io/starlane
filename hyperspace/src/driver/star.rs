@@ -5,6 +5,9 @@ use crate::driver::{
 use crate::platform::Platform;
 use crate::reg::Registration;
 use crate::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
+use async_trait::async_trait;
+use dashmap::DashMap;
+use once_cell::sync::Lazy;
 use space::artifact::ArtRef;
 use space::command::common::StateSrc;
 use space::command::direct::create::Strategy;
@@ -36,9 +39,6 @@ use space::wave::{
     Recipients, Retries, WaitTime, Wave, WaveVariantDef,
 };
 use space::HYPERUSER;
-use async_trait::async_trait;
-use dashmap::DashMap;
-use once_cell::sync::Lazy;
 use starlane_macros::{handler, route, DirectedHandler};
 use starlane_primitive_macros::push_mark;
 use std::cmp::Ordering;

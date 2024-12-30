@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 
 pub mod mesh {
-    use serde::{Deserialize, Serialize};
+    use serde_derive::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub enum Fail {
@@ -10,7 +10,7 @@ pub mod mesh {
 }
 
 pub mod portal {
-    use serde::{Deserialize, Serialize};
+    use serde_derive::{Deserialize, Serialize};
 
     use crate::fail::{ext, http, resource};
 
@@ -24,7 +24,7 @@ pub mod portal {
 }
 
 pub mod http {
-    use serde::{Deserialize, Serialize};
+    use serde_derive::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Error {
@@ -33,7 +33,7 @@ pub mod http {
 }
 
 pub mod resource {
-    use serde::{Deserialize, Serialize};
+    use serde_derive::{Deserialize, Serialize};
 
     use crate::fail::{BadCoercion, BadRequest, Conditional, Messaging};
     use crate::point::Point;
@@ -70,7 +70,7 @@ pub mod resource {
 }
 
 pub mod ext {
-    use serde::{Deserialize, Serialize};
+    use serde_derive::{Deserialize, Serialize};
 
     use crate::fail::{BadRequest, Conditional};
 

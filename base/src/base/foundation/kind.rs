@@ -1,5 +1,5 @@
 use derive_name::Name;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde_derive::{Deserialize, Deserializer, Serialize};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::str::FromStr;

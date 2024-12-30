@@ -1,12 +1,14 @@
-
 use crate::env::{
-    config, config_path, config_save, context, context_dir, Enviro, GlobalMode, StdEnviro,
+    config_save, context, Enviro, GlobalMode, StdEnviro,
     STARLANE_GLOBAL_SETTINGS, STARLANE_HOME,
 };
 use starlane::base::foundation::Foundation;
 
-use crate::server::{Starlane, StarlaneConfig};
 use crate::hyperspace::shutdown::shutdown;
+use crate::server::StarlaneConfig;
+use crate::space::parse::util::{new_span, result};
+use crate::space::parse::{path, var_case, VarCase};
+use crate::space::particle::Status;
 use crate::{env, COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION};
 use anyhow::anyhow;
 use cliclack::log::{error, remark};
@@ -17,15 +19,10 @@ use cliclack::{
 use colored::{Colorize, CustomColor};
 use console::style;
 use lerp::Lerp;
-use nom::combinator::all_consuming;
-use serde::Serialize;
-use crate::space::parse::util::{new_span, result};
-use crate::space::parse::{path, var_case, VarCase};
-use crate::space::particle::Status;
+use serde_derive::Serialize;
 use std::fmt::Display;
 use std::io::Write;
 use std::ops::Deref;
-use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;

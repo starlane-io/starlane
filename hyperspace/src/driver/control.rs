@@ -9,6 +9,9 @@ use crate::hyperlane::{
 };
 use crate::platform::Platform;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
+use anyhow::anyhow;
+use async_trait::async_trait;
+use dashmap::DashMap;
 use space::artifact::ArtRef;
 use space::command::common::StateSrc;
 use space::command::direct::create::{
@@ -33,9 +36,6 @@ use space::wave::exchange::asynch::{
 };
 use space::wave::exchange::SetStrategy;
 use space::wave::{Agent, DirectedProto, PongCore, ToRecipients, Wave, WaveVariantDef};
-use anyhow::anyhow;
-use async_trait::async_trait;
-use dashmap::DashMap;
 use starlane_macros::DirectedHandler;
 use starlane_primitive_macros::logger;
 use std::marker::PhantomData;

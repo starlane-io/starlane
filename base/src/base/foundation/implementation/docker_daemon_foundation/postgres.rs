@@ -1,16 +1,13 @@
+use crate::base;
 use crate::base::err::BaseErr;
+use crate::base::foundation;
+use crate::base::foundation::config;
 use crate::base::foundation::implementation::docker_daemon_foundation;
 use crate::base::foundation::util::{IntoSer, Map, SerMap};
 use crate::base::foundation::Provider;
-use crate::space::parse::{CamelCase, DbCase};
-use serde::{Deserialize, Serialize, Serializer};
-use std::collections::HashMap;
-use std::ops::Deref;
-use std::str::FromStr;
-use crate::base;
-use crate::base::foundation;
 use crate::base::kind::{DependencyKind, Kind, ProviderKind};
-use crate::base::foundation::config;
+use crate::space::parse::{CamelCase, DbCase};
+use serde_derive::{Deserialize, Serialize, Serializer};
 
 
 pub trait DependencyConfig: foundation::config::DependencyConfig {}

@@ -1,11 +1,11 @@
-use crate::types::{private, TypeCategory, SrcDef, TypeKind, Type};
+use crate::parse::CamelCase;
+use crate::types::private::{Exact, KindVariantDef};
+use crate::types::{private, SrcDef, Type, TypeCategory, TypeKind};
 use core::str::FromStr;
-use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
 use starlane_space::kind::Specific;
 use starlane_space::types::PointKindDefSrc;
-use crate::parse::CamelCase;
-use crate::types::private::{KindVariantDef, Exact};
+use strum_macros::EnumDiscriminants;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
 #[strum_discriminants(vis(pub))]

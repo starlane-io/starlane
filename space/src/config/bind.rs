@@ -2,7 +2,7 @@ use core::str::FromStr;
 use std::convert::TryInto;
 
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 
 use crate::err::{ParseErrs, SpaceErr};
 use crate::loc::Topic;

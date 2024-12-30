@@ -25,18 +25,17 @@ clippy::trivially_copy_pass_by_ref
 
 static ONESHOT: &str = "tokio::sync::oneshot";
 
-use proc_macro2::Ident;
-use proc_macro::TokenStream;
-use std::borrow::Borrow;
 use convert_case::{Case, Casing};
 use deluxe::HasAttributes;
 use nom_supreme::final_parser::ExtractContext;
+use proc_macro::TokenStream;
+use proc_macro2::Ident;
 use quote::{format_ident, quote, ToTokens};
-use syn::{parse2, parse_macro_input, parse_quote, Attribute, FnArg, ItemMod, Meta, MetaNameValue, PatType, ReturnType, Signature, Token, TraitItem, Type};
+use std::borrow::Borrow;
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::token::{At, In};
-
+use syn::{parse2, parse_macro_input, parse_quote, Attribute, FnArg, ItemMod, Meta, MetaNameValue, PatType, ReturnType, Signature, Token, TraitItem, Type};
 
 
 /*

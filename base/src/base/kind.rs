@@ -5,7 +5,7 @@ use crate::space::parse::{camel_case, CamelCase};
 use derive_name::Name;
 use nom::bytes::complete::tag;
 use nom::sequence::tuple;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use serde_with_macros::DeserializeFromStr;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;

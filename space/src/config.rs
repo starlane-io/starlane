@@ -1,12 +1,12 @@
 use core::str::FromStr;
 use std::ops::Deref;
 
+use crate::config::bind::BindConfig;
 use crate::config::mechtron::MechtronConfig;
 use crate::particle::{Details, Stub};
 use crate::point::Point;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use starlane_macros::Autobox;
-use crate::config::bind::BindConfig;
 
 pub mod bind;
 pub mod mechtron;

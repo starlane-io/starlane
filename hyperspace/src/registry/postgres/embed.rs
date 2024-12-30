@@ -1,5 +1,5 @@
-use crate::env::STARLANE_DATA_DIR;
 use crate::database::{Database, LiveDatabase};
+use crate::env::STARLANE_DATA_DIR;
 use crate::platform::PlatformConfig;
 use crate::reg::PgRegistryConfig;
 use crate::registry::err::RegErr;
@@ -9,7 +9,7 @@ use derive_builder::Builder;
 use port_check::is_local_ipv4_port_free;
 use postgresql_embedded::{PostgreSQL, Settings};
 use rustyline::completion::Candidate;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::fs;

@@ -1,16 +1,16 @@
-use crate::types::{private, DataPoint, Type, TypeKind};
-use crate::types::TypeCategory;
-use core::str::FromStr;
-use std::borrow::Borrow;
-use derive_builder::Builder;
-use strum_macros::EnumDiscriminants;
-use starlane_space::err::ParseErrs;
-use starlane_space::types::SchemaKind;
-use starlane_space::types::schema::BindConfig;
 use crate::kind::Specific;
 use crate::parse::CamelCase;
 use crate::point::Point;
 use crate::types::private::Exact;
+use crate::types::TypeCategory;
+use crate::types::{private, DataPoint, Type, TypeKind};
+use core::str::FromStr;
+use derive_builder::Builder;
+use starlane_space::err::ParseErrs;
+use starlane_space::types::schema::BindConfig;
+use starlane_space::types::SchemaKind;
+use std::borrow::Borrow;
+use strum_macros::EnumDiscriminants;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
 #[strum_discriminants(vis(pub))]

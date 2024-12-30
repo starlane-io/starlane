@@ -22,6 +22,14 @@ use crate::service::{
     Service, ServiceErr, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate,
 };
 use crate::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
+use anyhow::__private::kind::TraitKind;
+use anyhow::{anyhow, Error};
+use async_trait::async_trait;
+use dashmap::DashMap;
+use futures::future::select_all;
+use futures::task::Spawn;
+use futures::{FutureExt, TryFutureExt};
+use once_cell::sync::Lazy;
 use space::artifact::asynch::{ArtErr, Artifacts};
 use space::artifact::ArtRef;
 use space::command::common::StateSrc::Subst;
@@ -55,14 +63,6 @@ use space::wave::exchange::asynch::{
 use space::wave::exchange::SetStrategy;
 use space::wave::{Agent, DirectedWave, ReflectedWave, Wave};
 use space::HYPERUSER;
-use anyhow::__private::kind::TraitKind;
-use anyhow::{anyhow, Error};
-use async_trait::async_trait;
-use dashmap::DashMap;
-use futures::future::select_all;
-use futures::task::Spawn;
-use futures::{FutureExt, TryFutureExt};
-use once_cell::sync::Lazy;
 use starlane_macros::{handler, route, DirectedHandler, ToSpaceErr};
 use starlane_primitive_macros::push_loc;
 use std::collections::HashMap;

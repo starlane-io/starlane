@@ -3,7 +3,7 @@ use crate::parse::mechtron_config;
 use crate::parse::model::MechtronScope;
 use crate::point::Point;
 use core::str::FromStr;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct MechtronConfig {

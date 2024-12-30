@@ -1,9 +1,3 @@
-use crate::parse::util::new_span;
-use convert_case::{Case, Casing};
-use core::str::FromStr;
-use nom::combinator::all_consuming;
-use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
 use crate::command::direct::create::KindTemplate;
 use crate::err::{ParseErrs, PrintErr};
 use crate::loc::{
@@ -11,6 +5,7 @@ use crate::loc::{
     MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
     STD_WAVE_TRAVERSAL_PLAN,
 };
+use crate::parse::util::new_span;
 use crate::parse::util::result;
 use crate::parse::{kind_parts, specific, CamelCase, Domain, SkewerCase};
 use crate::particle::traversal::TraversalPlan;
@@ -20,6 +15,11 @@ use crate::selector::{
     VersionReq,
 };
 use crate::util::ValuePattern;
+use convert_case::{Case, Casing};
+use core::str::FromStr;
+use nom::combinator::all_consuming;
+use serde_derive::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {

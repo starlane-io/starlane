@@ -1,8 +1,7 @@
-use core::str::FromStr;
-use strum_macros::{EnumDiscriminants, EnumString};
 use crate::loc::Version;
 use crate::parse::{CamelCase, SkewerCase};
-
+use core::str::FromStr;
+use strum_macros::{EnumDiscriminants, EnumString};
 
 
 /// Some Domain Prefixes are reserved builtins like `root` & `starlane`
@@ -97,8 +96,8 @@ impl FromStr for Segment {
 }
 #[cfg(test)]
 pub mod test {
-    use crate::types::domain::{DomainScope, Prefix};
     use crate::types::domain::parse::parse;
+    use crate::types::domain::{DomainScope, Prefix};
 
     #[test]
     fn text_x( )  {
@@ -131,23 +130,18 @@ pub mod test {
 }
 
 pub mod parse {
-    use std::str::FromStr;
-    use cliclack::input;
-    use futures::TryStreamExt;
-    use nom::combinator::{opt, peek};
+    use crate::err;
+    use crate::parse::util::{new_span, result, Span};
+    use crate::parse::{skewer, skewer_chars, version, Res};
+    use crate::types::domain::{DomainScope, Prefix, Segment};
+    use nom::branch::alt;
+    use nom::combinator::opt;
     use nom::multi::separated_list0;
     use nom::sequence::{terminated, tuple};
+    use nom::Parser;
     use nom_supreme::tag::complete::tag;
-    use url::ParseError;
-    use starlane_space::parse::SpaceContextError;
-    use crate::command::common::PropertyMod;
-    use crate::err;
-    use crate::parse::{skewer, skewer_case, skewer_chars, version, Res, SkewerCase};
-    use crate::parse::util::{new_span, result, Span};
-    use crate::types::domain::{DomainScope, Prefix, Segment};
-    use nom::{Err, Parser};
-    use nom::branch::alt;
     use nom_supreme::ParserExt;
+    use std::str::FromStr;
 
     pub(crate) fn parse(s: impl AsRef<str> ) -> Result<DomainScope,err::ParseErrs> {
         let span = new_span(s.as_ref());

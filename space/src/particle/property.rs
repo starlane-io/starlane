@@ -2,15 +2,15 @@ use core::str::FromStr;
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use validator::validate_email;
 
 use crate::command::common::{PropertyMod, SetProperties};
-use crate::parse::SkewerCase;
-use crate::point::Point;
-use serde::Deserialize;
-use serde::Serialize;
 use crate::err::SpaceErr;
 use crate::kind::Kind;
+use crate::parse::SkewerCase;
+use crate::point::Point;
+use serde_derive::Deserialize;
+use serde_derive::Serialize;
+use validator::ValidateEmail;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PropertyDef {
@@ -113,9 +113,11 @@ impl PropertyPattern for UsernamePattern {
 pub struct EmailPattern {}
 
 impl PropertyPattern for EmailPattern {
-    fn is_match(&self, value: &String) -> Result<(), SpaceErr> {
-        if !validate_email(value) {
-            Err(format!("not a valid email: '{}'", value).into())
+
+    fn is_match(&self, email: &String) -> Result<(), SpaceErr> {
+
+        if !email.validate_email() {
+            Err(format!("not a valid email: '{}'", email).into())
         } else {
             Ok(())
         }

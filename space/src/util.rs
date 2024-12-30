@@ -11,7 +11,7 @@ use core::option::Option;
 use core::option::Option::{None, Some};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::marker::PhantomData;

@@ -11,7 +11,7 @@ use quote::{format_ident, quote, ToTokens};
 use syn::__private::TokenStream2;
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, parse_quote, Attribute, Data, DeriveInput, Expr, ExprTuple, File, FnArg, GenericArgument, ImplItem, ItemImpl, ItemMod, ItemTrait, LitStr, Meta, PathArguments, PathSegment, ReturnType, Type, Visibility};
+use syn::{parse_macro_input, parse_quote, Attribute, Data, DeriveInput, Expr, ExprTuple, File, FnArg, GenericArgument, ImplItem, ItemImpl, ItemTrait, LitStr, Meta, PathArguments, PathSegment, ReturnType, Type, Visibility};
 
 /// This macro will auto implement the `#crt::wave::exchange::asynch::DirectedHandler` trait.
 /// In order to finalize the core a `#[handler]` attribute must also be specified
