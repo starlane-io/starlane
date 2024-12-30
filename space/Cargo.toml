@@ -56,7 +56,6 @@ async-trait = { workspace = true }
 bincode = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-wasmer-wasix = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
 ascii = { workspace = true }
@@ -79,8 +78,6 @@ serde_urlencoded = { workspace = true, optional = true }
 enum-ordinalize = { workspace = true, optional = true }
 convert_case = { workspace = true, optional = true }
 validator = { workspace = true, optional = true }
-
-
 
 
 

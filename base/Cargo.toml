@@ -32,7 +32,6 @@ async-trait = { workspace = true }
 ctrlc = { workspace = true }
 bincode = { workspace = true }
 strum_macros = { workspace = true }
-wasmer-wasix = { workspace = true }
 itertools = { workspace = true }
 shadow-rs = { workspace = true, features = ["metadata"] }
 once_cell = { workspace = true }

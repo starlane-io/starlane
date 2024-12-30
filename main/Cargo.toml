@@ -34,7 +34,7 @@ tokio = { workspace = true, features = ["full"] }
 async-trait = { workspace = true }
 ctrlc = { workspace = true }
 strum_macros = { workspace = true }
-wasmer-wasix = { workspace = true }
+#wasmer-wasix = { workspace = true }
 shadow-rs = { workspace = true, features = ["metadata"] }
 once_cell = { workspace = true }
 zip = { workspace = true, optional = true }

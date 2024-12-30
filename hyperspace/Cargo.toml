@@ -64,7 +64,6 @@ path-clean = { workspace = true }
 thiserror-context = { workspace = true }
 rustyline = { workspace = true, features = ["with-file-history", "with-dirs"] }
 derive_builder = { workspace = true }
-postgresql_embedded = { workspace = true, optional = true }
 port_check = { workspace = true }
 derive-name = { workspace = true }
 
