@@ -67,7 +67,6 @@ dashmap = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true }
 rustls = { workspace = true, features = ["aws_lc_rs"] }
-md5.workspace = true
 
 ariadne = { workspace = true }
 nom = { workspace = true }
@@ -86,6 +85,7 @@ anyhow = { workspace = true }
 cliclack = { workspace = true }
 derive_builder = { workspace = true }
 derive-name = { workspace = true }
+md5 = { workspace = true }
 
 #tracing = { workspace = true, features=["std","log","attributes","tracing-attributes","max_level_trace"]}
 tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-attributes", "async-await"] }
