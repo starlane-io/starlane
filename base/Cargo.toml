@@ -35,28 +35,28 @@ strum_macros = { workspace = true }
 itertools = { workspace = true }
 shadow-rs = { workspace = true, features = ["metadata"] }
 once_cell = { workspace = true }
-zip = { workspace = true, optional = true }
+zip = { workspace = true }
 dirs = { workspace = true }
 serde_with = { workspace = true }
 serde_with_macros = { workspace = true }
 typetag = { workspace = true }
 # hyper requirements
-futures = { workspace = true, default-features = true, optional = true }
-semver = { workspace = true, features = ['serde'], optional = true }
-serde = { workspace = true, features = ['derive', 'rc'], optional = true }
-rustls = { workspace = true, optional = true, features = ["aws_lc_rs"] }
+futures = { workspace = true }
+semver = { workspace = true }
+serde = { workspace = true }
+rustls = { workspace = true, features = ["aws_lc_rs"] }
 
-clap = { workspace = true, optional = true, features = ["derive"] }
-walkdir = { workspace = true, optional = true }
-nom = { workspace = true, optional = true }
+clap = { workspace = true, features = ["derive"] }
+walkdir = { workspace = true }
+nom = { workspace = true }
 downcast-rs = { workspace = true }
 
 
-anyhow = { workspace = true, optional = true }
+anyhow = { workspace = true }
 rustyline = { workspace = true, features = ["with-file-history", "with-dirs"] }
 cliclack = { workspace = true }
 
-serde_yaml = { workspace = true, optional = true }
+serde_yaml = { workspace = true }
 derive_builder = { workspace = true }
 text-to-ascii-art = { workspace = true }
 colored = { workspace = true }

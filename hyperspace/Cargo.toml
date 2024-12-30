@@ -42,24 +42,24 @@ itertools = { workspace = true }
 
 once_cell = { workspace = true }
 
-futures = { workspace = true, default-features = true, optional = true }
-dashmap = { workspace = true, optional = true }
-semver = { workspace = true, features = ['serde'], optional = true }
+futures = { workspace = true, default-features = true }
+dashmap = { workspace = true }
+semver = { workspace = true, features = ['serde'] }
 
 
 # postgres deps
-sqlx = { workspace = true, features = ["runtime-tokio", "runtime-tokio-rustls", "postgres", "macros", "any"], optional = true }
-serde = { workspace = true, features = ['derive', 'rc'], optional = true }
-async-recursion = { workspace = true, optional = true }
+sqlx = { workspace = true, features = ["runtime-tokio", "runtime-tokio-rustls", "postgres", "macros", "any"] }
+serde = { workspace = true, features = ['derive', 'rc'] }
+async-recursion = { workspace = true }
 
-rcgen = { workspace = true, optional = true, features = ["pem", "x509-parser"] }
-rustls = { workspace = true, optional = true, features = ["aws_lc_rs"] }
-rustls-pemfile = { workspace = true, optional = true }
-tokio-rustls = { workspace = true, optional = true }
-clap = { workspace = true, optional = true, features = ["derive"] }
-nom = { workspace = true, optional = true }
+rcgen = { workspace = true, features = ["pem", "x509-parser"] }
+rustls = { workspace = true, features = ["aws_lc_rs"] }
+rustls-pemfile = { workspace = true }
+tokio-rustls = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+nom = { workspace = true }
 
-anyhow = { workspace = true, optional = true }
+anyhow = { workspace = true }
 path-clean = { workspace = true }
 thiserror-context = { workspace = true }
 rustyline = { workspace = true, features = ["with-file-history", "with-dirs"] }
