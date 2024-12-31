@@ -358,6 +358,7 @@ pub mod direct {
 
     pub mod create {
         use std::convert::TryInto;
+        use std::fmt::Display;
         use std::sync::atomic::{AtomicU64, Ordering};
         use std::sync::Arc;
         use async_trait::async_trait;
@@ -447,9 +448,9 @@ pub mod direct {
         }
 
 
-        impl ToString for KindTemplate {
-            fn to_string(&self) -> String {
-                if self.sub.is_some() {
+        impl Display for KindTemplate {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let str = if self.sub.is_some() {
                     if self.specific.is_some() {
                         format!(
                             "{}<{}<{}>>",
@@ -466,7 +467,8 @@ pub mod direct {
                     }
                 } else {
                     self.base.to_string()
-                }
+                };
+                write!(f, "{}", str)
             }
         }
 

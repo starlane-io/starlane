@@ -40,7 +40,7 @@ pub enum ArtErr {
     #[error("artifact is being parsing")]
     ParsingStatus,
     #[error("artifact '{0}' not found.")]
-    NotFound(Point),
+    NotFound(String),
     #[error("repo for artifact is is not currently reachable")]
     Unreachable,
     #[error("timeout")]
@@ -80,7 +80,7 @@ impl ArtErr {
     }
 
     pub fn not_found(point: &Point) -> Self {
-        ArtErr::NotFound(point.clone())
+        ArtErr::NotFound(point.to_string())
     }
 
     pub fn err<E>(err: E) -> Self
@@ -449,7 +449,7 @@ impl Artifacts {
                 }
             }
         }
-        Err(ArtErr::NotFound(point.clone()))
+        Err(ArtErr::NotFound(point.to_string()))
     }
 
     pub async fn get_mechtron(

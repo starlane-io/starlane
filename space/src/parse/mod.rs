@@ -98,9 +98,9 @@ use std::fmt::Formatter;
 use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
-use miette::Report;
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
+use crate::err::report::{Label, Report, ReportKind};
 
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
 pub type StarParser<I: Span, O> = dyn nom_supreme::parser_ext::ParserExt<I, O, SpaceTree<I>>;

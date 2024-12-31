@@ -9,8 +9,6 @@ use std::num::ParseIntError;
 use std::ops::Range;
 use std::string::FromUtf8Error;
 use std::sync::{Arc, PoisonError};
-use ariadne::ReportKind;
-use miette::Report;
 use nom_supreme::error::BaseErrorKind;
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError};
 use tokio::sync::oneshot::error::RecvError;
@@ -31,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use strum::{IntoEnumIterator, ParseError};
 use thiserror::Error;
 use starlane_space::parse::SpaceTree;
+use crate::err::report::{Label, Report, ReportKind};
 /*
 #[macro_export]
 macro_rules! err {
@@ -577,14 +576,14 @@ impl From<Report> for ParseErrs {
 
 #[derive(Debug, Clone, Error, Serialize, Deserialize)]
 pub struct ParseErrs {
-    pub report: Vec<Arc<Report>>,
+    pub report: Vec<Report>,
     pub src: String,
 }
 
 impl ParseErrs {
     pub fn report(report: Report) -> Self {
         Self {
-            report: vec![Arc::new(report)],
+            report: vec![report],
             src: "".to_string(),
         }
     }
@@ -843,7 +842,6 @@ impl From<serde_urlencoded::ser::Error> for SpaceErr {
     }
 }
 
-/*
 pub mod report {
     use serde::{Deserialize, Serialize};
 
@@ -1053,7 +1051,6 @@ pub mod report {
     }
 }
 
- */
 
 pub trait PrintErr {
     fn print(&self);
