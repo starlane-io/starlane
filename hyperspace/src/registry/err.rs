@@ -37,8 +37,7 @@ pub enum RegErr {
     PoolNotFound(String),
 
 
-    #[error("postgres embed error error: {0}")]
-    PgErr(#[from] postgresql_embedded::Error),
+
     #[error(transparent)]
     IoErr(Arc<std::io::Error>),
     #[error("database has scorch guard enabled.  To change this: 'INSERT INTO reset_mode VALUES ('Scorch')'"

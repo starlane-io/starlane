@@ -35,6 +35,7 @@ use serde::{Deserialize, Serialize};
 use starlane_macros::{logger, push_loc};
 use std::collections::HashSet;
 use std::ops::Deref;
+use starlane_hyperspace::database::LiveDatabase;
 use starlane_hyperspace::reg::Registry;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -349,4 +350,25 @@ pub struct StarlaneContext {
     pub home: String,
     pub log_dir: String,
     pub config: StarlaneConfig,
+}
+
+#[derive(Clone)]
+pub struct PostgresLookups(LiveDatabase);
+
+impl PostgresLookups {
+    pub fn new(database: LiveDatabase) -> Self {
+        Self(database)
+    }
+}
+
+impl PostgresPlatform for PostgresLookups {
+    fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr> {
+        Ok(self.0.clone().into())
+    }
+
+    fn lookup_star_db(&self, star: &StarKey) -> Result<Database<PostgresConnectInfo>, RegErr> {
+        let mut rtn: Database<PostgresConnectInfo> = self.0.clone().into();
+        rtn.database = star.to_sql_name();
+        Ok(rtn)
+    }
 }

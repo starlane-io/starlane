@@ -1,13 +1,12 @@
 
 
-pub mod embed;
+/// embedded postgres for local development environments is slated to be removed in favor of
+/// Postgres provided by `DockerDesktopFoundation`
+// pub mod embed;
 
-use crate::database::{Database, LiveDatabase};
 use crate::platform::Platform;
-use crate::reg::{PgRegistryConfig, Registration, RegistryApi};
+use crate::reg::{Registration, RegistryApi};
 use crate::registry::err::RegErr;
-use crate::registry::postgres::embed::PostgresClusterConfig;
-use crate::server::PostgresLookups;
 use starlane_space::command::common::{PropertyMod, SetProperties};
 use starlane_space::command::direct::create::Strategy;
 use starlane_space::command::direct::delete::Delete;
@@ -1943,13 +1942,4 @@ pub mod test {
     }
 }
 
-impl Default for PgRegistryConfig {
-    fn default() -> Self {
-        let database = Database::new(
-            "main".to_string(),
-            "public".to_string(),
-            PostgresClusterConfig::default(),
-        );
-        Self::Embedded(database)
-    }
-}
+

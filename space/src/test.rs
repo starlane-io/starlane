@@ -43,8 +43,11 @@ impl MyStr {
  */
 
 
+/*
 #[proxy]
 pub trait My {
   fn some_method(&self, limits: u8) -> Result<(),()> {
   }
 }
+
+ */

@@ -1,7 +1,9 @@
 pub mod tcp;
 
 
-pub mod quic;
+/// `quic` is meant to be a drop in replacement for `tcp`.  the Quic networking protocol
+/// has many advantages over TCP and Starlane will benefit from quic immensely...
+//pub mod quic;
 
 use starlane_space::err::SpaceErr;
 use starlane_space::hyper::{Greet, InterchangeKind, Knock};

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
+use crate::registry::postgres::{PostgresConnectInfo, PostgresDbKey};
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct Database<S> {
@@ -68,6 +69,8 @@ impl Database<PostgresConnectInfo> {
         self.url.clone()
     }
 }
+
+pub struct PostgresClusterConfig;
 
 impl Database<PostgresClusterConfig> {
     pub fn from_embed<D, S>(

@@ -37,6 +37,7 @@ use serde::{Deserialize, Serialize};
 use starlane_macros::{logger, push_loc};
 use std::collections::HashSet;
 use std::ops::Deref;
+use starlane_hyperspace::database::LiveDatabase;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -320,16 +321,6 @@ where
 }
 
 
-#[derive(Clone)]
-pub struct PostgresLookups(LiveDatabase);
-
-
-impl PostgresLookups {
-    pub fn new(database: LiveDatabase) -> Self {
-        Self(database)
-    }
-}
-
 /*
 
 impl Default for PostgresLookups {
@@ -340,18 +331,6 @@ impl Default for PostgresLookups {
 
  */
 
-
-impl PostgresPlatform for PostgresLookups {
-    fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr> {
-        Ok(self.0.clone().into())
-    }
-
-    fn lookup_star_db(&self, star: &StarKey) -> Result<Database<PostgresConnectInfo>, RegErr> {
-        let mut rtn: Database<PostgresConnectInfo> = self.0.clone().into();
-        rtn.database = star.to_sql_name();
-        Ok(rtn)
-    }
-}
 
 pub struct StarlaneContext {
     pub context: String,

@@ -18,6 +18,9 @@ pub mod shutdown;
 pub mod tests;
 
 
-pub mod database;
+/// disabled for now... this mod's functionality may be superseded by the current
+/// refactor in which case it will be deleted for good
+/// -- Scot
+//pub mod database;
 pub mod service;
 pub mod template;
