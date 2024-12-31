@@ -1,5 +1,5 @@
 
-use starlane_hyperspace::registry::postgres::{
+use starlane_platform_postgres_registry::::{
     PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };

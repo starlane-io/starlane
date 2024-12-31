@@ -4,9 +4,9 @@
 /// Postgres provided by `DockerDesktopFoundation`
 // pub mod embed;
 
-use crate::platform::Platform;
-use crate::reg::{Registration, RegistryApi};
-use crate::registry::err::RegErr;
+use starlane::platform::Platform;
+use starlane::reg::{Registration, RegistryApi};
+use starlane::registry::err::RegErr;
 use starlane_space::command::common::{PropertyMod, SetProperties};
 use starlane_space::command::direct::create::Strategy;
 use starlane_space::command::direct::delete::Delete;
@@ -114,7 +114,7 @@ w                           INSERT INTO reset_mode VALUES ('None');"#;
          point TEXT NOT NULL,
          point_segment TEXT NOT NULL,
          parent TEXT NOT NULL,
-         base TEXT NOT NULL,
+         common TEXT NOT NULL,
          sub TEXT,
          provider TEXT,
          vendor TEXT,
@@ -287,7 +287,7 @@ impl RegistryApi for PostgresRegistry {
             }
         }
 
-        let statement = format!("INSERT INTO particles (point,point_segment,base,sub,provider,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.provider), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
+        let statement = format!("INSERT INTO particles (point,point_segment,common,sub,provider,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.provider), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
         trans.execute(statement.as_str()).await?;
 
         for (_, property_mod) in registration.properties.iter() {
@@ -582,7 +582,7 @@ impl RegistryApi for PostgresRegistry {
                 KindBaseSelector::Always => {}
                 KindBaseSelector::Exact(kind) => {
                     index = index + 1;
-                    where_clause.push_str(format!(" AND base=${}", index).as_str());
+                    where_clause.push_str(format!(" AND common=${}", index).as_str());
                     params.push(kind.to_string());
                 }
                 KindBaseSelector::Never => {}
@@ -1089,7 +1089,7 @@ impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord {
         fn wrap(row: &PgRow) -> Result<PostgresParticleRecord, RegErr> {
             let parent: String = row.get("parent");
             let point_segment: String = row.get("point_segment");
-            let base: String = row.get("base");
+            let base: String = row.get("common");
             let sub: Option<CamelCase> = match row.get("sub") {
                 Some(sub) => {
                     let sub: String = sub;
@@ -1472,13 +1472,13 @@ pub mod test {
     use std::str::FromStr;
     use std::sync::Arc;
 
-    use crate::driver::DriversBuilder;
-    use crate::hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
-    use crate::machine::MachineTemplate;
-    use crate::platform::Platform;
-    use crate::reg::{Registration, Registry};
-    use crate::registry::err::RegErr;
-    use crate::registry::postgres::{
+    use starlane::driver::DriversBuilder;
+    use starlane::hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
+    use starlane::machine::MachineTemplate;
+    use starlane::platform::Platform;
+    use starlane::reg::{Registration, Registry};
+    use starlane::registry::err::RegErr;
+    use starlane_platform_postgres_registry::::{
         PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
     };

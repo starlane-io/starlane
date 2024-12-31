@@ -961,7 +961,7 @@ pub fn space_point_capture_segment(input: Span) -> Res<Span, PointSeg> {
 
 pub fn base_point_capture_segment(input: Span) -> Res<Span, PointSeg> {
     preceded(tag(":"), rec_skewer_capture)(input)
-        .map(|(next, base)| (next, PointSeg::Base(base.to_string())))
+        .map(|(next, common)| (next, PointSeg::Base(common.to_string())))
 }
 
 pub fn filesystem_point_capture_segment(input: Span) -> Res<Span, PointSeg> {
@@ -5981,7 +5981,7 @@ pub fn sub_kind_selector<I: Span>(input: I) -> Res<I, SubKindSelector> {
 }
 
 pub fn base_kind<I: Span>(input: I) -> Res<I, BaseKind> {
-    let (next, kind) = context("kind-base", camel_case)(input.clone())?;
+    let (next, kind) = context("kind-common", camel_case)(input.clone())?;
 
     match BaseKind::try_from(kind.clone()) {
         Ok(kind) => Ok((next, kind)),
@@ -6328,7 +6328,7 @@ fn base_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
 fn file_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
     tuple((file_segment, opt(tag("+"))))(input).map(|(next, (segment, inclusive))| {
         let tks = KindSelector {
-            base: Pattern::Exact(BaseKind::File),
+            common: Pattern::Exact(BaseKind::File),
             sub: Pattern::Always,
             specific: ValuePattern::Always,
         };

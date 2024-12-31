@@ -35,6 +35,14 @@ use starlane_space::wave::exchange::asynch::Exchanger;
 use starlane_space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
 use starlane_space::HYPERUSER;
 
+
+/// just a convenience function for testing if the build is sound so the Rust Rover IDE
+/// will create a test_build run configuration that can be triggered by clicking a button
+#[test]
+pub fn test_build() {
+
+}
+
 pub static LESS: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:less").expect("point"));
 pub static FAE: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:fae").expect("point"));
 
@@ -110,6 +118,7 @@ async fn create(
     star_api.to_gravity(wave).await;
     Ok(())
 }
+
 
 #[test]
 fn test_control() -> Result<(), OldStarErr> {
@@ -333,7 +342,7 @@ fn test_control_cli() -> Result<(), OldStarErr> {
 
         println!("{}", core.to_err().to_string());
         assert!(core.is_ok());
-        let core = cli.exec("create localhost:base<Base>").await?;
+        let core = cli.exec("create localhost:common<Base>").await?;
         assert!(core.is_ok());
 
         Ok(())

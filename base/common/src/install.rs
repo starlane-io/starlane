@@ -32,7 +32,7 @@ use std::time::Duration;
 use std::{io, thread};
 use text_to_ascii_art::to_art;
 use textwrap::Options;
-//use main::base::foundation::implementation::docker_daemon_foundation::DockerDaemonFoundation;
+//use main::common::foundation::implementation::docker_daemon_foundation::DockerDaemonFoundation;
 
 #[tokio::main]
 pub async fn install(edit: bool) -> Result<(), anyhow::Error> {

@@ -20,7 +20,7 @@ use std::sync::Arc;
 static BASE_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
     ArtRef::new(
         Arc::new(base_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/base.bind").unwrap(),
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/common.bind").unwrap(),
     )
 });
 

@@ -26,11 +26,11 @@ pub trait ProviderConfig: foundation::config::ProviderConfig {}
 /// aspect needed to maybe `initialize` and certainly to `connect` to the Postgres Cluster instance.
 /// ```
 /// pub mod postgres {
-///   use starlane::base::foundation;
-///   use starlane::base::foundation::config;
+///   use starlane::common::foundation;
+///   use starlane::common::foundation::config;
 ///
 ///   /// this example implementation is not configured for `modes`.
-///   /// a mode implementation example is documented here: [starlane::base::mode]
+///   /// a mode implementation example is documented here: [starlane::common::mode]
 ///   ///
 ///   /// As you can see this overloaded example provides everything needed to set up a Postgres
 ///   /// cluster except for any information pertaining to installing and starting the service, because
@@ -61,7 +61,7 @@ pub mod provider {
 use super::my;
 
 pub mod mode {
-    use crate::base::foundation;
+    use crate::common::foundation;
 
     use super::my;
     pub mod create {
@@ -71,7 +71,7 @@ pub mod mode {
         /// will want to Create the Provision (potentially meaning: downloading, instancing, credential setup,  initializing...etc.)
         /// and then will want to [`Utilize`] the Provision (potentially meaning: authenticating via the same credentials supplied from
         /// [`Create`], connecting to the same port that was set up etc.
-        pub trait ProviderConfig: my::ProviderConfig + crate::base::config::provider::mode::utilize::ProviderConfig {}
+        pub trait ProviderConfig: my::ProviderConfig + crate::common::config::provider::mode::utilize::ProviderConfig {}
     }
 
     pub mod utilize {
@@ -92,19 +92,19 @@ pub mod mode {
 pub mod concrete {
     ///  reference the above a [`my`] implementation ...
     pub mod my { pub use super::super::*; }
-    pub use crate::base::foundation;
+    pub use crate::common::foundation;
 
 
 
     pub mod variant {
-        use crate::base::foundation;
+        use crate::common::foundation;
         use super::my;
 
         impl foundation::Dependency for Dependency {}
         impl my::Dependency for Dependency {}
 
         /// [super::variant] follows the same pattern as [`super::variant`] except in this case it is for
-        /// [crate::base::foundation::Provider] variants
+        /// [crate::common::foundation::Provider] variants
         pub mod variant {
             use super::my;
             pub struct Provider {}
@@ -124,7 +124,7 @@ pub mod concrete {
                 /// will want to Create the Provision (potentially meaning: downloading, instancing, credential setup,  initializing...etc.)
                 /// and then will want to [`Utilize`] the Provision (potentially meaning: authenticating via the same credentials supplied from
                 /// [`Create`], connecting to the same port that was set up etc.
-                pub trait ProviderConfig: my::ProviderConfig + crate::base::config::provider::mode::utilize::ProviderConfig {}
+                pub trait ProviderConfig: my::ProviderConfig + crate::common::config::provider::mode::utilize::ProviderConfig {}
             }
 
             pub mod utilize {

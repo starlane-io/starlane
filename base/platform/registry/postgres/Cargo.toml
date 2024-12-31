@@ -1,0 +1,13 @@
+[package]
+name = "starlane-platform-for-postgres-registry"
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+description.workspace = true
+version.workspace = true
+
+[dependencies]
+starlane-space = { workspace = true }

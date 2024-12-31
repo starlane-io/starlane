@@ -22,7 +22,7 @@ pub enum Prefix {
 }
 
 /// a segment providing `scope` [Specific] [Meta] in the case where
-/// multiple definitions of the same base type and/or to group like definitions
+/// multiple definitions of the same common type and/or to group like definitions
 /// together.
 ///
 ///

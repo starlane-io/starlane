@@ -133,7 +133,7 @@ pub fn test_template() {
     let t: Template = util::log(t.to_resolved(&env)).unwrap();
 
     let t = util::log(result(base_point_segment(new_span(
-        "localhost:base<Space>",
+        "localhost:common<Space>",
     ))))
         .unwrap();
 
@@ -141,13 +141,13 @@ pub fn test_template() {
         util::log(result(tuple((
             point_var_seg(root_ctx_seg(space_point_segment)),
             many0(base_seg(point_var_seg(pop(base_point_segment)))),
-        ))(new_span("localhost:base:nopo<Space>"))))
+        ))(new_span("localhost:common:nopo<Space>"))))
             .unwrap();
     println!("space: {}", space.to_string());
     for base in bases {
-        println!("\tbase: {}", base.to_string());
+        println!("\tcommon: {}", base.to_string());
     }
-    //let t= util::log(result(all_consuming(template)(new_span("localhost:base<Space>")))).unwrap();
+    //let t= util::log(result(all_consuming(template)(new_span("localhost:common<Space>")))).unwrap();
     //        let env = Env::new(Point::root());
     //       let t: Template = util::log(t.to_resolved(&env)).unwrap();
 }
@@ -175,7 +175,7 @@ pub fn test_point_template() {
 //    #[test]
 pub fn test_point_var() {
     util::log(result(all_consuming(point_var)(new_span(
-        "[hub]::my-domain.com:${name}:base",
+        "[hub]::my-domain.com:${name}:common",
     ))))
         .unwrap();
     util::log(result(all_consuming(point_var)(new_span(
@@ -211,13 +211,13 @@ pub fn test_point_var() {
     }
 
     let point = util::log(result(point_var(new_span(
-        "${route}::my-domain.com:${name}:base",
+        "${route}::my-domain.com:${name}:common",
     ))))
         .unwrap();
 
     // this one SHOULD fail and an appropriate error should be located at BAD
     util::log(result(point_var(new_span(
-        "${route of routes}::my-domain.com:${BAD}:base",
+        "${route of routes}::my-domain.com:${BAD}:common",
     ))));
 
     if let RouteSegVar::Var(ref var) = point.route {
@@ -239,7 +239,7 @@ pub fn test_point_var() {
     }
 
     if let Some(PointSegVar::Base(base)) = point.segments.get(2) {
-        assert_eq!("base", base.as_str());
+        assert_eq!("common", base.as_str());
     } else {
         assert!(false);
     }
@@ -296,7 +296,7 @@ pub fn test_point_var() {
 pub fn test_point() {
     util::log(
         result(all_consuming(point_var)(new_span(
-            "[hub]::my-domain.com:name:base",
+            "[hub]::my-domain.com:name:common",
         )))
             .unwrap()
             .to_point(),
@@ -323,19 +323,19 @@ pub fn test_point() {
 #[test]
 pub fn test_simple_point_var() {
     /*
-    let point = util::log(result(point_var(new_span("localhost:base")))).unwrap();
+    let point = util::log(result(point_var(new_span("localhost:common")))).unwrap();
     println!("point '{}'", point.to_string());
     let point :Point = point.collapse().unwrap();
-    assert_eq!("localhost:base", point.to_string().as_str());
-    let point = util::log(result(point_var(new_span("localhost:base<Kind>")))).unwrap();
+    assert_eq!("localhost:common", point.to_string().as_str());
+    let point = util::log(result(point_var(new_span("localhost:common<Kind>")))).unwrap();
     let point :Point = point.collapse().unwrap();
-    assert_eq!("localhost:base", point.to_string().as_str());
+    assert_eq!("localhost:common", point.to_string().as_str());
 
-    let point = util::log(result(point_var(new_span("localhost:base:3.0.0<Kind>")))).unwrap();
+    let point = util::log(result(point_var(new_span("localhost:common:3.0.0<Kind>")))).unwrap();
     let point :Point = point.collapse().unwrap();
-    assert_eq!("localhost:base:3.0.0", point.to_string().as_str());
-    let point = util::log(result(point_var(new_span("localhost:base:3.0.0:/some/file.txt<Kind>")))).unwrap();
-    assert_eq!("localhost:base:3.0.0:/some/file.txt", point.to_string().as_str());
+    assert_eq!("localhost:common:3.0.0", point.to_string().as_str());
+    let point = util::log(result(point_var(new_span("localhost:common:3.0.0:/some/file.txt<Kind>")))).unwrap();
+    assert_eq!("localhost:common:3.0.0:/some/file.txt", point.to_string().as_str());
     let point :Point = point.collapse().unwrap();
     println!("point: '{}'",point.to_string());
 
@@ -347,11 +347,11 @@ pub fn test_simple_point_var() {
      */
 
     let point = util::log(result(point_var(new_span(
-        "localhost:base:/fs/file.txt<Kind>",
+        "localhost:common:/fs/file.txt<Kind>",
     ))))
         .unwrap();
     let point: Point = point.collapse().unwrap();
-    assert_eq!("localhost:base:/fs/file.txt", point.to_string().as_str());
+    assert_eq!("localhost:common:/fs/file.txt", point.to_string().as_str());
 }
 
 #[test]

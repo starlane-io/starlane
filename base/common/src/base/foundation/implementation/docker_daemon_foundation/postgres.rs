@@ -21,9 +21,9 @@ pub trait ProviderConfig: foundation::config::ProviderConfig {}
 
 pub mod concrete {
     use std::str::FromStr;
-    use crate::base;
-    use crate::base::err::BaseErr;
-    use crate::base::foundation::implementation::docker_daemon_foundation::postgres::PostgresDependencyConfig;
+    use crate::common;
+    use crate::common::err::BaseErr;
+    use crate::common::foundation::implementation::docker_daemon_foundation::postgres::PostgresDependencyConfig;
     use crate::space::parse::{CamelCase, DbCase};
 
     fn default_schema() -> DbCase {
@@ -59,7 +59,7 @@ pub mod concrete {
         }
     }
 
-    impl base::config::DependencyConfig for PostgresDependencyConfig {
+    impl common::config::DependencyConfig for PostgresDependencyConfig {
 
 
         fn kind(&self) -> &DependencyKind {

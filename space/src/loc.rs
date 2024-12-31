@@ -683,7 +683,7 @@ pub mod test {
 
     #[test]
     pub fn test_point_file() {
-        let parent = Point::from_str("super:base").unwrap();
+        let parent = Point::from_str("super:common").unwrap();
         let point = parent.push("/subdir/file.txt").unwrap();
         let filepath = point.truncate_filepath(&parent).unwrap();
         assert_eq!(filepath, "/subdir/file.txt");
@@ -695,7 +695,7 @@ pub mod test {
 
     #[test]
     pub fn test_chop_relative() {
-        let parent = Point::from_str("super:base").unwrap();
+        let parent = Point::from_str("super:common").unwrap();
         let point = parent.push("/subdir/file.txt").unwrap();
         let filepath = point.relative_segs(&parent).unwrap();
         assert_eq!(
@@ -710,7 +710,7 @@ pub mod test {
         let filepath = parent.relative_segs(&root).unwrap();
         assert_eq!(
             filepath,
-            vec!["base"]
+            vec!["common"]
                 .into_iter()
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>()
