@@ -1,3 +1,6 @@
+
+/// this should maybe be replaced with the [tokio-graceful-shutdown](https://crates.io/crates/tokio-graceful-shutdown)
+
 use once_cell::sync::Lazy;
 use std::future::Future;
 use std::pin::Pin;

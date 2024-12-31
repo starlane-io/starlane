@@ -10,4 +10,10 @@ description.workspace = true
 version.workspace = true
 
 [dependencies]
+starlane-macros = { workspace = true }
 starlane-space = { workspace = true }
+starlane-hyperspace = { workspace = true }
+sqlx = { workspace = true }
+serde = { workspace = true }
+serde_derive = { workspace = true }
+async-trait = { workspace = true }

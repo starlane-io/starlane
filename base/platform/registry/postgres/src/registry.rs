@@ -4,9 +4,7 @@
 /// Postgres provided by `DockerDesktopFoundation`
 // pub mod embed;
 
-use starlane::platform::Platform;
-use starlane::reg::{Registration, RegistryApi};
-use starlane::registry::err::RegErr;
+
 use starlane_space::command::common::{PropertyMod, SetProperties};
 use starlane_space::command::direct::create::Strategy;
 use starlane_space::command::direct::delete::Delete;
@@ -38,7 +36,6 @@ use starlane_space::substance::{Substance, SubstanceList, SubstanceMap};
 use starlane_space::util::ValuePattern;
 use starlane_space::HYPERUSER;
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
@@ -47,6 +44,8 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use serde_derive::{Deserialize, Serialize};
+use starlane_hyperspace::registry::err::RegErr;
 
 pub trait PostgresPlatform: Send + Sync {
     fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr>;
