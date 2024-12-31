@@ -40,8 +40,8 @@ use crate::env::{
     config_exists, context, context_dir, ensure_global_settings, save_global_settings, set_context,
     STARLANE_HOME,
 };
-pub use crate::hyperspace::platform::Platform;
-use crate::hyperspace::shutdown::shutdown;
+pub use starlane_hyperspace::platform::Platform;
+use starlane_hyperspace::shutdown::shutdown;
 use crate::install::{Console, StarlaneTheme};
 use crate::server::Starlane;
 use crate::space::err::PrintErr;

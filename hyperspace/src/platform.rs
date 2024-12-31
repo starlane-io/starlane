@@ -4,17 +4,17 @@ use crate::hyperlane::{
 };
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 use crate::reg::Registry;
-use space::artifact::asynch::Artifacts;
-use space::command::direct::create::KindTemplate;
-use space::err::SpaceErr;
-use space::kind::{
+use starlane_space::artifact::asynch::Artifacts;
+use starlane_space::command::direct::create::KindTemplate;
+use starlane_space::err::SpaceErr;
+use starlane_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind,
     UserBaseSubKindBase,
 };
-use space::loc::{MachineName, StarKey, ToBaseKind};
-use space::log::Logger;
-use space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
-use space::settings::Timeouts;
+use starlane_space::loc::{MachineName, StarKey, ToBaseKind};
+use starlane_space::log::Logger;
+use starlane_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
+use starlane_space::settings::Timeouts;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use starlane_primitive_macros::logger;

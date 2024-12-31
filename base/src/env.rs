@@ -1,5 +1,5 @@
-use crate::hyperspace::err::HypErr;
-use crate::hyperspace::shutdown::panic_shutdown;
+use starlane_hyperspace::err::HypErr;
+use starlane_hyperspace::shutdown::panic_shutdown;
 
 use anyhow::anyhow;
 use atty::Stream;

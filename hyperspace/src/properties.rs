@@ -1,7 +1,7 @@
-use space::err::SpaceErr;
-use space::kind::BaseKind;
-use space::loc::ToBaseKind;
-use space::particle::property::{
+use starlane_space::err::SpaceErr;
+use starlane_space::kind::BaseKind;
+use starlane_space::loc::ToBaseKind;
+use starlane_space::particle::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
     PropertySource, U64Pattern, UsernamePattern,
 };

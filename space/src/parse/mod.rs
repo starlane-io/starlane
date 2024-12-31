@@ -20,7 +20,6 @@ use crate::config::bind::{
 };
 use crate::config::mechtron::MechtronConfig;
 use crate::config::{DocKind, Document};
-use crate::err::report::{Label, Report, ReportKind};
 use crate::err::ParseErrs;
 use crate::kind::{
     ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, Specific, StarSub,
@@ -68,7 +67,6 @@ use model::{
     PipelineSegmentVar, PipelineVar, RootScopeSelector, RouteScope, ScopeFilterDef,
     ScopeFiltersDef, Spanned, Subst, TerminatedBlockKind, TextType, VarParser,
 };
-//use ariadne::{Label, Report, ReportKind};
 use nom::branch::alt;
 use nom::bytes::complete::{is_a, is_not};
 use nom::bytes::complete::{tag, take_until};
@@ -100,6 +98,7 @@ use std::fmt::Formatter;
 use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
+use miette::Report;
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
 

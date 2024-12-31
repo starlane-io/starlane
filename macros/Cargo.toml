@@ -19,13 +19,7 @@ proc-macro = true
 doctest = false
 
 [dependencies]
-lazy_static = { workspace = true}
-#syn = { workspace = true, features = ["full"] }
 quote = { workspace = true}
 proc-macro2 = {workspace = true, feature=["proc-macro"]}
-deluxe ={ workspace = true }
-nom-supreme = { workspace = true }
-convert_case= {workspace = true}
 
-derive_builder = { workspace = true }
 syn = { workspace = true, features=["full"]}

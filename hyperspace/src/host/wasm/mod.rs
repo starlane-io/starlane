@@ -4,7 +4,7 @@ mod source;
 use crate::host::err::HostErr;
 use crate::host::wasm::cache::WasmModuleCache;
 use crate::host::FileSystemFactory;
-use crate::hyperspace::service::OsProcess;
+use starlane_hyperspace::service::OsProcess;
 use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;

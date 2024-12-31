@@ -446,13 +446,7 @@ pub mod direct {
             pub specific: Option<SpecificSelector>,
         }
 
-        impl AsDisplay<'_> for KindTemplate {
-            type Target = String;
 
-            fn as_display(&self) -> Self::Target {
-                self.to_string()
-            }
-        }
         impl ToString for KindTemplate {
             fn to_string(&self) -> String {
                 if self.sub.is_some() {

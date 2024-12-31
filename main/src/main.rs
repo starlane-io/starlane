@@ -33,22 +33,21 @@ pub mod space;
 pub mod hyperspace;
 
 
-pub mod base;
 
 use crate::cli::{Cli, Commands, ContextCmd};
 use crate::env::{
     config_exists, context, context_dir, ensure_global_settings, save_global_settings, set_context,
     STARLANE_HOME,
 };
-pub use crate::hyperspace::platform::Platform;
-use crate::hyperspace::shutdown::shutdown;
+pub use starlane_hyperspace::platform::Platform;
+use starlane_hyperspace::shutdown::shutdown;
 use crate::install::{Console, StarlaneTheme};
 use crate::server::Starlane;
-use crate::space::err::PrintErr;
-use crate::space::loc::ToBaseKind;
-use crate::space::log::push_scope;
-use crate::space::parse::SkewerCase;
-use crate::space::particle::Status;
+use starlane_space::err::PrintErr;
+use starlane_space::loc::ToBaseKind;
+use starlane_space::log::push_scope;
+use starlane_space::parse::SkewerCase;
+use starlane_space::particle::Status;
 use anyhow::{anyhow, ensure};
 use clap::Parser;
 use cliclack::log::{error, success};

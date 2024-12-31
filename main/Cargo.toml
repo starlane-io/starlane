@@ -27,6 +27,9 @@ repository.workspace = true
 
 [dependencies]
 starlane-macros = { workspace = true, version = "0.3.21" }
+starlane-space = { workspace = true  }
+starlane-hyperspace = { workspace = true, version = "0.3.21" }
+starlane-base = { workspace = true, version = "0.3.21" }
 lazy_static = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 chrono = { workspace = true, features = ["serde"] }
@@ -69,6 +72,8 @@ console = { workspace = true }
 
 #tracing = { workspace = true, features=["std","log","attributes","tracing-attributes","max_level_trace"]}
 tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-attributes", "async-await"] }
+serde_with = { workspace = true }
+serde_derive = { workspace = true }
 
 [build-dependencies]
 shadow-rs = { workspace = true }

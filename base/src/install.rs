@@ -6,7 +6,7 @@ use crate::env::{
 use starlane::base::foundation::Foundation;
 
 use crate::server::{Starlane, StarlaneConfig};
-use crate::hyperspace::shutdown::shutdown;
+use starlane_hyperspace::shutdown::shutdown;
 use crate::{env, COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION};
 use anyhow::anyhow;
 use cliclack::log::{error, remark};

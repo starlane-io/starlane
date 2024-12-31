@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use thiserror::__private::AsDisplay;
 
 use crate::command::Command;
 use crate::err::{ParseErrs, SpaceErr};
@@ -283,13 +282,6 @@ pub enum Method {
 
 pub trait BodyExpect {}
 
-impl AsDisplay<'_> for Method {
-    type Target = String;
-
-    fn as_display(&self) -> Self::Target {
-        self.to_deep_string()
-    }
-}
 
 impl Method {
     pub fn to_deep_string(&self) -> String {

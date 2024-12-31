@@ -1,18 +1,18 @@
 use crate::registry::err::RegErr;
-use space::command::common::{SetProperties, SetRegistry};
-use space::command::direct::create::Strategy;
-use space::command::direct::delete::Delete;
-use space::command::direct::query::{Query, QueryResult};
-use space::command::direct::select::{Select, SubSelect};
-use space::hyper::{ParticleLocation, ParticleRecord};
-use space::kind::Kind;
-use space::particle::{Details, Properties, Status, Stub};
-use space::security::{Access, AccessGrant, IndexedAccessGrant};
-use space::selector::Selector;
-use space::substance::SubstanceList;
+use starlane_space::command::common::{SetProperties, SetRegistry};
+use starlane_space::command::direct::create::Strategy;
+use starlane_space::command::direct::delete::Delete;
+use starlane_space::command::direct::query::{Query, QueryResult};
+use starlane_space::command::direct::select::{Select, SubSelect};
+use starlane_space::hyper::{ParticleLocation, ParticleRecord};
+use starlane_space::kind::Kind;
+use starlane_space::particle::{Details, Properties, Status, Stub};
+use starlane_space::security::{Access, AccessGrant, IndexedAccessGrant};
+use starlane_space::selector::Selector;
+use starlane_space::substance::SubstanceList;
 use async_trait::async_trait;
 use std::sync::Arc;
-use space::point::Point;
+use starlane_space::point::Point;
 
 pub type Registry = Arc<dyn RegistryApi>;
 

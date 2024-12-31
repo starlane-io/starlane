@@ -27,6 +27,7 @@ repository.workspace = true
 
 [dependencies]
 starlane-macros = { workspace = true, version = "0.3.21" }
+starlane-space = { workspace = true, version = "0.3.21" }
 
 thiserror = { workspace = true }
 lazy_static = { workspace = true }
@@ -50,6 +51,7 @@ semver = { workspace = true, features = ['serde'] }
 # postgres deps
 sqlx = { workspace = true, features = ["runtime-tokio", "runtime-tokio-rustls", "postgres", "macros", "any"] }
 serde = { workspace = true, features = ['derive', 'rc'] }
+serde_derive = { workspace = true }
 async-recursion = { workspace = true }
 
 rcgen = { workspace = true, features = ["pem", "x509-parser"] }

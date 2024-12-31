@@ -2,12 +2,12 @@ use crate::hyperlane::{
     HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
     HyperwayEndpointFactory,
 };
-use space::err::SpaceErr;
-use space::hyper::Knock;
-use space::log::Logger;
-use space::substance::Substance;
-use space::wave::{PingCore, Wave, WaveVariantDef};
-use space::VERSION;
+use starlane_space::err::SpaceErr;
+use starlane_space::hyper::Knock;
+use starlane_space::log::Logger;
+use starlane_space::substance::Substance;
+use starlane_space::wave::{PingCore, Wave, WaveVariantDef};
+use starlane_space::VERSION;
 use async_trait::async_trait;
 use rcgen::{generate_simple_self_signed, RcgenError};
 use rustls::pki_types::ServerName;
@@ -582,10 +582,10 @@ mod tests {
     use crate::hyperlane::test_util::{
         LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
     };
-    use space::err::SpaceErr;
-    use space::loc::ToSurface;
-    use space::log::{LogAppender, StdOutAppender};
-    use space::point::Point;
+    use starlane_space::err::SpaceErr;
+    use starlane_space::loc::ToSurface;
+    use starlane_space::log::{LogAppender, StdOutAppender};
+    use starlane_space::point::Point;
     use anyhow::anyhow;
     use chrono::{DateTime, Utc};
     use starlane_primitive_macros::{logger, push_loc};

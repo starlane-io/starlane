@@ -1,5 +1,6 @@
 use std::ops::{Deref, DerefMut};
 use async_trait::async_trait;
+use enum_ordinalize::Ordinalize;
 use crate::err::SpaceErr;
 use crate::hyper::ParticleRecord;
 use crate::loc::{Layer, Surface};

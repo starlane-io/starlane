@@ -9,12 +9,13 @@ use std::num::ParseIntError;
 use std::ops::Range;
 use std::string::FromUtf8Error;
 use std::sync::{Arc, PoisonError};
+use ariadne::ReportKind;
+use miette::Report;
 use nom_supreme::error::BaseErrorKind;
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 
-use crate::err::report::{Label, Report, ReportKind};
 use crate::parse::util::Span;
 use crate::parse::util::SpanExtra;
 
@@ -576,14 +577,14 @@ impl From<Report> for ParseErrs {
 
 #[derive(Debug, Clone, Error, Serialize, Deserialize)]
 pub struct ParseErrs {
-    pub report: Vec<Report>,
+    pub report: Vec<Arc<Report>>,
     pub src: String,
 }
 
 impl ParseErrs {
     pub fn report(report: Report) -> Self {
         Self {
-            report: vec![report],
+            report: vec![Arc::new(report)],
             src: "".to_string(),
         }
     }
@@ -593,6 +594,7 @@ impl ParseErrs {
         A: AsRef<str>,
         B: AsRef<str>,
         C: AsRef<str>,
+
     {
         let report = Report::build(ReportKind::Error, (), 0)
             .with_message(format!(
@@ -841,6 +843,7 @@ impl From<serde_urlencoded::ser::Error> for SpaceErr {
     }
 }
 
+/*
 pub mod report {
     use serde::{Deserialize, Serialize};
 
@@ -1049,6 +1052,8 @@ pub mod report {
         RGB(u8, u8, u8),
     }
 }
+
+ */
 
 pub trait PrintErr {
     fn print(&self);

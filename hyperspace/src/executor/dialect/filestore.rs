@@ -2,7 +2,7 @@ use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::cli::{CliErr, CliIn, CliOut};
 use crate::executor::Executor;
 use crate::host::err::HostErr;
-use space::substance::Bin;
+use starlane_space::substance::Bin;
 use clap::{Parser, Subcommand};
 use itertools::Itertools;
 use path_clean::PathClean;

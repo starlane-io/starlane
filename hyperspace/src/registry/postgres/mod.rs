@@ -8,36 +8,36 @@ use crate::reg::{PgRegistryConfig, Registration, RegistryApi};
 use crate::registry::err::RegErr;
 use crate::registry::postgres::embed::PostgresClusterConfig;
 use crate::server::PostgresLookups;
-use space::command::common::{PropertyMod, SetProperties};
-use space::command::direct::create::Strategy;
-use space::command::direct::delete::Delete;
-use space::command::direct::get::{Get, GetOp};
-use space::command::direct::query::{Query, QueryResult};
-use space::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
-use space::command::direct::set::Set;
-use space::err::SpaceErr;
-use space::hyper::{ParticleLocation, ParticleRecord};
-use space::kind::{BaseKind, Kind, KindParts, Specific};
-use space::loc::{StarKey, ToBaseKind, Version};
-use space::log::Logger;
-use space::parse::util::{parse_errs, result};
-use space::parse::{CamelCase, Domain, SkewerCase};
-use space::particle::{Details, Properties, Property, Status, Stub};
-use space::point::Point;
-use space::security::{
+use starlane_space::command::common::{PropertyMod, SetProperties};
+use starlane_space::command::direct::create::Strategy;
+use starlane_space::command::direct::delete::Delete;
+use starlane_space::command::direct::get::{Get, GetOp};
+use starlane_space::command::direct::query::{Query, QueryResult};
+use starlane_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
+use starlane_space::command::direct::set::Set;
+use starlane_space::err::SpaceErr;
+use starlane_space::hyper::{ParticleLocation, ParticleRecord};
+use starlane_space::kind::{BaseKind, Kind, KindParts, Specific};
+use starlane_space::loc::{StarKey, ToBaseKind, Version};
+use starlane_space::log::Logger;
+use starlane_space::parse::util::{parse_errs, result};
+use starlane_space::parse::{CamelCase, Domain, SkewerCase};
+use starlane_space::particle::{Details, Properties, Property, Status, Stub};
+use starlane_space::point::Point;
+use starlane_space::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions,
     PermissionsMask, PermissionsMaskKind, Privilege, Privileges,
 };
-use space::selector::specific::{
+use starlane_space::selector::specific::{
     ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
 };
-use space::selector::{
+use starlane_space::selector::{
     ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector,
     SubKindSelector,
 };
-use space::substance::{Substance, SubstanceList, SubstanceMap};
-use space::util::ValuePattern;
-use space::HYPERUSER;
+use starlane_space::substance::{Substance, SubstanceList, SubstanceMap};
+use starlane_space::util::ValuePattern;
+use starlane_space::HYPERUSER;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use sqlx::pool::PoolConnection;
@@ -1483,18 +1483,18 @@ pub mod test {
         PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
     };
-    use space::artifact::asynch::Artifacts;
-    use space::command::direct::create::Strategy;
-    use space::command::direct::query::Query;
-    use space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
-    use space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
-    use space::loc::{MachineName, StarKey, ToPoint};
-    use space::particle::property::PropertiesConfig;
-    use space::particle::Status;
-    use space::point::Point;
-    use space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
-    use space::selector::{PointHierarchy, Selector};
-    use space::HYPERUSER;
+    use starlane_space::artifact::asynch::Artifacts;
+    use starlane_space::command::direct::create::Strategy;
+    use starlane_space::command::direct::query::Query;
+    use starlane_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
+    use starlane_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
+    use starlane_space::loc::{MachineName, StarKey, ToPoint};
+    use starlane_space::particle::property::PropertiesConfig;
+    use starlane_space::particle::Status;
+    use starlane_space::point::Point;
+    use starlane_space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
+    use starlane_space::selector::{PointHierarchy, Selector};
+    use starlane_space::HYPERUSER;
 
     #[derive(Clone)]
     pub struct TestPlatform {

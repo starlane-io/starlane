@@ -22,39 +22,39 @@ use crate::service::{
     Service, ServiceErr, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate,
 };
 use crate::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
-use space::artifact::asynch::{ArtErr, Artifacts};
-use space::artifact::ArtRef;
-use space::command::common::StateSrc::Subst;
-use space::command::common::{SetProperties, StateSrc};
-use space::command::direct::create::{
+use starlane_space::artifact::asynch::{ArtErr, Artifacts};
+use starlane_space::artifact::ArtRef;
+use starlane_space::command::common::StateSrc::Subst;
+use starlane_space::command::common::{SetProperties, StateSrc};
+use starlane_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use space::config::bind::BindConfig;
-use space::err::{any_result, CoreReflector, SpaceErr, SpatialError};
-use space::hyper::{Assign, HyperSubstance, ParticleRecord};
-use space::kind::{BaseKind, Kind, StarSub};
-use space::loc::{Layer, Surface, ToBaseKind, ToPoint, ToSurface};
-use space::log::{Logger, Tracker};
-use space::parse::bind_config;
-use space::parse::util::{parse_errs, result};
-use space::particle::traversal::{
+use starlane_space::config::bind::BindConfig;
+use starlane_space::err::{any_result, CoreReflector, SpaceErr, SpatialError};
+use starlane_space::hyper::{Assign, HyperSubstance, ParticleRecord};
+use starlane_space::kind::{BaseKind, Kind, StarSub};
+use starlane_space::loc::{Layer, Surface, ToBaseKind, ToPoint, ToSurface};
+use starlane_space::log::{Logger, Tracker};
+use starlane_space::parse::bind_config;
+use starlane_space::parse::util::{parse_errs, result};
+use starlane_space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
-use space::particle::{Details, Status, Stub};
-use space::point::Point;
-use space::selector::KindSelector;
-use space::substance::{Substance, SubstanceErr};
-use space::util::{log, IdSelector, ValueMatcher};
-use space::wave::core::cmd::CmdMethod;
-use space::wave::core::http2::StatusCode;
-use space::wave::core::{CoreBounce, Method, ReflectedCore};
-use space::wave::exchange::asynch::{
+use starlane_space::particle::{Details, Status, Stub};
+use starlane_space::point::Point;
+use starlane_space::selector::KindSelector;
+use starlane_space::substance::{Substance, SubstanceErr};
+use starlane_space::util::{log, IdSelector, ValueMatcher};
+use starlane_space::wave::core::cmd::CmdMethod;
+use starlane_space::wave::core::http2::StatusCode;
+use starlane_space::wave::core::{CoreBounce, Method, ReflectedCore};
+use starlane_space::wave::exchange::asynch::{
     DirectedHandler, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
     Router, TraversalRouter,
 };
-use space::wave::exchange::SetStrategy;
-use space::wave::{Agent, DirectedWave, ReflectedWave, Wave};
-use space::HYPERUSER;
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::{Agent, DirectedWave, ReflectedWave, Wave};
+use starlane_space::HYPERUSER;
 use anyhow::__private::kind::TraitKind;
 use anyhow::{anyhow, Error};
 use async_trait::async_trait;

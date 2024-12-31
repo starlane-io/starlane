@@ -1,7 +1,7 @@
 use crate::env::STARLANE_HOME;
-use crate::hyperspace::driver::control::{ControlCliSession, ControlClient};
-use crate::hyperspace::hyperlane::tcp::HyperlaneTcpClient;
-use crate::hyperspace::hyperlane::HyperwayEndpointFactory;
+use starlane_hyperspace::driver::control::{ControlCliSession, ControlClient};
+use starlane_hyperspace::hyperlane::tcp::HyperlaneTcpClient;
+use starlane_hyperspace::hyperlane::HyperwayEndpointFactory;
 use crate::space::command::{CmdTransfer, RawCommand};
 use crate::space::err::SpaceErr;
 use crate::space::hyper::Knock;

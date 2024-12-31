@@ -937,6 +937,8 @@ pub struct PointDef<Route, Seg> {
     pub segments: Vec<Seg>,
 }
 
+
+
 impl<Route, Seg> PointDef<Route, Seg>
 where
     Route: Clone,
@@ -1387,10 +1389,8 @@ impl Point {
     }
 
     pub fn to_md5(&self) -> String {
-        let mut hasher = md5:
-        hasher.update(self.to_string());
-        let result = hasher.finalize();
-        format!("{:x}", result)
+        let digest = md5::compute(self.to_string().as_bytes());
+        format!("{:x}", digest)
     }
 }
 
@@ -1491,17 +1491,9 @@ where
     }
 }
 
-impl<Route, Seg> AsDisplay<'_> for PointDef<Route, Seg>
-where
-    Route: RouteSegQuery + ToString,
-    Seg: PointSegQuery + ToString,
-{
-    type Target = String;
 
-    fn as_display(&'_ self) -> Self::Target {
-        self.to_string()
-    }
-}
+
+
 
 impl Point {
     pub fn root() -> Self {
@@ -1548,8 +1540,8 @@ impl PointCtx {
 /// To create a Point:
 /// ```
 /// use std::str::FromStr;
-/// use crate::loc::Point;
-/// let Point = Point::from_str("my-domain.com:apps:my-app")?;
+/// use starlane::point::Point;
+/// let point = Point::from_str("my-domain.com:apps:my-app")?;
 /// ```
 /// Besides PointSegs points also have a RouteSeg which can change the meaning of a Point drastically
 /// including referencing a completely different Cosmos, etc.  Routes are prepended and delimited by
@@ -1565,8 +1557,7 @@ pub type Point = PointDef<RouteSeg, PointSeg>;
 /// with a proper Env (environment) reference which should have a contextual point set:
 /// ```
 /// use std::str::FromStr;
-/// use crate::loc::Point;
-/// use crate::loc::PointCtx;
+/// use starlane::point::{Point, PointCtx};
 /// let point_var = PointCtx::from_str("..:another-app:something")?;
 /// let point: Point = point_ctx.to_resolve(&env)?;
 /// ```
@@ -1577,8 +1568,9 @@ pub type PointCtx = PointDef<RouteSeg, PointSegCtx>;
 /// usable point it must be resolved like so:
 /// ```
 /// use std::str::FromStr;
-/// use crate::loc::{Point, PointVar};
+/// use starlane::point::{Point, PointVar};
 /// let point_var = PointVar::from_str("my-domain:users:${user}")?;
 /// let point: Point = point_var.to_resolve(&env)?;
 /// ```
 pub type PointVar = PointDef<RouteSegVar, PointSegVar>;
+

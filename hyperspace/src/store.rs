@@ -1,7 +1,7 @@
 use crate::err::StarErr;
-use crate::hyperspace::err::HyperErr;
-use crate::hyperspace::platform::Platform;
-use space::substance::Substance;
+use starlane_hyperspace::err::HyperErr;
+use starlane_hyperspace::platform::Platform;
+use starlane_space::substance::Substance;
 use itertools::Itertools;
 use std::path::PathBuf;
 

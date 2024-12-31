@@ -8,10 +8,10 @@ use crate::service::{
     FileStoreService, ServiceKind,
 };
 use crate::star::HyperStarSkel;
-use space::kind::{BaseKind, Kind};
-use space::loc::ToBaseKind;
-use space::point::Point;
-use space::selector::KindSelector;
+use starlane_space::kind::{BaseKind, Kind};
+use starlane_space::loc::ToBaseKind;
+use starlane_space::point::Point;
+use starlane_space::selector::KindSelector;
 use async_trait::async_trait;
 use starlane_macros::{handler, DirectedHandler};
 use std::str::FromStr;

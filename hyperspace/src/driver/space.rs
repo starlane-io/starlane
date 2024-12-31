@@ -4,10 +4,10 @@ use crate::driver::{
 };
 use crate::platform::Platform;
 use crate::star::HyperStarSkel;
-use space::kind::{BaseKind, Kind};
-use space::point::Point;
-use space::selector::KindSelector;
-use space::wave::exchange::asynch::DirectedHandler;
+use starlane_space::kind::{BaseKind, Kind};
+use starlane_space::point::Point;
+use starlane_space::selector::KindSelector;
+use starlane_space::wave::exchange::asynch::DirectedHandler;
 use async_trait::async_trait;
 use starlane_macros::{handler, DirectedHandler};
 use std::str::FromStr;

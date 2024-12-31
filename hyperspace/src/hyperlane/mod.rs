@@ -3,19 +3,19 @@ pub mod tcp;
 #[cfg(feature = "quic")]
 pub mod quic;
 
-use space::err::SpaceErr;
-use space::hyper::{Greet, InterchangeKind, Knock};
-use space::loc::{Layer, PointFactory, Surface, ToSurface};
-use space::log::{Logger, Tracker};
-use space::point::Point;
-use space::substance::{Substance, Token};
-use space::wave::core::ext::ExtMethod;
-use space::wave::exchange::asynch::{
+use starlane_space::err::SpaceErr;
+use starlane_space::hyper::{Greet, InterchangeKind, Knock};
+use starlane_space::loc::{Layer, PointFactory, Surface, ToSurface};
+use starlane_space::log::{Logger, Tracker};
+use starlane_space::point::Point;
+use starlane_space::substance::{Substance, Token};
+use starlane_space::wave::core::ext::ExtMethod;
+use starlane_space::wave::exchange::asynch::{
     Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
 };
-use space::wave::exchange::SetStrategy;
-use space::wave::{Agent, DirectedProto, HyperWave, Wave};
-use space::VERSION;
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::{Agent, DirectedProto, HyperWave, Wave};
+use starlane_space::VERSION;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use derive_name::Name;
@@ -1927,7 +1927,7 @@ impl Bridge {
 #[cfg(test)]
 mod tests {
     use crate::hyperlane::HyperRouter;
-    use space::wave::HyperWave;
+    use starlane_space::wave::HyperWave;
     use async_trait::async_trait;
 
     /*
@@ -2001,16 +2001,16 @@ pub mod test_util {
         HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
         MountInterchangeGate,
     };
-    use space::err::SpaceErr;
-    use space::hyper::{Greet, InterchangeKind, Knock};
-    use space::loc::{Layer, Surface, ToSurface};
-    use space::log::Logger;
-    use space::point::Point;
-    use space::settings::Timeouts;
-    use space::substance::Substance;
-    use space::wave::core::ext::ExtMethod;
-    use space::wave::exchange::asynch::{Exchanger, ProtoTransmitter, Router};
-    use space::wave::{
+    use starlane_space::err::SpaceErr;
+    use starlane_space::hyper::{Greet, InterchangeKind, Knock};
+    use starlane_space::loc::{Layer, Surface, ToSurface};
+    use starlane_space::log::Logger;
+    use starlane_space::point::Point;
+    use starlane_space::settings::Timeouts;
+    use starlane_space::substance::Substance;
+    use starlane_space::wave::core::ext::ExtMethod;
+    use starlane_space::wave::exchange::asynch::{Exchanger, ProtoTransmitter, Router};
+    use starlane_space::wave::{
         DirectedProto, PongCore, ReflectedKind, ReflectedProto, WaveVariantDef,
     };
     use starlane_primitive_macros::{create_mark, logger, push_loc, push_mark};
@@ -2309,20 +2309,20 @@ pub mod test {
         HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
         MountInterchangeGate,
     };
-    use space::err::SpaceErr;
-    use space::hyper::InterchangeKind;
-    use space::loc::{Layer, ToSurface};
-    use space::point::Point;
-    use space::settings::Timeouts;
-    use space::substance::Substance;
-    use space::wave::core::cmd::CmdMethod;
-    use space::wave::core::ext::ExtMethod;
-    use space::wave::core::{Method, ReflectedCore};
-    use space::wave::exchange::asynch::{
+    use starlane_space::err::SpaceErr;
+    use starlane_space::hyper::InterchangeKind;
+    use starlane_space::loc::{Layer, ToSurface};
+    use starlane_space::point::Point;
+    use starlane_space::settings::Timeouts;
+    use starlane_space::substance::Substance;
+    use starlane_space::wave::core::cmd::CmdMethod;
+    use starlane_space::wave::core::ext::ExtMethod;
+    use starlane_space::wave::core::{Method, ReflectedCore};
+    use starlane_space::wave::exchange::asynch::{
         Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
     };
-    use space::wave::exchange::SetStrategy;
-    use space::wave::{
+    use starlane_space::wave::exchange::SetStrategy;
+    use starlane_space::wave::{
         Agent, DirectedProto, HyperWave, PongCore, ReflectedKind, ReflectedProto, Wave,
         WaveVariantDef,
     };

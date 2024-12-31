@@ -22,6 +22,8 @@ repository.workspace = true
 [dependencies]
 
 starlane-macros = { workspace = true, version = "0.3.21" }
+starlane-space = { workspace = true, version = "0.3.21" }
+starlane-hyperspace = { workspace = true, version = "0.3.21" }
 
 thiserror = { workspace = true }
 lazy_static = { workspace = true }

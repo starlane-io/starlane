@@ -2,7 +2,7 @@ use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::cli::HostEnv;
 use crate::executor::Executor;
 use crate::host::err::HostErr;
-use space::wave::exchange::asynch::DirectedHandler;
+use starlane_space::wave::exchange::asynch::DirectedHandler;
 use clap::CommandFactory;
 use itertools::Itertools;
 use nom::AsBytes;

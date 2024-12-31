@@ -13,27 +13,27 @@ use crate::hyperlane::HyperClient;
 use crate::machine::MachineApiExtFactory;
 use crate::platform::Platform;
 use crate::star::HyperStarApi;
-use space::command::common::StateSrc;
-use space::command::direct::create::{
+use starlane_space::command::common::StateSrc;
+use starlane_space::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use space::command::{CmdTransfer, RawCommand};
-use space::hyper::{
+use starlane_space::command::{CmdTransfer, RawCommand};
+use starlane_space::hyper::{
     Assign, AssignmentKind, HyperSubstance, ParticleLocation, ParticleRecord,
 };
-use space::kind::Kind;
-use space::loc::{Layer, StarHandle, StarKey, ToSurface};
-use space::particle::{Details, Properties, Status, Stub};
-use space::point::Point;
-use space::settings::Timeouts;
-use space::substance::Substance;
-use space::wave::core::cmd::CmdMethod;
-use space::wave::core::ext::ExtMethod;
-use space::wave::core::hyper::HypMethod;
-use space::wave::core::{Method, ReflectedCore};
-use space::wave::exchange::asynch::Exchanger;
-use space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
-use space::HYPERUSER;
+use starlane_space::kind::Kind;
+use starlane_space::loc::{Layer, StarHandle, StarKey, ToSurface};
+use starlane_space::particle::{Details, Properties, Status, Stub};
+use starlane_space::point::Point;
+use starlane_space::settings::Timeouts;
+use starlane_space::substance::Substance;
+use starlane_space::wave::core::cmd::CmdMethod;
+use starlane_space::wave::core::ext::ExtMethod;
+use starlane_space::wave::core::hyper::HypMethod;
+use starlane_space::wave::core::{Method, ReflectedCore};
+use starlane_space::wave::exchange::asynch::Exchanger;
+use starlane_space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
+use starlane_space::HYPERUSER;
 
 pub static LESS: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:less").expect("point"));
 pub static FAE: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:fae").expect("point"));

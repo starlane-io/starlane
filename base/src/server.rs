@@ -1,13 +1,13 @@
 #[cfg(feature = "postgres")]
-use crate::hyperspace::registry::postgres::{
+use starlane_hyperspace::registry::postgres::{
     PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
 
-use crate::hyperspace::driver::base::BaseDriverFactory;
-use crate::hyperspace::driver::control::ControlDriverFactory;
-use crate::hyperspace::driver::root::RootDriverFactory;
-use crate::hyperspace::driver::{DriverAvail, DriversBuilder};
+use starlane_hyperspace::driver::base::BaseDriverFactory;
+use starlane_hyperspace::driver::control::ControlDriverFactory;
+use starlane_hyperspace::driver::root::RootDriverFactory;
+use starlane_hyperspace::driver::{DriverAvail, DriversBuilder};
 use crate::space::artifact::asynch::Artifacts;
 use crate::space::kind::StarSub;
 use crate::space::loc::{MachineName, StarKey};
@@ -20,17 +20,17 @@ use std::sync::Arc;
 use crate::base::foundation::settings::ProtoFoundationSettings;
 use crate::base::foundation::Foundation;
 use crate::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
-use crate::hyperspace::driver::space::SpaceDriverFactory;
-use crate::hyperspace::err::HypErr;
-use crate::hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
-use crate::hyperspace::hyperlane::{
+use starlane_hyperspace::driver::space::SpaceDriverFactory;
+use starlane_hyperspace::err::HypErr;
+use starlane_hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
+use starlane_hyperspace::hyperlane::{
     AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper,
 };
-//use crate::hyperspace::config::docker::DockerDesktopFoundation;
-use crate::hyperspace::machine::MachineTemplate;
-use crate::hyperspace::platform::{Platform, PlatformConfig};
-use crate::hyperspace::registry::err::RegErr;
-use crate::hyperspace::shutdown::panic_shutdown;
+//use starlane_hyperspace::config::docker::DockerDesktopFoundation;
+use starlane_hyperspace::machine::MachineTemplate;
+use starlane_hyperspace::platform::{Platform, PlatformConfig};
+use starlane_hyperspace::registry::err::RegErr;
+use starlane_hyperspace::shutdown::panic_shutdown;
 use anyhow::anyhow;
 use port_check::is_local_ipv4_port_free;
 use serde::{Deserialize, Serialize};

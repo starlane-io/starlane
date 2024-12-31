@@ -59,7 +59,7 @@ strum_macros = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
 ascii = { workspace = true }
-url = { workspace = true }
+url = { workspace = true, features = ["serde"] }
 serde_with_macros = { workspace = true }
 # hyper requirements
 futures = { workspace = true }
@@ -74,12 +74,15 @@ nom-supreme = { workspace = true }
 nom_locate = { workspace = true }
 regex = { workspace = true }
 serde_json = { workspace = true }
+serde_with = { workspace = true }
 serde_urlencoded = { workspace = true }
+serde_derive = { workspace = true }
 enum-ordinalize = { workspace = true }
 convert_case = { workspace = true }
 validator = { workspace = true }
 
 
+miette = {workspace = true}
 
 anyhow = { workspace = true }
 cliclack = { workspace = true }

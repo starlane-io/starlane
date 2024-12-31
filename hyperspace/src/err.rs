@@ -4,9 +4,9 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::registry::err::RegErr;
-use space::err::{CoreReflector, HyperSpatialError, SpaceErr, SpatialError};
-use space::wave::core::http2::StatusCode;
-use space::wave::core::ReflectedCore;
+use starlane_space::err::{CoreReflector, HyperSpatialError, SpaceErr, SpatialError};
+use starlane_space::wave::core::http2::StatusCode;
+use starlane_space::wave::core::ReflectedCore;
 
 pub type HyperErr2 = anyhow::Error;
 use crate::star::StarErr;
@@ -94,9 +94,9 @@ impl From<ThisErr> for OldStarErr {
 
 /*
 pub mod convert {
-    use space as main;
+    use starlane_space as main;
     use crate::err::OldStarErr;
-    use crate::hyperspace::err::{ErrKind, HyperErr};
+    use starlane_hyperspace::err::{ErrKind, HyperErr};
     use ascii::FromAsciiError;
     use std::io;
     use std::str::Utf8Error;
@@ -104,7 +104,7 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-    use space::err::SpaceErr;
+    use starlane_space::err::SpaceErr;
 
     impl From<strum::ParseError> for OldStarErr {
         fn from(e: strum::ParseError) -> Self {

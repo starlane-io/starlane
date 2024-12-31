@@ -12,33 +12,33 @@ use crate::reg::{Registration, Registry};
 use crate::registry::err::RegErr;
 use crate::service::ServiceTemplate;
 use crate::template::Templates;
-use space::command::common::StateSrc;
-use space::command::direct::create::{Create, Strategy};
-use space::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError};
-use space::hyper::{Assign, AssignmentKind, HyperSubstance, Provision, Search};
-use space::hyper::{MountKind, ParticleLocation};
-use space::kind::{Kind, StarStub, StarSub};
-use space::loc::{
+use starlane_space::command::common::StateSrc;
+use starlane_space::command::direct::create::{Create, Strategy};
+use starlane_space::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError};
+use starlane_space::hyper::{Assign, AssignmentKind, HyperSubstance, Provision, Search};
+use starlane_space::hyper::{MountKind, ParticleLocation};
+use starlane_space::kind::{Kind, StarStub, StarSub};
+use starlane_space::loc::{
     Layer, StarKey, Surface, SurfaceSelector, ToPoint, ToSurface, GLOBAL_EXEC,
 };
-use space::log::{Logger, Trackable, Tracker};
-use space::particle::traversal::{
+use starlane_space::log::{Logger, Trackable, Tracker};
+use starlane_space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
-use space::particle::{Details, Status};
-use space::point::Point;
-use space::substance::{Substance, SubstanceErr, SubstanceKind};
-use space::util::ValueMatcher;
-use space::wave::core::cmd::CmdMethod;
-use space::wave::core::hyper::HypMethod;
-use space::wave::core::ReflectedCore;
-use space::wave::exchange::asynch::{
+use starlane_space::particle::{Details, Status};
+use starlane_space::point::Point;
+use starlane_space::substance::{Substance, SubstanceErr, SubstanceKind};
+use starlane_space::util::ValueMatcher;
+use starlane_space::wave::core::cmd::CmdMethod;
+use starlane_space::wave::core::hyper::HypMethod;
+use starlane_space::wave::core::ReflectedCore;
+use starlane_space::wave::exchange::asynch::{
     DirectedHandler, DirectedHandlerShell, Exchanger, ProtoTransmitter, ProtoTransmitterBuilder,
     Router, TraversalRouter, TxRouter,
 };
-use space::wave::exchange::SetStrategy;
-use space::wave::Wave;
-use space::wave::{
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::Wave;
+use starlane_space::wave::{
     Agent, DirectedProto, Handling, HandlingKind, PongCore, Priority, Recipients, Reflectable,
     ReflectedWave, Retries, Ripple, Scope, SignalCore, SingularRipple, ToReflected, WaitTime,
     WaveId, WaveKind, WaveVariantDef,

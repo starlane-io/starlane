@@ -9,30 +9,30 @@ use crate::hyperlane::{
 };
 use crate::platform::Platform;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use space::artifact::ArtRef;
-use space::command::common::StateSrc;
-use space::command::direct::create::{
+use starlane_space::artifact::ArtRef;
+use starlane_space::command::common::StateSrc;
+use starlane_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use space::command::RawCommand;
-use space::config::bind::BindConfig;
-use space::err::{CoreReflector, SpaceErr};
-use space::hyper::{ControlPattern, Greet, InterchangeKind};
-use space::kind::{BaseKind, Kind, StarSub};
-use space::loc::{Layer, PointFactory, Surface, ToSurface};
-use space::log::{Logger, Tracker};
-use space::particle::traversal::Traversal;
-use space::point::Point;
-use space::selector::KindSelector;
-use space::settings::Timeouts;
-use space::substance::{Substance, SubstanceErr};
-use space::wave::core::ext::ExtMethod;
-use space::wave::core::ReflectedCore;
-use space::wave::exchange::asynch::{
+use starlane_space::command::RawCommand;
+use starlane_space::config::bind::BindConfig;
+use starlane_space::err::{CoreReflector, SpaceErr};
+use starlane_space::hyper::{ControlPattern, Greet, InterchangeKind};
+use starlane_space::kind::{BaseKind, Kind, StarSub};
+use starlane_space::loc::{Layer, PointFactory, Surface, ToSurface};
+use starlane_space::log::{Logger, Tracker};
+use starlane_space::particle::traversal::Traversal;
+use starlane_space::point::Point;
+use starlane_space::selector::KindSelector;
+use starlane_space::settings::Timeouts;
+use starlane_space::substance::{Substance, SubstanceErr};
+use starlane_space::wave::core::ext::ExtMethod;
+use starlane_space::wave::core::ReflectedCore;
+use starlane_space::wave::exchange::asynch::{
     Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TraversalRouter,
 };
-use space::wave::exchange::SetStrategy;
-use space::wave::{Agent, DirectedProto, PongCore, ToRecipients, Wave, WaveVariantDef};
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::{Agent, DirectedProto, PongCore, ToRecipients, Wave, WaveVariantDef};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use dashmap::DashMap;

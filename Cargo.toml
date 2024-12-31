@@ -3,13 +3,12 @@
 license = "MIT"
 repository = "https://github.com/starlane-io/starlane.git"
 
-version = "0.3.21"
-
-edition = "2021" 
+edition = "2021"
 rust-version = "1.81.0"
 authors = []
 homepage = "https://starlane.io"
 description="The Workspace package for Starlane.  What to see: './space' contains the "
+version="0.3.20"
 
 [workspace]
 default-run = "starlane"
@@ -27,6 +26,10 @@ starlane-space = { package="starlane-space", path= "space", version = "0.3.20" }
 starlane-hyperspace = { package="starlane-hyperspace", path= "hyperspace", version = "0.3.20" }
 starlane-base = { package="starlane-base", path= "base", version = "0.3.20" }
 starlane = { package="starlane", path="./main"}
+
+
+
+
 
 lazy_static = "1.5.0"
 uuid = { version="1.11.0" }
@@ -53,10 +56,11 @@ futures = {version = "0.3.31", default-features = true }
 dashmap = "6.1.0"
 semver = { version="1.0.24", features=['serde'] }
 eyre = "0.6.12" # NOTE: add 'miette = "7.4.0"' for reporting later!
-deluxe = "0.5.0"
+miette = "7.4.0"
 itertools = "0.13.0"
 
 serde = "1.0.217"
+serde_derive = "1.0.217"
 async-recursion = "1.1.1"
 
 rcgen = "0.13.2"

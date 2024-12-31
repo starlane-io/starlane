@@ -6,7 +6,7 @@ use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::proxy::sealed::ProxySealed;
 use crate::base::foundation::status::Status;
 use crate::base::kind::DependencyKind;
-use crate::hyperspace::reg::Registry;
+use starlane_hyperspace::reg::Registry;
 use crate::space::progress::Progress;
 use std::ops::Deref;
 use std::sync::Arc;

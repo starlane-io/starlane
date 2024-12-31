@@ -6,7 +6,7 @@ use crate::env::{
 use starlane::base::foundation::Foundation;
 
 use crate::server::{Starlane, StarlaneConfig};
-use crate::hyperspace::shutdown::shutdown;
+use starlane_hyperspace::shutdown::shutdown;
 use crate::{env, COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION};
 use anyhow::anyhow;
 use cliclack::log::{error, remark};
@@ -19,9 +19,9 @@ use console::style;
 use lerp::Lerp;
 use nom::combinator::all_consuming;
 use serde::Serialize;
-use crate::space::parse::util::{new_span, result};
-use crate::space::parse::{path, var_case, VarCase};
-use crate::space::particle::Status;
+use starlane_space::parse::util::{new_span, result};
+use starlane_space::parse::{path, var_case, VarCase};
+use starlane_space::particle::Status;
 use std::fmt::Display;
 use std::io::Write;
 use std::ops::Deref;

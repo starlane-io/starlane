@@ -2,17 +2,17 @@ use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere,
     DRIVER_BIND,
 };
-use crate::hyperspace::platform::Platform;
-use crate::hyperspace::star::HyperStarSkel;
-use space::artifact::ArtRef;
-use space::config::bind::BindConfig;
-use space::kind::{BaseKind, Kind};
-use space::parse::bind_config;
-use space::point::Point;
-use space::selector::KindSelector;
-use space::util::log;
-use space::wave::core::CoreBounce;
-use space::wave::exchange::asynch::{DirectedHandler, RootInCtx};
+use starlane_hyperspace::platform::Platform;
+use starlane_hyperspace::star::HyperStarSkel;
+use starlane_space::artifact::ArtRef;
+use starlane_space::config::bind::BindConfig;
+use starlane_space::kind::{BaseKind, Kind};
+use starlane_space::parse::bind_config;
+use starlane_space::point::Point;
+use starlane_space::selector::KindSelector;
+use starlane_space::util::log;
+use starlane_space::wave::core::CoreBounce;
+use starlane_space::wave::exchange::asynch::{DirectedHandler, RootInCtx};
 use once_cell::sync::Lazy;
 use std::str::FromStr;
 use std::sync::Arc;

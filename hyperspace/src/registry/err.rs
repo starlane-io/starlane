@@ -1,8 +1,8 @@
 #[cfg(feature = "postgres")]
 use sqlx::Error;
 
-use space::err::{HyperSpatialError, ParseErrs, SpaceErr, SpatialError};
-use space::point::Point;
+use starlane_space::err::{HyperSpatialError, ParseErrs, SpaceErr, SpatialError};
+use starlane_space::point::Point;
 use std::sync::Arc;
 use thiserror::Error;
 

@@ -6,23 +6,23 @@ use url::Url;
 
 use crate::platform::Platform;
 use crate::star::{HyperStarSkel, TraverseToNextRouter};
-use space::artifact::asynch::ArtErr;
-use space::artifact::ArtRef;
-use space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
-use space::err::{CoreReflector, SpaceErr, StatusErr};
-use space::loc::{Layer, Surface, ToSurface};
-use space::log::{Logger, Trackable};
-use space::parse::model::{PipelineSegmentVar, PipelineVar};
-use space::parse::{Env, RegexCapturesResolver};
-use space::particle::traversal::{Traversal, TraversalLayer};
-use space::point::Point;
-use space::selector::PayloadBlock;
-use space::substance::Substance;
-use space::util::{log, ToResolved};
-use space::wave::core::{Method, ReflectedCore};
-use space::wave::exchange::asynch::ProtoTransmitter;
-use space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
-use space::wave::{
+use starlane_space::artifact::asynch::ArtErr;
+use starlane_space::artifact::ArtRef;
+use starlane_space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
+use starlane_space::err::{CoreReflector, SpaceErr, StatusErr};
+use starlane_space::loc::{Layer, Surface, ToSurface};
+use starlane_space::log::{Logger, Trackable};
+use starlane_space::parse::model::{PipelineSegmentVar, PipelineVar};
+use starlane_space::parse::{Env, RegexCapturesResolver};
+use starlane_space::particle::traversal::{Traversal, TraversalLayer};
+use starlane_space::point::Point;
+use starlane_space::selector::PayloadBlock;
+use starlane_space::substance::Substance;
+use starlane_space::util::{log, ToResolved};
+use starlane_space::wave::core::{Method, ReflectedCore};
+use starlane_space::wave::exchange::asynch::ProtoTransmitter;
+use starlane_space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
+use starlane_space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, PongCore, Reflection, Wave,
     WaveVariantDef,
 };
