@@ -1,7 +1,7 @@
 use core::str::FromStr;
 use strum_macros::{EnumDiscriminants, EnumString};
 use crate::loc::Version;
-use crate::parse::{CamelCase, SkewerCase};
+use crate::parse::{space_point_segment, CamelCase, SkewerCase};
 
 
 
@@ -76,23 +76,7 @@ impl DomainScope {
 
 
 
-impl FromStr for Segment {
-    type Err = eyre::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        fn ext(s: &str) -> Result<Segment, eyre::Error> {
-            Ok(Segment::Seg(SkewerCase::from_str(s)?.into()))
-        }
-
-        match SegmentKind::from_str(s) {
-            /// this Ok match is actually an Error!
-            Ok(SegmentKind::Seg) => ext(s),
-            Ok(kind) => ext(kind.into()),
-            /// a non match in the builtins means a [Segment::_Ext]
-            Err(_) => ext(s),
-        }
-    }
-}
 #[cfg(test)]
 pub mod test {
     use crate::types::domain::{DomainScope, Prefix};
