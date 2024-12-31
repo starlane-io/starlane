@@ -588,7 +588,7 @@ mod tests {
     use starlane_space::point::Point;
     use anyhow::anyhow;
     use chrono::{DateTime, Utc};
-    use starlane_primitive_macros::{logger, push_loc};
+    use starlane_macros::{logger, push_loc};
     use std::str::FromStr;
     use std::sync::Arc;
 

@@ -1,4 +1,4 @@
-#[cfg(feature = "postgres")]
+
 use starlane_hyperspace::registry::postgres::{
     PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
@@ -34,7 +34,7 @@ use starlane_hyperspace::shutdown::panic_shutdown;
 use anyhow::anyhow;
 use port_check::is_local_ipv4_port_free;
 use serde::{Deserialize, Serialize};
-use starlane_primitive_macros::{logger, push_loc};
+use starlane_macros::{logger, push_loc};
 use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
@@ -116,8 +116,8 @@ impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
 
  */
 
-#[cfg(feature = "postgres")]
-#[cfg(feature = "blah")]
+
+
 impl Starlane {
     pub async fn new(
         config: StarlaneConfig,
@@ -319,11 +319,11 @@ where
     }
 }
 
-#[cfg(feature = "postgres")]
+
 #[derive(Clone)]
 pub struct PostgresLookups(LiveDatabase);
 
-#[cfg(feature = "postgres")]
+
 impl PostgresLookups {
     pub fn new(database: LiveDatabase) -> Self {
         Self(database)
@@ -331,7 +331,7 @@ impl PostgresLookups {
 }
 
 /*
-#[cfg(feature = "postgres")]
+
 impl Default for PostgresLookups {
     fn default() -> Self {
         Self::new(PgR)
@@ -340,7 +340,7 @@ impl Default for PostgresLookups {
 
  */
 
-#[cfg(feature = "postgres")]
+
 impl PostgresPlatform for PostgresLookups {
     fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr> {
         Ok(self.0.clone().into())

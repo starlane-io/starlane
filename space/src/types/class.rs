@@ -6,7 +6,6 @@ use derive_builder::Builder;
 use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
 use starlane_space::types::SchemaKind;
-use starlane_space::types::schema::BindConfig;
 use crate::kind::Specific;
 use crate::parse::CamelCase;
 use crate::point::Point;
@@ -16,8 +15,6 @@ use crate::types::private::Exact;
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ClassType))]
 #[strum_discriminants(derive(
-    Clone,
-    Debug,
     Hash,
     strum_macros::EnumString,
     strum_macros::ToString,
@@ -87,8 +84,8 @@ impl private::Kind for ClassKind  {
     }
 
 
-    fn factory() -> impl Fn(Exact<Self>) -> Type {
-        |t| Type::Class(t)
+    fn type_kind(&self) -> TypeKind {
+        todo!()
     }
 }
 
@@ -142,7 +139,7 @@ pub type Class = private::Exact<ClassKind>;
 
 
 
-//#[cfg(feature = "parse")]
+
 /*
 mod parse {
     use crate::types::class::Class;

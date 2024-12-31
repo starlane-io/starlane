@@ -82,7 +82,7 @@ impl Driver for RepoDriver {
     }
 
     async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
-        let filestore = self.filestore.sub_root(point.md5().into()).await?;
+        let filestore = self.filestore.sub_root(point.to_md5().into()).await?;
 
         let repo = Repo::restore((), (), filestore);
         Ok(repo.sphere()?)

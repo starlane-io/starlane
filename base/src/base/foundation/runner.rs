@@ -11,7 +11,7 @@ use crate::space::parse::CamelCase;
 use crate::space::point::Point;
 use crate::space::progress::Progress;
 use md5::digest::FixedOutput;
-use starlane_primitive_macros::logger;
+use starlane_macros::logger;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;

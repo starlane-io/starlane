@@ -12,7 +12,7 @@ pub enum TypeErr {
     EmptyMeta(TypeKind),
     #[error("{kind} Meta::by_layer({tried}) index out of bounds because exceeds layers length {len}")]
     MetaLayerIndexOutOfBounds{ kind: TypeKind, tried: usize, len: usize,  },
-    #[error("specific '{specific} not found in '{search_foundation}'")]
+    #[error("specific '{specific} not found in '{search_location}'")]
     SpecificNotFound{ search_location: String ,specific: Specific  },
 }
 

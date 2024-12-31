@@ -1,4 +1,4 @@
-#[cfg(feature = "postgres")]
+
 use sqlx::Error;
 
 use starlane_space::err::{HyperSpatialError, ParseErrs, SpaceErr, SpatialError};
@@ -29,14 +29,14 @@ pub enum RegErr {
     #[error("{0}")]
     Msg(String),
 
-    #[cfg(feature = "postgres")]
+
     #[error("postgres error: {0}")]
     SqlxErr(#[from] Arc<sqlx::Error>),
 
     #[error("postgres registry db connection pool '{0}' not found")]
     PoolNotFound(String),
 
-    #[cfg(feature = "postgresql-embedded")]
+
     #[error("postgres embed error error: {0}")]
     PgErr(#[from] postgresql_embedded::Error),
     #[error(transparent)]
@@ -71,7 +71,7 @@ impl From<&String> for RegErr {
     }
 }
 
-#[cfg(feature = "postgres")]
+
 impl From<sqlx::Error> for RegErr {
     fn from(value: Error) -> Self {
         RegErr::SqlxErr(Arc::new(value))

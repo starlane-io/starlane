@@ -64,7 +64,7 @@ use futures::task::Spawn;
 use futures::{FutureExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use starlane_macros::{handler, route, DirectedHandler, ToSpaceErr};
-use starlane_primitive_macros::push_loc;
+use starlane_macros::push_loc;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -1048,7 +1048,7 @@ impl ParticleOuter {}
 
 #[async_trait]
 impl TraversalLayer for ParticleOuter {
-    fn surface(&self) -> space::loc::Surface {
+    fn surface(&self) -> Surface {
         self.surface.clone()
     }
 

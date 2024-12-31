@@ -1,5 +1,4 @@
 #![allow(warnings)]
-extern crate starlane as space;
 
 pub mod err;
 pub mod global;
@@ -18,7 +17,7 @@ pub mod registry;
 pub mod shutdown;
 pub mod tests;
 
-#[cfg(feature = "postgres")]
+
 pub mod database;
 pub mod service;
 pub mod template;

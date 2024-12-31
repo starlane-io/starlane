@@ -17,7 +17,7 @@ use starlane_space::particle::property::{PropertiesConfig, PropertiesConfigBuild
 use starlane_space::settings::Timeouts;
 use anyhow::anyhow;
 use async_trait::async_trait;
-use starlane_primitive_macros::logger;
+use starlane_macros::logger;
 use std::str::FromStr;
 use std::sync::Arc;
 

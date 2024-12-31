@@ -35,7 +35,6 @@ impl RegistryWrapper {
 
 pub mod err {
     use crate::point::Point;
-    use alloc::string::{String, ToString};
     use thiserror::Error;
 
     #[derive(Error, Debug)]

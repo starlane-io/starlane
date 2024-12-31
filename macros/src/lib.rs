@@ -956,8 +956,8 @@ pub fn warn(_item: TokenStream) -> TokenStream {
     // pushing scope so we don't collide with
     // any other imports or local things...
     {
-        use starlane_primitive_macros::mark;
-        use starlane_primitive_macros::create_mark;
+        use starlane_macros::mark;
+        use starlane_macros::create_mark;
         use #crt::log::Log;
         use #crt::log::LOGGER;
         use #crt::log::root_logger;

@@ -53,6 +53,7 @@ sqlx = { workspace = true, features = ["runtime-tokio", "runtime-tokio-rustls", 
 serde = { workspace = true, features = ['derive', 'rc'] }
 serde_derive = { workspace = true }
 async-recursion = { workspace = true }
+enum-ordinalize = { workspace = true }
 
 rcgen = { workspace = true, features = ["pem", "x509-parser"] }
 rustls = { workspace = true, features = ["aws_lc_rs"] }
@@ -72,6 +73,7 @@ derive-name = { workspace = true }
 #tracing = { workspace = true, features=["std","log","attributes","tracing-attributes","max_level_trace"]}
 tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-attributes", "async-await"] }
 tracing-core = { workspace = true, features = ["valuable", "default"] }
+url = "2.5.4"
 
 [build-dependencies]
 shadow-rs = { workspace = true }

@@ -13,7 +13,7 @@ use crate::space::substance::Substance;
 use crate::space::wave::core::ReflectedCore;
 use clap::clap_derive::{Args, Subcommand};
 use clap::Parser;
-use starlane_primitive_macros::logger;
+use starlane_macros::logger;
 use std::fs::File;
 use std::io::{Cursor, Read, Seek, Write};
 use std::path::Path;

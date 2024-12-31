@@ -19,26 +19,23 @@ pub static VERSION: Lazy<semver::Version> =
 pub mod test;
 
 pub mod install;
-//#[cfg(feature="space")]
+
+pub mod env;
+pub mod server;
 
 
-#[cfg(feature = "cli")]
+
+
 pub mod cli;
 
-#[cfg(feature = "server")]
+
 pub mod env;
-#[cfg(feature = "server")]
+
 pub mod server;
-pub mod space;
-pub mod hyperspace;
 
 
 
-use crate::cli::{Cli, Commands, ContextCmd};
-use crate::env::{
-    config_exists, context, context_dir, ensure_global_settings, save_global_settings, set_context,
-    STARLANE_HOME,
-};
+
 pub use starlane_hyperspace::platform::Platform;
 use starlane_hyperspace::shutdown::shutdown;
 use crate::install::{Console, StarlaneTheme};
@@ -59,7 +56,7 @@ use lerp::Lerp;
 use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
 use shadow_rs::shadow;
-use starlane_primitive_macros::{create_mark, ToBase};
+use starlane_macros::{create_mark, ToBase};
 use std::any::Any;
 use std::fmt::Display;
 use std::fs::File;
@@ -73,7 +70,8 @@ use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
-use zip::write::FileOptions;
+use zip::write::{FileOptionExtension, FileOptions};
+use crate::env::{context_dir, ensure_global_settings, save_global_settings, STARLANE_HOME};
 /*
 let config = Default::default();
 
@@ -82,7 +80,7 @@ config
  */
 
 pub fn init() {
-    #[cfg(feature = "cli")]
+
     {
         use rustls::crypto::aws_lc_rs::default_provider;
         default_provider()
@@ -91,7 +89,7 @@ pub fn init() {
     }
 }
 
-#[cfg(feature = "cli")]
+
 pub fn main() -> Result<(), anyhow::Error> {
     ctrlc::set_handler(move || shutdown(1)).unwrap();
 
@@ -208,7 +206,7 @@ fn run() -> Result<(), anyhow::Error> {
         "'machine' feature is not enabled in this main installation"
     ))
 }
-#[cfg(feature = "server")]
+
 async fn run() -> Result<(), anyhow::Error> {
     let console = Console::new();
     console.info("main started.")?;
@@ -331,7 +329,7 @@ async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 /*
-#[cfg(feature = "server")]
+
 fn run() -> Result<(), anyhow::Error> {
     let console = Console::new();
     console.info("main started.")?;
@@ -448,7 +446,7 @@ Timestamp { millis: Utc::now().timestamp_millis() }
 
 */
 /*
-#[cfg(feature = "cli")]
+
 async fn cli() -> Result<(), SpaceErr> {
     let home_dir: String = match dirs::home_dir() {
         None => ".".to_string(),
@@ -511,7 +509,7 @@ where
     T: Write + Seek,
 {
     let mut zip = zip::ZipWriter::new(writer);
-    let options = FileOptions::default()
+    let options: FileOptions<'_,FileOptionExtension> = FileOptions::default()
         .compression_method(method)
         .unix_permissions(0o755);
 

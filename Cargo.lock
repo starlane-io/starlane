@@ -2962,6 +2962,7 @@ dependencies = [
  "starlane-hyperspace",
  "starlane-macros",
  "starlane-space",
+ "strum",
  "strum_macros",
  "termsize",
  "text-to-ascii-art",
@@ -3010,6 +3011,7 @@ dependencies = [
  "starlane-hyperspace",
  "starlane-macros",
  "starlane-space",
+ "strum",
  "strum_macros",
  "termsize",
  "text-to-ascii-art",
@@ -3037,6 +3039,7 @@ dependencies = [
  "dashmap",
  "derive-name",
  "derive_builder",
+ "enum-ordinalize",
  "futures",
  "itertools 0.13.0",
  "lazy_static",
@@ -3063,6 +3066,7 @@ dependencies = [
  "tokio-rustls",
  "tracing",
  "tracing-core",
+ "url",
 ]
 
 [[package]]

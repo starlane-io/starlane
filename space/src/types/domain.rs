@@ -33,8 +33,6 @@ pub enum Prefix {
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(SegmentKind))]
 #[strum_discriminants(derive(
-    Clone,
-    Debug,
     Hash,
     strum_macros::EnumString,
 ))]
@@ -90,7 +88,7 @@ impl FromStr for Segment {
             /// this Ok match is actually an Error!
             Ok(SegmentKind::Seg) => ext(s),
             Ok(kind) => ext(kind.into()),
-            /// a non match in the builtins means an [Segment::_Ext]
+            /// a non match in the builtins means a [Segment::_Ext]
             Err(_) => ext(s),
         }
     }

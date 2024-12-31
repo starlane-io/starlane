@@ -1,4 +1,4 @@
-#[cfg(feature = "postgres")]
+
 use starlane_hyperspace::registry::postgres::{
     PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
@@ -17,8 +17,6 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::base::foundation::settings::ProtoFoundationSettings;
-use crate::base::foundation::Foundation;
 use crate::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
 use starlane_hyperspace::driver::space::SpaceDriverFactory;
 use starlane_hyperspace::err::HypErr;
@@ -34,10 +32,10 @@ use starlane_hyperspace::shutdown::panic_shutdown;
 use anyhow::anyhow;
 use port_check::is_local_ipv4_port_free;
 use serde::{Deserialize, Serialize};
-use starlane_primitive_macros::{logger, push_loc};
+use starlane_macros::{logger, push_loc};
 use std::collections::HashSet;
 use std::ops::Deref;
-use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
+use starlane_hyperspace::reg::Registry;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
@@ -116,8 +114,8 @@ impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
 
  */
 
-#[cfg(feature = "postgres")]
-#[cfg(feature = "blah")]
+
+
 impl Starlane {
     pub async fn new(
         config: StarlaneConfig,
@@ -167,14 +165,7 @@ impl Starlane {
     }
 }
 
-impl Drop for Starlane {
-    fn drop(&mut self) {
-        match &self.config.registry {
-            PgRegistryConfig::Embedded(db) => {}
-            _ => {}
-        };
-    }
-}
+
 
 #[async_trait]
 impl Platform for Starlane
@@ -319,11 +310,11 @@ where
     }
 }
 
-#[cfg(feature = "postgres")]
+
 #[derive(Clone)]
 pub struct PostgresLookups(LiveDatabase);
 
-#[cfg(feature = "postgres")]
+
 impl PostgresLookups {
     pub fn new(database: LiveDatabase) -> Self {
         Self(database)
@@ -331,7 +322,7 @@ impl PostgresLookups {
 }
 
 /*
-#[cfg(feature = "postgres")]
+
 impl Default for PostgresLookups {
     fn default() -> Self {
         Self::new(PgR)
@@ -340,7 +331,7 @@ impl Default for PostgresLookups {
 
  */
 
-#[cfg(feature = "postgres")]
+
 impl PostgresPlatform for PostgresLookups {
     fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr> {
         Ok(self.0.clone().into())

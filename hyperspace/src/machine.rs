@@ -35,7 +35,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use futures::future::{join_all, select_all, BoxFuture};
 use futures::{FutureExt, TryFutureExt};
-use starlane_primitive_macros::{push_loc, push_mark};
+use starlane_macros::{push_loc, push_mark};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::mpsc::SendError;

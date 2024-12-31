@@ -1,4 +1,4 @@
-#![cfg(feature="types2")]
+
 
 use strum_macros::EnumDiscriminants;
 
@@ -23,7 +23,7 @@ pub enum DefSrc {
 pub(crate) mod private {
     use std::borrow::Borrow;
     use std::collections::HashMap;
-    use std::fmt::Display;
+    use std::fmt::{Display, Formatter};
     use std::marker::PhantomData;
     use std::ops::{Deref, DerefMut, Index};
     use std::str::FromStr;
@@ -32,6 +32,7 @@ pub(crate) mod private {
     use nom::Parser;
     use nom_supreme::ParserExt;
     use rustls::pki_types::Der;
+    use serde_derive::{Deserialize, Serialize};
     use tracing::Instrument;
     use crate::err::ParseErrs;
     use crate::kind::Specific;
@@ -258,11 +259,33 @@ pub(crate) mod private {
 
 
 
-    #[derive(Clone, Debug, Eq, PartialEq, Hash, ,Serialize,Deserialize)]
+    #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize,Deserialize)]
     pub(crate) struct Exact<K> where K: Kind{
         scope: domain::DomainScope,
         kind: K,
         specific: Specific,
+    }
+
+    impl<K> Display for Exact<K>
+    where
+        K: Kind,
+    {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            todo!()
+        }
+    }
+
+    impl<K> Into<TypeKind> for Exact<K>
+    where
+        K: Kind,
+    {
+        fn into(self) -> TypeKind {
+            match self {
+                Exact { scope, kind, specific } => {
+                    TypeKind::from(kind)
+                }
+            }
+        }
     }
 
     impl <K> Typical for Exact<K> where K: Kind{
@@ -323,11 +346,13 @@ pub enum Type {
     Class(Class),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants,strum_macros::Display)]
 pub enum TypeKind {
     Schema(SchemaKind),
     Class(ClassKind),
 }
+
+
 
 
 impl Type {
@@ -378,7 +403,6 @@ pub mod parse {
     use nom_supreme::parser_ext::FromStrParser;
     use nom_supreme::ParserExt;
     use nom_supreme::tag::complete::tag;
-    use wasmer_wasix::runtime::resolver::Source;
     use crate::{err, types};
     use crate::err::report::Report;
     use crate::kind::Specific;

@@ -15,6 +15,7 @@ use std::str::FromStr;
 use std::string::ToString;
 use std::sync::Arc;
 use uuid::Uuid;
+use crate::server::StarlaneConfig;
 
 pub fn context() -> String {
     fs::read_to_string(format!("{}/.context", STARLANE_HOME.as_str()).to_string())
@@ -38,7 +39,7 @@ pub fn context_dir() -> String {
     format!("{}/{}", STARLANE_HOME.as_str(), context()).to_string()
 }
 
-#[cfg(feature = "server")]
+
 pub static STARLANE_CONFIG: Lazy<StarlaneConfig> = Lazy::new(|| match config() {
     Ok(Some(config)) => config,
     Ok(None) => StarlaneConfig::default(),
@@ -141,7 +142,6 @@ pub fn config_exists(context: String) -> bool {
     fs::exists(config_path_context(context)).unwrap_or(false)
 }
 
-#[cfg(feature = "server")]
 pub fn config() -> Result<Option<StarlaneConfig>, HypErr> {
     let file = config_path();
 

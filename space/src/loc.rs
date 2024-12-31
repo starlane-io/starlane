@@ -1,6 +1,7 @@
 use core::fmt::Formatter;
 use core::str::FromStr;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use async_trait::async_trait;
 use convert_case::Casing;
@@ -9,7 +10,7 @@ use nom::combinator::all_consuming;
 use once_cell::sync::Lazy;
 use serde::de::{Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-
+use starlane_macros::ToBase;
 use crate::err::{ParseErrs, SpaceErr};
 use crate::kind::BaseKind;
 use crate::log::Trackable;
@@ -131,6 +132,12 @@ pub struct Version {
     pub version: semver::Version,
 }
 
+impl Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.version.to_string())
+    }
+}
+
 impl Deref for Version {
     type Target = semver::Version;
 
@@ -180,11 +187,6 @@ impl<'de> Deserialize<'de> for Version {
     }
 }
 
-impl ToString for Version {
-    fn to_string(&self) -> String {
-        self.version.to_string()
-    }
-}
 
 impl TryInto<semver::Version> for Version {
     type Error = ParseErrs;

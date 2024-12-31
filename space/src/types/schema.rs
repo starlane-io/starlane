@@ -5,14 +5,11 @@ use starlane_space::err::ParseErrs;
 use starlane_space::kind::Specific;
 use starlane_space::types::PointKindDefSrc;
 use crate::parse::CamelCase;
-use crate::types::private::{KindVariantDef, Exact};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(SchemaType))]
 #[strum_discriminants(derive(
-    Clone,
-    Debug,
     Hash,
     strum_macros::EnumString,
     strum_macros::ToString,
@@ -90,10 +87,9 @@ pub type Schema = private::Exact<SchemaKind>;
 
 pub type BindConfigSrc = PointKindDefSrc<SchemaKind>;
 
-pub type BindConfig = SchemaKind::BindConfig;
 
 /*
-#[cfg(feature="parse")]
+
 mod parse {
     use core::str::FromStr;
     use crate::err::SpaceErr;

@@ -17,6 +17,7 @@ use crate::util::ToResolved;
 use crate::wave::{Agent, Recipients, ToRecipients};
 use crate::{ANONYMOUS, HYPERUSER};
 use core::str::FromStr;
+use std::fmt::Display;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -558,6 +559,8 @@ impl PointSeg {
         self.kind().preceding_delim(post_fileroot)
     }
 }
+
+
 
 impl ToString for PointSeg {
     fn to_string(&self) -> String {
@@ -1471,25 +1474,28 @@ where
     }
 }
 
-impl<Route, Seg> ToString for PointDef<Route, Seg>
+impl<Route, Seg> Display for PointDef<Route, Seg>
 where
     Route: RouteSegQuery + ToString,
     Seg: PointSegQuery + ToString,
 {
-    fn to_string(&self) -> String {
-        self.to_string_impl(!self.route.is_local())
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string_impl(!self.route.is_local()))
     }
 }
 
-impl<Route, Seg> ToString for &PointDef<Route, Seg>
+/*
+impl<Route, Seg> Display for &PointDef<Route, Seg>
 where
     Route: RouteSegQuery + ToString,
     Seg: PointSegQuery + ToString,
 {
-    fn to_string(&self) -> String {
-        self.to_string_impl(!self.route.is_local())
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string_impl(!self.route.is_local()))
     }
 }
+
+ */
 
 
 

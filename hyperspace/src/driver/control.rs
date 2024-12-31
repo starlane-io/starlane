@@ -37,7 +37,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use starlane_macros::DirectedHandler;
-use starlane_primitive_macros::logger;
+use starlane_macros::logger;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;

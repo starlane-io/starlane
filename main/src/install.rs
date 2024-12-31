@@ -3,7 +3,6 @@ use crate::env::{
     config, config_path, config_save, context, context_dir, Enviro, GlobalMode, StdEnviro,
     STARLANE_GLOBAL_SETTINGS, STARLANE_HOME,
 };
-use starlane::base::foundation::Foundation;
 
 use crate::server::{Starlane, StarlaneConfig};
 use starlane_hyperspace::shutdown::shutdown;

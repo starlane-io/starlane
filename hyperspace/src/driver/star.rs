@@ -40,7 +40,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use starlane_macros::{handler, route, DirectedHandler};
-use starlane_primitive_macros::push_mark;
+use starlane_macros::push_mark;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::marker::PhantomData;

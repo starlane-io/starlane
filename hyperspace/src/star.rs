@@ -48,7 +48,7 @@ use async_recursion::async_recursion;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use itertools::Itertools;
-use starlane_primitive_macros::{log_span, push_loc, push_mark};
+use starlane_macros::{log_span, push_loc, push_mark};
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::marker::PhantomData;
