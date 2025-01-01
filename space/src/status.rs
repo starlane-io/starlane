@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
 use std::fmt::{Display, Formatter};
@@ -7,57 +7,77 @@ use derive_builder::Builder;
 use enum_ordinalize::Ordinalize;
 use starlane_space::parse::CamelCase;
 use crate::point::Point;
-use crate::provider::err::StateErrDetail;
 use crate::wave::Agent;
 
+/// [StatusWatcher] is type bound to [tokio::sync::watch::Receiver<StatusDetail>]) can get the realtime
+/// [StatusDetail] of a [StatusEntity] by polling: [StatusWatcher::borrow] or by listening for
+/// changes vi [StatusWatcher::changed]
+pub type StatusWatcher = tokio::sync::watch::Receiver<StatusDetail>;
 
-pub type Watcher = tokio::sync::watch::Receiver<State>;
-
-///  [StatusEntity] provides an interfact to query and report it's internal Status
+///  [StatusEntity] provides an interface for entities to report status
 #[async_trait]
 pub trait StatusEntity {
-    fn status(&self) -> Status;
+    fn status(&self) -> StatusDetail;
 
     fn status_detail(&self) -> StatusDetail;
 
-    /// return a [Watcher] which facilitates asynchronous status updates
-    async fn synchronize(&self) -> Watcher;
+    /// Returns a [StatusWatcher]
+    fn status_watcher(&self) -> StatusWatcher;
+
+    /// synchronize the [StatusEntity] [Status] with the real world properties that
+    /// it models.
+    fn probe(&self) -> StatusWatcher;
+
+
+    /// take necessary actions to get the [StatusEntity] to [Status::Ready] state
+    fn start(&self) -> StatusWatcher;
 }
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize)]
-pub struct Status {
-    pub stage: Stage,
-    pub action: ActionDetail,
+
+/// the broad classification of a [StatusEntity]'s internal state.
+/// most importantly the desired variant of a [StatusEntity] is [Status::Ready]
+/// and if that is the [Status] then there isn't a need to drill any deeper into
+/// the [StatusDetail]
+#[derive(Hash,Eq,PartialEq, Debug, Serialize, Deserialize)]
+pub enum Status {
+    Unknown,
+    /// [Status::Idle] is a healthy state of [StatusEntity] that indicates not [Status::Ready]
+    /// because the [StatusEntity::start] action has not been requested by the host
+    Idle,
+    /// meaning the [StatusEntity] is healthy and is working towards reaching a
+    /// [Status::Ready] state.
+    Working,
+    /// the [StatusEntity] is waiting on a prerequisite condition to be true before it can
+    /// return to [Status::Working] state and complete the [StatusEntity::start]
+    Pending,
+    /// [StatusEntity::start] procedure has been halted by a problem that the [StatusEntity]
+    /// understands and perhaps can supply an [ActionRequest] so an external [Actor] can
+    /// remedy the situation.  An example: a Database depends on a DatabaseConnectionPool
+    /// to be [Status::Ready] state (in this case the actual Database is managed externally
+    /// and is stopped) so the status is set to [Status::Blocked] prompting the host to
+    /// see if there are any [ActionRequest]s from [StatusDetail]
+    Blocked,
+    /// A non-fatal error occurred that [StatusEntity] does not compre
+    Panic,
+    Fatal,
+    Ready
 }
 
-impl Status {
-    pub fn new(stage: Stage, action: ActionDetail) -> Self {
-        Self { stage, action }
-    }
-}
-
+/// The verbose details of a [StatusEntity]'s [StatusDetail]
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct StatusDetail {
-    pub stage: Stage,
-    ///
+    pub stage: StageDetail,
     pub action: ActionDetail,
 }
-
 
 
 impl StatusDetail {
-    pub fn new(stage: Stage, action: ActionDetail) -> Self {
+    pub fn new(stage: StageDetail, action: ActionDetail) -> Self {
         Self { stage, action }
     }
 }
 
-impl Into<Status> for StatusDetail {
-    fn into(self) -> Status {
-        let stage = self.stage.into();
-        let action = self.action.into();
-        Status::new(stage, action)
-    }
-}
+
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
@@ -72,10 +92,10 @@ pub enum StateDetail{
     Pending(PendingDetail),
     /// [StatusEntity] is halted described by [StateErrDetail]
     Error(StateErrDetail),
-    /// [StatusEntity] is `provisioning` meaning it is progressing through it's [Stage] variants
+    /// [StatusEntity] is `provisioning` meaning it is progressing through it's [StageDetail] variants
     ///
     Provisioning,
-    /// Status entity is ready to be used
+    /// [StatusEntity] is ready to be used
     Ready
 }
 
@@ -83,18 +103,21 @@ pub enum StateDetail{
 
 
 
-/// [Stage] describes the entity's presently reached life cycle stage.
-/// The [Stage] should progress through the variants in order although
+/// [StageDetail] describes the [StatusEntity]'s presently reached life cycle stage.
+/// The [StageDetail] should progress through the variants in order although
 /// a [Provider] implementation may skip states that are not relative... such as
 /// the fetching and caching of an external config which would skip over the
-/// [Stage::Installed] stage.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Ordinalize, Deserialize, EnumDiscriminants)]
-pub enum Stage {
-    /// [Status]
+/// [StageDetail::Installed] stage.
+#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(Stage))]
+#[strum_discriminants(derive(Hash, Serialize, Deserialize))]
+pub enum StageDetail {
+    /// [StatusDetail]
     Unknown,
     ///
     None,
-    /// the meaning of [Stage::Cached] differs by implementation. It's most common meaning
+    /// the meaning of [StageDetail::Cached] differs by implementation. It's most common meaning
     /// signifies that all fetching/downloading stages have completed... and of course
     /// some providers don't have a cached stage at all
     Cached,
@@ -103,25 +126,20 @@ pub enum Stage {
     /// [StatusEntity] has completed its Initialize
     Initialized,
     Started,
-    Ready,
+    /// [StatusEntity] is ready to be used
+    Ready(),
 }
 
-impl Stage {
-    pub fn stage(&self) -> Stage {
+impl StageDetail {
+    pub fn stage(&self) -> StageDetail {
         self.clone().into()
     }
 }
 
 
-impl Default for Stage {
+impl Default for StageDetail {
     fn default() -> Self {
-        Stage::Unknown
-    }
-}
-
-impl Default for Stage {
-    fn default() -> Self {
-        Stage::default().into()
+        StageDetail::Unknown
     }
 }
 
@@ -152,7 +170,7 @@ pub enum ActionDetail {
     /// Idle is the nominal action state in two cases:
     /// 1. the Status Entity
     Idle,
-    /// the entity is attempting to make the entity model match the external resource
+    /// the ntity is attempting to make the [StatusEntity] model match the external resource
     /// that the [StatusEntity] represent (this can mean changing the [StatusEntity] to match
     /// the external model or changing the external model to match the [StatusEntity]...
     /// the synchronizing strategy differs by implementation use case
@@ -166,7 +184,7 @@ pub enum ActionDetail {
     /// are being created
     Initializing,
     /// Attempting to start the [StatusEntity] AFTER it has been initialized... If the status
-    /// entity is, for example a Postgres cluster instance managed by the Starlane foundation
+    /// [StatusEntity] is, for example a Postgres cluster instance managed by the Starlane foundation
     /// this action is being performed after the postgres start command has been issued until
     /// it is ready to accept requests
     Starting,
@@ -325,4 +343,24 @@ impl Display for ActionItem {
         f.write_str(&self.details)?;
         f.write_str("\n")
     }
+}
+
+///
+#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(StateErr))]
+#[strum_discriminants(derive(Hash, Serialize, Deserialize))]
+pub enum StateErrDetail {
+  /// The Panic signals an obstacle that the status [StatusEntity] doesn't know how to resolve.
+  /// A Panic state indicates that the Entity has Not reached the desired
+  /// [State::Ready] state and is now idle.
+  ///
+  /// An [StatusEntity] may recover from a Panic if the panic issue is externally resolved and then
+  /// `Entity::synchronize()` is invoked trigger another try-again loop.
+  Panic(String),
+  /// [StateErr::Fatal] signals an error condition that cannot be recovered from.
+  /// Depending upon the context of the status [StatusEntity] reporting [StateErr::Fatal`] possible
+  /// actions might be deleting and recreating the [StatusEntity] or shutting down the entire
+  /// Starlane process
+  Fatal(String)
 }

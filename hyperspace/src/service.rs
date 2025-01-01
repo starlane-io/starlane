@@ -26,6 +26,7 @@ use strum_macros::EnumString;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use starlane_space::parse::CamelCase;
+use crate::service::private::ServiceCall;
 
 pub type FileStoreService = Service<FileStore>;
 
@@ -87,10 +88,12 @@ impl ServiceRunnerConf {
 ///
 /// [ServiceKind] defines some builtin variants that every version of Starlane must know to use and
 /// additional variants can be added via [ServiceKind::_Ext]
-#[derive(Hash, Clone, Eq, PartialEq, Debug, EnumString, strum_macros::Display,Serialize,Deserialize)]
+#[derive(Hash, Clone, Eq, PartialEq, Debug, strum_macros::Display, Serialize,Deserialize)]
+
 pub enum ServiceKind {
     FileStore,
     Postgres,
+    #[strum(to_string = "{0}")]
     _Ext(CamelCase),
 }
 
@@ -486,7 +489,7 @@ pub enum ServiceErr {
 }
 
 
-mod private {
+pub(super) mod private {
     use crate::service::ServiceErr;
 
     pub struct ServiceCall<I, O> {

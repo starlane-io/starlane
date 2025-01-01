@@ -169,7 +169,7 @@ pub mod progress;
 
 #[cfg(test)]
 pub mod test;
-pub mod provider;
+pub mod status;
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
