@@ -1,6 +1,6 @@
 
 use starlane_platform_for_postgres::{
-    ConnectionInfo, PostgresPlatform
+    Config, PostgresPlatform
 };
 
 use starlane_platform_for_postgres_registry::registry::{
@@ -338,12 +338,12 @@ impl Default for PostgresLookups {
 
 
 impl PostgresPlatform for PostgresLookups {
-    fn lookup_registry_db(&self) -> Result<Database<ConnectionInfo>, RegErr> {
+    fn lookup_registry_db(&self) -> Result<Database<Config>, RegErr> {
         Ok(self.0.clone().into())
     }
 
-    fn lookup_star_db(&self, star: &StarKey) -> Result<Database<ConnectionInfo>, RegErr> {
-        let mut rtn: Database<ConnectionInfo> = self.0.clone().into();
+    fn lookup_star_db(&self, star: &StarKey) -> Result<Database<Config>, RegErr> {
+        let mut rtn: Database<Config> = self.0.clone().into();
         rtn.database = star.to_sql_name();
         Ok(rtn)
     }
@@ -366,12 +366,12 @@ impl PostgresLookups {
 }
 
 impl PostgresPlatform for PostgresLookups {
-    fn lookup_registry_db(&self) -> Result<Database<ConnectionInfo>, RegErr> {
+    fn lookup_registry_db(&self) -> Result<Database<Config>, RegErr> {
         Ok(self.0.clone().into())
     }
 
-    fn lookup_star_db(&self, star: &StarKey) -> Result<Database<ConnectionInfo>, RegErr> {
-        let mut rtn: Database<ConnectionInfo> = self.0.clone().into();
+    fn lookup_star_db(&self, star: &StarKey) -> Result<Database<Config>, RegErr> {
+        let mut rtn: Database<Config> = self.0.clone().into();
         rtn.database = star.to_sql_name();
         Ok(rtn)
     }

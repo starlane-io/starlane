@@ -13,7 +13,7 @@ use crate::wave::Agent;
 /// [StatusWatcher] is type bound to [tokio::sync::watch::Receiver<StatusDetail>]) can get the realtime
 /// [StatusDetail] of a [StatusEntity] by polling: [StatusWatcher::borrow] or by listening for
 /// changes vi [StatusWatcher::changed]
-pub type StatusWatcher = tokio::sync::watch::Receiver<StatusDetail>;
+pub type StatusWatcher = tokio::sync::watch::Receiver<Status>;
 
 ///  [StatusEntity] provides an interface for entities to report status
 #[async_trait]
@@ -86,11 +86,25 @@ pub enum Status {
     Ready
 }
 
+impl Default for Status {
+    fn default() -> Self {
+        Status::Unknown
+    }
+}
+
 /// The verbose details of a [StatusEntity]'s [StatusDetail]
-#[derive(Default, Clone, Debug, Serialize, Deserialize)]
+#[derive( Clone, Debug, Serialize, Deserialize)]
 pub struct StatusDetail {
     pub stage: StageDetail,
     pub action: ActionDetail,
+}
+impl Default for StatusDetail {
+    fn default() -> Self {
+        Self {
+            stage: StageDetail::default(),
+            action: ActionDetail::default()
+        }
+    }
 }
 
 

@@ -3,15 +3,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Timestamp {
-    pub millis: i64,
+    pub millis: u64,
 }
 
 impl Timestamp {
-    pub fn timestamp_millis(&self) -> i64 {
+    pub fn timestamp_millis(&self) -> u64 {
         self.millis
     }
 
-    pub fn new(millis: i64) -> Self {
+    pub fn new(millis: u64) -> Self {
         Self { millis }
     }
 }

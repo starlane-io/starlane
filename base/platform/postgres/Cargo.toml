@@ -15,6 +15,7 @@ starlane-space = { workspace = true }
 starlane-hyperspace = { workspace = true }
 url  = { workspace = true }
 thiserror = {workspace = true}
+tokio = {workspace = true}
 strum = {workspace = true}
 strum_macros = {workspace = true}
 sqlx = {workspace = true}

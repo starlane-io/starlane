@@ -7,8 +7,13 @@ use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 use starlane_space::progress::Progress;
-use starlane_space::status::{StatusDetail, StatusWatcher};
+use starlane_space::status::{StatusDetail, StatusEntity, StatusWatcher};
 use crate::provider::err::ProviderErr;
+
+use starlane_space::status::Status;
+use starlane_space::status::Stage;
+use starlane_space::status::StateDetail;
+use starlane_space::status::PendingDetail;
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
@@ -47,24 +52,38 @@ pub enum Manager {
 /// is a Database server like Postgres... the Dependency will download, install, initialize and
 /// start the service whereas a Provider in this example would represent an individual Database
 #[async_trait]
-pub trait Provider: Send + Sync {
+pub trait Provider: StatusEntity + Sync {
     type Config: config::ProviderConfig + ?Sized;
+
+    type Item;
 
     fn kind(&self) -> ProviderKindDef;
 
     fn config(&self) -> Arc<Self::Config>;
 
-    fn status(&self) -> StatusDetail;
-
-    fn status_watcher(&self) -> Arc<tokio::sync::watch::Receiver<StatusDetail>>;
-
-    /// [Provider::synchronize] triggers a state query and updates
-    /// the [StatusDetail] as best it can be described
-    async fn synchronize(&self);
+    /// [Provider::probe] query the state of the concrete resource that this [Provider]
+    /// is modeling and make this [Provider] model match the current Provision state.
+    /// [Provider::probe] is especially useful when it comes to updating [StatusEntity::status]
+    /// from [Status::unknown]
+    async fn probe(&self) -> Result<(),ProviderErr>;
 
 
+    /// Returns an interface clone for [Provider::Item] when it reaches [Status::Ready].
+    /// If [Provider::Item] is not [Status::Ready] [Provider::ready] will start executing
+    /// the necessary task and steps in order to produce a readied [Provider::Item]
     ///
-    async fn provision(&self) -> Result<StatusWatcher,ProviderErr>;
+    /// The [Provider::ready] should be reentrant--meaning it can be called multiple times without
+    /// causing an error. A [Provider::ready] implementation should always first call
+    /// [Provider::probe] to determine the last completed successful [Stage] and continue its
+    /// remaining stages if possible.
+    ///
+    /// Calling [Provider::ready] on a [Provider] that's current [StateDetail]'s variant is
+    /// [StateDetail::Pending] should `un-panic` the [Provider] and cause it to retry readying
+    /// [Provider::Item]. A [Provider::ready] invocation on a [Provider] that is
+    /// [StateDetail::Fatal] should fail immediately.
+    ///
+    /// Progress [Status] of [Self::ready] can be tracked using: [Self::status_watcher]
+    async fn ready(&self) -> Result<Self::Item,ProviderErr>;
 
 }
 

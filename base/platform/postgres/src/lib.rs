@@ -1,9 +1,72 @@
-use starlane_hyperspace::provider::Manager;
+use starlane_hyperspace::provider::{Manager, Provider, ProviderKindDef};
 use starlane_space::err::ParseErrs;
 use starlane_space::parse::{Domain, VarCase};
 use starlane_space::status::{Handle, Status, StatusDetail, StatusEntity, StatusWatcher};
 use std::fmt::Display;
 use std::str::FromStr;
+use std::sync::Arc;
+use starlane_hyperspace::provider::config::ProviderConfig;
+use starlane_hyperspace::provider::err::ProviderErr;
+
+
+pub struct PostgresService {
+    config: Arc<Config>,
+    status_reporter: tokio::sync::watch::Sender<Status>,
+}
+
+impl PostgresService {
+    pub fn new(config: Arc<Config>) -> PostgresService {
+        let (status_reporter, _ ) = tokio::sync::watch::channel(Default::default());
+
+
+        Self {
+            config,
+            status_reporter,
+        }
+    }
+}
+
+impl Provider for PostgresService {
+    type Config = Config;
+
+    fn kind(&self) -> ProviderKindDef {
+        ProviderKindDef::Service
+    }
+
+    fn config(&self) -> Arc<Self::Config> {
+        self.config.clone()
+    }
+
+    async fn probe(&self) -> StatusWatcher {
+        self.status_reporter.subscribe()
+    }
+
+    async fn ready(&self)  {
+
+    }
+}
+
+impl StatusEntity for PostgresService {
+    fn status(&self) -> StatusDetail {
+        todo!()
+    }
+
+    fn status_detail(&self) -> StatusDetail {
+        todo!()
+    }
+
+    fn status_watcher(&self) -> StatusWatcher {
+        todo!()
+    }
+
+    fn probe(&self) -> StatusWatcher {
+        todo!()
+    }
+
+    fn start(&self) -> StatusWatcher {
+        todo!()
+    }
+}
 
 /// the [StatusEntity] implementation which tracks with a Postgres Connection Pool.
 /// With any [StatusEntity] the goal is to get to a [Status::Ready] state.  [PostgresServiceStub]
@@ -14,7 +77,7 @@ use std::str::FromStr;
 /// a connection pool to the given Postgres Cluster
 pub struct PostgresServiceStub {
     key: DbKey,
-    connection_info: ConnectionInfo,
+    connection_info: Config,
 }
 
 impl StatusEntity for PostgresServiceStub {
@@ -44,7 +107,6 @@ impl PostgresServiceStub {
         &self.key
     }
 }
-
 /// represents the
 pub type PostgresServiceHandle = Handle<PostgresServiceStub>;
 
@@ -77,22 +139,43 @@ impl Display for DbKey {
     }
 }
 
+
+
+
+
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum PostErr {
     #[error("{0}")]
     ParseErrs(#[from] ParseErrs),
 }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
-pub struct ConnectionInfo {
+
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct Config {
+    pool: PostgresConnectionConfig
+}
+
+impl Config {
+
+}
+
+impl ProviderConfig for Config {
+    fn kind(&self) -> &ProviderKindDef {
+        &ProviderKindDef::Service
+    }
+}
+
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct PostgresConnectionConfig {
     pub host: Hostname,
-    pub schema: Option<SchemaName>,
     pub port: u16,
     pub username: Username,
     pub password: String,
 }
 
-impl ConnectionInfo {
+impl PostgresConnectionConfig{
     pub fn new<User, Pass>(
         host: Hostname,
         port: u16,
@@ -108,18 +191,13 @@ impl ConnectionInfo {
         let schema = None;
         Ok(Self {
             host,
-            schema,
             username,
             password,
             port,
         })
     }
 
-    /// use a non-default Postgres `schema`
-    pub fn with_schema(mut self, schema: SchemaName) -> Self {
-        self.schema = Some(schema);
-        self
-    }
+
 }
 
 /*

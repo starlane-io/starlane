@@ -38,8 +38,8 @@ bincode = "1.3.3"
 sqlx = "0.8.2"
 strum = "0.26.3"
 strum_macros = "0.26.4"
-#wasmer = "5.0.4"
-#wasmer-wasix = "0.34.0"
+
+
 zip = "2.2.2"
 dirs = "5.0.1"
 ascii = "1.1.0"
@@ -115,5 +115,9 @@ derive-name = "1.1.0"
 tracing = "0.1.41"
 tracing-core = "0.1.33"
 
+# dependencies currently in the `Penalty Box`:
+#retry-if = "0.2.3"
+#wasmer = "5.0.4"
+#wasmer-wasix = "0.34.0"
 #zipsign = "0.1.2"
 #insta="1.41.1"

@@ -1,3 +1,52 @@
+use indexmap::IndexMap;
+use crate::parse::SkewerCase;
+use crate::status::{Status, StatusDetail, StatusWatcher};
+use crate::wasm::Timestamp;
+
+pub type Watcher = tokio::sync::mpsc::Receiver<TaskState>;
+
+pub struct Tracker {
+    watcher: Watcher,
+    states: Box<dyn Fn() -> IndexMap<SkewerCase,TaskState>>
+}
+
+impl Tracker {
+    pub fn states(&self) -> &IndexMap<SkewerCase,TaskState> {
+        &self.states
+    }
+}
+
+
+enum TrackerCall {
+    State(TaskState),
+    TaskStates(tokio::sync::oneshot::Sender<IndexMap<SkewerCase,TaskState>>),
+}
+
+struct TrackerRunner {
+  rx: tokio::sync::mpsc::Receiver<TaskState>,
+  tasks: IndexMap<SkewerCase,TaskState>
+}
+
+impl TrackerRunner {
+    fn new() -> tokio::sync::mpsc::Sender<TaskState> {
+        let (tx,rx ) = tokio::sync::mpsc::channel(1);
+        let tasks = IndexMap::new();
+        let runner =  Self { rx, tasks };
+
+        tokio::spawn( async move {
+            runner.run().await;
+        });
+
+        tx
+    }
+
+    async fn run(mut self) {
+        while let Some(state) = self.rx.recv().await {
+        }
+    }
+
+}
+
 #[derive(Clone)]
 pub struct Progress {
     tx: tokio::sync::mpsc::Sender<TaskState>,
@@ -11,14 +60,17 @@ impl Progress {
 }
 
 pub struct TaskState {
-    pub name: String,
-    pub step: Option<String>,
+    pub name: &'static str,
+    pub step: &'static str,
+    /// should be constrained in range 0..100 I guess
     pub inc: u16,
+    pub status: Status,
 }
 
 impl TaskState {
-    pub fn new(name: String, step: Option<String>, inc: u16) -> Self {
-        Self { name, step, inc }
+    pub fn new(name: &'static str, step: &'static str, inc: u16) -> Self {
+        let status = Status::default();
+        Self { name, step, inc, status }
     }
 }
 
@@ -33,27 +85,37 @@ pub trait Task {
     /// end this task and create another
     fn task(self, task: &'static str) -> impl Task;
 
+    fn status(&mut self, status: Status);
+
     /// end this task
     fn end(self);
 }
 
+
+
 pub mod private {
+    use starlane_space::parse::SkewerCase;
     use crate::progress::TaskState;
+    use crate::status::{Status, StatusDetail, StatusEntity, StatusWatcher};
 
     pub struct Task {
-        task: String,
-        step: Option<String>,
+        name: &'static str,
+        step: &'static str,
         inc: u16,
         tx: tokio::sync::mpsc::Sender<TaskState>,
+        status: Status
     }
 
     impl Task {
-        pub fn new(task: &'static str, tx: tokio::sync::mpsc::Sender<TaskState>) -> Self {
-            let task = task.to_string();
+        pub fn new(name: &'static str, tx: tokio::sync::mpsc::Sender<TaskState>) -> Self {
+
+            let task = name.to_string();
+            let status = Status::default();
             let task = Self {
-                task,
-                step: None,
-                inc: 0,
+                name,
+                step: "started",
+                inc: 0u16,
+                status,
                 tx,
             };
 
@@ -64,24 +126,31 @@ pub mod private {
 
     impl Task {
         fn update(&self) {
-            let state = TaskState::new(self.task.clone(), self.step.clone(), self.inc.clone());
+            let state = TaskState::new(self.name, self.step, self.inc.clone());
             self.tx.try_send(state).unwrap_or_default();
         }
     }
 
+
+
     impl super::Task for Task {
-        fn step(&mut self, step: impl AsRef<str>) {
-            self.step = Some(step.as_ref().to_string());
+        fn step(&mut self, step: &'static str) {
+            self.step = step;
+            self.inc = 0u16;
             self.update()
         }
 
         fn inc(&mut self, inc: u16) {
             self.inc = inc;
-            self.update()
+            self.update();
         }
 
-        fn task(self, task: &'static str) -> impl super::Task {
-            Task::new(task, self.tx.clone())
+        fn task(self, name: &'static str) -> impl super::Task {
+            Task::new(name, self.tx.clone())
+        }
+
+        fn status(&mut self, status: Status) {
+            self.status = status
         }
 
         fn end(self) {}
