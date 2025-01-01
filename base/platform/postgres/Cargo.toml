@@ -1,5 +1,5 @@
 [package]
-name = "starlane-platform-for-postgres-registry"
+name = "starlane-platform-for-postgres"
 license.workspace = true
 repository.workspace = true
 edition.workspace = true
@@ -10,14 +10,11 @@ description.workspace = true
 version.workspace = true
 
 [dependencies]
-starlane-macros = { workspace = true }
+starlane-base-common = {workspace = true}
 starlane-space = { workspace = true }
 starlane-hyperspace = { workspace = true }
-starlane-base-common = {workspace = true }
-starlane-platform-for-postgres = { workspace = true }
-
-sqlx = { workspace = true }
-serde = { workspace = true }
-serde_derive = { workspace = true }
-async-trait = { workspace = true }
-
+url  = { workspace = true }
+thiserror = {workspace = true}
+strum = {workspace = true}
+strum_macros = {workspace = true}
+sqlx = {workspace = true}

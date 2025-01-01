@@ -1593,6 +1593,10 @@ impl Deref for CamelCase {
     }
 }
 
+/// this mapping may not be totally correct.... could the string "localhost" pass
+/// as a [Domain] ?  Will return if problems arise
+pub type Hostname = Domain;
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Domain {
     string: String,

@@ -25,50 +25,7 @@ impl<Info> Database<Info> {
     }
 }
 
-#[derive(Clone)]
-pub struct LiveDatabase {
-    pub database: Database<PostgresConnectInfo>,
-    tx: tokio::sync::mpsc::Sender<()>,
-}
 
-impl LiveDatabase {
-    pub fn new(database: Database<PostgresConnectInfo>, tx: tokio::sync::mpsc::Sender<()>) -> Self {
-        Self { database, tx }
-    }
-}
-
-impl Database<PostgresConnectInfo> {
-    pub fn from_con<D, S>(
-        database: D,
-        schema: S,
-        info: PostgresConnectInfo,
-    ) -> Database<PostgresConnectInfo>
-    where
-        D: ToString,
-        S: ToString,
-    {
-        Database::new(database, schema, info)
-    }
-
-    pub fn to_key(&self) -> PostgresDbKey {
-        PostgresDbKey {
-            url: self.url.clone(),
-            user: self.user.clone(),
-            database: self.database.clone(),
-        }
-    }
-
-    pub fn to_uri(&self) -> String {
-        /*
-        format!(
-            "postgres://{}:{}@{}/{}",
-            self.user, self.password, self.url, self.database
-        )
-
-         */
-        self.url.clone()
-    }
-}
 
 pub struct PostgresClusterConfig;
 

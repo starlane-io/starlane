@@ -46,22 +46,18 @@ use std::str::FromStr;
 use std::sync::Arc;
 use serde_derive::{Deserialize, Serialize};
 use starlane_hyperspace::registry::err::RegErr;
-
-pub trait PostgresPlatform: Send + Sync {
-    fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr>;
-    fn lookup_star_db(&self, star: &StarKey) -> Result<Database<PostgresConnectInfo>, RegErr>;
-}
+use starlane_hyperspace::registry::{Registration, RegistryApi};
+use starlane_platform_for_postgres::{DbKey, PostgresServiceHandle};
+use starlane_space::status::Handle;
 
 pub struct PostgresRegistry {
     logger: Logger,
     ctx: PostgresRegistryContextHandle,
-    platform: Box<dyn PostgresPlatform>,
 }
 
 impl PostgresRegistry {
-    pub async fn new2(database: LiveDatabase, logger: Logger) -> Result<Self, RegErr> {
+    pub async fn new2(database: PostgresServiceHandle, logger: Logger) -> Result<Self, RegErr> {
         let logger = push_loc!((logger, Point::global_registry()));
-        let lookups = PostgresLookups::new(database.clone());
         let mut set = HashSet::new();
         set.insert(database.clone());
         let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookups.clone())).await?);
@@ -70,7 +66,6 @@ impl PostgresRegistry {
     }
     pub async fn new(
         ctx: PostgresRegistryContextHandle,
-        platform: Box<dyn PostgresPlatform>,
         logger: Logger,
     ) -> Result<Self, RegErr> {
         let logger = push_loc!((logger, Point::global_registry()));
@@ -84,7 +79,6 @@ impl PostgresRegistry {
          */
         let registry = Self {
             ctx,
-            platform,
             logger: logger.clone(),
         };
 
@@ -1353,7 +1347,7 @@ impl PostRegApi {
 
 #[derive(Clone)]
 pub struct PostgresRegistryContextHandle {
-    key: PostgresDbKey,
+    key: DbKey,
     pool: Arc<PostgresRegistryContext>,
     pub schema: String,
 }
@@ -1377,8 +1371,7 @@ impl PostgresRegistryContextHandle {
 }
 
 pub struct PostgresRegistryContext {
-    pools: HashMap<PostgresDbKey, Pool<Postgres>>,
-    platform: Box<dyn PostgresPlatform>,
+    pools: HashMap<DbKey, PostgresServiceHandle>,
 }
 
 impl PostgresRegistryContext {
@@ -1400,7 +1393,7 @@ impl PostgresRegistryContext {
 
     pub async fn acquire<'a>(
         &'a self,
-        key: &'a PostgresDbKey,
+        key: &'a DbKey,
     ) -> Result<PoolConnection<Postgres>, RegErr> {
         let pool = self.pools.get(key);
 
@@ -1412,7 +1405,7 @@ impl PostgresRegistryContext {
 
     pub async fn begin<'a>(
         &'a self,
-        key: &'a PostgresDbKey,
+        key: &'a DbKey,
     ) -> Result<Transaction<Postgres>, RegErr> {
         Ok(self
             .pools
@@ -1420,47 +1413,6 @@ impl PostgresRegistryContext {
             .ok_or(RegErr::pool_not_found(key))?
             .begin()
             .await?)
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct PostgresDbKey {
-    pub url: String,
-    pub user: String,
-    pub database: String,
-}
-
-impl ToString for PostgresDbKey {
-    fn to_string(&self) -> String {
-        format!("{}:{}@{}", self.user, self.database, self.url)
-    }
-}
-
-impl ToString for &PostgresDbKey {
-    fn to_string(&self) -> String {
-        format!("{}:{}@{}", self.user, self.database, self.url)
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct PostgresConnectInfo {
-    pub url: String,
-    pub user: String,
-    pub password: String,
-}
-
-impl PostgresConnectInfo {
-    pub fn new<Url, User, Pass>(url: Url, user: User, password: Pass) -> Self
-    where
-        Url: ToString,
-        User: ToString,
-        Pass: ToString,
-    {
-        Self {
-            url: url.to_string(),
-            user: user.to_string(),
-            password: password.to_string(),
-        }
     }
 }
 
@@ -1477,7 +1429,7 @@ pub mod test {
     use starlane::platform::Platform;
     use starlane::reg::{Registration, Registry};
     use starlane::registry::err::RegErr;
-    use starlane_platform_postgres_registry::::{
+    use starlane_platform_postgres_registry::{
         PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
     };

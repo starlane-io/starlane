@@ -2961,6 +2961,8 @@ dependencies = [
  "starlane-base-common",
  "starlane-hyperspace",
  "starlane-macros",
+ "starlane-platform-for-postgres",
+ "starlane-platform-for-postgres-registry",
  "starlane-space",
  "strum",
  "strum_macros",
@@ -3083,6 +3085,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "starlane-platform-for-postgres"
+version = "0.3.20"
+dependencies = [
+ "sqlx",
+ "starlane-base-common",
+ "starlane-hyperspace",
+ "starlane-space",
+ "strum",
+ "strum_macros",
+ "thiserror 2.0.9",
+ "url",
+]
+
+[[package]]
 name = "starlane-platform-for-postgres-registry"
 version = "0.3.20"
 dependencies = [
@@ -3090,8 +3106,10 @@ dependencies = [
  "serde",
  "serde_derive",
  "sqlx",
+ "starlane-base-common",
  "starlane-hyperspace",
  "starlane-macros",
+ "starlane-platform-for-postgres",
  "starlane-space",
 ]
 

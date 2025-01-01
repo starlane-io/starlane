@@ -2,6 +2,7 @@ use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 use async_trait::async_trait;
 use derive_builder::Builder;
 use enum_ordinalize::Ordinalize;
@@ -32,6 +33,28 @@ pub trait StatusEntity {
     /// take necessary actions to get the [StatusEntity] to [Status::Ready] state
     fn start(&self) -> StatusWatcher;
 }
+
+
+/// [Handle] contains an `api` giving access to a [StatusEntity] `Ready` API and a private
+/// `hold` reference which is a [tokio::sync::mpsc::Sender] created from the [StatusEntity]'s
+/// internal `runner`.  The Runner should stay alive until it has no more hold references
+/// at which time it is up to the Runner to stop itself or ignore a reference count of 0
+#[derive(Clone)]
+pub struct Handle<A> {
+    pub api: Arc<A>,
+    hold: tokio::sync::mpsc::Sender<()>,
+}
+
+impl<A> Handle<A> {
+    pub fn new( api: A, hold: tokio::sync::mpsc::Sender<()> ) -> Self {
+        /// hopefully the [Arc::from] does what I hope it does which is only create a new
+        /// [Arc<A>] if [A] is not already an instance of an [Arc<A>]
+        let api = From::from(api);
+        Self { api, hold }
+    }
+}
+
+
 
 
 /// the broad classification of a [StatusEntity]'s internal state.
