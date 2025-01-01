@@ -16,10 +16,10 @@ use crate::driver::star::StarDriverFactory;
 use crate::executor::dialect::filestore::FileStoreErr;
 use crate::machine::MachineErr;
 use crate::platform::Platform;
-use crate::reg::{Registration, Registry};
+use crate::registry::{Registration, Registry};
 use crate::registry::err::RegErr;
 use crate::service::{
-    Service, ServiceErr, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate,
+    Service, ServiceErr, ServiceKind, ServiceRunnerConf, ServiceSelector, ServiceTemplate,
 };
 use crate::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
 use starlane_space::artifact::asynch::{ArtErr, Artifacts};
@@ -1361,7 +1361,7 @@ impl DriverSkel {
     pub async fn select_service(
         &self,
         kind: ServiceKind,
-    ) -> Result<Service<ServiceRunner>, ServiceErr> {
+    ) -> Result<Service<ServiceRunnerConf>, ServiceErr> {
         let selector = ServiceSelector {
             name: IdSelector::Always,
             kind,

@@ -3,7 +3,7 @@ use crate::hyperlane::{
     HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory,
 };
 use crate::machine::{Machine, MachineApi, MachineTemplate};
-use crate::reg::Registry;
+use crate::registry::Registry;
 use starlane_space::artifact::asynch::Artifacts;
 use starlane_space::command::direct::create::KindTemplate;
 use starlane_space::err::SpaceErr;

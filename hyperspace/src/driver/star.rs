@@ -3,7 +3,7 @@ use crate::driver::{
     Particle, ParticleSphere, ParticleSphereInner, ParticleStarErr,
 };
 use crate::platform::Platform;
-use crate::reg::Registration;
+use crate::registry::Registration;
 use crate::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::StateSrc;

@@ -8,7 +8,7 @@ use crate::layer::field::Field;
 use crate::layer::shell::{Shell, ShellState};
 use crate::machine::{MachineApi, MachineErr, MachineSkel};
 use crate::platform::Platform;
-use crate::reg::{Registration, Registry};
+use crate::registry::{Registration, Registry};
 use crate::registry::err::RegErr;
 use crate::service::ServiceTemplate;
 use crate::template::Templates;

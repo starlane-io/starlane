@@ -14,6 +14,8 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use starlane_space::point::Point;
 
+pub mod err;
+
 pub type Registry = Arc<dyn RegistryApi>;
 
 #[async_trait]

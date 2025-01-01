@@ -59,8 +59,6 @@ use crate::base::foundation::util::CreateProxy;
 /// the Starlane Registry is the only required core from the vanilla Starlane installation
 use crate::base::kind::{DependencyKind, IKind, Kind, ProviderKind};
 use starlane_hyperspace::platform::PlatformConfig;
-use crate::space::parse::CamelCase;
-use crate::space::progress::Progress;
 use base::registry;
 use downcast_rs::{impl_downcast, Downcast, DowncastSync};
 use futures::TryFutureExt;
@@ -77,7 +75,8 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
-
+use starlane_space::parse::CamelCase;
+use starlane_space::progress::Progress;
 //pub mod proxy;
 
 //pub mod runner;
@@ -172,8 +171,8 @@ pub trait Dependency: Downcast + Send + Sync {
 
     fn status_watcher(&self) -> Arc<tokio::sync::watch::Receiver<Status>>;
 
-    /// perform any downloads for the Dependency
-    async fn download(&self, progress: Progress) -> Result<(), BaseErr>;
+    /// perform any fetching operations for the Dependency
+    async fn fetch(&self, progress: Progress) -> Result<(), BaseErr>;
 
     /// install the dependency
     async fn install(&self, progress: Progress) -> Result<(), BaseErr>;
@@ -207,6 +206,7 @@ pub trait Provider: Downcast + Send + Sync {
 
     fn status_watcher(&self) -> Arc<tokio::sync::watch::Receiver<Status>>;
 
+    ///
     async fn initialize(&self, progress: Progress) -> Result<(), BaseErr>;
 
     async fn start(&self, progress: Progress) -> Result<LiveService<CamelCase>, BaseErr>;

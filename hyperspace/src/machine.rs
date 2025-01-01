@@ -6,7 +6,7 @@ use crate::hyperlane::{
     SimpleGreeter,
 };
 use crate::platform::Platform;
-use crate::reg::Registry;
+use crate::registry::Registry;
 use crate::service::{
     service_conf, Service, ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate,
 };

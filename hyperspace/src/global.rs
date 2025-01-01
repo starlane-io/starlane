@@ -1,4 +1,4 @@
-use crate::reg::Registration;
+use crate::registry::Registration;
 use crate::registry::err::RegErr;
 use crate::star::{HyperStarSkel, SmartLocator, StarErr};
 use starlane_space::artifact::ArtRef;

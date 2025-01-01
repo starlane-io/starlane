@@ -250,7 +250,7 @@ pub mod concrete {
                 todo!()
             }
 
-            async fn download(&self, progress: Progress) -> Result<(), BaseErr> {
+            async fn fetch(&self, progress: Progress) -> Result<(), BaseErr> {
                 todo!()
             }
 

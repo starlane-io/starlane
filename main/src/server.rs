@@ -36,7 +36,7 @@ use starlane_macros::{logger, push_loc};
 use std::collections::HashSet;
 use std::ops::Deref;
 use starlane_hyperspace::database::LiveDatabase;
-use starlane_hyperspace::reg::Registry;
+use starlane_hyperspace::registry::Registry;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {

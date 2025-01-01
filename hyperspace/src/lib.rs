@@ -4,7 +4,7 @@ pub mod err;
 pub mod global;
 pub mod layer;
 pub mod machine;
-pub mod reg;
+pub mod registry;
 pub mod star;
 
 pub mod driver;
@@ -13,7 +13,6 @@ pub mod host;
 pub mod hyperlane;
 pub mod platform;
 pub mod properties;
-pub mod registry;
 pub mod shutdown;
 pub mod tests;
 

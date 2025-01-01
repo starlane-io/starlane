@@ -1,9 +1,9 @@
-use crate::executor::cli::os::CliOsExecutor;
-use crate::executor::cli::HostEnv;
-use crate::executor::dialect::filestore::{FileStore, FileStoreErr, FILE_STORE_ROOT};
+
+pub mod standard;
+
+use crate::executor::dialect::filestore::{FileStore, FileStoreErr};
 use crate::executor::{ExeConf, Executor};
 use crate::host::err::HostErr;
-use crate::host::{ExeStub, Host, HostCli};
 use crate::machine::MachineErr;
 use starlane_space::err::SpaceErr;
 use starlane_space::kind::Kind;
@@ -11,38 +11,25 @@ use starlane_space::loc::ToBaseKind;
 use starlane_space::particle::Status;
 use starlane_space::point::Point;
 use starlane_space::selector::KindSelector;
-use starlane_space::util::{IdSelector, MatchSelector, OptSelector, RegexMatcher, ValueMatcher};
+use starlane_space::util::{IdSelector, OptSelector, ValueMatcher};
 use starlane_space::wave::exchange::asynch::{DirectedHandler, Router};
 use itertools::Itertools;
 use nom::AsBytes;
-use std::env;
 use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::hash::Hash;
 use std::io::Read;
+use std::mem::offset_of;
 use std::ops::{Deref, DerefMut};
-use std::path::{absolute, PathBuf};
-use std::str::FromStr;
+use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumString;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use starlane_space::parse::CamelCase;
 
 pub type FileStoreService = Service<FileStore>;
 
-impl FileStoreService {
-    pub async fn sub_root(&self, sub_root: PathBuf) -> Result<FileStoreService, ServiceErr> {
-        let runner = self.runner.sub_root(sub_root).await?;
-        Ok(FileStoreService {
-            template: self.template.clone(),
-            runner,
-        })
-    }
-}
 
-pub struct ServiceCall<I, O> {
-    pub input: I,
-    pub output: tokio::sync::oneshot::Sender<Result<O, ServiceErr>>,
-}
 
 #[derive(Clone)]
 pub struct ServiceStub<I, O> {
@@ -55,8 +42,8 @@ pub struct Service<R> {
     runner: R,
 }
 
-impl Service<ServiceRunner> {
-    pub fn new(template: ServiceTemplate) -> Service<ServiceRunner> {
+impl Service<ServiceRunnerConf> {
+    pub fn new(template: ServiceTemplate) -> Service<ServiceRunnerConf> {
         let runner = template.config.clone();
         Self { template, runner }
     }
@@ -78,25 +65,37 @@ impl<R> Deref for Service<R> {
 }
 
 #[derive(Clone)]
-pub enum ServiceRunner {
+pub enum ServiceRunnerConf {
     Exe(ExeConf),
 }
 
-impl ServiceRunner {
+impl ServiceRunnerConf {
     pub fn filestore(&self) -> Result<FileStore, ServiceErr> {
         match self {
-            ServiceRunner::Exe(exe) => Ok(exe.create()?),
+            ServiceRunnerConf::Exe(exe) => Ok(exe.create()?),
         }
     }
 }
 
-#[derive(Hash, Clone, Eq, PartialEq, Debug, EnumString, strum_macros::Display)]
+/// [ServiceKind] define Service types that are known to Starlane.
+/// A `Known` [ServiceKind] means Starlane knows what it is and how to work with it...
+/// It does NOT mean that Starlane Base controls or has access to the actual service and
+/// in some cases a particular Starlane Cluster Node implementation may not be able to use a
+/// Service. An example of a [ServiceKind] which may be unavailable:
+/// Builds targeting and embedded architecture may not have access to Postgres due to resource
+/// constraints.
+///
+/// [ServiceKind] defines some builtin variants that every version of Starlane must know to use and
+/// additional variants can be added via [ServiceKind::_Ext]
+#[derive(Hash, Clone, Eq, PartialEq, Debug, EnumString, strum_macros::Display,Serialize,Deserialize)]
 pub enum ServiceKind {
     FileStore,
+    Postgres,
+    _Ext(CamelCase),
 }
 
-impl Into<Service<ServiceRunner>> for ServiceTemplate {
-    fn into(self) -> Service<ServiceRunner> {
+impl Into<Service<ServiceRunnerConf>> for ServiceTemplate {
+    fn into(self) -> Service<ServiceRunnerConf> {
         let runner = self.config.clone();
         Service {
             template: self,
@@ -105,7 +104,7 @@ impl Into<Service<ServiceRunner>> for ServiceTemplate {
     }
 }
 
-impl TryInto<Service<FileStore>> for Service<ServiceRunner> {
+impl TryInto<Service<FileStore>> for Service<ServiceRunnerConf> {
     type Error = ServiceErr;
 
     fn try_into(self) -> Result<Service<FileStore>, Self::Error> {
@@ -171,7 +170,7 @@ impl PartialEq<ServiceTemplate> for ServiceSelector {
 }
 
 // at this time, Conf and Runner do not differ
-pub type ServiceConf = ServiceRunner;
+pub type ServiceConf = ServiceRunnerConf;
 
 /*
 
@@ -285,9 +284,9 @@ pub mod tests {
     use crate::executor::{ExeConf, Executor};
     use crate::host::HostCli;
     use crate::service::{
-        service_conf, Service, ServiceConf, ServiceErr, ServiceKind, ServiceTemplate,
+        service_conf, Service, ServiceErr, ServiceKind, ServiceTemplate,
     };
-    use starlane_space::kind::{BaseKind, Kind};
+    use starlane_space::kind::BaseKind;
     use starlane_space::selector::KindSelector;
     use starlane_space::util::OptSelector;
     use std::path::{absolute, PathBuf};
@@ -484,4 +483,14 @@ pub enum ServiceErr {
     NoTemplate(ServiceSelector),
     #[error("call not processed")]
     CallRecvErr(#[from] tokio::sync::oneshot::error::RecvError),
+}
+
+
+mod private {
+    use crate::service::ServiceErr;
+
+    pub struct ServiceCall<I, O> {
+        pub input: I,
+        pub output: tokio::sync::oneshot::Sender<Result<O, ServiceErr>>,
+    }
 }
