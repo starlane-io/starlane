@@ -6,7 +6,7 @@
 /// of another.
 ///
 /// Example: Say you have created a new common [foundation::Dependency] and [foundation::Provider]'s
-/// for a `PostgresCluster` and a `Database` instance provider.  Postgres has three use cases and
+/// for a `PostgresService` and a `Database` instance provider.  Postgres has three use cases and
 /// therefore three distinct `Modes`
 ///
 /// ## Mode use cases:
@@ -16,7 +16,7 @@
 ///   storage, configure a custom port.
 ///
 /// * [Mode::Start] -> After [foundation::Foundation]  Creates the Postgres Cluster--or--determines
-///   that a Postgres Cluster has already been created it needs to `Start` the Service instance.
+///   that a Postgres Cluster has already been created it needs to [Provider::start] the Service instance.
 ///   Important details for [Mode::Start] are: path of the Postgres Cluster executable and
 ///   ability to probe the health and availability of the Cluster Instance.
 ///
@@ -32,7 +32,7 @@
 ///
 /// ## Titrated Subsets
 /// Sequential Modes configure Subsets of the Prior Mode's Definitions.   Note that in our
-/// PostgresCluster Mode example [Mode::Create] the union of all Postgres Cluster Dependency
+/// PostgresService Mode example [Mode::Create] the union of all Postgres Cluster Dependency
 /// Definitions and [Mode::Create] supplies the most minimal subset.
 ///
 /// ## Not Every Mode is Available in every case!
@@ -43,8 +43,8 @@
 /// the desired setup.
 ///
 /// Consider again our Postgres example this time it's a scenario where we want to use
-/// a `PostgresCluster` that is *already* available, or perhaps stringent requirements require
-/// a special `PostgresCluster` setup that isn't supported by any [foundation::Foundation]
+/// a `PostgresService` that is *already* available, or perhaps stringent requirements require
+/// a special `PostgresService` setup that isn't supported by any [foundation::Foundation]
 /// implementation... In those cases the [foundation::config::DependencyConfig] only needs be
 /// configured for [Mode::Connect] and details like: mounting persistent storage, port assignment
 /// credential setup, etc... do not need to be furnished to `Starlane`  In this case [Mode::Create]
@@ -95,3 +95,10 @@ use crate::base;
 use base::config;
 use base::foundation;
 use base::platform;
+use starlane_hyperspace::provider::Provider;
+
+pub enum Mode {
+    Connect,
+    Create,
+    Start
+}

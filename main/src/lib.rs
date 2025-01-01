@@ -11,7 +11,7 @@ extern crate starlane_macros;
 pub extern crate starlane_macros as macros;
 pub extern crate starlane_space as space;
 pub extern crate starlane_hyperspace as hyperspace;
-pub extern crate starlane_base as base;
+pub extern crate starlane_base_common as base;
 
 shadow!(build);
 

@@ -1,7 +1,7 @@
 use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
-use crate::space::parse::util::{new_span, result};
-use crate::space::parse::{camel_case, CamelCase};
+use starlane_space::parse::util::{new_span, result};
+use starlane_space::parse::{camel_case, CamelCase};
 use derive_name::Name;
 use nom::bytes::complete::tag;
 use nom::sequence::tuple;

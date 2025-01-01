@@ -1,5 +1,5 @@
 use crate::base;
-use crate::space::parse::DbCase;
+use starlane_space::parse::DbCase;
 use base::foundation;
 
 /// Dependency and Providers of a particular Kind usually share some common traits regardless

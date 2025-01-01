@@ -74,6 +74,7 @@ use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
+use async_trait::async_trait;
 use tokio::sync::watch::Receiver;
 use starlane_space::parse::CamelCase;
 use starlane_space::progress::Progress;

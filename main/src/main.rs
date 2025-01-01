@@ -9,7 +9,14 @@ extern crate clap;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
-extern crate starlane_macros;shadow!(build);
+extern crate starlane_macros;
+
+shadow!(build);
+
+pub extern crate starlane_macros as macros;
+pub extern crate starlane_space as space;
+pub extern crate starlane_hyperspace as hyperspace;
+pub extern crate starlane_base_common_common as base;
 
 
 pub static VERSION: Lazy<semver::Version> =

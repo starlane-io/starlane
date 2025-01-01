@@ -2,7 +2,7 @@ use crate::base::err::BaseErr;
 use crate::base::foundation::implementation::docker_daemon_foundation;
 use crate::base::foundation::util::{IntoSer, Map, SerMap};
 use crate::base::foundation::Provider;
-use crate::space::parse::{CamelCase, DbCase};
+use starlane_space::parse::{CamelCase, DbCase};
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -24,7 +24,7 @@ pub mod concrete {
     use crate::common;
     use crate::common::err::BaseErr;
     use crate::common::foundation::implementation::docker_daemon_foundation::postgres::PostgresDependencyConfig;
-    use crate::space::parse::{CamelCase, DbCase};
+    use starlane_space::parse::{CamelCase, DbCase};
 
     fn default_schema() -> DbCase {
         DbCase::from_str("PUBLIC").unwrap()

@@ -1,23 +1,21 @@
 use crate::base::err::BaseErr;
 use crate::base::foundation::kind::FoundationKind;
-use crate::base::foundation::Provider;
 use crate::base::kind::{DependencyKind, Kind, ProviderKind};
 use crate::base::partial::skel;
-use crate::space::parse::CamelCase;
+use starlane_space::parse::CamelCase;
 use downcast_rs::{impl_downcast, Downcast, DowncastSync};
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 
 pub trait Config
-
 {
     type Err: Into<BaseErr>;
     type PlatformConfig: PlatformConfig + ?Sized;
     type FoundationConfig: FoundationConfig + ?Sized;
 
     fn foundation(&self) -> Self::FoundationConfig;
-    fn platform(&self) -> Self::FoundationConfig;
+    fn platform(&self) -> Self::PlatformConfig;
 }
 
 
@@ -71,10 +69,13 @@ pub mod provider {
         pub mod create {
             use super::my;
             use super::utilize;
-            ///  [`Create`] mode must also [`Utilize`] mode's properties since the foundation
-            /// will want to Create the Provision (potentially meaning: downloading, instancing, credential setup,  initializing...etc.)
-            /// and then will want to [`Utilize`] the Provision (potentially meaning: authenticating via the same credentials supplied from
-            /// [`Create`], connecting to the same port that was set up etc.
+            use super::super::super::ProviderMode;
+            ///  [ProviderMode::Create] mode must also contain [ProviderMode::Utilize] mode's
+            /// properties since the foundation will want to Create the Provision
+            /// (potentially meaning: downloading, instancing, credential setup,  initializing...
+            /// etc.) and then will want to [`Utilize`] the Provision (potentially meaning:
+            /// authenticating via the same credentials supplied from [`Create`], connecting to the
+            /// same port that was set up etc.
             pub trait ProviderConfig: my::ProviderConfig + utilize::ProviderConfig {}
         }
 

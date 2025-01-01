@@ -1,7 +1,7 @@
 use crate::base::foundation;
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::util::{IntoSer, SerMap};
-use crate::space::parse::CamelCase;
+use starlane_space::parse::CamelCase;
 use derive_name::{Name, Named};
 use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
@@ -64,7 +64,7 @@ pub mod concrete {
     use crate::base::foundation;
     use crate::base::foundation::kind::FoundationKind;
     use crate::base::kind::{DependencyKind, Kind};
-    use crate::space::progress::Progress;
+    use starlane_space::progress::Progress;
 
     pub struct Foundation {
         config: Arc<FoundationConfig>,

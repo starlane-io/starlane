@@ -2958,7 +2958,7 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "shadow-rs",
- "starlane-base",
+ "starlane-base-common",
  "starlane-hyperspace",
  "starlane-macros",
  "starlane-space",
@@ -2975,7 +2975,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "starlane-base"
+name = "starlane-base-common"
 version = "0.3.20"
 dependencies = [
  "anyhow",

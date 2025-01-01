@@ -22,7 +22,8 @@ exclude = [ ]
 starlane-macros = { package="starlane-macros", path= "macros", version = "0.3.20" }
 starlane-space = { package="starlane-space", path= "space", version = "0.3.20" }
 starlane-hyperspace = { package="starlane-hyperspace", path= "hyperspace", version = "0.3.20" }
-starlane-base = { package="starlane-base", path= "base/common", version = "0.3.20" }
+starlane-base-common = { package="starlane-base-common", path= "base/common", version = "0.3.20" }
+
 starlane = { package="starlane", path="./main"}
 
 lazy_static = "1.5.0"

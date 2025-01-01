@@ -1,32 +1,19 @@
 #![allow(warnings)]
 
 //#![feature(hasher_prefixfree_extras)]
-#[macro_use]
-extern crate async_trait;
-extern crate core;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate starlane_macros;shadow!(build);
-
 use once_cell::sync::Lazy;
 use shadow_rs::shadow;
 use std::str::FromStr;
 
-pub use starlane_space as space;
-
-
-
-pub mod env;
-
-
-pub mod server;
-
 pub mod base;
 
+#[cfg(test)]
+pub mod test;
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
+
+
 
 pub fn init() {
 

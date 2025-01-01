@@ -1,8 +1,8 @@
 use crate::base::foundation::kind::FoundationKind;
 use crate::base::foundation::status::ActionRequest;
 use crate::base::kind::{DependencyKind, IKind, Kind, ProviderKind};
-use crate::space::err::ParseErrs;
-use crate::space::substance::Call;
+use starlane_space::err::ParseErrs;
+use starlane_space::substance::Call;
 use serde_yaml::Value;
 use std::fmt::Display;
 use std::sync::Arc;
