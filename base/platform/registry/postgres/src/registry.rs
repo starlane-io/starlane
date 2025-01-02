@@ -47,7 +47,7 @@ use std::sync::Arc;
 use serde_derive::{Deserialize, Serialize};
 use starlane_hyperspace::registry::err::RegErr;
 use starlane_hyperspace::registry::{Registration, RegistryApi};
-use starlane_platform_for_postgres::service::{DbKey, PostgresServiceHandle};
+use starlane_platform_for_postgres::service::{DbKey, PostgresServiceHandle, PostgresService};
 use starlane_space::status::Handle;
 
 pub struct PostgresRegistry {
@@ -62,7 +62,7 @@ impl PostgresRegistry {
         set.insert(database.clone());
         let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookups.clone())).await?);
         let handle = PostgresRegistryContextHandle::new(database, ctx);
-        PostgresRegistry::new(handle, Box::new(lookups), logger).await
+        PostgresRegistry::new(handle, logger).await
     }
     pub async fn new(
         ctx: PostgresRegistryContextHandle,
@@ -1376,16 +1376,11 @@ pub struct PostgresRegistryContext {
 
 impl PostgresRegistryContext {
     pub async fn new(
-        dbs: HashSet<LiveDatabase>,
-        platform: Box<dyn PostgresPlatform>,
+        handle: Handle<PostgresService>,
     ) -> Result<Self, RegErr> {
-        let mut pools = HashMap::new();
 
         for db in dbs {
-            let pool = PgPoolOptions::new()
-                .max_connections(5)
-                .connect(db.database.to_uri().as_str())
-                .await?;
+
             pools.insert(db.database.to_key(), pool);
         }
         Ok(Self { pools, platform })

@@ -1,50 +1,57 @@
 use std::fmt::Display;
+use std::ops::Deref;
 use starlane_space::parse::{Domain, VarCase};
 use std::sync::Arc;
 use async_trait::async_trait;
 use starlane_base_common::config::ProviderConfig;
 use starlane_base_common::provider::{Manager, Provider, ProviderKindDef};
 use starlane_base_common::provider::err::ProviderErr;
-use starlane_space::err::ParseErrs;
 use std::str::FromStr;
+use sqlx;
+use sqlx::{ConnectOptions, Connection};
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use tokio::sync::Mutex;
 use starlane_base_common::Foundation;
 use starlane_base_common::platform::prelude::Platform;
-use starlane_base_common::status::{Handle,Status,StatusDetail,StatusEntity,StatusWatcher};
+use starlane_base_common::status::{Handle, Status, StatusDetail, StatusEntity, StatusWatcher};
+use crate::err::PostErr;
+
+pub type Pool = sqlx::Pool<sqlx::Postgres>;
+pub type Connection = sqlx::pool::PoolConnection<sqlx::Postgres>;
 
 
-/// The [Platform]  implementation of [PostgresService].
+
+
+/// The [Platform]  implementation of [PostgresServiceProvider].
 ///
-/// [PostgresService] provides access to a Postgres Cluster Instance.
+/// [PostgresServiceProvider] provides access to a Postgres Cluster Instance.
 ///
-/// This mod implements the platform [PostgresService] which is a [Provider] that readies a
-/// [PostgresServiceHandle].  Like every platform provider this [PostgresService] implementation
+/// This mod implements the platform [PostgresServiceProvider] which is a [Provider] that readies a
+/// [PostgresServiceHandle].  Like every platform provider this [PostgresServiceProvider] implementation
 /// cannot install 3rd party extensions, a platform [Provider] CAN maintain a connection pool
 /// to a postgres cluster that already exists or if the [Foundation] has a [Provider] definition of
 /// with a matching [ProviderKindDef]... the [Foundation] [Provider] can be a dependency of the
 /// [Platform]
+pub type PostgresServiceHandle = Handle<PostgresService>;
 
-pub type PostgresServiceHandle = Handle<PostgresServiceStub>;
-
-
-pub struct PostgresService {
+pub struct PostgresServiceProvider {
     config: Arc<Config>,
-    status_reporter: tokio::sync::watch::Sender<Status>,
+    status: tokio::sync::watch::Sender<Status>,
 }
 
-impl PostgresService {
-    pub fn new(config: Arc<Config>) -> PostgresService {
+impl PostgresServiceProvider {
+    pub fn new(config: Arc<Config>) -> PostgresServiceProvider {
         let (status_reporter, _ ) = tokio::sync::watch::channel(Default::default());
-
 
         Self {
             config,
-            status_reporter,
+            status: status_reporter,
         }
     }
 }
 
 #[async_trait]
-impl Provider for PostgresService {
+impl Provider for PostgresServiceProvider {
     type Config = Config;
     type Item = PostgresServiceHandle;
 
@@ -67,6 +74,53 @@ impl Provider for PostgresService {
 
 
 #[async_trait]
+impl StatusEntity for PostgresServiceProvider {
+    fn status(&self) -> Status {
+        todo!()
+    }
+
+    fn status_detail(&self) -> StatusDetail {
+        todo!()
+    }
+
+    fn status_watcher(&self) -> StatusWatcher {
+        todo!()
+    }
+
+    async fn probe(&self) -> StatusWatcher {
+        todo!()
+    }
+}
+
+/// the [StatusEntity] implementation which tracks with a Postgres Connection Pool.
+/// With any [StatusEntity] the goal is to get to a [Status::Ready] state.  [PostgresService]
+/// should abstract the specific [Manager] details.  A [PostgresService] may be a
+/// [Manager::Foundation] in which the [PostgresService] would be responsible for
+/// downloading, installing, initializing and starting Postgres before it creates the pool or if
+/// [Manager::External] then Starlane's [Platform] is only responsible for maintaining
+/// a connection pool to the given Postgres Cluster
+pub struct PostgresService {
+    config: Config,
+    connection: Mutex<sqlx::PgConnection>
+}
+
+
+
+impl PostgresService {
+
+    async fn new( config: Config ) -> Result<Self,sqlx::Error> {
+        let connection = Mutex::new(config.connect_options().connect().await?);
+        Ok(Self {
+            config,
+            connection
+        })
+    }
+
+
+
+}
+
+#[async_trait]
 impl StatusEntity for PostgresService {
     fn status(&self) -> Status {
         todo!()
@@ -81,44 +135,11 @@ impl StatusEntity for PostgresService {
     }
 
     async fn probe(&self) -> StatusWatcher {
-        todo!()
-    }
-
-
-}
-
-/// the [StatusEntity] implementation which tracks with a Postgres Connection Pool.
-/// With any [StatusEntity] the goal is to get to a [Status::Ready] state.  [PostgresServiceStub]
-/// should abstract the specific [Manager] details.  A [PostgresServiceStub] may be a
-/// [Manager::Foundation] in which the [PostgresServiceStub] would be responsible for
-/// downloading, installing, initializing and starting Postgres before it creates the pool or if
-/// [Manager::External] then Starlane's [Platform] is only responsible for maintaining
-/// a connection pool to the given Postgres Cluster
-pub struct PostgresServiceStub {
-    key: DbKey,
-    connection_info: Config,
-}
-
-#[async_trait]
-impl StatusEntity for PostgresServiceStub {
-    fn status(&self) -> Status {
-        todo!()
-    }
-
-    fn status_detail(&self) -> StatusDetail {
-        todo!()
-    }
-
-    fn status_watcher(&self) -> StatusWatcher {
-        todo!()
-    }
-
-    async fn probe(&self) -> StatusWatcher {
-        todo!()
+        self.connection.lock().await.ping().await
     }
 }
 
-impl PostgresServiceStub {
+impl PostgresService {
     pub fn key(&self) -> &DbKey {
         &self.key
     }
@@ -151,15 +172,17 @@ impl Display for DbKey {
     }
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
-pub enum PostErr {
-    #[error("{0}")]
-    ParseErrs(#[from] ParseErrs),
-}
-
 #[derive(Clone, Eq, PartialEq)]
 pub struct Config {
-    pool: PostgresConnectionConfig
+    connection_info: PostgresConnectionConfig
+}
+
+impl Deref for Config {
+    type Target = PostgresConnectionConfig;
+
+    fn deref(&self) -> &Self::Target {
+        &self.connection_info
+    }
 }
 
 impl Config {
@@ -201,5 +224,31 @@ impl PostgresConnectionConfig{
         })
     }
 
+    pub(crate) fn connect_options(&self) -> PgConnectOptions {
+        PgConnectOptions::new()
+            .host(self.host.as_str())
+            .port(self.port.clone())
+            .username(self.username.as_str())
+            .password(self.password.as_str())
+    }
 
+
+
+    /*
+    pub fn to_uri(&self) -> String {
+        format!(
+            "postgres://{}:{}@{}/{}",
+            self.username, self.password, self.host, self.database
+        )
+    }
+
+
+     */
+
+    pub fn to_uri(&self) -> String {
+        format!(
+            "postgres://{}:{}@{}",
+            self.username, self.password, self.host
+        )
+    }
 }

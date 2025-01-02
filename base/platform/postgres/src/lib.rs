@@ -1,5 +1,6 @@
 pub mod service;
 pub mod database;
+mod err;
 
 use starlane_hyperspace::provider::Provider;
 use starlane_space::status::StatusEntity;

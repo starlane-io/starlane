@@ -6,8 +6,6 @@ use std::ops::Deref;
 use std::sync::Arc;
 use async_trait::async_trait;
 use derive_builder::Builder;
-use enum_ordinalize::Ordinalize;
-use starlane_space::parse::CamelCase;
 use crate::point::Point;
 use crate::wave::Agent;
 
@@ -38,7 +36,7 @@ pub trait StatusEntity {
 /// at which time it is up to the Runner to stop itself or ignore a reference count of 0
 #[derive(Clone)]
 pub struct Handle<E> where E: StatusEntity {
-    entity: Arc<E>,
+    pub entity: Arc<E>,
     hold: tokio::sync::mpsc::Sender<()>,
 }
 
@@ -58,8 +56,6 @@ impl <E> Deref for Handle<E> where E: StatusEntity {
         & self.entity
     }
 }
-
-
 
 
 /// the broad classification of a [StatusEntity]'s internal state.
