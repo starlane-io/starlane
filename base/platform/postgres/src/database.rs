@@ -1,8 +1,9 @@
 use std::str::FromStr;
 use std::sync::Arc;
 use async_trait::async_trait;
-use sqlx::{ConnectOptions, PgPool};
+use sqlx::{ConnectOptions, Error, PgPool};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use sqlx::postgres::any::AnyConnectionBackend;
 use starlane_base_common::status::{Handle, Status, StatusDetail, StatusWatcher, StatusEntity};
 use starlane_base_common::provider::{Provider,ProviderKindDef,ProviderKind};
 use starlane_base_common::provider::err::ProviderErr;
@@ -52,7 +53,7 @@ impl Provider for PostgresDatabaseProvider{
         self.config.clone()
     }
 
-    async fn probe(&self) -> Result<(), ProviderErr> {
+    async fn probe(&self) -> Status {
         todo!()
     }
 
@@ -119,8 +120,16 @@ impl StatusEntity for PostgresDatabase {
         todo!()
     }
 
-    async fn probe(&self) -> StatusWatcher {
-        todo!()
+    async fn probe(&self) -> Status{
+        async fn ping(pool: & Pool) -> Result<Status,sqlx::Error> {
+            pool.acquire().await?.ping().await
+        }
+
+        match ping(&self.pool).await {
+            Ok(_) => Status::Ready,
+            Err(_) => Status::Unknown
+        }
+
     }
 }
 

@@ -83,15 +83,16 @@ use async_trait::async_trait;
 use starlane_hyperspace::provider::{Provider, ProviderKind};
 use std::sync::Arc;
 use starlane_hyperspace::registry::Registry;
-use starlane_space::progress::Progress;
+use starlane_space::progress::{Progress};
 use tokio::sync::watch::Receiver;
 use starlane_hyperspace::driver::Driver;
 use starlane_space::particle::Particle;
-use starlane_space::status::Handle;
+use starlane_space::status::{Handle, StatusWatcher,StatusReporter};
 use crate::kind::FoundationKind;
 use status::Status;
 use status::StatusDetail;
 use err::BaseErr;
+
 
 #[cfg(test)]
 pub mod test;
@@ -132,10 +133,12 @@ pub trait Foundation: Sync + Send {
 
     async fn status_detail(&self) -> Result<status::StatusDetail, err::BaseErr>;
 
-    fn status_watcher(&self) -> Arc<tokio::sync::watch::Receiver<Status>>;
+    fn status_watcher(&self) -> StatusWatcher;
 
-    /// [Foundation::probe] synchronize [Foundation]'s model from that of the external services.
-    async fn probe(&self, progress: Progress) -> Result<Status, BaseErr>;
+    /// [Foundation::probe] synchronize [Foundation]'s model from that of the external services
+    /// and return a [Status].  [Foundation::probe] should also rebuild the [Provider][StatusDetail]
+    /// model and update [StatusReporter]
+    async fn probe(&self) -> Status;
 
     /// Take action to bring this [Foundation] to [Status::Ready] if not already. A [Foundation]
     /// is considered ready when all [Provider] dependencies are [Status::Ready].
@@ -144,9 +147,5 @@ pub trait Foundation: Sync + Send {
     /// Returns a [Provider] implementation which
     fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<Self::Provider>>, BaseErr>;
 
-    /*
-     return a handle to the [Registry]
-    fn registry(&self) -> Result<registry::Registry, BaseErr>;
-     */
 }
 

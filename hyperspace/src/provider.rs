@@ -95,8 +95,16 @@ pub trait Provider: StatusEntity + Sync {
     /// and make the [Provider] model match the real world state of said resource.
     ///
     /// [Provider::probe] is especially useful when it comes to updating [StatusEntity::status]
-    /// from [Status::unknown]
-    async fn probe(&self) -> Result<(),ProviderErr>;
+    /// from [Status::Unknown]
+    ///
+    /// The return [Status] may differ between [Provider] that share a [ProviderKind]
+    /// when the pair are part of the [Platform] and [Foundation] layers respectively.
+    /// [Platform] [Provider] can only connect to a service or resource via the network, or filesystem.
+    /// therefore [Provider::probe] may return [Status::Unreachable] which may not be very helpful
+    /// since the core problem could exist anywhere from the local host to a blocked response from
+    /// the requester's routing table. Since the [Foundation] [Provider] is capable of `managing`
+    /// the external service or resource, it can usually provide a more accurate [Status].
+    async fn probe(&self) -> Status;
 
 
     /// Returns an interface clone for [Provider::Item] when it reaches [Status::Ready].

@@ -13,6 +13,7 @@ use crate::wave::Agent;
 /// [StatusDetail] of a [StatusEntity] by polling: [StatusWatcher::borrow] or by listening for
 /// changes vi [StatusWatcher::changed]
 pub type StatusWatcher = tokio::sync::watch::Receiver<Status>;
+pub type StatusReporter = tokio::sync::watch::Sender<Status>;
 
 ///  [StatusEntity] provides an interface for entities to report status
 #[async_trait]
@@ -24,9 +25,8 @@ pub trait StatusEntity {
     /// Returns a [StatusWatcher]
     fn status_watcher(&self) -> StatusWatcher;
 
-    /// synchronize the [StatusEntity] [Status] with the real world properties that
-    /// it models.
-    async fn probe(&self) -> StatusWatcher;
+    /// query the [StatusEntity]'s  real world status and categorize it with a [Status]
+    async fn probe(&self) -> Status;
 }
 
 
@@ -81,6 +81,9 @@ pub enum Status {
     /// and is stopped) so the status is set to [Status::Blocked] prompting the host to
     /// see if there are any [ActionRequest]s from [StatusDetail]
     Blocked,
+    /// the [StatusEntity]s actually [Status] cannot be determined because it cannot
+    /// be reached over the network.
+    Unreachable,
     /// A non-fatal error occurred that [StatusEntity] does not compre
     Panic,
     Fatal,

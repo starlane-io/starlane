@@ -17,7 +17,7 @@ use starlane_base_common::status::{Handle, Status, StatusDetail, StatusEntity, S
 use crate::err::PostErr;
 
 pub type Pool = sqlx::Pool<sqlx::Postgres>;
-pub type Connection = sqlx::pool::PoolConnection<sqlx::Postgres>;
+pub type Con = sqlx::pool::PoolConnection<sqlx::Postgres>;
 
 
 
@@ -63,7 +63,7 @@ impl Provider for PostgresServiceProvider {
         self.config.clone()
     }
 
-    async fn probe(&self) -> Result<(), ProviderErr> {
+    async fn probe(&self) -> Status {
         todo!()
     }
 
@@ -135,7 +135,9 @@ impl StatusEntity for PostgresService {
     }
 
     async fn probe(&self) -> StatusWatcher {
-        self.connection.lock().await.ping().await
+        /// need to normalize the [PostgresService::probe]
+        self.connection.lock().await.ping().await.unwrap();
+        todo!()
     }
 }
 

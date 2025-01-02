@@ -142,7 +142,7 @@ pub mod concrete {
             todo!()
         }
 
-        async fn probe(&self, progress: Progress) -> Result<Status, BaseErr> {
+        async fn probe(&self) -> Status {
             todo!()
         }
 
@@ -227,7 +227,7 @@ pub mod concrete {
                 todo!()
             }
 
-            async fn probe(&self) -> Result<(), ProviderErr> {
+            async fn probe(&self) -> Status {
                 todo!()
             }
 
@@ -236,7 +236,6 @@ pub mod concrete {
             }
         }
 
-        impl dependency::Provider for Provider {}
     }
 
     /*
