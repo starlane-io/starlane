@@ -342,7 +342,7 @@ fn test_control_cli() -> Result<(), OldStarErr> {
 
         println!("{}", core.to_err().to_string());
         assert!(core.is_ok());
-        let core = cli.exec("create localhost:common<Base>").await?;
+        let core = cli.exec("create localhost:base<Base>").await?;
         assert!(core.is_ok());
 
         Ok(())

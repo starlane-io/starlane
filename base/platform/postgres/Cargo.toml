@@ -10,7 +10,7 @@ description.workspace = true
 version.workspace = true
 
 [dependencies]
-starlane-base-common = {workspace = true}
+starlane-base = {workspace = true}
 starlane-space = { workspace = true }
 starlane-hyperspace = { workspace = true }
 url  = { workspace = true }

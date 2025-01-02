@@ -5,7 +5,7 @@
 /// used.`Modes` can be used when the configuration for one of its use cases requires only a subset
 /// of another.
 ///
-/// Example: Say you have created a new common [foundation::Dependency] and [foundation::Provider]'s
+/// Example: Say you have created a new base [foundation::Dependency] and [foundation::Provider]'s
 /// for a `PostgresService` and a `Database` instance provider.  Postgres has three use cases and
 /// therefore three distinct `Modes`
 ///
@@ -23,7 +23,7 @@
 /// * [Mode::Connect] -> If the Dependency is already available or freshly created and started ...
 ///   then all that is needed is to access the cluster via a connection pool. [Mode::Connect] provides
 ///   the same Credential properties that it used from [Mode::Create].  In only makes sense
-///   to configure and define common properties and behaviors across all potential use cases.
+///   to configure and define base properties and behaviors across all potential use cases.
 ///
 /// ## Mode Definition = Property+Feature+Functionality
 /// The Mode `Definition` encapsulates the set of Properties for the [config::DependencyConfig],

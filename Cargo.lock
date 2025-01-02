@@ -2958,7 +2958,7 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "shadow-rs",
- "starlane-base-common",
+ "starlane-base",
  "starlane-hyperspace",
  "starlane-macros",
  "starlane-platform-for-postgres",
@@ -2977,7 +2977,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "starlane-base-common"
+name = "starlane-base"
 version = "0.3.20"
 dependencies = [
  "anyhow",
@@ -3090,7 +3090,7 @@ version = "0.3.20"
 dependencies = [
  "async-trait",
  "sqlx",
- "starlane-base-common",
+ "starlane-base",
  "starlane-hyperspace",
  "starlane-space",
  "strum",
@@ -3108,7 +3108,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "sqlx",
- "starlane-base-common",
+ "starlane-base",
  "starlane-hyperspace",
  "starlane-macros",
  "starlane-platform-for-postgres",

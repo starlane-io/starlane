@@ -29,7 +29,7 @@ repository.workspace = true
 starlane-macros = { workspace = true, version = "0.3.21" }
 starlane-space = { workspace = true  }
 starlane-hyperspace = { workspace = true, version = "0.3.21" }
-starlane-base-common = { workspace = true, version = "0.3.21" }
+starlane-base = { workspace = true, version = "0.3.21" }
 starlane-platform-for-postgres = {workspace = true }
 starlane-platform-for-postgres-registry = {workspace = true }
 

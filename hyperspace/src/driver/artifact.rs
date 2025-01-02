@@ -444,7 +444,7 @@ impl BundleDriverHandler
                                     ),
                                 },
                                 kind: KindTemplate {
-                                    common: point_and_kind.kind.to_base(),
+                                    base: point_and_kind.kind.to_base(),
                                     sub: point_and_kind.kind.sub().into(),
                                     specific: None,
                                 },

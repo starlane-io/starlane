@@ -64,7 +64,7 @@ pub enum SpaceErr {
     NotImplemented(String),
     #[error("platform does not have a kind that matches template '{0}'")]
     KindNotAvailable(KindTemplate),
-    #[error("expected a sub kind for common kind '{kind}' ... known options: [{subs}]")]
+    #[error("expected a sub kind for base kind '{kind}' ... known options: [{subs}]")]
     ExpectedSub { kind: BaseKind, subs: String },
     #[error("{0}")]
     Msg(String),
@@ -519,7 +519,7 @@ impl<I: Span> From<nom::Err<ErrorTree<I>>> for SpaceErr {
                         location.get_column()
                     ),
                 },
-                ErrorTree::Stack { common, contexts } => match contexts.first() {
+                ErrorTree::Stack { base, contexts } => match contexts.first() {
                     None => SpaceErr::Status {
                         status: 500,
                         message: "error, cannot find location".to_string(),

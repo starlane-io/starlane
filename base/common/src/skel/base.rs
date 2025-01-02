@@ -2,10 +2,10 @@
 ///
 /// # COMMON?
 /// This example further defines traits for specific [Provider] implementation. The
-/// trait extensions are said to be `common` because these trait extensions will be implemented
+/// trait extensions are said to be `base` because these trait extensions will be implemented
 /// in the [foundation] and [platform] with a matching [ProviderKind].
 ///
-/// The `common` implementation pattern only makes sense if you understand different jobs
+/// The `base` implementation pattern only makes sense if you understand different jobs
 /// that [Platform] and [Foundation] fulfil. To put it simply: [Platform] enables `utilization` of
 /// services and resources that are not native to `Starlane` and the [Foundation] enables
 /// `creation` and `management` of those same external services or resources.
@@ -33,7 +33,7 @@ pub trait Provider: provider::Provider<Config: ProviderConfig> {}
 pub trait ProviderConfig: foundation::config::ProviderConfig {}
 
 /// Unlike the implementations defined in [foundation::skel::concrete] where the final `structs`
-/// are implementing the entire inheritance tree for their type, `common` merely defines child
+/// are implementing the entire inheritance tree for their type, `base` merely defines child
 /// traits.
 ///
 /// [provider] mods should make the final definition for all the
@@ -41,22 +41,22 @@ pub trait ProviderConfig: foundation::config::ProviderConfig {}
 /// being defined yet lacking specific definitions that any particular [foundation::Foundation]
 /// requires.
 ///
-/// A good example of this is the `Postgres` common definition which should implement every
+/// A good example of this is the `Postgres` base definition which should implement every
 /// aspect needed to maybe `initialize` and certainly to `connect` to the Postgres Cluster instance.
 /// ```
 /// pub mod postgres {
 ///
-///   use starlane_base_common::config;
+///   use starlane_base::config;
 ///
 ///   /// this example implementation is not configured for `modes`.
-///   /// a mode implementation example is documented here: [starlane::common::mode]
+///   /// a mode implementation example is documented here: [starlane::base::mode]
 ///   ///
 ///   /// As you can see this overloaded example provides everything needed to set up a Postgres
 ///   /// cluster except for any information pertaining to installing and starting the service, because
 ///   /// the mechanisms for installing and starting differ amongst Foundation implementations.
 ///   ///
 ///   /// `DockerDaemonFoundation` implements a concrete version of this `Postgres` dependency
-///   /// that inherits the common interface but also adds contextual foundation definitions
+///   /// that inherits the base interface but also adds contextual foundation definitions
 ///   /// such as a Docker `repository`:`image`:`tag` to be pulled, instanced, initialized and started
 ///   pub trait ProviderConfig: config::ProviderConfig{
 ///     fn url(&self) -> String;

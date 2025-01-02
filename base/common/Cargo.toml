@@ -1,5 +1,5 @@
 [package]
-name = "starlane-base-common"
+name = "starlane-base"
 
 description = """
 This is a support crate for starlane: 'https://starlane.io'
@@ -82,7 +82,7 @@ shadow-rs = { workspace = true }
 
 
 [lib]
-name = "starlane_base_common"
+name = "starlane_base"
 path = "src/lib.rs"
 
 

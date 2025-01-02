@@ -107,7 +107,7 @@ w                           INSERT INTO reset_mode VALUES ('None');"#;
          point TEXT NOT NULL,
          point_segment TEXT NOT NULL,
          parent TEXT NOT NULL,
-         common TEXT NOT NULL,
+         base TEXT NOT NULL,
          sub TEXT,
          provider TEXT,
          vendor TEXT,
@@ -280,7 +280,7 @@ impl RegistryApi for PostgresRegistry {
             }
         }
 
-        let statement = format!("INSERT INTO particles (point,point_segment,common,sub,provider,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.provider), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
+        let statement = format!("INSERT INTO particles (point,point_segment,base,sub,provider,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.provider), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
         trans.execute(statement.as_str()).await?;
 
         for (_, property_mod) in registration.properties.iter() {
@@ -575,7 +575,7 @@ impl RegistryApi for PostgresRegistry {
                 KindBaseSelector::Always => {}
                 KindBaseSelector::Exact(kind) => {
                     index = index + 1;
-                    where_clause.push_str(format!(" AND common=${}", index).as_str());
+                    where_clause.push_str(format!(" AND base=${}", index).as_str());
                     params.push(kind.to_string());
                 }
                 KindBaseSelector::Never => {}
@@ -1082,7 +1082,7 @@ impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord {
         fn wrap(row: &PgRow) -> Result<PostgresParticleRecord, RegErr> {
             let parent: String = row.get("parent");
             let point_segment: String = row.get("point_segment");
-            let base: String = row.get("common");
+            let base: String = row.get("base");
             let sub: Option<CamelCase> = match row.get("sub") {
                 Some(sub) => {
                     let sub: String = sub;

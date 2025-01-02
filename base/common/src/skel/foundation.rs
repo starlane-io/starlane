@@ -209,7 +209,7 @@ pub mod concrete {
                 todo!()
             }
 
-            fn probe(&self) -> StatusWatcher {
+            fn probe(&self) -> Status {
                 todo!()
             }
         }

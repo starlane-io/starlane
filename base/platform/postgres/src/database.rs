@@ -1,14 +1,12 @@
-use std::str::FromStr;
 use std::sync::Arc;
 use async_trait::async_trait;
 use sqlx::{ConnectOptions, Error, PgPool};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::postgres::any::AnyConnectionBackend;
-use starlane_base_common::status::{Handle, Status, StatusDetail, StatusWatcher, StatusEntity};
-use starlane_base_common::provider::{Provider,ProviderKindDef,ProviderKind};
-use starlane_base_common::provider::err::ProviderErr;
-use starlane_space::parse::Res;
-use crate::service::{Connection, DbKey, Pool, PostgresConnectionConfig, PostgresService, PostgresServiceHandle};
+use starlane_base::status::{Handle, Status, StatusDetail, StatusWatcher, StatusEntity};
+use starlane_base::provider::{Provider,ProviderKindDef,ProviderKind};
+use starlane_base::provider::err::ProviderErr;
+use crate::service::{ DbKey, Pool, PostgresConnectionConfig, PostgresService, PostgresServiceHandle};
 
 #[derive(Clone, Eq, PartialEq)]
 struct Config {
@@ -22,6 +20,7 @@ impl Config {
         options.database(&self.database.as_str())
     }
 }
+
 
 pub type PostgresDatabaseHandle = Handle<PostgresDatabase>;
 pub struct PostgresDatabaseProvider {
@@ -53,9 +52,6 @@ impl Provider for PostgresDatabaseProvider{
         self.config.clone()
     }
 
-    async fn probe(&self) -> Status {
-        todo!()
-    }
 
     async fn ready(&self) -> Result<Self::Item, ProviderErr> {
         todo!()
@@ -77,7 +73,7 @@ impl StatusEntity for PostgresDatabaseProvider{
         todo!()
     }
 
-    async fn probe(&self) -> StatusWatcher {
+    async fn probe(&self) -> Status{
         todo!()
     }
 }
@@ -101,9 +97,7 @@ impl PostgresDatabase {
             pool
         })
     }
-    async fn acquire(&self ) -> Result<Connection, sqlx::Error> {
-        self.service.acquire().await
-    }
+
 }
 
 #[async_trait]

@@ -158,7 +158,7 @@ pub enum StageDetail {
     Unknown,
     ///
     None,
-    /// the meaning of [StageDetail::Cached] differs by implementation. It's most common meaning
+    /// the meaning of [StageDetail::Cached] differs by implementation. It's most base meaning
     /// signifies that all fetching/downloading stages have completed... and of course
     /// some providers don't have a cached stage at all
     Cached,

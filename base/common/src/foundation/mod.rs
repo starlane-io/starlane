@@ -19,7 +19,7 @@
 /// The [`FoundationConfig`] enumerates dependencies which are typically things that don't ship
 /// with the Starlane binary.  Common examples are: Postgres, Keycloak, Docker.  Each config
 /// core must know how to ready that Dependency and potentially even launch an
-/// instance of that Dependency.  For Example: Postgres Database is a common core especially
+/// instance of that Dependency.  For Example: Postgres Database is a base core especially
 /// because the default Starlane [`Registry`] (and at the time of this writing the only Registry support).
 /// The Postgres [`Dependency`] ensures that Postgres is accessible and properly configured for the
 /// Starlane Platform.
@@ -47,10 +47,6 @@ use crate::Foundation;
 use crate::provider::Provider;
 use crate::kind::{ProviderKind,ProviderKindDef,FoundationKind};
 
-/// [skel] provides a starter implementations of the [crate::foundation] traits in order
-/// to support a new [FoundationKind]
-#[cfg(feature="skel")]
-pub mod skel;
 
 pub mod config;
 

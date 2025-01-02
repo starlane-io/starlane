@@ -90,11 +90,11 @@ impl KindSelector {
     pub fn as_point_segments(&self) -> Result<String, SpaceErr> {
         match &self.base {
             KindBaseSelector::Always => Err(SpaceErr::server_error(
-                "cannot turn a common wildcard kind into point segments",
+                "cannot turn a base wildcard kind into point segments",
             )),
             KindBaseSelector::Exact(e) => Ok(e.to_skewer().to_string()),
             KindBaseSelector::Never => Err(SpaceErr::server_error(
-                "cannot turn a common never kind into point segments",
+                "cannot turn a base never kind into point segments",
             )),
         }
     }
@@ -903,8 +903,8 @@ impl ToString for PointSegKindHop {
                    ValuePattern::Always => rtn.push_str("<*>"),
                    ValuePattern::Never => rtn.push_str("<!>"),
                    ValuePattern::Pattern(kind_selector) => {
-                       if let Pattern::Exact(common) = &kind_selector.common {
-                           rtn.push_str(format!("<{}", common.to_string()).as_str());
+                       if let Pattern::Exact(base) = &kind_selector.base {
+                           rtn.push_str(format!("<{}", base.to_string()).as_str());
                            if let Pattern::Exact(sub) = &kind_selector.sub {
                                rtn.push_str(format!("<{}", sub.as_ref().unwrap().to_string()).as_str());
                                if let ValuePattern::Pattern(specific) = &kind_selector.specific {

@@ -1542,7 +1542,7 @@ impl PointCtx {
 }
 
 /// A Point is an address usually referencing a Particle.
-/// Points can be created from a String composed of ':' delimited segments: `space.com:common:etc`
+/// Points can be created from a String composed of ':' delimited segments: `space.com:base:etc`
 /// To create a Point:
 /// ```
 /// use std::str::FromStr;

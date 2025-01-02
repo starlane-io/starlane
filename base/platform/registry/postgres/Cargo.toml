@@ -13,7 +13,7 @@ version.workspace = true
 starlane-macros = { workspace = true }
 starlane-space = { workspace = true }
 starlane-hyperspace = { workspace = true }
-starlane-base-common = {workspace = true }
+starlane-base = {workspace = true }
 starlane-platform-for-postgres = { workspace = true }
 
 sqlx = { workspace = true }

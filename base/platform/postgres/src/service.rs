@@ -3,17 +3,17 @@ use std::ops::Deref;
 use starlane_space::parse::{Domain, VarCase};
 use std::sync::Arc;
 use async_trait::async_trait;
-use starlane_base_common::config::ProviderConfig;
-use starlane_base_common::provider::{Manager, Provider, ProviderKindDef};
-use starlane_base_common::provider::err::ProviderErr;
+use starlane_base::config::ProviderConfig;
+use starlane_base::provider::{Manager, Provider, ProviderKindDef};
+use starlane_base::provider::err::ProviderErr;
 use std::str::FromStr;
 use sqlx;
 use sqlx::{ConnectOptions, Connection};
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use tokio::sync::Mutex;
-use starlane_base_common::Foundation;
-use starlane_base_common::platform::prelude::Platform;
-use starlane_base_common::status::{Handle, Status, StatusDetail, StatusEntity, StatusWatcher};
+use starlane_base::Foundation;
+use starlane_base::platform::prelude::Platform;
+use starlane_base::status::{Handle, Status, StatusDetail, StatusEntity, StatusWatcher};
 use crate::err::PostErr;
 
 pub type Pool = sqlx::Pool<sqlx::Postgres>;
@@ -63,9 +63,6 @@ impl Provider for PostgresServiceProvider {
         self.config.clone()
     }
 
-    async fn probe(&self) -> Status {
-        todo!()
-    }
 
     async fn ready(&self) -> Result<Self::Item, ProviderErr> {
         todo!()
@@ -87,7 +84,7 @@ impl StatusEntity for PostgresServiceProvider {
         todo!()
     }
 
-    async fn probe(&self) -> StatusWatcher {
+    async fn probe(&self) -> Status {
         todo!()
     }
 }
@@ -134,18 +131,14 @@ impl StatusEntity for PostgresService {
         todo!()
     }
 
-    async fn probe(&self) -> StatusWatcher {
+    async fn probe(&self) -> Status {
         /// need to normalize the [PostgresService::probe]
         self.connection.lock().await.ping().await.unwrap();
         todo!()
     }
 }
 
-impl PostgresService {
-    pub fn key(&self) -> &DbKey {
-        &self.key
-    }
-}
+
 
 /// maybe add proper postgres type constraints on the following stuff:
 pub type Username = VarCase;
@@ -234,23 +227,4 @@ impl PostgresConnectionConfig{
             .password(self.password.as_str())
     }
 
-
-
-    /*
-    pub fn to_uri(&self) -> String {
-        format!(
-            "postgres://{}:{}@{}/{}",
-            self.username, self.password, self.host, self.database
-        )
-    }
-
-
-     */
-
-    pub fn to_uri(&self) -> String {
-        format!(
-            "postgres://{}:{}@{}",
-            self.username, self.password, self.host
-        )
-    }
 }
