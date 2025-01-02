@@ -47,7 +47,7 @@ use std::sync::Arc;
 use serde_derive::{Deserialize, Serialize};
 use starlane_hyperspace::registry::err::RegErr;
 use starlane_hyperspace::registry::{Registration, RegistryApi};
-use starlane_platform_for_postgres::{DbKey, PostgresServiceHandle};
+use starlane_platform_for_postgres::service::{DbKey, PostgresServiceHandle};
 use starlane_space::status::Handle;
 
 pub struct PostgresRegistry {
@@ -1353,7 +1353,7 @@ pub struct PostgresRegistryContextHandle {
 }
 
 impl PostgresRegistryContextHandle {
-    pub fn new(db: LiveDatabase, pool: Arc<PostgresRegistryContext>) -> Self {
+    pub fn new(db: PostgresServiceHandle, pool: Arc<PostgresRegistryContext>) -> Self {
         Self {
             key: db.database.to_key(),
             schema: db.database.schema.clone(),

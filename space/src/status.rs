@@ -19,7 +19,7 @@ pub type StatusWatcher = tokio::sync::watch::Receiver<Status>;
 ///  [StatusEntity] provides an interface for entities to report status
 #[async_trait]
 pub trait StatusEntity {
-    fn status(&self) -> StatusDetail;
+    fn status(&self) -> Status;
 
     fn status_detail(&self) -> StatusDetail;
 
@@ -29,10 +29,6 @@ pub trait StatusEntity {
     /// synchronize the [StatusEntity] [Status] with the real world properties that
     /// it models.
     fn probe(&self) -> StatusWatcher;
-
-
-    /// take necessary actions to get the [StatusEntity] to [Status::Ready] state
-    fn start(&self) -> StatusWatcher;
 }
 
 
@@ -287,7 +283,6 @@ pub enum PendingDetail {
 
 #[derive(Clone, Debug,  Serialize, Deserialize)]
 pub struct PendingDetail {
-
   request: Vec<ActionRequest>,
   conditions: Vec<AwaitCondition>,
 }

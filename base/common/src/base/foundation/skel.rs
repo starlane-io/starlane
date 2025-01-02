@@ -124,7 +124,7 @@ pub mod concrete {
             todo!()
         }
 
-        fn dependency(&self, kind: &DependencyKind) -> Option<&Self::DependencyConfig> {
+        fn provider(&self, kind: &DependencyKind) -> Option<&Self::DependencyConfig> {
             todo!()
         }
     }
@@ -172,7 +172,7 @@ pub mod concrete {
             todo!()
         }
 
-        fn dependency(&self, kind: &DependencyKind) -> Result<Option<Box<Self::Dependency>>, BaseErr> {
+        fn provider(&self, kind: &DependencyKind) -> Result<Option<Box<Self::Dependency>>, BaseErr> {
             todo!()
         }
 

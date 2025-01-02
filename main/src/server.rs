@@ -1,7 +1,5 @@
 
-use starlane_platform_for_postgres::{
-    Config, PostgresPlatform
-};
+use starlane_platform_for_postgres::PostgresPlatform;
 
 use starlane_platform_for_postgres_registry::registry::{
     PostgresRegistry, PostgresRegistryContext,
@@ -41,6 +39,7 @@ use std::collections::HashSet;
 use std::ops::Deref;
 use starlane_hyperspace::database::LiveDatabase;
 use starlane_hyperspace::registry::Registry;
+use starlane_platform_for_postgres::service::Config;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {

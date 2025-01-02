@@ -1,8 +1,5 @@
 pub mod config;
 pub mod err;
+pub mod prelude;
 
-
-pub trait Platform {
-    type Config: config::PlatformConfig;
-}
 

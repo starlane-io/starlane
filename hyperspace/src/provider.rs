@@ -6,21 +6,52 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
-use starlane_space::status::StatusEntity;
+use starlane_space::parse::CamelCase;
+use starlane_space::status::{Action, ActionRequest, StatusEntity, PendingDetail};
 use crate::provider::err::ProviderErr;
 
 use starlane_space::status::Status;
 use starlane_space::status::Stage;
 use starlane_space::status::StateDetail;
-
+use crate::registry::Registry;
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ProviderKind))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize))]
 pub enum ProviderKindDef {
- ///
- Service
+  /// [Provider::probe] should ascertain if the docker daemon is installed and running.
+  /// If the DockerDaemon is accessible set [Status::Ready].
+  /// If not accessible set [Status::Pending] with an [ActionRequest] providing helpful guidance
+  /// to the Starlane admin on how to rectify the issue.
+  ///
+  /// Note: that the DockerDaemon [Provider] should take any steps to install or start Docker
+  /// Daemon because Starlane is not keen on installing raw binaries for purposes of security...
+  /// The whole point of the DockerDaemon dependency is to provide a way to extend Starlane using
+  /// secure containers
+  DockerDaemon,
+  /// Represents a postgres cluster instance that serves [ProviderKindDef::PostgresDatabase]
+  PostgresService,
+  /// depends upon a readied [ProviderKindDef::PostgresService]
+  PostgresDatabase(PostgresDatabaseKind),
+  /// depends upon [ProviderKindDef::PostgresDatabase]::[PostgresDatabaseKindDef::Registry]
+  Registry,
+  /// [ProviderKindDef::_Ext] defines a new [ProviderKind] that is not builtin to Starlane
+  _Ext(CamelCase)
+}
+
+
+#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(PostgresDatabaseKind))]
+#[strum_discriminants(derive(Hash, Serialize, Deserialize))]
+pub enum PostgresDatabaseKindDef{
+    /// just a plain, empty postgres database full of potential
+    Default,
+    /// a variant of [ProviderKindDef::PostgresDatabase] that is initialized with the [Registry]
+    /// sql schema to be utilized by a
+    Registry,
+    _Ext(CamelCase)
 }
 
 
@@ -69,8 +100,10 @@ pub trait Provider: StatusEntity + Sync {
 
 
     /// Returns an interface clone for [Provider::Item] when it reaches [Status::Ready].
-    /// If [Provider::Item] is not [Status::Ready] [Provider::ready] will start executing
-    /// the necessary task and steps in order to produce a readied [Provider::Item]
+    ///
+    /// If [Provider::Item] is NOT ready [Provider::ready] will start the `readying` tasks
+    /// and will not return until the [Status::Ready] state is reached or if a [ProviderErr]
+    /// is encountered.
     ///
     /// The [Provider::ready] should be reentrant--meaning it can be called multiple times without
     /// causing an error. A [Provider::ready] implementation should always first call

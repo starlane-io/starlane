@@ -1,12 +1,13 @@
 use crate::base::err::BaseErr;
-use crate::base::foundation::kind::FoundationKind;
-use crate::base::kind::{DependencyKind, Kind, ProviderKind};
 use crate::base::partial::skel;
 use starlane_space::parse::CamelCase;
 use downcast_rs::{impl_downcast, Downcast, DowncastSync};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
+use starlane_hyperspace::provider::ProviderKind;
+use crate::base::foundation::skel::concrete::my_dependency::my_provider::Provider;
+use crate::base::kind::FoundationKind;
 
 pub trait Config
 {
@@ -20,33 +21,23 @@ pub trait Config
 
 
 pub trait FoundationConfig: DowncastSync {
-    type DependencyConfig: DependencyConfig + ?Sized;
+    type ProviderConfig: ProviderConfig+ ?Sized;
 
     fn kind(&self) -> FoundationKind;
 
-    /// required [`Vec<Kind>`]  must be installed and running for THIS [`Foundation`] to work.
+    /// required [HashSet<ProviderKind>]  must be installed and running for THIS [`Foundation`] to work.
     /// at a minimum this must contain a Registry of some form.
-    fn required(&self) -> Vec<Kind>;
+    fn required(&self) -> HashSet<ProviderKind>;
 
-    fn dependency_kinds(&self) -> &Vec<DependencyKind>;
+    fn provider_kinds(&self) -> &HashSet<ProviderKind>;
 
-    fn dependency(&self, kind: &DependencyKind) -> Option<&Self::DependencyConfig>;
+    fn provider(&self, kind: &ProviderKind) -> Option<&Self::ProviderConfig>;
 }
 
-pub trait DependencyConfig: DowncastSync {
-    type ProviderConfig: ProviderConfig + ?Sized;
-
-    fn kind(&self) -> &DependencyKind;
-
-    fn require(&self) -> Vec<Kind>;
-}
 
 pub trait ProviderConfigSrc
 {
     type Config: ProviderConfig + ?Sized;
-
-
-    fn providers(&self) -> Result<HashMap<CamelCase, &Self::Config>, BaseErr>;
 
     fn provider(&self, kind: &CamelCase) -> Result<Option<&Self::Config>, BaseErr>;
 }

@@ -38,7 +38,7 @@
 /// ## Not Every Mode is Available in every case!
 /// The Purpose of modes is to supply the [foundation::Foundation] cascading approaches to
 /// achieving the Dependency's Ready state which--in the case of the Postgres Cluster Dependency--
-/// is for the [foundation::Foundation] to provide the [platform::Platform] with a database
+/// is for the [foundation::Foundation] to provide the [crate::base::platform::prelude::Platform] with a database
 /// connection pool. And to accomplish the goal not all modes are required depending upon
 /// the desired setup.
 ///
