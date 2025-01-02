@@ -1,5 +1,5 @@
 use crate::base::foundation::kind::FoundationKind;
-use crate::base::foundation::status::ActionRequest;
+use crate::base::status::ActionRequest;
 use crate::base::kind::{DependencyKind, IKind, Kind, ProviderKind};
 use starlane_space::err::ParseErrs;
 use starlane_space::substance::Call;

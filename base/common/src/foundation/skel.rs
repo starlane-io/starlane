@@ -1,9 +1,19 @@
+use std::sync::Arc;
+use async_trait::async_trait;
+use tokio::sync::watch::Receiver;
 use crate::base;
 use base::foundation;
+use starlane_hyperspace::provider::ProviderKind;
+use starlane_space::progress::Progress;
+use crate::base::err::BaseErr;
+use crate::base::kind::FoundationKind;
+use crate::base::registry::Registry;
+use crate::base::status::Status;
+use crate::base::status::StatusDetail;
 
-/// [`foundation::skel`] provides a starter custom implementation of a [foundation`]
+/// [foundation::skel] provides a starter custom implementation of a [foundation]
 /// here you can see the recommended extension technique of re-implementing each of the traits
-/// and then providing a [`concrete`] child mod where the concrete implementations of the
+/// and then providing a `concrete` child mod where the concrete implementations of the
 /// same suite of APIs are implemented,
 ///
 /// please copy this file to a new mod and customize as needed
@@ -11,30 +21,28 @@ use base::foundation;
 /// # FINAL TRAIT DEFINITIONS
 /// this implementation should first define the `Final Trait Definitions` for this Foundation implementation.
 ///
-/// # [mod concrete]
-/// `mod concrete` defines this foundation's *actual* config & functionality
+/// # mod concrete
+/// the [concrete] mod defines this [Foundation]'s *actual* [FoundationConfig] & functionality
 ///
-/// this trait is for extending [`foundation::Foundation`] API and constraining generic traits like [`FoundationConfig`] so
+/// this trait is for extending [foundation::Foundation] API and constraining generic traits like [FoundationConfig] so
 /// that foundation implementations can better customize their traits for whatever is required.
 ///
-/// #ASSOCIATED TYPES
-/// Take careful notice the slight pattern shift when definition `Associated Types` at the `Foundation Kind `
-///
-///
-///
+/// # NEW ASSOCIATED TYPES & METHOD's INTRODUCED IN [Foundation]
+/// Take careful notice that new `Associated Types` are introduced in [Foundation] trait defs.
+/// For example: The [Foundation] [ProviderConfig] trait a new associated type:
+/// [ProviderConfig::MountsConfig] and a new method: [ProviderConfig::mounts]. Since every
+/// [Foundation] must support mounting volumes it is added at this very abstract level
 
-pub trait FoundationConfig: foundation::config::FoundationConfig<DependencyConfig=dyn DependencyConfig<MountsConfig=concrete::partial::mounts::MountsConfig, ProviderConfig=dyn ProviderConfig>> {}
+pub trait FoundationConfig: foundation::config::FoundationConfig<ProviderConfig=dyn ProviderConfig<MountsConfig=partial::mounts::MountsConfig>> {}
 
-pub trait DependencyConfig: foundation::config::DependencyConfig<ProviderConfig=dyn ProviderConfig> {
+
+
+pub trait ProviderConfig: foundation::config::ProviderConfig {
     type MountsConfig: partial::MountsConfig;
-
     fn mounts(&self) -> &Self::MountsConfig;
 }
 
-pub trait ProviderConfig: foundation::config::ProviderConfig {}
-
 pub trait Foundation: foundation::Foundation {}
-pub trait Dependency: foundation::Dependency<Config=dyn DependencyConfig<MountsConfig=concrete::partial::mounts::MountsConfig>, Provider=dyn Provider> {}
 pub trait Provider: foundation::Provider<Config=dyn ProviderConfig> {}
 
 pub mod partial {
@@ -83,19 +91,9 @@ pub mod partial {
 
 pub mod concrete {
     use crate::base;
-    use crate::base::err::BaseErr;
-    use crate::base::foundation::kind::FoundationKind;
-    use crate::base::foundation::skel::concrete::partial::mounts;
-    use crate::base::foundation::status::{Status, StatusDetail};
     use crate::base::foundation::Provider;
-    use crate::base::kind::{DependencyKind, Kind};
-    use crate::base::registry::Registry;
-    use starlane_space::progress::Progress;
     use base::foundation;
     use serde::{Deserialize, Serialize};
-    use std::sync::Arc;
-    use async_trait::async_trait;
-    use tokio::sync::watch::Receiver;
 
     ///  reference the above a [`my`] implementation ...
     mod my {
@@ -108,26 +106,7 @@ pub mod concrete {
     impl my::FoundationConfig for FoundationConfig {}
 
     impl foundation::config::FoundationConfig for FoundationConfig {}
-
-    impl base::config::FoundationConfig for FoundationConfig {
-        type DependencyConfig = dyn my::DependencyConfig<ProviderConfig=dyn my::ProviderConfig, MountsConfig=mounts::MountsConfig>;
-
-        fn kind(&self) -> FoundationKind {
-            todo!()
-        }
-
-        fn required(&self) -> Vec<Kind> {
-            todo!()
-        }
-
-        fn dependency_kinds(&self) -> &Vec<DependencyKind> {
-            todo!()
-        }
-
-        fn provider(&self, kind: &DependencyKind) -> Option<&Self::DependencyConfig> {
-            todo!()
-        }
-    }
+   }
 
     /// Finally! after all the levels of trait inheritance we have reach an *actual* implementation
     /// of [Foundation]
@@ -139,9 +118,8 @@ pub mod concrete {
 
     #[async_trait]
     impl foundation::Foundation for Foundation {
-        type Config = FoundationConfig;
-        type Dependency = dyn my::Dependency;
-        type Provider = dyn my::Provider;
+        type Config = ();
+        type Provider = ();
 
         fn kind(&self) -> FoundationKind {
             todo!()
@@ -159,7 +137,6 @@ pub mod concrete {
             todo!()
         }
 
-
         fn status_watcher(&self) -> Arc<Receiver<Status>> {
             todo!()
         }
@@ -172,7 +149,7 @@ pub mod concrete {
             todo!()
         }
 
-        fn provider(&self, kind: &DependencyKind) -> Result<Option<Box<Self::Dependency>>, BaseErr> {
+        fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<Self::Dependency>>, BaseErr> {
             todo!()
         }
 
@@ -191,9 +168,9 @@ pub mod concrete {
         use super::my;
         use crate::base::err::BaseErr;
         use crate::base::foundation::skel::concrete::partial::mounts;
-        use crate::base::foundation::status::Status;
+        use crate::base::status::Status;
         use crate::base::foundation::LiveService;
-        use crate::base::kind::{DependencyKind, Kind, ProviderKind};
+        use crate::base::kind::ProviderKind;
         use crate::base::{config, foundation};
         use starlane_space::progress::Progress;
         use serde::{Deserialize, Serialize};
@@ -202,26 +179,9 @@ pub mod concrete {
         use async_trait::async_trait;
         use tokio::sync::watch::Receiver;
 
-        #[derive(Clone, Serialize, Deserialize)]
-        pub struct DependencyConfig {}
-
-        impl config::DependencyConfig for DependencyConfig {
-            type ProviderConfig = dyn my::ProviderConfig;
-
-            fn kind(&self) -> &DependencyKind {
-                todo!()
-            }
-
-            fn require(&self) -> Vec<Kind> {
-                todo!()
-            }
-        }
-
 
         impl foundation::config::DependencyConfig for DependencyConfig {
-            fn volumes(&self) -> HashMap<String, String> {
-                todo!()
-            }
+
         }
 
         impl my::DependencyConfig for DependencyConfig {
@@ -282,7 +242,12 @@ pub mod concrete {
         /// providers in [foundation::skel::concrete::my_dependency]... this is because all
         /// Foundation resources must have uniform trait bounds meaning that traits defined
         /// at the foundation level are defining the `final` interface...
-        pub trait Provider: my::Provider {}
+        pub trait Provider: my::Provider {
+            fn volumes(&self) -> HashMap<String, String> {
+                todo!()
+            }
+
+        }
 
 
         /// [super::my_provider] follows the same pattern as [`super::my_provider`] except in this case it is for
@@ -291,7 +256,7 @@ pub mod concrete {
             use super::my;
             use crate::base::err::BaseErr;
             use crate::base::foundation;
-            use crate::base::foundation::status::Status;
+            use crate::base::status::Status;
             use crate::base::foundation::LiveService;
             use crate::base::kind::ProviderKind;
             use starlane_space::parse::CamelCase;
@@ -363,7 +328,7 @@ pub mod concrete {
             use async_trait::async_trait;
             use super::my;
             use crate::base::err::BaseErr;
-            use crate::base::foundation::status::Status;
+            use crate::base::status::Status;
             use crate::base::partial::skel as root;
             use crate::base::partial;
             use serde::{Deserialize, Serialize};

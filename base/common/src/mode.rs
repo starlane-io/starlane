@@ -1,6 +1,6 @@
 /// Abstract definition of `Modes`.
 ///
-/// Some implementations of [foundation::Foundation],[foundation::Dependency] and
+/// Some implementations of [crate::Foundation],[foundation::Dependency] and
 /// [foundation::Provider] may need to defined different behaviors based on how a resource is being
 /// used.`Modes` can be used when the configuration for one of its use cases requires only a subset
 /// of another.
@@ -10,12 +10,12 @@
 /// therefore three distinct `Modes`
 ///
 /// ## Mode use cases:
-/// * [Mode::Create] -> Provides all details to create and supply a [foundation::Foundation]
+/// * [Mode::Create] -> Provides all details to create and supply a [crate::Foundation]
 ///   managed `Postgres Cluster` instance including  download an artifact, install an executable,
 ///   initialize(setup) including: assigning credentials, creating and mapping local persistent
 ///   storage, configure a custom port.
 ///
-/// * [Mode::Start] -> After [foundation::Foundation]  Creates the Postgres Cluster--or--determines
+/// * [Mode::Start] -> After [crate::Foundation]  Creates the Postgres Cluster--or--determines
 ///   that a Postgres Cluster has already been created it needs to [Provider::start] the Service instance.
 ///   Important details for [Mode::Start] are: path of the Postgres Cluster executable and
 ///   ability to probe the health and availability of the Cluster Instance.
@@ -27,7 +27,7 @@
 ///
 /// ## Mode Definition = Property+Feature+Functionality
 /// The Mode `Definition` encapsulates the set of Properties for the [config::DependencyConfig],
-/// and the available `Features` and `Functionalities` that [foundation::Foundation] must support
+/// and the available `Features` and `Functionalities` that [crate::Foundation] must support
 /// for when operating in that mode.
 ///
 /// ## Titrated Subsets
@@ -36,15 +36,15 @@
 /// Definitions and [Mode::Create] supplies the most minimal subset.
 ///
 /// ## Not Every Mode is Available in every case!
-/// The Purpose of modes is to supply the [foundation::Foundation] cascading approaches to
+/// The Purpose of modes is to supply the [crate::Foundation] cascading approaches to
 /// achieving the Dependency's Ready state which--in the case of the Postgres Cluster Dependency--
-/// is for the [foundation::Foundation] to provide the [crate::base::platform::prelude::Platform] with a database
+/// is for the [crate::Foundation] to provide the [crate::base::platform::prelude::Platform] with a database
 /// connection pool. And to accomplish the goal not all modes are required depending upon
 /// the desired setup.
 ///
 /// Consider again our Postgres example this time it's a scenario where we want to use
 /// a `PostgresService` that is *already* available, or perhaps stringent requirements require
-/// a special `PostgresService` setup that isn't supported by any [foundation::Foundation]
+/// a special `PostgresService` setup that isn't supported by any [crate::Foundation]
 /// implementation... In those cases the [foundation::config::DependencyConfig] only needs be
 /// configured for [Mode::Connect] and details like: mounting persistent storage, port assignment
 /// credential setup, etc... do not need to be furnished to `Starlane`  In this case [Mode::Create]
@@ -56,7 +56,7 @@
 /// Oh... Security for Modes is NOT implemented at the time of this writing, and I'm not sure
 /// exactly how it will be implemented. I mention the as-of-yet vaporous security mechanism because
 /// an imported prerequisite for any security implementation is a means to create bounds around
-/// a resources definition.  Modes are used to define all that is required for [foundation::Foundation]
+/// a resources definition.  Modes are used to define all that is required for [crate::Foundation]
 /// to accomplish an aspect of the *total* resources definitions... Exactly what our future security
 /// uh... *thingy* will need to comprehend in order to someday keep out the riffraff.
 ///
@@ -66,8 +66,8 @@
 /// to understand that the [foundation::Dependency] goal is pursued trying mode's in *reverse* order.
 /// The reverse order may seem unintuitive because you can't [Mode::Connect] to the Cluster before it goes through
 /// [Mode::Create] and [Mode::Start] is run. To understand the reverse order rational consider
-/// every time [foundation::Foundation] is started it makes no assumptions about the present
-/// state of the infrastructure it manages.  [foundation::Foundation] attempts to get a database
+/// every time [crate::Foundation] is started it makes no assumptions about the present
+/// state of the infrastructure it manages.  [crate::Foundation] attempts to get a database
 /// connection by trying modes from least to most... it tries each mode in turn until its goal
 /// is reached or if the final available mode is attempted and fails.
 ///```
@@ -77,7 +77,7 @@
 ///      Create
 ///  }
 ///  ```
-/// So, here is the sequence that [foundation::Foundation] follows on startup:
+/// So, here is the sequence that [crate::Foundation] follows on startup:
 ///
 /// * [Mode::Connect] -> Try to connect to the database
 /// * [Mode::Start] -> This mode may be capable of probing the health of the Postgres Cluster
@@ -89,7 +89,7 @@
 ///   doing a `docker pull "some-postgres-images:latest"`
 /// * [Mode::Create] -> Checks if the Postgres Docker image artifact is downloaded, installed and
 ///   initialized and then performs the necessary actions to download, install and initialize as needed.
-///   IF [Mode::Create] succeeds... the [foundation::Foundation] will then reverse its mode traversal
+///   IF [Mode::Create] succeeds... the [crate::Foundation] will then reverse its mode traversal
 
 use crate::base;
 use base::config;

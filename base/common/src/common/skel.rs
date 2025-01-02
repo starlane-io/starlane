@@ -4,7 +4,7 @@
 ///
 /// ## !Foundation implementation required!
 /// For a new [`Kind`] to work it will also need a concrete implementation for one or more
-/// [`Foundation`](crate::base::foundation::Foundation)s. See foundation starter template: [`skel`](crate::base::foundation::skel)
+/// [`Foundation`](crate::Foundation)s. See foundation starter template: [`skel`](crate::base::foundation::skel)
 use crate::base;
 use base::foundation;
 

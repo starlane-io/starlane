@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use crate::base::foundation::status::Status;
+use crate::base::status::Status;
 /// `Partials` are generic definitions that can be inherited by `common` and `foundation`
 /// definitions.  Whereas a `common` definition describes the abstract traits of a particular
 /// resource a `partial` defines traits that may apply to multiple `common` or `foundation`
