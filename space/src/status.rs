@@ -28,7 +28,7 @@ pub trait StatusEntity {
 
     /// synchronize the [StatusEntity] [Status] with the real world properties that
     /// it models.
-    fn probe(&self) -> StatusWatcher;
+    async fn probe(&self) -> StatusWatcher;
 }
 
 

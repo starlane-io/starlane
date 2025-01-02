@@ -1,15 +1,16 @@
 use std::fmt::Display;
 use starlane_space::parse::{Domain, VarCase};
-use starlane_space::status::{Handle, Status, StatusDetail, StatusEntity, StatusWatcher};
 use std::sync::Arc;
 use async_trait::async_trait;
-use starlane_hyperspace::provider::config::ProviderConfig;
-use starlane_hyperspace::provider::{Manager, Provider, ProviderKindDef};
-use starlane_hyperspace::provider::err::ProviderErr;
+use starlane_base_common::config::ProviderConfig;
+use starlane_base_common::provider::{Manager, Provider, ProviderKindDef};
+use starlane_base_common::provider::err::ProviderErr;
 use starlane_space::err::ParseErrs;
 use std::str::FromStr;
 use starlane_base_common::Foundation;
-use starlane_base_common::base::platform::prelude::Platform;
+use starlane_base_common::platform::prelude::Platform;
+use starlane_base_common::status::{Handle,Status,StatusDetail,StatusEntity,StatusWatcher};
+
 
 /// The [Platform]  implementation of [PostgresService].
 ///
@@ -21,11 +22,6 @@ use starlane_base_common::base::platform::prelude::Platform;
 /// to a postgres cluster that already exists or if the [Foundation] has a [Provider] definition of
 /// with a matching [ProviderKindDef]... the [Foundation] [Provider] can be a dependency of the
 /// [Platform]
-///
-///
-///
-///
-///
 
 pub type PostgresServiceHandle = Handle<PostgresServiceStub>;
 
@@ -53,7 +49,7 @@ impl Provider for PostgresService {
     type Item = PostgresServiceHandle;
 
     fn kind(&self) -> ProviderKindDef {
-        ProviderKindDef::Service
+        ProviderKindDef::PostgresService
     }
 
     fn config(&self) -> Arc<Self::Config> {
@@ -69,8 +65,10 @@ impl Provider for PostgresService {
     }
 }
 
+
+#[async_trait]
 impl StatusEntity for PostgresService {
-    fn status(&self) -> StatusDetail {
+    fn status(&self) -> Status {
         todo!()
     }
 
@@ -82,13 +80,11 @@ impl StatusEntity for PostgresService {
         todo!()
     }
 
-    fn probe(&self) -> StatusWatcher {
+    async fn probe(&self) -> StatusWatcher {
         todo!()
     }
 
-    fn start(&self) -> StatusWatcher {
-        todo!()
-    }
+
 }
 
 /// the [StatusEntity] implementation which tracks with a Postgres Connection Pool.
@@ -103,8 +99,9 @@ pub struct PostgresServiceStub {
     connection_info: Config,
 }
 
+#[async_trait]
 impl StatusEntity for PostgresServiceStub {
-    fn status(&self) -> StatusDetail {
+    fn status(&self) -> Status {
         todo!()
     }
 
@@ -116,11 +113,7 @@ impl StatusEntity for PostgresServiceStub {
         todo!()
     }
 
-    fn probe(&self) -> StatusWatcher {
-        todo!()
-    }
-
-    fn start(&self) -> StatusWatcher {
+    async fn probe(&self) -> StatusWatcher {
         todo!()
     }
 }
@@ -175,7 +168,7 @@ impl Config {
 
 impl ProviderConfig for Config {
     fn kind(&self) -> &ProviderKindDef {
-        &ProviderKindDef::Service
+        &ProviderKindDef::PostgresService
     }
 }
 
