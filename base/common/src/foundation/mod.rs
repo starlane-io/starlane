@@ -95,24 +95,6 @@ impl<K> LiveService<K> {
     }
 }
 
-pub(crate) struct FoundationSafety<F>
-where
-    F: Foundation,
-{
-    foundation: Box<F>,
-}
-
-impl<F> CreateProxy for FoundationSafety<F>
-where
-    F: Foundation,
-{
-    type Proxy = F;
-
-    fn proxy(&self) -> Result<Self::Proxy, BaseErr> {
-        todo!()
-    }
-}
-
 
 
 #[cfg(test)]

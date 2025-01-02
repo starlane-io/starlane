@@ -1,15 +1,9 @@
-use std::sync::Arc;
-use async_trait::async_trait;
-use tokio::sync::watch::Receiver;
-use crate::base;
-use base::foundation;
-use starlane_hyperspace::provider::ProviderKind;
-use starlane_space::progress::Progress;
-use crate::base::err::BaseErr;
-use crate::base::kind::FoundationKind;
-use crate::base::registry::Registry;
-use crate::base::status::Status;
-use crate::base::status::StatusDetail;
+use crate::foundation;
+use crate::config;
+use crate::status::Status;
+use crate::status::StatusDetail;
+use crate::provider;
+
 
 /// [foundation::skel] provides a starter custom implementation of a [foundation]
 /// here you can see the recommended extension technique of re-implementing each of the traits
@@ -33,7 +27,7 @@ use crate::base::status::StatusDetail;
 /// [ProviderConfig::MountsConfig] and a new method: [ProviderConfig::mounts]. Since every
 /// [Foundation] must support mounting volumes it is added at this very abstract level
 
-pub trait FoundationConfig: foundation::config::FoundationConfig<ProviderConfig=dyn ProviderConfig<MountsConfig=partial::mounts::MountsConfig>> {}
+pub trait FoundationConfig: foundation::config::FoundationConfig<ProviderConfig =dyn ProviderConfig<MountsConfig: partial::MountsConfig>> {}
 
 
 
@@ -43,7 +37,7 @@ pub trait ProviderConfig: foundation::config::ProviderConfig {
 }
 
 pub trait Foundation: foundation::Foundation {}
-pub trait Provider: foundation::Provider<Config=dyn ProviderConfig> {}
+pub trait Provider: provider::Provider<Config=dyn ProviderConfig> {}
 
 pub mod partial {
     mod my {
@@ -52,10 +46,9 @@ pub mod partial {
 
     use async_trait::async_trait;
     /// here is the continued implementation of the `mount` partial defined here: [partial::skel]
-    use crate::base;
-    use base::err;
-    use base::foundation;
-    use base::partial;
+    use crate::err;
+    use crate::foundation;
+    use crate::partial;
     use partial::skel as mount;
 
 
@@ -90,10 +83,18 @@ pub mod partial {
 }
 
 pub mod concrete {
-    use crate::base;
-    use crate::base::foundation::Provider;
-    use base::foundation;
+    use std::sync::Arc;
+    use async_trait::async_trait;
+    use crate::provider::Provider;
+    use crate::foundation;
     use serde::{Deserialize, Serialize};
+    use tokio::sync::watch::Receiver;
+    use starlane_hyperspace::provider::ProviderKind;
+    use starlane_space::progress::Progress;
+    use crate::err::BaseErr;
+    use crate::kind::FoundationKind;
+    use crate::status::Status;
+    use crate::status::StatusDetail;
 
     ///  reference the above a [`my`] implementation ...
     mod my {
@@ -106,7 +107,6 @@ pub mod concrete {
     impl my::FoundationConfig for FoundationConfig {}
 
     impl foundation::config::FoundationConfig for FoundationConfig {}
-   }
 
     /// Finally! after all the levels of trait inheritance we have reach an *actual* implementation
     /// of [Foundation]
@@ -118,7 +118,7 @@ pub mod concrete {
 
     #[async_trait]
     impl foundation::Foundation for Foundation {
-        type Config = ();
+        type Config = FoundationConfig;
         type Provider = ();
 
         fn kind(&self) -> FoundationKind {
@@ -141,19 +141,15 @@ pub mod concrete {
             todo!()
         }
 
-        async fn synchronize(&self, progress: Progress) -> Result<Status, BaseErr> {
+        async fn probe(&self, progress: Progress) -> Result<Status, BaseErr> {
             todo!()
         }
 
-        async fn install(&self, progress: Progress) -> Result<(), BaseErr> {
+        async fn ready(&self, progress: Progress) -> Result<(), BaseErr> {
             todo!()
         }
 
-        fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<Self::Dependency>>, BaseErr> {
-            todo!()
-        }
-
-        fn registry(&self) -> Result<Registry, BaseErr> {
+        fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<Self::Provider>>, BaseErr> {
             todo!()
         }
     }

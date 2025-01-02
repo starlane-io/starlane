@@ -1,6 +1,5 @@
-pub use crate::base;
-use std::collections::HashMap;
+pub use crate::config;
 
-pub trait FoundationConfig: base::config::FoundationConfig<ProviderConfig: ProviderConfig> {}
+pub trait FoundationConfig: config::FoundationConfig<ProviderConfig: ProviderConfig> {}
 
-pub trait ProviderConfig: base::config::ProviderConfig {}
+pub trait ProviderConfig: config::ProviderConfig {}

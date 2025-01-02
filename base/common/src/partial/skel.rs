@@ -1,15 +1,14 @@
-use crate::base;
-use base::partial;
+use crate::partial;
 use partial::config;
 
-/// this is another skel template example for implementing a `partial`.
+/// this is another skel template example for implementing a [partial::Partial]
 pub trait MountsConfig: config::PartialConfig {
     type VolumeConfig: VolumeConfig;
     fn volumes(&self) -> Vec<Self::VolumeConfig>;
 }
 
 pub trait VolumeConfig: config::PartialConfig {
-    /// name must be unique amongst this volumes container: [Mounts]
+    /// name must be unique amongst this volumes container: [partial:Mounts]
     fn name(&self) -> String;
     fn path(&self) -> String;
 }

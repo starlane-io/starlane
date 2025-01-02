@@ -1,15 +1,14 @@
-use crate::base::err::BaseErr;
+use crate::err::BaseErr;
 use downcast_rs::{impl_downcast, Downcast, DowncastSync};
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
-use crate::base::provider::Provider;
-use crate::base::kind::ProviderKind;
-use crate::base::kind::FoundationKind;
+use crate::provider::Provider;
+use crate::ProviderKind;
+use crate::kind::FoundationKind;
 
 /// reexporting [ProviderConfig]
 pub use starlane_hyperspace::provider::config::ProviderConfig;
-
 
 pub trait BaseConfig
 {
@@ -48,7 +47,7 @@ where
 
 
 pub mod provider {
-    use crate::base::config as my;
+    use crate::config as my;
     pub mod mode {
         use super::my;
         pub mod create {

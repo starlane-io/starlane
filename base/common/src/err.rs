@@ -1,20 +1,24 @@
-use crate::base::foundation::kind::FoundationKind;
-use crate::base::status::ActionRequest;
-use crate::base::kind::{DependencyKind, IKind, Kind, ProviderKind};
+
 use starlane_space::err::ParseErrs;
 use starlane_space::substance::Call;
 use serde_yaml::Value;
 use std::fmt::Display;
 use std::sync::Arc;
 use thiserror::Error;
+use crate::kind::ProviderKind;
+use crate::kind::FoundationKind;
+use crate::status::ActionRequest;
 
 impl BaseErr {
+    /*
     pub fn kind<'z>(kind: &impl IKind) -> BaseErrBuilder<'z> {
         BaseErrBuilder {
             kind: Some((kind.category(), kind.as_str())),
             ..Default::default()
         }
     }
+
+     */
 
     pub fn user_action_required<CAT, KIND, ACTION, SUMMARY>(
         cat: CAT,
@@ -78,9 +82,6 @@ impl BaseErr {
         BaseErr::DepNotAvailable(kind.as_ref().to_string())
     }
 
-    pub fn dep_not_available(kind: DependencyKind) -> Self {
-        BaseErr::DepNotAvailable(kind.to_string())
-    }
 
     pub fn provider_not_found<KIND>(kind: KIND) -> Self
     where
@@ -93,26 +94,9 @@ impl BaseErr {
         BaseErr::ProviderNotAvailable(kind.to_string())
     }
 
-    pub fn dep_err(kind: DependencyKind, msg: String) -> Self {
-        Self::DepErr { kind, msg }
-    }
 
     pub fn prov_err(kind: ProviderKind, msg: String) -> Self {
         Self::ProviderErr { kind: kind, msg }
-    }
-
-    pub fn foundation_verbose_error<C>(
-        kind: impl Into<Kind>,
-        err: serde_yaml::Error,
-        config: C,
-    ) -> Self
-    where
-        C: ToString,
-    {
-        let kind = kind.into();
-        let err = err.to_string();
-        let config = config.to_string();
-        Self::BaseVerboseErr { kind, err, config }
     }
 
 
@@ -152,11 +136,6 @@ impl BaseErr {
         Self::MissingKind(category)
     }
 
-    pub fn dep_conf_err(kind: DependencyKind, err: serde_yaml::Error, config: Value) -> Self {
-        let err = err.to_string();
-        let config = config.as_str().unwrap_or("?").to_string();
-        Self::DepConfErr { kind, err, config }
-    }
 
     pub fn prov_conf_err(kind: ProviderKind, err: serde_yaml::Error, config: Value) -> Self {
         let err = Arc::new(err);
@@ -200,10 +179,7 @@ pub enum BaseErr {
     BaseNotFound(String),
     #[error("config: '{0}' is recognized but is not available on this build of Starlane")]
     FoundationNotAvailable(String),
-    #[error(
-        "DependencyConfig.config is set to '{0}' which this Starlane build does not recognize"
-    )]
-    DepNotFound(String),
+
     #[error("core: '{0}' is recognized but is not available on this build of Starlane")]
     DepNotAvailable(String),
     #[error(
@@ -212,21 +188,12 @@ pub enum BaseErr {
     ProviderNotFound(String),
     #[error("provider: '{0}' is recognized but is not available on this build of Starlane")]
     ProviderNotAvailable(String),
-    #[error(
-        "error converting config config for '{kind}' serialization err: '{err}' config: {config}"
-    )]
-    BaseVerboseErr {
-        kind: Kind,
-        err: String,
-        config: String,
-    },
+
 
     #[error("config config err: {0}")]
     BaseConfErr(String),
     #[error("[{kind}] Foundation Error: '{msg}'")]
     BaseError { kind: FoundationKind, msg: String },
-    #[error("[{kind}] Error: '{msg}'")]
-    DepErr { kind: DependencyKind, msg: String },
     #[error("Action Required: {cat}: {kind} cannot {action} without user help.  Additional Info: '{summary}'"
     )]
     UserActionRequired {
@@ -237,13 +204,6 @@ pub enum BaseErr {
     },
     #[error("[{kind}] Error: '{msg}'")]
     ProviderErr { kind: ProviderKind, msg: String },
-    #[error("error converting config args for core: '{kind}' serialization err: '{err}' from config: '{config}'"
-    )]
-    DepConfErr {
-        kind: DependencyKind,
-        err: String,
-        config: String,
-    },
     #[error("error converting config args for provider: '{kind}' serialization err: '{err}' from config: '{config}'"
     )]
     ProvConfErr {
@@ -321,10 +281,6 @@ impl<'z> Default for BaseErrBuilder<'z> {
 }
 
 impl<'z> BaseErrBuilder<'z> {
-    pub fn kind(&mut self, kind: impl IKind) -> &mut Self {
-        self.kind = Some((kind.category(), kind.as_str()));
-        self
-    }
 
     pub fn config(&mut self, config: &'z (dyn Display + 'z)) -> &mut Self {
         self.config = Some(config);

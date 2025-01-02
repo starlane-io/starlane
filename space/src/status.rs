@@ -66,7 +66,7 @@ impl <E> Deref for Handle<E> where E: StatusEntity {
 /// most importantly the desired variant of a [StatusEntity] is [Status::Ready]
 /// and if that is the [Status] then there isn't a need to drill any deeper into
 /// the [StatusDetail]
-#[derive(Hash,Eq,PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Hash,Eq,PartialEq, Debug, Serialize, Deserialize)]
 pub enum Status {
     Unknown,
     /// [Status::Idle] is a healthy state of [StatusEntity] that indicates not [Status::Ready]

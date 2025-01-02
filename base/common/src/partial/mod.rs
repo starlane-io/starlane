@@ -1,9 +1,11 @@
 use async_trait::async_trait;
-use crate::base::status::Status;
-/// `Partials` are generic definitions that can be inherited by `common` and `foundation`
-/// definitions.  Whereas a `common` definition describes the abstract traits of a particular
-/// resource a `partial` defines traits that may apply to multiple `common` or `foundation`
-/// definitions.
+use crate::status::Status;
+use crate::Foundation;
+
+/// [Partial]s are generic definitions that can be inherited by [crate::config], [crate::common] and
+/// [crate::foundation] definitions.  Whereas a [crate::common] definition describes the abstract
+/// traits of a particular resource a [Partial] defines traits that may apply to multiple
+/// [crate::config], [crate::common] or [crate::foundation] definitions.
 ///
 /// Example:
 /// the `common` definitions for `Postgres` and `Keycloak` require a persistent storage directory
