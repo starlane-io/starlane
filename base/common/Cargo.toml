@@ -17,6 +17,9 @@ repository.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
+# 'skel' enables the various starter implentatation templates. Activate this feature so your can review
+# the skel code in your IDE
+skel=[]
 
 
 [dependencies]

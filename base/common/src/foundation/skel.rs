@@ -1,9 +1,6 @@
 use crate::foundation;
-use crate::config;
-use crate::status::Status;
-use crate::status::StatusDetail;
 use crate::provider;
-
+use crate::kind;
 
 /// [foundation::skel] provides a starter custom implementation of a [foundation]
 /// here you can see the recommended extension technique of re-implementing each of the traits
@@ -23,12 +20,15 @@ use crate::provider;
 ///
 /// # NEW ASSOCIATED TYPES & METHOD's INTRODUCED IN [Foundation]
 /// Take careful notice that new `Associated Types` are introduced in [Foundation] trait defs.
-/// For example: The [Foundation] [ProviderConfig] trait a new associated type:
+/// For example: The [Foundation] [config::ProviderConfig] trait a new associated type:
 /// [ProviderConfig::MountsConfig] and a new method: [ProviderConfig::mounts]. Since every
 /// [Foundation] must support mounting volumes it is added at this very abstract level
+///
+/// For illustration purposes a fictitious a [Foundation] implementation:
+/// [kind::FoundationKind::Skel] which looks a lot like a Foundation for a unix filesystem...
+///
 
 pub trait FoundationConfig: foundation::config::FoundationConfig<ProviderConfig =dyn ProviderConfig<MountsConfig: partial::MountsConfig>> {}
-
 
 
 pub trait ProviderConfig: foundation::config::ProviderConfig {
@@ -39,13 +39,14 @@ pub trait ProviderConfig: foundation::config::ProviderConfig {
 pub trait Foundation: foundation::Foundation {}
 pub trait Provider: provider::Provider<Config=dyn ProviderConfig> {}
 
+/// We need extend some partials to provide new functionality
 pub mod partial {
     mod my {
         pub use super::super::*;
     }
 
     use async_trait::async_trait;
-    /// here is the continued implementation of the `mount` partial defined here: [partial::skel]
+    /// here is the continued implementation of the [mount] partial defined in: [crate::partial::skel]
     use crate::err;
     use crate::foundation;
     use crate::partial;
@@ -96,7 +97,8 @@ pub mod concrete {
     use crate::status::Status;
     use crate::status::StatusDetail;
 
-    ///  reference the above a [`my`] implementation ...
+    /// reference the above a `my` mod implementation ... (which is actually [foundation::skel]
+    /// the root of this very file!
     mod my {
         pub use super::super::*;
     }
@@ -110,7 +112,6 @@ pub mod concrete {
 
     /// Finally! after all the levels of trait inheritance we have reach an *actual* implementation
     /// of [Foundation]
-
     pub struct Foundation {
         config: Arc<<Self as foundation::Foundation>::Config>,
     }
@@ -119,7 +120,7 @@ pub mod concrete {
     #[async_trait]
     impl foundation::Foundation for Foundation {
         type Config = FoundationConfig;
-        type Provider = ();
+        type Provider = my_provider::Provider;
 
         fn kind(&self) -> FoundationKind {
             todo!()
@@ -154,47 +155,71 @@ pub mod concrete {
         }
     }
 
-    /// [super::my_dependency] is just a generic mod name for a [`Dependency`] variant.
-    /// when implementing this pattern probably give it a name that differentiates if from
-    /// other dependencies.  For example: if the hypothetical implementation is for [`FoundationKind::Kubernetes`]
-    /// the various concrete dependency implementations should have meaningful names like: `postgres`,
-    /// `keycloak`, `s3`, `kafka` ...  and of course instead of one custom dependency variant
-    /// multiple implementations can and should be implemented for this Foundation
-    pub mod my_dependency {
-        use super::my;
-        use crate::base::err::BaseErr;
-        use crate::base::foundation::skel::concrete::partial::mounts;
-        use crate::base::status::Status;
-        use crate::base::foundation::LiveService;
-        use crate::base::kind::ProviderKind;
-        use crate::base::{config, foundation};
-        use starlane_space::progress::Progress;
+    /// [super::my_provider] is a concrete
+    pub mod my_provider {
+
         use serde::{Deserialize, Serialize};
-        use std::collections::HashMap;
         use std::sync::Arc;
         use async_trait::async_trait;
-        use tokio::sync::watch::Receiver;
-
-
-        impl foundation::config::DependencyConfig for DependencyConfig {
-
+        use starlane_hyperspace::provider::err::ProviderErr;
+        use starlane_hyperspace::provider::ProviderKindDef;
+        use starlane_space::status::{StatusEntity, StatusWatcher};
+        use crate::foundation;
+        use crate::config;
+        use crate::kind;
+        use crate::status::Status;
+        use crate::status::StatusDetail;
+        mod dependency {
+            pub use super::super::*;
         }
 
-        impl my::DependencyConfig for DependencyConfig {
-            type MountsConfig = mounts::MountsConfig;
+        #[derive(Clone, Serialize, Deserialize)]
+        pub struct ProviderConfig {}
+
+        impl foundation::skel::ProviderConfig for ProviderConfig {
+            type MountsConfig = ();
 
             fn mounts(&self) -> &Self::MountsConfig {
                 todo!()
             }
         }
 
-        pub struct Dependency {}
-        #[async_trait]
-        impl foundation::Dependency for Dependency {
-            type Config = dyn my::DependencyConfig<MountsConfig=mounts::MountsConfig>;
-            type Provider = dyn my::Provider;
+        impl foundation::config::ProviderConfig for ProviderConfig {}
 
-            fn kind(&self) -> DependencyKind {
+        impl config::ProviderConfig for ProviderConfig {
+            fn kind(&self) -> &kind::ProviderKind {
+                todo!()
+            }
+        }
+
+        pub struct Provider {}
+
+        impl foundation::skel::Provider for Provider {}
+
+        impl StatusEntity for Provider {
+            fn status(&self) -> Status {
+                todo!()
+            }
+
+            fn status_detail(&self) -> StatusDetail {
+                todo!()
+            }
+
+            fn status_watcher(&self) -> StatusWatcher {
+                todo!()
+            }
+
+            fn probe(&self) -> StatusWatcher {
+                todo!()
+            }
+        }
+
+        #[async_trait]
+        impl foundation::Provider for Provider<> {
+            type Config = ProviderConfig;
+            type Item = ();
+
+            fn kind(&self) -> ProviderKindDef {
                 todo!()
             }
 
@@ -202,35 +227,31 @@ pub mod concrete {
                 todo!()
             }
 
-            fn status(&self) -> Status {
+            async fn probe(&self) -> Result<(), ProviderErr> {
                 todo!()
             }
 
-            fn status_watcher(&self) -> Arc<Receiver<Status>> {
-                todo!()
-            }
-
-            async fn fetch(&self, progress: Progress) -> Result<(), BaseErr> {
-                todo!()
-            }
-
-            async fn install(&self, progress: Progress) -> Result<(), BaseErr> {
-                todo!()
-            }
-
-            async fn initialize(&self, progress: Progress) -> Result<(), BaseErr> {
-                todo!()
-            }
-
-            async fn start(&self, progress: Progress) -> Result<LiveService<DependencyKind>, BaseErr> {
-                todo!()
-            }
-
-            fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<Self::Provider>>, BaseErr> {
+            async fn ready(&self) -> Result<Self::Item, ProviderErr> {
                 todo!()
             }
         }
-        impl my::Dependency for Dependency {}
+
+        impl dependency::Provider for Provider {}
+    }
+
+    /*
+    /// [super::my_dependency] is just a generic mod name for a [Dependency] variant.
+    /// when implementing this pattern probably give it a name that differentiates if from
+    /// other dependencies.  For example: if the hypothetical implementation is for [FoundationKind::Kubernetes]
+    /// the various concrete dependency implementations should have meaningful names like: `postgres`,
+    /// `keycloak`, `s3`, `kafka` ...  and of course instead of one custom dependency variant
+    /// multiple implementations can and should be implemented for this Foundation
+    pub mod my_dependency {
+        use super::my;
+
+        use crate::foundation;
+        use serde::{Deserialize, Serialize};
+        use std::collections::HashMap;
 
         pub trait ProviderConfig: my::ProviderConfig {}
 
@@ -242,91 +263,23 @@ pub mod concrete {
             fn volumes(&self) -> HashMap<String, String> {
                 todo!()
             }
-
         }
 
 
-        /// [super::my_provider] follows the same pattern as [`super::my_provider`] except in this case it is for
-        /// [crate::base::foundation::Provider] variants
-        pub mod my_provider {
-            use super::my;
-            use crate::base::err::BaseErr;
-            use crate::base::foundation;
-            use crate::base::status::Status;
-            use crate::base::foundation::LiveService;
-            use crate::base::kind::ProviderKind;
-            use starlane_space::parse::CamelCase;
-            use starlane_space::progress::Progress;
-            use serde::{Deserialize, Serialize};
-            use std::sync::Arc;
-            use async_trait::async_trait;
-            use tokio::sync::watch::Receiver;
-            mod dependency {
-                pub use super::super::*;
-            }
 
-            #[derive(Clone, Serialize, Deserialize)]
-            pub struct ProviderConfig {}
-
-            impl crate::base::foundation::skel::ProviderConfig for ProviderConfig {}
-
-            impl crate::base::foundation::config::ProviderConfig for ProviderConfig {}
-
-            impl crate::base::config::ProviderConfig for ProviderConfig {
-                fn kind(&self) -> &ProviderKind {
-                    todo!()
-                }
-            }
-
-            impl dependency::ProviderConfig for ProviderConfig {}
-
-
-            pub struct Provider {}
-
-            impl foundation::skel::Provider for Provider {}
-
-            #[async_trait]
-            impl foundation::Provider for Provider {
-                type Config = dyn my::ProviderConfig;
-
-                fn kind(&self) -> &ProviderKind {
-                    todo!()
-                }
-
-                fn config(&self) -> Arc<Self::Config> {
-                    todo!()
-                }
-
-                fn status(&self) -> Status {
-                    todo!()
-                }
-
-                fn status_watcher(&self) -> Arc<Receiver<Status>> {
-                    todo!()
-                }
-
-                async fn initialize(&self, progress: Progress) -> Result<(), BaseErr> {
-                    todo!()
-                }
-
-                async fn start(&self, progress: Progress) -> Result<LiveService<CamelCase>, BaseErr> {
-                    todo!()
-                }
-            }
-
-            impl dependency::Provider for Provider {}
-        }
     }
+
+     */
 
     pub mod partial {
         use super::my::partial as my;
         pub mod mounts {
             use async_trait::async_trait;
             use super::my;
-            use crate::base::err::BaseErr;
-            use crate::base::status::Status;
-            use crate::base::partial::skel as root;
-            use crate::base::partial;
+            use crate::err::BaseErr;
+            use crate::status::Status;
+            use crate::partial::skel as root;
+            use crate::partial;
             use serde::{Deserialize, Serialize};
             use tokio::sync::watch::Receiver;
 

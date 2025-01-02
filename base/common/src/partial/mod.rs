@@ -19,6 +19,7 @@ use downcast_rs::{impl_downcast, Downcast, DowncastSync};
 use tokio::sync::watch;
 
 /// The partial starter template
+#[cfg(feature="skel")]
 pub mod skel;
 pub mod config;
 

@@ -1,5 +1,3 @@
-use crate::base;
-use crate::base::err::BaseErr;
 /// # FOUNDATION
 ///
 ///
@@ -44,13 +42,14 @@ use std::future::Future;
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
-use base::provider::{Provider, ProviderKind, ProviderKindDef};
 use starlane_hyperspace::registry::Registry;
 use crate::Foundation;
-use crate::base::platform::prelude::Platform;
+use crate::provider::Provider;
+use crate::kind::{ProviderKind,ProviderKindDef,FoundationKind};
 
-
-/// [`skel`] provides a starter implementation of [`foundation`] where all the traits are extended
+/// [skel] provides a starter implementations of the [crate::foundation] traits in order
+/// to support a new [FoundationKind]
+#[cfg(feature="skel")]
 pub mod skel;
 
 pub mod config;
