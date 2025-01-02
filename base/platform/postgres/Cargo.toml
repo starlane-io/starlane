@@ -19,3 +19,4 @@ tokio = {workspace = true}
 strum = {workspace = true}
 strum_macros = {workspace = true}
 sqlx = {workspace = true}
+async-trait = {workspace = true}

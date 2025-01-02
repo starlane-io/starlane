@@ -6,14 +6,13 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
-use starlane_space::progress::Progress;
-use starlane_space::status::{StatusDetail, StatusEntity, StatusWatcher};
+use starlane_space::status::StatusEntity;
 use crate::provider::err::ProviderErr;
 
 use starlane_space::status::Status;
 use starlane_space::status::Stage;
 use starlane_space::status::StateDetail;
-use starlane_space::status::PendingDetail;
+
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
@@ -61,8 +60,9 @@ pub trait Provider: StatusEntity + Sync {
 
     fn config(&self) -> Arc<Self::Config>;
 
-    /// [Provider::probe] query the state of the concrete resource that this [Provider]
-    /// is modeling and make this [Provider] model match the current Provision state.
+    /// Query the state of the concrete resource that this [Provider] is modeling
+    /// and make the [Provider] model match the real world state of said resource.
+    ///
     /// [Provider::probe] is especially useful when it comes to updating [StatusEntity::status]
     /// from [Status::unknown]
     async fn probe(&self) -> Result<(),ProviderErr>;

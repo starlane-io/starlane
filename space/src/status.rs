@@ -2,6 +2,7 @@ use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
 use std::fmt::{Display, Formatter};
+use std::ops::Deref;
 use std::sync::Arc;
 use async_trait::async_trait;
 use derive_builder::Builder;
@@ -35,22 +36,30 @@ pub trait StatusEntity {
 }
 
 
-/// [Handle] contains an `api` giving access to a [StatusEntity] `Ready` API and a private
+/// [Handle] contains [E]--which implements the [StatusEntity] trait--and a private
 /// `hold` reference which is a [tokio::sync::mpsc::Sender] created from the [StatusEntity]'s
 /// internal `runner`.  The Runner should stay alive until it has no more hold references
 /// at which time it is up to the Runner to stop itself or ignore a reference count of 0
 #[derive(Clone)]
-pub struct Handle<A> {
-    pub api: Arc<A>,
+pub struct Handle<E> where E: StatusEntity {
+    entity: Arc<E>,
     hold: tokio::sync::mpsc::Sender<()>,
 }
 
-impl<A> Handle<A> {
-    pub fn new( api: A, hold: tokio::sync::mpsc::Sender<()> ) -> Self {
+impl<E> Handle<E> where E: StatusEntity {
+    pub fn new(api: E, hold: tokio::sync::mpsc::Sender<()> ) -> Self {
         /// hopefully the [Arc::from] does what I hope it does which is only create a new
-        /// [Arc<A>] if [A] is not already an instance of an [Arc<A>]
+        /// [Arc<E>] if [E] is not already an instance of an [Arc<E>]
         let api = From::from(api);
-        Self { api, hold }
+        Self { entity: api, hold }
+    }
+}
+
+impl <E> Deref for Handle<E> where E: StatusEntity {
+    type Target = Arc<E>;
+
+    fn deref(&self) -> &Self::Target {
+        & self.entity
     }
 }
 

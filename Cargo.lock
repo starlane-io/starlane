@@ -3088,6 +3088,7 @@ dependencies = [
 name = "starlane-platform-for-postgres"
 version = "0.3.20"
 dependencies = [
+ "async-trait",
  "sqlx",
  "starlane-base-common",
  "starlane-hyperspace",

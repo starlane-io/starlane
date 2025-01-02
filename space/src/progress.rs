@@ -7,15 +7,14 @@ pub type Watcher = tokio::sync::mpsc::Receiver<TaskState>;
 
 pub struct Tracker {
     watcher: Watcher,
-    states: Box<dyn Fn() -> IndexMap<SkewerCase,TaskState>>
+
 }
 
 impl Tracker {
-    pub fn states(&self) -> &IndexMap<SkewerCase,TaskState> {
-        &self.states
+    pub fn states(&self) -> &IndexMap<&'static str,TaskState> {
+        todo!()
     }
 }
-
 
 enum TrackerCall {
     State(TaskState),
@@ -76,7 +75,7 @@ impl TaskState {
 
 pub trait Task {
     /// provide textual updates to the parent progress bar
-    fn step(&mut self, task: impl AsRef<str>);
+    fn step(&mut self, step: &'static str);
 
     /// provide an increment (a number between 0..100)
     /// the task should complete when it reaches 100

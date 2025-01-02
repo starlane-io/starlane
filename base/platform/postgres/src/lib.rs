@@ -5,8 +5,11 @@ use starlane_space::status::{Handle, Status, StatusDetail, StatusEntity, StatusW
 use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::Arc;
+use async_trait::async_trait;
 use starlane_hyperspace::provider::config::ProviderConfig;
 use starlane_hyperspace::provider::err::ProviderErr;
+
+pub type PostgresServiceHandle = Handle<PostgresServiceStub>;
 
 
 pub struct PostgresService {
@@ -26,8 +29,10 @@ impl PostgresService {
     }
 }
 
+#[async_trait]
 impl Provider for PostgresService {
     type Config = Config;
+    type Item = PostgresServiceHandle;
 
     fn kind(&self) -> ProviderKindDef {
         ProviderKindDef::Service
@@ -37,12 +42,12 @@ impl Provider for PostgresService {
         self.config.clone()
     }
 
-    async fn probe(&self) -> StatusWatcher {
-        self.status_reporter.subscribe()
+    async fn probe(&self) -> Result<(), ProviderErr> {
+        todo!()
     }
 
-    async fn ready(&self)  {
-
+    async fn ready(&self) -> Result<Self::Item, ProviderErr> {
+        todo!()
     }
 }
 
@@ -107,8 +112,6 @@ impl PostgresServiceStub {
         &self.key
     }
 }
-/// represents the
-pub type PostgresServiceHandle = Handle<PostgresServiceStub>;
 
 /// maybe add proper postgres type constraints on the following stuff:
 pub type Username = VarCase;
@@ -188,7 +191,6 @@ impl PostgresConnectionConfig{
     {
         let username = Username::from_str(username.as_ref())?;
         let password = password.to_string();
-        let schema = None;
         Ok(Self {
             host,
             username,

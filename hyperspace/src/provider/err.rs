@@ -1,7 +1,7 @@
-use strum_macros::Display;
 use thiserror::Error;
-#[derive(Debug, Error,Display)]
+#[derive(Debug, Error)]
 pub enum ProviderErr {
-  StateEr,
+  #[error("StateErr")]
+  StateErr,
 }
 
