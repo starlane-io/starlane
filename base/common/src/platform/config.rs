@@ -1,5 +1,5 @@
-use crate::base;
+use crate::config;
 
-pub trait PlatformConfig: base::config::BaseConfig {}
+pub trait PlatformConfig: config::BaseConfig {}
 
-pub trait ProviderConfig: base::config::ProviderConfig {}
+pub trait ProviderConfig: config::ProviderConfig {}

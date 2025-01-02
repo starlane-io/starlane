@@ -18,7 +18,7 @@ use crate::registry::Registry;
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ProviderKind))]
-#[strum_discriminants(derive(Hash, Serialize, Deserialize))]
+#[strum_discriminants(derive(Hash, Serialize, Deserialize,strum_macros::Display))]
 pub enum ProviderKindDef {
   /// [Provider::probe] should ascertain if the docker daemon is installed and running.
   /// If the DockerDaemon is accessible set [Status::Ready].

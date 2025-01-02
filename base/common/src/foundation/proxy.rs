@@ -12,6 +12,11 @@ use std::ops::Deref;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
 
+pub trait CreateProxy {
+    type Proxy;
+    fn proxy(&self) -> Result<Self::Proxy, BaseErr>;
+}
+
 pub trait Proxy<T>: Deref<Target=T> {}
 
 pub struct Foundation<F>

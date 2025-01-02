@@ -6,7 +6,6 @@ use starlane_space::progress::Progress;
 use starlane_space::status::{Status, StatusDetail};
 use crate::err::BaseErr;
 use crate::{registry, Foundation};
-use crate::foundation::util::CreateProxy;
 use crate::kind::FoundationKind;
 
 pub(crate) struct FoundationSafety<F>

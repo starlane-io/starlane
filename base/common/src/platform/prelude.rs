@@ -1,5 +1,5 @@
 use starlane_hyperspace::provider::Provider;
-use crate::base::platform::config;
+use crate::platform::config;
 
 pub trait Platform {
 

@@ -54,7 +54,9 @@ pub mod skel;
 
 pub mod config;
 
-pub mod util;
+
+/// disabled for now ...
+//pub mod util;
 
 static REQUIRED: Lazy<Vec<ProviderKindDef>> = Lazy::new(|| vec![]);
 

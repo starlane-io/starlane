@@ -95,7 +95,9 @@ use err::BaseErr;
 
 #[cfg(test)]
 pub mod test;
-mod safety;
+
+/// we cannot afford `safety` with prices as high as they are
+// pub mod safety;
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());

@@ -1,6 +1,5 @@
-use crate::base::err::BaseErr;
-use crate::base::foundation::kind::FoundationKind;
-use crate::base::kind::IKind;
+use crate::err::BaseErr;
+use crate::kind::FoundationKind;
 use bincode::Options;
 use derive_name::Name;
 use serde::de::{DeserializeOwned, MapAccess, Visitor};
@@ -284,11 +283,6 @@ impl Map {
 
 pub trait IntoSer {
     fn into_ser(&self) -> Box<dyn SerMap>;
-}
-
-pub trait CreateProxy {
-    type Proxy;
-    fn proxy(&self) -> Result<Self::Proxy, BaseErr>;
 }
 
 

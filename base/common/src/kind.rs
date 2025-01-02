@@ -3,7 +3,7 @@ use starlane_space::parse::CamelCase;
 /// reexport from [starlane_hyperspace]
 pub use starlane_hyperspace::provider::{ProviderKind,ProviderKindDef};
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, strum_macros::Display)]
 #[non_exhaustive]
 pub enum FoundationKind {
    /// A great foundation for local development. The [Provider] implementations create and
