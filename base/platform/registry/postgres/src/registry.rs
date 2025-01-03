@@ -159,6 +159,7 @@ w                           INSERT INTO reset_mode VALUES ('None');"#;
         let point_segment_parent_index = "CREATE UNIQUE INDEX IF NOT EXISTS resource_point_segment_parent_index ON particles(parent,point_segment)";
         let access_grants_index =
             "CREATE INDEX IF NOT EXISTS query_root_index ON access_grants(query_root)";
+
         let mut conn = self.handle.acquire().await?;
         let mut transaction = conn.begin().await?;
         transaction.execute(particles).await?;

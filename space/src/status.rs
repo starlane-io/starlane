@@ -26,7 +26,7 @@ use thiserror::Error;
 /// [starlane_hyperspace]: ../../starlane_hyperspace
 /// [Provider]: ../../starlane_hyperspace/src/provider.rs
 pub trait Entity {
-    type Id: Hash + Eq + PartialEq + Debug + Send + Sync + ?Sized;
+//    type Id: Hash + Eq + PartialEq + Debug + Send + Sync + ?Sized;
 }
 
 
@@ -35,6 +35,12 @@ pub trait Entity {
 /// changes vi [StatusWatcher::changed]
 pub type StatusWatcher = tokio::sync::watch::Receiver<StatusResult>;
 pub type StatusReporter = tokio::sync::watch::Sender<StatusResult>;
+
+/// get a [StatusWatcher] via [StatusReporter::subscribe]
+pub fn status_reporter() -> StatusReporter {
+    tokio::sync::watch::channel(StatusResult::default()).0
+}
+
 
 /// [StatusProbe::probe] triggers the [StatusProbe::Entity] status model synchronization
 /// to generate a [StatusDetail]
@@ -83,7 +89,7 @@ pub trait EntityReadier: StatusProbe {
 #[derive(Clone)]
 pub struct Handle<E>
 where
-    E: Entity + Send + Sync + ?Sized,
+    E: Entity + Send + Sync + ?Sized
 {
     entity: Arc<E>,
     watcher: StatusWatcher,
@@ -93,7 +99,7 @@ where
 impl <E> Entity for Handle<E>
 where
     E: Entity + Send + Sync {
-    type Id = E::Id;
+//    type Id = E::Id;
 }
 
 impl<E> Handle<E>
@@ -110,6 +116,7 @@ where
         }
     }
 
+
     pub fn status(&self) -> StatusResult {
         self.watcher.borrow().clone()
     }
@@ -120,6 +127,27 @@ where
 
     pub fn entity(&self) -> &E {
         & (*self.entity)
+    }
+
+    ///  return a mocked version of `Handle` for testing
+    #[cfg(test)]
+    pub fn mock(entity: E) -> Handle<E> {
+        let entity = Arc::new(entity);
+        let (hold,mut hold_rx) = tokio::sync::mpsc::channel(1);
+        let reporter = status_reporter();;
+        let watcher = reporter.subscribe();
+        tokio::spawn(async move {
+            /// idle =
+            while let Some(_) = hold_rx.recv().await {
+                reporter.send(StatusResult::Ready).unwrap();
+            }
+        });
+
+        Self {
+            hold,
+            watcher,
+            entity,
+        }
     }
 }
 
@@ -132,6 +160,37 @@ impl <E,D> Deref for Handle<E> where E: Deref<Target=D>+Entity+Send+Sync {
         self.entity.deref()
     }
 }
+
+#[test]
+pub fn test_handle_deref() {
+   struct Mock {
+       value: String
+   }
+   impl Default for Mock {
+       fn default() -> Self {
+           Self { value: "blah".to_string() }
+       }
+   }
+
+
+   impl Deref for Mock {
+       type Target = String;
+
+       fn deref(&self) -> &Self::Target {
+           &self.value
+       }
+   }
+
+   impl Entity for Mock {}
+
+   let mock = Mock::default();
+
+   let handle = Handle::mock(mock);
+
+   let x = handle.deref();
+
+}
+
 
 
 #[async_trait]
@@ -495,6 +554,13 @@ pub enum StatusResult {
     NotReady(StatusDetail),
 }
 
+impl Default for StatusResult {
+    fn default() -> Self {
+        StatusResult::NotReady(StatusDetail::default())
+    }
+}
+
+
 /// Similar to [Result] [EntityResult] is a convenience enum for [StatusProbe] hosts which
 /// may be responsible for keeping the [StatusProbe] in a [Status::Ready] state...
 ///
@@ -550,7 +616,7 @@ pub enum StatusResult {
 ///
 /// ```
 
-#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
+#[derive(Clone, Debug, EnumDiscriminants)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(EntityResultKind))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize))]

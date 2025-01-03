@@ -51,7 +51,7 @@ pub trait Provider:  provider::Provider<Entity=Arc<dyn PostgresService>>  {
 
 /// trait implementation [Provider::Entity]
 #[async_trait]
-pub trait PostgresService : Entity<Id=String>+StatusProbe+Send+Sync { }
+pub trait PostgresService : Entity+StatusProbe+Send+Sync { }
 
 
 pub type PostgresServiceHandle = Handle<dyn PostgresService>;
@@ -217,7 +217,7 @@ mod concrete {
         connection: Arc<Mutex<sqlx::PgConnection>>
     }
 
-    impl Entity for PostgresService { type Id = String; }
+    impl Entity for PostgresService { }
 
     #[async_trait]
     impl my::PostgresService for PostgresService { }

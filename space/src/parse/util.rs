@@ -13,7 +13,7 @@ use nom_locate::LocatedSpan;
 use nom_supreme::error::{GenericErrorTree, StackContext};
 use nom_supreme::final_parser::ExtractContext;
 use nom_supreme::ParserExt;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use std::ops::{Deref, Range, RangeFrom, RangeTo};
 use std::sync::Arc;
 use thiserror::__private::AsDisplay;
@@ -172,7 +172,7 @@ pub fn span_with_extra<'a>(
     Wrap::new(LocatedSpan::new_extra(s, extra))
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Trace {
     pub range: Range<usize>,
     pub extra: SpanExtra,

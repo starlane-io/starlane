@@ -25,11 +25,10 @@ pub type PostgresDatabaseHandle = Handle<dyn PostgresDatabase>;
 /// }
 /// ```
 #[async_trait]
-pub trait PostgresDatabase: Entity<Id=String>+StatusProbe+Deref<Target=Pool>+Send+Sync {
+pub trait PostgresDatabase: Entity+StatusProbe+Deref<Target=Pool>+Send+Sync {
 
 }
 
-//pub trait PostgresService : Entity<Id=String>+StatusProbe+Send+Sync { }
 
 mod concrete {
     mod my { pub use super::super::*; }
@@ -155,9 +154,7 @@ mod concrete {
     }
 
 
-    impl Entity for PostgresDatabase {
-        type Id = String;
-    }
+    impl Entity for PostgresDatabase { }
 
     #[async_trait]
     impl StatusProbe for PostgresDatabase {
