@@ -49,8 +49,8 @@ where
 }
 
  */
-/// trait for a `facilitator` which
-pub trait StatusEntityReadyFacilitator{
+/// trait that can bring a [StatusEntity] into a [Status::Ready] state
+pub trait EntityReadier {
    type Entity: StatusEntity+Send+Sync;
    async fn ready(&self) -> EntityResult<Self::Entity>;
 }
@@ -60,12 +60,31 @@ pub trait StatusEntityReadyFacilitator{
 /// internal `runner`.  The Runner should stay alive until it has no more hold references
 /// at which time it is up to the Runner to stop itself or ignore a reference count of 0
 #[derive(Clone)]
-pub struct Handle<E> where E: StatusEntity {
+pub struct Handle<E> where E: StatusEntity+Send+Sync {
     pub entity: Arc<E>,
     hold: tokio::sync::mpsc::Sender<()>,
 }
 
-impl<E> Handle<E> where E: StatusEntity {
+#[async_trait]
+impl <E> StatusEntity for Handle<E> where E: StatusEntity+Send+Sync {
+    fn status(&self) -> Status {
+        self.entity.status()
+    }
+
+    fn status_detail(&self) -> Result {
+        self.entity.status_detail()
+    }
+
+    fn status_watcher(&self) -> StatusWatcher {
+        self.entity.status_watcher()
+    }
+
+    async fn probe(&self) -> Result {
+        self.probe().await
+    }
+}
+
+impl<E> Handle<E> where E: StatusEntity+Send+Sync {
     pub fn new(api: E, hold: tokio::sync::mpsc::Sender<()> ) -> Self {
         /// hopefully the [Arc::from] does what I hope it does which is only create a new
         /// [Arc<E>] if [E] is not already an instance of an [Arc<E>]
@@ -74,7 +93,7 @@ impl<E> Handle<E> where E: StatusEntity {
     }
 }
 
-impl <E> Deref for Handle<E> where E: StatusEntity {
+impl <E> Deref for Handle<E> where E: StatusEntity+Send+Sync {
     type Target = Arc<E>;
 
     fn deref(&self) -> &Self::Target {
@@ -114,6 +133,10 @@ pub enum Status {
     Unreachable,
     /// A non-fatal error occurred that [StatusEntity] does not compre
     Panic,
+    /// the [StatusEntity] reports that it cannot go on... [Status::Fatal] is a suggestion
+    /// leaving the [StatusEntity]'s [EntityReadier] with the choice to: delete and recreate the
+    /// [StatusEntity], abort its [EntityReadier::ready] attempt or kill the entire process
+    /// with an error code
     Fatal,
     Ready
 }
@@ -427,7 +450,7 @@ pub enum StateErrDetail {
   /// `Entity::synchronize()` is invoked trigger another try-again loop.
   Panic(String),
   /// [StateErr::Fatal] signals an error condition that cannot be recovered from.
-  /// Depending upon the context of the status [StatusEntity] reporting [StateErr::Fatal`] possible
+  /// Depending upon the context of the status [StatusEntity] reporting [StateErr::Fatal] possible
   /// actions might be deleting and recreating the [StatusEntity] or shutting down the entire
   /// Starlane process
   Fatal(String)
@@ -452,7 +475,7 @@ pub enum Result {
 ///
 /// example:
 /// ```
-/// use starlane::status::StatusEntityReadyFacilitator;
+/// use starlane::status::EntityReadier;
 /// use starlane::status::Result;
 /// use starlane::status::EntityResult;
 ///
@@ -483,7 +506,7 @@ pub enum Result {
 ///     }
 /// }
 ///
-/// impl StatusEntityReadyFacilitator for ConnectionFacilitator {
+/// impl EntityReadier for ConnectionFacilitator {
 ///
 ///    type Entity = Connection;
 ///

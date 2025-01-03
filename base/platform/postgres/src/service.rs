@@ -22,6 +22,7 @@ pub type Hostname = Domain;
 
 use std::fmt::Display;
 use std::sync::Arc;
+use async_trait::async_trait;
 use sqlx::postgres::PgConnectOptions;
 use starlane_base::provider;
 use starlane_space::parse::{Domain, VarCase};
@@ -31,6 +32,7 @@ use starlane_base::platform::prelude::Platform;
 use starlane_base::kind::ProviderKindDef;
 
 /// final [provider::config::ProviderConfig] trait definitions for [concrete::PostgresProviderConfig]
+#[async_trait]
 pub trait ProviderConfig:  provider::config::ProviderConfig  {
     fn utilization_config(&self) ->  & config::PostgresUtilizationConfig;
 
@@ -41,12 +43,14 @@ pub trait ProviderConfig:  provider::config::ProviderConfig  {
 }
 
 /// final [provider::Provider] trait definitions for [concrete::PostgresServiceProvider]
+#[async_trait]
 pub trait Provider:  provider::Provider<Entity=PostgresServiceHandle>  {
     type Config: ProviderConfig + ?Sized;
 }
 
 
 /// trait implementation [Provider::Entity]
+#[async_trait]
 pub trait PostgresService : StatusEntity {}
 
 
@@ -143,7 +147,9 @@ mod concrete {
     use tokio::sync::Mutex;
     use starlane_base::Foundation;
     use starlane_base::platform::prelude::Platform;
-    use starlane_base::status::{Handle, Status, StatusDetail, StatusEntity, StatusWatcher};
+    use starlane_space::status;
+    use status::{EntityResult,Handle, Status, StatusDetail, StatusEntity, StatusWatcher};
+
     use crate::service::config::PostgresUtilizationConfig;
 
     pub mod my { pub use super::super::*;}
@@ -178,8 +184,7 @@ mod concrete {
             self.config.clone()
         }
 
-
-        async fn ready(&self) -> Result<Self::Entity, ProviderErr> {
+        async fn ready(&self) -> EntityResult<Self::Entity> {
             todo!()
         }
     }
@@ -191,7 +196,7 @@ mod concrete {
             todo!()
         }
 
-        fn status_detail(&self) -> StatusDetail {
+        fn status_detail(&self) -> status::Result {
             todo!()
         }
 
@@ -199,7 +204,7 @@ mod concrete {
             todo!()
         }
 
-        async fn probe(&self) -> Status {
+        async fn probe(&self) -> status::Result {
             todo!()
         }
     }
@@ -216,6 +221,7 @@ mod concrete {
         connection: Mutex<sqlx::PgConnection>
     }
 
+    #[async_trait]
     impl my::PostgresService for PostgresService { }
 
 
@@ -258,6 +264,8 @@ mod concrete {
         connection_info: my::config::PostgresUtilizationConfig
     }
 
+
+    #[async_trait]
     impl my::ProviderConfig for PostgresProviderConfig {
         fn utilization_config(&self) -> & PostgresUtilizationConfig {
             & self.connection_info
@@ -274,6 +282,7 @@ mod concrete {
 
     impl PostgresProviderConfig {}
 
+    #[async_trait]
     impl ProviderConfig for PostgresProviderConfig {
         fn kind(&self) -> &ProviderKindDef {
             &ProviderKindDef::PostgresService
