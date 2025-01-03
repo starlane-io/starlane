@@ -16,7 +16,8 @@ shadow!(build);
 pub extern crate starlane_macros as macros;
 pub extern crate starlane_space as space;
 pub extern crate starlane_hyperspace as hyperspace;
-pub extern crate starlane_base_common as base;
+
+pub mod base;
 
 
 pub static VERSION: Lazy<semver::Version> =

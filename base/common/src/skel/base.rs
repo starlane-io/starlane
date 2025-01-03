@@ -46,7 +46,8 @@ pub trait ProviderConfig: foundation::config::ProviderConfig {}
 /// ```
 /// pub mod postgres {
 ///
-///   use starlane_base::config;
+///   use starlane::config;
+/// use starlane_base::config;
 ///
 ///   /// this example implementation is not configured for `modes`.
 ///   /// a mode implementation example is documented here: [starlane::base::mode]

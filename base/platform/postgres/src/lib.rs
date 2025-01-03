@@ -6,7 +6,7 @@ use starlane_hyperspace::provider::Provider;
 use starlane_space::status::StatusProbe;
 use std::fmt::Display;
 use std::str::FromStr;
-use starlane_hyperspace::provider::config::ProviderConfig;
+use starlane::config::ProviderConfig;
 /*
 let pool = PgPoolOptions::new()
 .max_connections(5)

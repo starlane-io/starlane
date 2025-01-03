@@ -76,7 +76,7 @@ mod concrete {
         }
     }
 
-    impl provider::config::ProviderConfig for Config {
+    impl starlane::config::ProviderConfig for Config {
         fn kind(&self) -> &ProviderKindDef {
             todo!()
         }

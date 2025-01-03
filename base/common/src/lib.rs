@@ -90,12 +90,11 @@
 //
 
 
+mod base;
 
 
 pub mod foundation;
 pub mod config;
-pub mod base;
-pub mod platform;
 pub mod err;
 pub mod registry;
 pub mod partial;
@@ -104,22 +103,13 @@ pub mod provider;
 pub mod kind;
 pub mod status;
 
-use platform::prelude::Platform;
 use once_cell::sync::Lazy;
 use std::str::FromStr;
-use async_trait::async_trait;
 use starlane_hyperspace::provider::{Provider, ProviderKind};
-use std::sync::Arc;
-use starlane_hyperspace::registry::Registry;
-use starlane_space::progress::{Progress};
-use tokio::sync::watch::Receiver;
 use starlane_hyperspace::driver::Driver;
-use starlane_space::particle::Particle;
-use starlane_space::status::{Handle, StatusWatcher,StatusReporter};
-use crate::kind::FoundationKind;
-use status::Status;
-use status::StatusDetail;
-use err::BaseErr;
+
+pub use base::Platform;
+pub use base::Foundation;
 
 #[cfg(feature="skel")]
 pub(crate) mod skel;
@@ -143,39 +133,5 @@ pub fn init() {
             .install_default()
             .expect("crypto provider could not be installed");
     }
-}
-
-// ['Foundation'] is an abstraction for managing infrastructure.
-#[async_trait]
-pub trait Foundation: Sync + Send {
-
-    /// [Foundation::Config] should be a `concrete` implementation of [config::FoundationConfig]
-    type Config: config::FoundationConfig + ?Sized;
-
-    /// [Foundation::Provider] Should be [Provider] or a custom `trait` that implements [Provider]
-    type Provider: Provider + ?Sized;
-
-    fn kind(&self) -> FoundationKind;
-
-    fn config(&self) -> Arc<Self::Config>;
-
-    fn status(&self) -> status::Status;
-
-    async fn status_detail(&self) -> Result<status::StatusDetail, err::BaseErr>;
-
-    fn status_watcher(&self) -> StatusWatcher;
-
-    /// [Foundation::probe] synchronize [Foundation]'s model from that of the external services
-    /// and return a [Status].  [Foundation::probe] should also rebuild the [Provider][StatusDetail]
-    /// model and update [StatusReporter]
-    async fn probe(&self) -> Status;
-
-    /// Take action to bring this [Foundation] to [Status::Ready] if not already. A [Foundation]
-    /// is considered ready when all [Provider] dependencies are [Status::Ready].
-    async fn ready(&self, progress: Progress) -> Result<(), BaseErr>;
-
-    /// Returns a [Provider] implementation which
-    fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<Self::Provider>>, BaseErr>;
-
 }
 

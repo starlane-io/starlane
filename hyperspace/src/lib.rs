@@ -24,3 +24,4 @@ pub mod tests;
 pub mod service;
 pub mod template;
 pub mod provider;
+mod config;

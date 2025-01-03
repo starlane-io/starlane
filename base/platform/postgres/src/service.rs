@@ -9,15 +9,10 @@
 //! with a matching [ProviderKindDef]... the [Foundation] [provider::Provider] can be a dependency of the
 //! [Platform]
 
-
-
-
 #[cfg(not(test))]
 pub use types::*;
 #[cfg(test)]
 pub use tests::types::*;
-
-
 
 #[cfg(not(test))]
 pub(super) mod types {
@@ -42,12 +37,12 @@ use starlane_base::provider;
 use starlane_space::parse::{Domain, VarCase};
 use starlane_space::status::{Entity, Handle, StatusProbe};
 use starlane_base::Foundation;
-use starlane_base::platform::prelude::Platform;
+use starlane_base::Platform;
 use starlane_base::kind::ProviderKindDef;
 
-/// final [provider::config::ProviderConfig] trait definitions for [concrete::PostgresProviderConfig]
+/// final [starlane::config::ProviderConfig] trait definitions for [concrete::PostgresProviderConfig]
 #[async_trait]
-pub trait ProviderConfig:  provider::config::ProviderConfig  {
+pub trait ProviderConfig: starlane::config::ProviderConfig {
     fn utilization_config(&self) ->  & config::PostgresUtilizationConfig;
 
     /// reexport [config::PostgresUtilizationConfig::connect_options]
@@ -160,7 +155,7 @@ mod concrete {
     use std::ops::Deref;
     use std::sync::Arc;
     use async_trait::async_trait;
-    use starlane_base::config::ProviderConfig;
+    use starlane::config::ProviderConfig;
     use starlane_base::provider::{Manager, Provider, ProviderKindDef};
     use starlane_base::provider::err::ProviderErr;
     use std::str::FromStr;
@@ -168,7 +163,7 @@ mod concrete {
     use sqlx::{ConnectOptions, Connection};
     use tokio::sync::Mutex;
     use starlane_base::Foundation;
-    use starlane_base::platform::prelude::Platform;
+    use starlane_base::Platform;
     use starlane_space::status;
     use starlane_space::status::{Entity, EntityReadier, StatusReporter, StatusResult};
     use status::{ReadyResult, Handle, Status, StatusDetail, StatusProbe, StatusWatcher};

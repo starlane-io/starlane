@@ -8,13 +8,13 @@
 /// * [Foundation] implementations to expand the environments that `Starlane` can control
 ///
 /// * [base] examples for extending [ProviderKind]'s [Provider] the trait definitions
-///   that are common to a [ProviderKind]'s [Platform] and [Foundation]
+///   that are common to a [ProviderKind]'s [crate::Platform] and [Foundation]
 ///
 /// * [Partial] examples for adding functionality that spans over multiple [Provider] and/or
 ///   [Foundation] implementations
 
 use crate::foundation::Foundation;
-use crate::platform::prelude::Platform;
+use crate::Platform;
 use crate::partial::Partial;
 
 pub mod base;
