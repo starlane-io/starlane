@@ -451,7 +451,7 @@ mod test {
 
 
 ///
-/// FORMERLY 'main-primitive-macros'
+/// FORMERLY 'starlane-primitive-macros'
 ///
 ///
 
@@ -695,7 +695,7 @@ pub fn mech_err(item: TokenStream) -> TokenStream {
     let from = vec![
         quote!(Box<bincode::ErrorKind>),
         quote!(mechtron::err::MembraneErr),
-        quote!(main::err::ParseErrs),
+        quote!(starlane::err::ParseErrs),
         quote!(String),
         quote!(&'static str),
         quote!(mechtron::err::GuestErr),
@@ -705,8 +705,8 @@ pub fn mech_err(item: TokenStream) -> TokenStream {
     let rtn = quote! {
 
         impl MechErr for #ident {
-            fn to_uni_err(self) -> main::err::{
-               main::err::SpaceErr::server_error(self.to_string())
+            fn to_uni_err(self) -> starlane::err::{
+               starlane::err::SpaceErr::server_error(self.to_string())
             }
         }
 
@@ -718,11 +718,11 @@ pub fn mech_err(item: TokenStream) -> TokenStream {
             }
         }
 
-        impl main::err::CoreReflector for #ident {
-                fn as_reflected_core(self) -> main::wave::core::ReflectedCore {
-                   main::wave::core::ReflectedCore{
+        impl starlane::err::CoreReflector for #ident {
+                fn as_reflected_core(self) -> starlane::wave::core::ReflectedCore {
+                   starlane::wave::core::ReflectedCore{
                         headers: Default::default(),
-                        status: main::wave::core::http2::StatusCode::from_u16(500u16).unwrap(),
+                        status: starlane::wave::core::http2::StatusCode::from_u16(500u16).unwrap(),
                         body: self.into().into()
                     }
             }

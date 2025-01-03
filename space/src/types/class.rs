@@ -27,7 +27,7 @@ pub enum ClassKind {
     Platform,
     Foundation,
     /// Dependencies are external bits that can be downloaded and added to a Starlane instance.
-    /// Adding new capabilities to Starlane via external software is the main intended use case
+    /// Adding new capabilities to Starlane via external software is the starlane intended use case
     /// for a Dependency (both Foundation binaries and WebAssembly alike)
     ///
     /// A Dependency can be `downloaded`, `installed`, `initialized` and `started` (what those

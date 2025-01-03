@@ -94,7 +94,7 @@ impl From<ThisErr> for OldStarErr {
 
 /*
 pub mod convert {
-    use starlane_space as main;
+    use starlane_space as starlane;
     use crate::err::OldStarErr;
     use starlane_hyperspace::err::{ErrKind, HyperErr};
     use ascii::FromAsciiError;

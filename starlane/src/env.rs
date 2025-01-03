@@ -72,7 +72,7 @@ pub static STARLANE_HOME: Lazy<String> = Lazy::new(|| {
             None => ".".to_string(),
             Some(dir) => dir.display().to_string(),
         };
-        format!("{}/.main", home_dir).to_string()
+        format!("{}/.starlane", home_dir).to_string()
     })
 });
 
@@ -96,7 +96,7 @@ pub static STARLANE_DATA_DIR: Lazy<String> = Lazy::new(|| {
             None => current_dir().unwrap().display().to_string(),
             Some(dir) => dir.display().to_string(),
         };
-        format!("{}/main/data", dir).to_string()
+        format!("{}/starlane/data", dir).to_string()
     })
 });
 
@@ -149,7 +149,7 @@ pub fn config() -> Result<Option<StarlaneConfig>, HypErr> {
         true => {
             let config = std::fs::read_to_string(file.clone())?;
 
-            let mut config: StarlaneConfig = serde_yaml::from_str(config.as_str()).map_err(|err| anyhow!("main config found: '{}' yet Starlane encountered an error when attempting to process the config: '{}'", config_path(), err))?;
+            let mut config: StarlaneConfig = serde_yaml::from_str(config.as_str()).map_err(|err| anyhow!("starlane config found: '{}' yet Starlane encountered an error when attempting to process the config: '{}'", config_path(), err))?;
             config.context = context();
 
             Ok(Some(config))
@@ -173,12 +173,12 @@ pub fn config_save_new(config: StarlaneConfig, file: String) -> Result<(), anyho
                     Ok(())
                 }
                 None => {
-                    Err(anyhow!("main encountered an error when attempting to save config file: 'invalid parent'"))
+                    Err(anyhow!("starlane encountered an error when attempting to save config file: 'invalid parent'"))
                 }
             }
         }
         Err(err) => Err(anyhow!(
-            "main internal error: 'could not deserialize config"
+            "starlane internal error: 'could not deserialize config"
         )),
     }
 }

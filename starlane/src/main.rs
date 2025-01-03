@@ -202,9 +202,9 @@ pub fn main() -> Result<(), anyhow::Error> {
 /*
 #[cfg(not(feature = "server"))]
 fn run() -> Result<(), anyhow::Error> {
-    println!("'' feature is not enabled in this main installation");
+    println!("'' feature is not enabled in this starlane installation");
     Err(anyhow!(
-        "'machine' feature is not enabled in this main installation"
+        "'machine' feature is not enabled in this starlane installation"
     ))
 }
 
@@ -212,7 +212,7 @@ fn run() -> Result<(), anyhow::Error> {
 
 async fn run() -> Result<(), anyhow::Error> {
     let console = Console::new();
-    console.info("main started.")?;
+    console.info("starlane started.")?;
 
     console.intro("RUN STARLANE").unwrap_or_default();
 
@@ -239,7 +239,7 @@ async fn run() -> Result<(), anyhow::Error> {
 
                 console.note(
                     "install",
-                    "please run `main install` to configure a new Starlane runner",
+                    "please run `starlane install` to configure a new Starlane runner",
                 )?;
 
                 outro("Good Luck!")?;
@@ -253,7 +253,7 @@ async fn run() -> Result<(), anyhow::Error> {
                 console.note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", env::config_path()))?;
                 console.note(
                     "fresh install",
-                    "To create a fresh configuration please run: `main install`",
+                    "To create a fresh configuration please run: `starlane install`",
                 )?;
                 outro("Good Luck!")?;
                 console.newlines(3);
@@ -263,7 +263,7 @@ async fn run() -> Result<(), anyhow::Error> {
         };
 
         console.long_delay();
-        console.success("main configured.")?;
+        console.success("starlane configured.")?;
         spinner.next(
             "configuration loaded.",
             "launching registry [this may take a while]",
@@ -300,7 +300,7 @@ async fn run() -> Result<(), anyhow::Error> {
 
         console.note(
             "what's next?",
-            "You can connect to this main runner with a control terminal: `main term`",
+            "You can connect to this starlane runner with a control terminal: `starlane term`",
         )?;
 
         console.outro("Starlane is running.")?;
@@ -319,7 +319,7 @@ async fn run() -> Result<(), anyhow::Error> {
         Ok(_) => {}
         Err(err) => {
             error(format!(
-                "main halted due to an error: {}",
+                "starlane halted due to an error: {}",
                 err.to_string()
             ))
                 .unwrap_or_default();
@@ -335,7 +335,7 @@ async fn run() -> Result<(), anyhow::Error> {
 
 fn run() -> Result<(), anyhow::Error> {
     let console = Console::new();
-    console.info("main started.")?;
+    console.info("starlane started.")?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -363,7 +363,7 @@ fn run() -> Result<(), anyhow::Error> {
 
                     console.remark(format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", env::config_path()))?;
 
-                    console.note("install", "please run `main install` to configure a new Starlane runner")?;
+                    console.note("install", "please run `starlane install` to configure a new Starlane runner")?;
 
                     outro("Good Luck!")?;
                     console.newlines(3);
@@ -374,7 +374,7 @@ fn run() -> Result<(), anyhow::Error> {
                     spinner.error("invalid configuration");
                     console.error(format!("{}", err.to_string()))?;
                     console.note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", env::config_path()))?;
-                    console.note("fresh install", "To create a fresh configuration please run: `main install`")?;
+                    console.note("fresh install", "To create a fresh configuration please run: `starlane install`")?;
                     outro("Good Luck!")?;
                     console.newlines(3);
                     shutdown(1);
@@ -383,15 +383,15 @@ fn run() -> Result<(), anyhow::Error> {
             };
 
             console.long_delay();
-            console.success("main configured.")?;
+            console.success("starlane configured.")?;
             spinner.next("configuration loaded.","launching registry [this may take a while]");
 
             console.long_delay();
-            let main = Starlane::new(config,StandAloneFoundation()).await.map_err(|e|{println!("{}",e.to_string()); e}).unwrap();
+            let starlane = Starlane::new(config,StandAloneFoundation()).await.map_err(|e|{println!("{}",e.to_string()); e}).unwrap();
 
             spinner.next("registry status: [Ready]","acquiring machine API");
 
-            let machine_api = main.machine();
+            let machine_api = starlane.machine();
 
 
             spinner.next("machine API acquired","waiting for Starlane [Ready] status");
@@ -406,7 +406,7 @@ fn run() -> Result<(), anyhow::Error> {
 
             console.splash_with_params(1, 2, 25);
 
-            console.note("what's next?", "You can connect to this main runner with a control terminal: `main term`" )?;
+            console.note("what's next?", "You can connect to this starlane runner with a control terminal: `starlane term`" )?;
 
             console.outro("Starlane is running.")?;
             console.newlines(3);
@@ -423,7 +423,7 @@ fn run() -> Result<(), anyhow::Error> {
             Ok(_) => {}
             Err(err) =>
                 {
-                    error(format!("main halted due to an error: {}", err.to_string())).unwrap_or_default();
+                    error(format!("starlane halted due to an error: {}", err.to_string())).unwrap_or_default();
 
                     console.outro("runner failed").unwrap();
                     console.newlines(3);
@@ -637,7 +637,7 @@ fn nuke(all: bool) {
         let global = ensure_global_settings();
         if global.nuke {
             std::fs::remove_dir_all(STARLANE_HOME.as_str()).unwrap();
-            println!("all main contexts deleted");
+            println!("all starlane contexts deleted");
             // saving the global.conf again
             save_global_settings(global).unwrap();
         }

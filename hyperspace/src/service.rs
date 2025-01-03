@@ -265,7 +265,7 @@ pub fn service_conf() -> ServiceConf {
         STARLANE_DATA_DIR.to_string(),
     );
     let env = builder.build();
-    let path = "../target/debug/main-cli-filestore-service".to_string();
+    let path = "../target/debug/starlane-cli-filestore-service".to_string();
     let args: Option<Vec<String>> = Option::None;
 
     let stub = ExeStub::new(path.into(), env);
@@ -312,7 +312,7 @@ pub mod tests {
             format!("{}/tmp", env::current_dir().unwrap().to_str().unwrap()),
         );
         let env = builder.build();
-        let path = "../target/debug/main-cli-filestore-service".to_string();
+        let path = "../target/debug/starlane-cli-filestore-service".to_string();
         let args: Option<Vec<String>> = Option::None;
         let stub = ExeStub::new(path.into(), env);
         //        let info = ExeInfo::new(HostDialect::Cli(HostRunner::Os), stub);

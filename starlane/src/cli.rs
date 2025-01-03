@@ -143,7 +143,7 @@ pub struct Session {
 
 impl Session {
     pub async fn new(host: String, certs: String) -> Result<Self, SpaceErr> {
-        let logger = logger!(Point::from_str("main-cli")?);
+        let logger = logger!(Point::from_str("starlane-cli")?);
         let tcp_client: Box<dyn HyperwayEndpointFactory> = Box::new(HyperlaneTcpClient::new(
             format!("{}:{}", host, 4343),
             certs,

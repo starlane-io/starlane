@@ -13,7 +13,7 @@ version="0.3.20"
 [workspace]
 default-run = "starlane"
 resolver = "2"
-members = ["main", "space", "hyperspace", "base","macros", "foundation/docker-desktop", "platform/registry/postgres", "platform/postgres"]
+members = ["starlane", "space", "hyperspace", "base","macros", "foundation/docker-desktop", "platform/registry/postgres", "platform/postgres"]
 
 exclude = [ ]
 
@@ -26,7 +26,7 @@ starlane-base = { package="starlane-base", path= "base", version = "0.3.20" }
 starlane-platform-for-postgres = { package="starlane-platform-for-postgres", path= "platform/postgres" }
 starlane-platform-for-postgres-registry = { package="starlane-platform-for-postgres-registry", path= "platform/registry/postgres" }
 
-starlane = { package="starlane", path="./main"}
+starlane = { package="starlane", path= "starlane" }
 
 lazy_static = "1.5.0"
 uuid = { version="1.11.0" }

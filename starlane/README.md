@@ -39,13 +39,13 @@ essential crate that Starlane relied on and I have some rewriting to do!
 To install Starlane for local development simply run:
 
 ```bash
-cargo install main
+cargo install starlane
 ```
 
 And to create a starlane instance:
 
 ```bash
-main install
+starlane install
 ```
 
 You will be led through an installation script which will install postres locally as a starlane registry.
@@ -53,13 +53,13 @@ You will be led through an installation script which will install postres locall
 After Starlane is installed you can run:
 
 ```bash
-main run 
+starlane run 
 ```
 
 To connect to the running instance execute:
 
 ```bash
-main term
+starlane term
 ```
 
 ## READ ON

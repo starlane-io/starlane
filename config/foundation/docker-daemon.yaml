@@ -26,12 +26,12 @@ foundation:
 # The Settings configuration in this document does supply the default values for the installer
 
 platform:
-  data_dir: $HOME/main/$context/data
-  cache_dir: $HOME/main/$context/cache
+  data_dir: $HOME/starlane/$context/data
+  cache_dir: $HOME/starlane/$context/cache
   dependencies:
   - kind: Postgres
     volumes:
-    - database_dir: $HOME/main/data/postgres
+    - database_dir: $HOME/starlane/data/postgres
     username: postgres
     password: ${secret:postgres:password}
     providers:

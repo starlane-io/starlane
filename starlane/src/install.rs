@@ -31,7 +31,7 @@ use std::time::Duration;
 use std::{io, thread};
 use text_to_ascii_art::to_art;
 use textwrap::Options;
-//use main::base::foundation::implementation::docker_daemon_foundation::DockerDaemonFoundation;
+//use starlane::base::foundation::implementation::docker_daemon_foundation::DockerDaemonFoundation;
 
 #[tokio::main]
 pub async fn install(edit: bool) -> Result<(), anyhow::Error> {
@@ -82,7 +82,7 @@ version: {version}
                     self.console.outro_err(msg.as_str())?;
                     Err(anyhow!("{}", msg))?;
                 }
-                self.console.warning(format!("A valid main configuration already exists: '{}' this install process will overwrite the existing config", env::config_path()))?;
+                self.console.warning(format!("A valid starlane configuration already exists: '{}' this install process will overwrite the existing config", env::config_path()))?;
                 self.console.newlines(1usize);
                 let should_continue = self
                     .console
@@ -99,7 +99,7 @@ version: {version}
                 }
             }
             Err(err) => {
-                self.console.warning(format!("An invalid (corrupted or out of date) main configuration already exists: '{}' the installation process will overwrite this config file.", env::config_path())).unwrap_or_default();
+                self.console.warning(format!("An invalid (corrupted or out of date) starlane configuration already exists: '{}' the installation process will overwrite this config file.", env::config_path())).unwrap_or_default();
                 self.console.newlines(1usize);
                 let should_continue = confirm("Proceed with installation?").interact()?;
                 if !should_continue {

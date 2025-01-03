@@ -1,7 +1,3 @@
-
-
-;
-
 use starlane_hyperspace::driver::base::BaseDriverFactory;
 use starlane_hyperspace::driver::control::ControlDriverFactory;
 use starlane_hyperspace::driver::root::RootDriverFactory;
@@ -260,8 +256,8 @@ where
 
     async fn start_services(&self, gate: &Arc<HyperGateSelector>) {
         let dir = match dirs::home_dir() {
-            None => ".main/localhost/certs".to_string(),
-            Some(path) => format!("{}/.main/localhost/certs", path.display()),
+            None => ".starlane/localhost/certs".to_string(),
+            Some(path) => format!("{}/.starlane/localhost/certs", path.display()),
         };
         fs::create_dir_all(dir.as_str());
 
@@ -282,7 +278,7 @@ where
 
         if !is_local_ipv4_port_free(STARLANE_CONTROL_PORT.clone()) {
             panic_shutdown(format!(
-                "main port '{}' is being used by another process",
+                "starlane port '{}' is being used by another process",
                 STARLANE_CONTROL_PORT.to_string()
             ));
         }

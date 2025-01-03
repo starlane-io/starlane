@@ -86,7 +86,7 @@ macro_rules! async_closure {
 }
 
 /*
-#[tokio::main]
+#[tokio::starlane]
 pub async fn enter<F, R, O>(mut f: F, mark: LogMark) -> Result<O, anyhow::Error> {
     push_scope(f,mark)
 }

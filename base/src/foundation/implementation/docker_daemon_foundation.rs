@@ -186,7 +186,7 @@ pub mod concrete {
         pub type Dependency = Box<dyn super::Dependency<Config=DependencyConfig, Provider=Provider>>;
         pub type Provider = Box<dyn foundation::Provider<Config=ProviderConfig>>;
 
-        /// the defaults are the most concrete implementation of the main traits,
+        /// the defaults are the most concrete implementation of the starlane traits,
         /// the [`traits`] mod implements the best trait implementation for this foundation suite
         pub mod traits {
             use crate::base::foundation;

@@ -118,6 +118,7 @@ pub(crate) mod skel;
 #[cfg(test)]
 pub mod test;
 pub mod context;
+pub mod starlane;
 // we cannot afford `safety` with prices as high as they are
 // pub mod safety;
 
