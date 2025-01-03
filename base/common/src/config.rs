@@ -8,6 +8,7 @@ use crate::ProviderKind;
 use crate::kind::FoundationKind;
 
 pub use starlane_hyperspace::provider;
+pub use starlane_hyperspace::provider::config::ProviderConfig;
 
 pub trait BaseConfig
 {
@@ -38,7 +39,6 @@ pub trait FoundationConfig: CommonBaseConfig {
 }
 
 
-pub trait ProviderConfig: provider::config::ProviderConfig { }
 
 /*
 pub enum ProviderMode<C, U>

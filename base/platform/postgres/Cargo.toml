@@ -9,6 +9,9 @@ homepage.workspace = true
 description.workspace = true
 version.workspace = true
 
+[features]
+test=[]
+
 [dependencies]
 starlane-base = {workspace = true}
 starlane-space = { workspace = true }
@@ -21,3 +24,8 @@ strum_macros = {workspace = true}
 async-trait = {workspace = true}
 #[non_exhaustive]
 sqlx = { workspace = true, features = ["runtime-tokio", "runtime-tokio-rustls", "postgres", "macros", "any"] }
+
+[dev-dependencies]
+starlane-base = { workspace= true, features = ["test"] }
+starlane-hyperspace = { workspace = true, features = ["test"] }
+starlane-space = { workspace = true, features = ["test"] }

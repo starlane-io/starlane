@@ -39,10 +39,11 @@ use starlane_space::status::{Entity, Handle, StatusProbe};
 use starlane_base::Foundation;
 use starlane_base::Platform;
 use starlane_base::kind::ProviderKindDef;
+use starlane_base as base;
 
 /// final [starlane::config::ProviderConfig] trait definitions for [concrete::PostgresProviderConfig]
 #[async_trait]
-pub trait ProviderConfig: starlane::config::ProviderConfig {
+pub trait ProviderConfig: config::ProviderConfig {
     fn utilization_config(&self) ->  & config::PostgresUtilizationConfig;
 
     /// reexport [config::PostgresUtilizationConfig::connect_options]
@@ -90,6 +91,10 @@ pub mod config {
     use std::str::FromStr;
     use sqlx::postgres::PgConnectOptions;
     use crate::err::PostErr;
+    use starlane_base as base;
+    use crate::service::{Hostname, Password, Username};
+
+    pub trait ProviderConfig: base::config::ProviderConfig { }
 
     #[derive(Clone, Eq, PartialEq)]
     pub struct PostgresUtilizationConfig {
@@ -132,7 +137,10 @@ pub mod config {
         #[cfg(test)]
         pub fn mock() -> Self {
             Self {
-                ..Default::default()
+                host: Hostname::from_str("mock").unwrap(),
+                port: 5432u16,
+                username: Username::from_str("postgres").unwrap(),
+                password: Password::from_str("its_a_secret").unwrap(),
             }
         }
     }
@@ -155,9 +163,7 @@ mod concrete {
     use std::ops::Deref;
     use std::sync::Arc;
     use async_trait::async_trait;
-    use starlane::config::ProviderConfig;
     use starlane_base::provider::{Manager, Provider, ProviderKindDef};
-    use starlane_base::provider::err::ProviderErr;
     use std::str::FromStr;
     use sqlx;
     use sqlx::{ConnectOptions, Connection};
@@ -167,10 +173,13 @@ mod concrete {
     use starlane_space::status;
     use starlane_space::status::{Entity, EntityReadier, StatusReporter, StatusResult};
     use status::{ReadyResult, Handle, Status, StatusDetail, StatusProbe, StatusWatcher};
+    use super::config;
+    use super::base;
 
     use super::{Pool,PoolConnection,PgConnection};
 
-    use crate::service::config::PostgresUtilizationConfig;
+    use config::PostgresUtilizationConfig;
+    use starlane_base::config::ProviderConfig;
 
     pub mod my { pub use super::super::*; }
 
@@ -193,7 +202,7 @@ mod concrete {
         #[cfg(test)]
         pub fn mock() -> PostgresServiceProvider {
 
-          let config = Arc::new(PostgresProviderConfig::mock();)
+          let config = Arc::new(PostgresProviderConfig::mock());
            Self::new(config)
         }
 
@@ -229,6 +238,7 @@ mod concrete {
         }
     }
 
+
     /// the [StatusProbe] implementation which tracks with a Postgres Connection [Pool].
     /// With any [StatusProbe] the goal is to get to a [Status::Ready] state.  [PostgresService]
     /// should abstract the specific [Manager] details.  A [PostgresService] may be a
@@ -249,7 +259,9 @@ mod concrete {
     impl my::PostgresService for PostgresService {}
 
 
+
     impl PostgresService {
+        #[cfg(not(test))]
         async fn new(config: PostgresProviderConfig) -> Result<Self, sqlx::Error> {
             let connection = Arc::new(Mutex::new(config.connect_options().connect().await?));
             Ok(Self {
@@ -260,7 +272,7 @@ mod concrete {
 
         #[cfg(test)]
         pub fn mock() -> Self {
-            let connection = PgConnection::default();
+            let connection = Arc::new(Mutex::new(PgConnection::default()));
             let config = PostgresProviderConfig::mock();
             Self {
                 config,
@@ -309,14 +321,16 @@ mod concrete {
         }
     }
 
-    impl PostgresProviderConfig {}
 
     #[async_trait]
-    impl ProviderConfig for PostgresProviderConfig {
+    impl base::config::ProviderConfig for PostgresProviderConfig {
         fn kind(&self) -> &ProviderKindDef {
-            &ProviderKindDef::PostgresService
+            todo!()
         }
     }
+
+    #[async_trait]
+    impl config::ProviderConfig for PostgresProviderConfig { }
 }
 
 
@@ -324,18 +338,18 @@ mod concrete {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use starlane_space::status::Handle;
+    use base::status::Handle;
+    use crate::service::concrete::my::base;
     use super::concrete::{PostgresService, PostgresServiceProvider};
-
 
     pub(crate) mod types {
         use std::marker::PhantomData;
 
         pub type Pool = MockPool<sqlx::Postgres>;
         pub type PoolConnection = MockPoolConnection<sqlx::Postgres>;
-        pub type PgConnection = MockPgPoolConnection<sqlx::Postgres>;
+        pub type PgConnection = MockPgConnection<sqlx::Postgres>;
 
-        struct MockPool<Db> (PhantomData<Db>) where Db : sqlx::Database;
+        pub struct MockPool<Db> (PhantomData<Db>) where Db : sqlx::Database;
 
         impl Default for MockPool<sqlx::Postgres> {
             fn default() -> Self {
@@ -343,16 +357,16 @@ pub(crate) mod tests {
             }
         }
 
-        struct MockPoolConnection<Db> (PhantomData<Db>) where Db : sqlx::Database;
+        pub struct MockPoolConnection<Db> (PhantomData<Db>) where Db : sqlx::Database;
         impl Default for MockPoolConnection<sqlx::Postgres> {
             fn default() -> Self {
                 Self(PhantomData::default())
             }
         }
 
-        struct MockPgPoolConnection<Db> (PhantomData<Db>) where Db : sqlx::Database;
+        pub struct MockPgConnection<Db> (PhantomData<Db>) where Db : sqlx::Database;
 
-        impl Default for MockPgPoolConnection<sqlx::Postgres> {
+        impl Default for MockPgConnection<sqlx::Postgres> {
             fn default() -> Self {
                 Self(PhantomData::default())
             }

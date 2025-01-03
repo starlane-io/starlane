@@ -29,7 +29,10 @@ use serde::{Deserialize, Serialize};
 use strum::{IntoEnumIterator, ParseError};
 use thiserror::Error;
 use starlane_space::parse::SpaceTree;
+use starlane_space::status;
 use crate::err::report::{Label, Report, ReportKind};
+use crate::particle::StatusDetail;
+use crate::status::Status;
 /*
 #[macro_export]
 macro_rules! err {
@@ -45,6 +48,8 @@ macro_rules! err {
 pub enum SpaceErr {
     #[error("{status}: {message}")]
     Status { status: u16, message: String },
+    #[error("Status: {0}")]
+    Status2(status::Status),
     #[error(transparent)]
     ParseErrs(#[from] ParseErrs),
     #[error("expected substance: '{expected}' instead found: '{found}'")]
@@ -90,6 +95,21 @@ pub enum SpaceErr {
     #[error("{0}")]
     Anyhow(#[from] Arc<anyhow::Error>),
 }
+
+impl From<status::Status> for SpaceErr {
+    fn from(status: Status) -> Self {
+        SpaceErr::Status2(status)
+    }
+}
+
+impl From<status::StatusDetail> for SpaceErr {
+    fn from(detail: status::StatusDetail) -> Self {
+         let status: status::Status = detail.into();
+         status.into()
+    }
+}
+
+
 
 /*    #[error("artifact error: '{0}'")]
     #[serde(skip_serializing)]

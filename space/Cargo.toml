@@ -43,6 +43,7 @@ repository.workspace = true
 [features]
 default=["std"]
 std=[]
+test=[]
 
 
 [dependencies]
@@ -95,6 +96,9 @@ md5 = { workspace = true }
 #tracing = { workspace = true, features=["std","log","attributes","tracing-attributes","max_level_trace"]}
 tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-attributes", "async-await"] }
 dyn-clone = { workspace = true }
+
+[dev-dependencies]
+
 
 [build-dependencies]
 shadow-rs = { workspace = true }

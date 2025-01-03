@@ -1,9 +1,12 @@
+use crate::err::StatusErr;
 use crate::point::Point;
 use crate::wave::Agent;
+use ascii::AsciiChar::i;
 use async_trait::async_trait;
 use derive_builder::Builder;
 use futures::task::Spawn;
 use serde_derive::{Deserialize, Serialize};
+use starlane_space::err::SpaceErr;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
 use std::ops::Deref;
@@ -26,9 +29,8 @@ use thiserror::Error;
 /// [starlane_hyperspace]: ../../starlane_hyperspace
 /// [Provider]: ../../starlane_hyperspace/src/provider.rs
 pub trait Entity {
-//    type Id: Hash + Eq + PartialEq + Debug + Send + Sync + ?Sized;
+    //    type Id: Hash + Eq + PartialEq + Debug + Send + Sync + ?Sized;
 }
-
 
 /// [StatusWatcher] is type bound to [tokio::sync::watch::Receiver<StatusResult>]) can get the realtime
 /// [StatusDetail] of a [StatusProbe] by polling: [StatusWatcher::borrow] or by listening for
@@ -40,7 +42,6 @@ pub type StatusReporter = tokio::sync::watch::Sender<StatusResult>;
 pub fn status_reporter() -> StatusReporter {
     tokio::sync::watch::channel(StatusResult::default()).0
 }
-
 
 /// [StatusProbe::probe] triggers the [StatusProbe::Entity] status model synchronization
 /// to generate a [StatusDetail]
@@ -89,17 +90,18 @@ pub trait EntityReadier: StatusProbe {
 #[derive(Clone)]
 pub struct Handle<E>
 where
-    E: Entity + Send + Sync + ?Sized
+    E: Entity + Send + Sync + ?Sized,
 {
     entity: Arc<E>,
     watcher: StatusWatcher,
     hold: tokio::sync::mpsc::Sender<()>,
 }
 
-impl <E> Entity for Handle<E>
+impl<E> Entity for Handle<E>
 where
-    E: Entity + Send + Sync {
-//    type Id = E::Id;
+    E: Entity + Send + Sync,
+{
+    //    type Id = E::Id;
 }
 
 impl<E> Handle<E>
@@ -107,7 +109,6 @@ where
     E: Entity + Send + Sync,
 {
     pub fn new(entity: E, watcher: StatusWatcher, hold: tokio::sync::mpsc::Sender<()>) -> Self {
-
         let entity = Arc::new(entity);
         Self {
             entity,
@@ -115,7 +116,6 @@ where
             hold,
         }
     }
-
 
     pub fn status(&self) -> StatusResult {
         self.watcher.borrow().clone()
@@ -126,15 +126,15 @@ where
     }
 
     pub fn entity(&self) -> &E {
-        & (*self.entity)
+        &(*self.entity)
     }
 
     ///  return a mocked version of `Handle` for testing
-    #[cfg(test)]
+    #[cfg(feature = "test")]
     pub fn mock(entity: E) -> Handle<E> {
         let entity = Arc::new(entity);
-        let (hold,mut hold_rx) = tokio::sync::mpsc::channel(1);
-        let reporter = status_reporter();;
+        let (hold, mut hold_rx) = tokio::sync::mpsc::channel(1);
+        let reporter = status_reporter();
         let watcher = reporter.subscribe();
         tokio::spawn(async move {
             /// idle =
@@ -151,19 +151,16 @@ where
     }
 }
 
-
-
-impl <E,D> Deref for Handle<E> where E: Deref<Target=D>+Entity+Send+Sync {
+impl<E, D> Deref for Handle<E>
+where
+    E: Deref<Target = D> + Entity + Send + Sync,
+{
     type Target = D;
 
     fn deref(&self) -> &Self::Target {
         self.entity.deref()
     }
 }
-
-
-
-
 
 #[async_trait]
 impl<E> StatusProbe for Handle<E>
@@ -175,12 +172,11 @@ where
     }
 }
 
-
 /// Indicate [Entity]'s internal state.
 /// most importantly the desired variant of a [StatusProbe] is [Status::Ready]
 /// and if that is the [Status] then there isn't a need to drill any deeper into
 /// the [StatusDetail]
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, strum_macros::Display,strum_macros::EnumString)]
 pub enum Status {
     /// [Status::Unknown] is the default status
     Unknown,
@@ -223,8 +219,15 @@ impl Default for Status {
 /// The verbose details of a [StatusProbe]'s [StatusDetail]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StatusDetail {
+    pub status: Status,
     pub stage: StageDetail,
     pub action: ActionDetail,
+}
+
+impl Into<Status> for StatusDetail {
+    fn into(self) -> Status {
+       self.status
+    }
 }
 
 impl Into<StatusResult> for StatusDetail {
@@ -240,6 +243,7 @@ impl Into<StatusResult> for StatusDetail {
 impl Default for StatusDetail {
     fn default() -> Self {
         Self {
+            status: Status::default(),
             stage: StageDetail::default(),
             action: ActionDetail::default(),
         }
@@ -247,8 +251,8 @@ impl Default for StatusDetail {
 }
 
 impl StatusDetail {
-    pub fn new(stage: StageDetail, action: ActionDetail) -> Self {
-        Self { stage, action }
+    pub fn new(status: Status, stage: StageDetail, action: ActionDetail) -> Self {
+        Self { status, stage, action }
     }
 }
 
@@ -532,6 +536,23 @@ impl Default for StatusResult {
     }
 }
 
+impl StatusResult {
+    pub fn to_res(self) -> Result<(),SpaceErr> {
+        match self {
+            StatusResult::Ready => Ok(()),
+            StatusResult::NotReady(detail) => {
+                let err: SpaceErr = detail.into();
+                Err(err)
+            }
+        }
+    }
+}
+
+impl Into<Result<(),SpaceErr>> for StatusResult {
+    fn into(self) -> Result<(),SpaceErr> {
+        self.to_res()
+    }
+}
 
 /// Similar to [Result] [EntityResult] is a convenience enum for [StatusProbe] hosts which
 /// may be responsible for keeping the [StatusProbe] in a [Status::Ready] state...
@@ -600,6 +621,29 @@ where
     NotReady(StatusDetail),
 }
 
+impl<E> ReadyResult<E>
+where
+    E: Entity + Send + Sync + ?Sized,
+{
+    pub fn to_res(self) -> Result<Arc<E>, SpaceErr> {
+        match self {
+            ReadyResult::Ready(entity) => Ok(entity),
+            ReadyResult::NotReady(detail    ) => {
+                let err = detail.into();
+                Err(err)
+            }
+        }
+    }
+}
+
+impl<E> Into<Result<Arc<E>, SpaceErr>> for ReadyResult<E>
+where
+    E: Entity + Send + Sync + ?Sized,
+{
+    fn into(self) -> Result<Arc<E>, SpaceErr> {
+        self.to_res()
+    }
+}
 impl<E> Into<StatusDetail> for ReadyResult<E>
 where
     E: Entity + Clone + Send + Sync + ?Sized,
@@ -612,24 +656,25 @@ where
     }
 }
 
-
+#[cfg(feature = "test")]
 #[cfg(test)]
 pub mod test {
-    use std::ops::Deref;
     use crate::status::{Entity, Handle};
+    use std::ops::Deref;
 
     #[tokio::test]
     pub async fn test_handle_deref() {
         let value = "blah";
         struct Mock {
-            pub value: String
+            pub value: String,
         }
         impl Default for Mock {
             fn default() -> Self {
-                Self { value: "blah".to_string() }
+                Self {
+                    value: "blah".to_string(),
+                }
             }
         }
-
 
         impl Deref for Mock {
             type Target = String;
@@ -645,7 +690,6 @@ pub mod test {
 
         let handle = Handle::mock(mock);
 
-        assert_eq!(handle.as_str(),value);
-
+        assert_eq!(handle.as_str(), value);
     }
 }

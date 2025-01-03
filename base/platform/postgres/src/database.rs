@@ -1,7 +1,8 @@
+use async_trait::async_trait;
+use starlane_base as base;
+use base::status::{Entity, Handle, StatusProbe};
 use std::future::Future;
 use std::ops::Deref;
-use async_trait::async_trait;
-use starlane_space::status::{Entity, Handle, StatusProbe};
 
 
 /// these reexports must come from [crate::service] since they are mocks when `#[cfg(test)]`
@@ -34,23 +35,25 @@ pub trait PostgresDatabase: Entity+StatusProbe+Deref<Target=Pool>+Send+Sync {
 
 
 mod concrete {
-    mod my { pub use super::super::*; }
+    use super::base;
+    mod my {
+        pub use super::super::*;
+    }
 
+    use async_trait::async_trait;
+    use provider::{Provider, ProviderKindDef};
+    use sqlx::postgres::PgConnectOptions;
+    use sqlx::{Connection, PgPool};
+    use starlane_base::foundation::config::ProviderConfig;
+    use starlane_base::provider;
+    use starlane_base::status::{Status, StatusProbe};
     use std::ops::Deref;
     use std::sync::Arc;
-    use async_trait::async_trait;
-    use sqlx::{Connection, PgPool};
-    use sqlx::postgres::PgConnectOptions;
-    use starlane_base::foundation::config::ProviderConfig;
-    use starlane_base::status::{Status, StatusDetail, Handle, StatusProbe, StatusWatcher};
-    use starlane_base::provider;
-    use provider::{Provider,err::ProviderErr,ProviderKindDef};
 
-    use starlane_base::status::{Entity, EntityReadier, ReadyResult, StatusResult};
-    use starlane_space::kind::DatabaseSubKind;
     use super::Pool;
-    use crate::service::{PostgresServiceHandle};
-    use crate::service::config::{PostgresUtilizationConfig};
+    use crate::service::config::PostgresUtilizationConfig;
+    use crate::service::{MockPool, PostgresServiceHandle};
+    use starlane_base::status::{Entity, EntityReadier, ReadyResult, StatusResult};
 
 
     #[derive(Clone, Eq, PartialEq)]
@@ -76,7 +79,7 @@ mod concrete {
         }
     }
 
-    impl starlane::config::ProviderConfig for Config {
+    impl base::config::ProviderConfig for Config {
         fn kind(&self) -> &ProviderKindDef {
             todo!()
         }
@@ -162,6 +165,7 @@ mod concrete {
 
     impl PostgresDatabase {
         /// create a new Postgres Connection `Pool`
+        #[cfg(not(test))]
         async fn new(config: Config, service: PostgresServiceHandle) -> Result<Self, sqlx::Error> {
             let pool = PgPool::connect_with(config.connect_options()).await?;
 
@@ -172,9 +176,15 @@ mod concrete {
             })
         }
 
-        #[test]
+        #[cfg(test)]
         pub fn mock(service: PostgresServiceHandle) -> Self {
-
+            let config = Config::mock();
+            let pool : MockPool<sqlx::Postgres> = Pool::default();
+            Self {
+                config,
+                service,
+                pool
+            }
         }
 
     }
@@ -186,9 +196,17 @@ mod concrete {
     impl StatusProbe for PostgresDatabase {
 
         async fn probe(&self) -> StatusResult {
+
+            #[cfg(not(test))]
             async fn ping(pool: & Pool) -> Result<Status,sqlx::Error> {
                 pool.acquire().await?.ping().await.map(|_| Status::Ready)
             }
+
+            #[cfg(test)]
+            async fn ping(pool: & Pool) -> Result<Status,sqlx::Error> {
+                Ok(Status::Ready)
+            }
+
 
             todo!();
 
@@ -212,16 +230,17 @@ mod concrete {
 
 #[cfg(test)]
 pub mod tests {
-    use std::ops::Deref;
-    use starlane_base::status::{Entity, Handle, StatusProbe, StatusResult};
     use super::concrete::{PostgresDatabase, PostgresDatabaseProvider};
+    use starlane_base::status::Handle;
+    use std::ops::Deref;
+    use starlane_space::status::EntityReadier;
 
     #[tokio::test]
     pub async fn test_handle_deref() {
-        let service_provider = PostgresDatabaseProvider::mock();
+        let service_provider = PostgresServiceProvi::mock();
+        let service = service_provider.ready().await.to_res().unwrap();
         let database = PostgresDatabase::mock();
         let handle = Handle::mock(database);
-
         let deref = handle.deref();
 
     }

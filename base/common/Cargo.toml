@@ -20,8 +20,8 @@ repository.workspace = true
 # 'skel' enables the various starter implentatation templates. Activate this feature so your can review
 # the skel code in your IDE
 skel=[]
-# for testsing
-mock=[]
+
+test=[]
 
 
 [dependencies]
@@ -78,6 +78,10 @@ console = { workspace = true }
 derive-name = { workspace = true }
 
 tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-attributes", "async-await"] }
+
+[dev-dependencies]
+starlane-hyperspace = { workspace = true, features = ["test"] }
+starlane-space = { workspace = true, features = ["test"] }
 
 [build-dependencies]
 shadow-rs = { workspace = true }
