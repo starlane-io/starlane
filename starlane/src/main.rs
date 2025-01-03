@@ -38,7 +38,7 @@ pub mod cli;
 pub use starlane_hyperspace::platform::Platform;
 use starlane_hyperspace::shutdown::shutdown;
 use crate::install::{Console, StarlaneTheme};
-use crate::server::Starlane;
+use starlane_base::starlane::Starlane;
 use starlane_space::err::PrintErr;
 use starlane_space::loc::ToBaseKind;
 use starlane_space::log::push_scope;

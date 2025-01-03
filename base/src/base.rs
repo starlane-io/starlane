@@ -9,11 +9,11 @@ use crate::err::BaseErr;
 use crate::kind::FoundationKind;
 
 
+
 pub struct Base<P,F> where P:Platform, F: Foundation{
   platform: P,
   foundation: F
 }
-
 
 
 // ['Foundation'] is an abstraction for managing infrastructure.
@@ -51,7 +51,7 @@ pub trait Foundation: Sync + Send {
 
 }
 
-pub trait Platform {
+pub trait Platform:  {
 
     type Config: config::PlatformConfig +Send+Sync;
 

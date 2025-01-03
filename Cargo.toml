@@ -19,6 +19,7 @@ exclude = [ ]
 
 [workspace.dependencies]
 
+
 starlane-macros = { package="starlane-macros", path= "macros", version = "0.3.20" }
 starlane-space = { package="starlane-space", path= "space", version = "0.3.20" }
 starlane-hyperspace = { package="starlane-hyperspace", path= "hyperspace", version = "0.3.20" }
