@@ -1,41 +1,52 @@
-use serde_derive::{Deserialize, Serialize};
-use strum_macros::EnumDiscriminants;
-use thiserror::Error;
-use std::fmt::{Display, Formatter};
-use std::ops::Deref;
-use std::sync::Arc;
-use async_trait::async_trait;
-use derive_builder::Builder;
 use crate::point::Point;
 use crate::wave::Agent;
+use async_trait::async_trait;
+use derive_builder::Builder;
+use futures::task::Spawn;
+use serde_derive::{Deserialize, Serialize};
+use std::fmt::{Debug, Display, Formatter};
+use std::hash::Hash;
+use std::ops::Deref;
+use std::sync::Arc;
+use strum_macros::EnumDiscriminants;
+use thiserror::Error;
 
-/// [StatusWatcher] is type bound to [tokio::sync::watch::Receiver<StatusDetail>]) can get the realtime
-/// [StatusDetail] of a [StatusEntity] by polling: [StatusWatcher::borrow] or by listening for
+/// [Entity] provides a utilization interface for `anything` that can be described by the [Status]
+/// model be it `resource` or `service` ... anything!
+///
+/// `Examples:`
+/// *  A `resource` such as a remote file archive that is [Status::Ready] after being downloaded
+///    and cached to local storage
+///
+/// * A `service` such as [crate::particle::Particle]
+///
+/// * The [starlane_hyperspace] crate's [Provider] implements [Entity] to indicate that it is ready
+///   to `provision`
+///
+/// [starlane_hyperspace]: ../../starlane_hyperspace
+/// [Provider]: ../../starlane_hyperspace/src/provider.rs
+pub trait Entity {
+    type Id: Hash + Eq + PartialEq + Debug + Send + Sync + ?Sized;
+}
+
+
+/// [StatusWatcher] is type bound to [tokio::sync::watch::Receiver<StatusResult>]) can get the realtime
+/// [StatusDetail] of a [StatusProbe] by polling: [StatusWatcher::borrow] or by listening for
 /// changes vi [StatusWatcher::changed]
-pub type StatusWatcher = tokio::sync::watch::Receiver<Status>;
-pub type StatusReporter = tokio::sync::watch::Sender<Status>;
+pub type StatusWatcher = tokio::sync::watch::Receiver<StatusResult>;
+pub type StatusReporter = tokio::sync::watch::Sender<StatusResult>;
 
-///  [StatusEntity] provides an interface for entities to report status
+/// [StatusProbe::probe] triggers the [StatusProbe::Entity] status model synchronization
+/// to generate a [StatusDetail]
 #[async_trait]
-pub trait StatusEntity {
-    fn status(&self) -> Status;
-
-    /// Returns the most recent [Status] which is not guaranteed to be
-    /// in sync with the `real world` entity that this [StatusEntity] describes.
-    ///
-    /// call [StatusEntity::probe] to query the target entity and update the [StatusDetail]
-    fn status_detail(&self) -> Result;
-
-    /// Returns a [StatusWatcher]
-    fn status_watcher(&self) -> StatusWatcher;
-
+pub trait StatusProbe {
     /// Returns:
-    /// * [Result::Ready] if status is determined to be [Status::Ready]
-    /// * [Result::NotReady] which wraps a *hopefully* useful [StatusDetail]
+    /// * [StatusResult::Ready] if status is determined to be [Status::Ready]
+    /// * [StatusResult::NotReady] which wraps a *hopefully* useful [StatusDetail]
     ///
-    /// [StatusEntity::probe] should synchronize the internal [StatusDetail] model to
+    /// [StatusProbe::probe] should synchronize the internal [StatusDetail] model to
     /// describe the status of its target entity
-    async fn probe(&self) -> Result;
+    async fn probe(&self) -> StatusResult;
 }
 
 /*
@@ -48,97 +59,121 @@ where
     Control(C),
 }
 
+
  */
-/// trait that can bring a [StatusEntity] into a [Status::Ready] state
-pub trait EntityReadier {
-   type Entity: StatusEntity+Send+Sync;
-   async fn ready(&self) -> EntityResult<Self::Entity>;
+
+/// trait that can bring a [StatusProbe] into a [Status::Ready] state
+#[async_trait]
+pub trait EntityReadier: StatusProbe {
+    type Entity: Entity + Send + Sync + ?Sized;
+
+    /// takes steps to bring [Self::Entity] to a [Status::Ready] state. For a resource [Entity] such
+    /// as a network artifact (a remote file), readying steps might be downloading and storing
+    /// a copy to the local filesystem. For a fully managed service [Entity] such as a Postgres
+    /// service managed by [DockerDaemonFoundation] the [EntityReadier] may take many
+    /// steps such as: triggering and awaiting [ProviderKind::DockerDaemon] to reach [Status::Ready],
+    /// pulling a postgres docker image, starting the postgres docker image... .
+    async fn ready(&self) -> ReadyResult<Self::Entity>;
 }
 
-/// [Handle] contains [E]--which implements the [StatusEntity] trait--and a private
-/// `hold` reference which is a [tokio::sync::mpsc::Sender] created from the [StatusEntity]'s
+/// [Handle] contains [E]--which implements the [Entity] trait--and a private
+/// `hold` reference which is a [tokio::sync::mpsc::Sender] created from the [StatusProbe]'s
 /// internal `runner`.  The Runner should stay alive until it has no more hold references
 /// at which time it is up to the Runner to stop itself or ignore a reference count of 0
 #[derive(Clone)]
-pub struct Handle<E> where E: StatusEntity+Send+Sync {
-    pub entity: Arc<E>,
+pub struct Handle<E>
+where
+    E: Entity + Send + Sync + ?Sized,
+{
+    entity: Arc<E>,
+    watcher: StatusWatcher,
     hold: tokio::sync::mpsc::Sender<()>,
 }
 
+impl <E> Entity for Handle<E>
+where
+    E: Entity + Send + Sync {
+    type Id = E::Id;
+}
+
+impl<E> Handle<E>
+where
+    E: Entity + Send + Sync,
+{
+    pub fn new(entity: E, watcher: StatusWatcher, hold: tokio::sync::mpsc::Sender<()>) -> Self {
+
+        let entity = Arc::new(entity);
+        Self {
+            entity,
+            watcher,
+            hold,
+        }
+    }
+
+    pub fn status(&self) -> StatusResult {
+        self.watcher.borrow().clone()
+    }
+
+    pub fn watcher(&self) -> StatusWatcher {
+        self.watcher.clone()
+    }
+}
 #[async_trait]
-impl <E> StatusEntity for Handle<E> where E: StatusEntity+Send+Sync {
-    fn status(&self) -> Status {
-        self.entity.status()
-    }
-
-    fn status_detail(&self) -> Result {
-        self.entity.status_detail()
-    }
-
-    fn status_watcher(&self) -> StatusWatcher {
-        self.entity.status_watcher()
-    }
-
-    async fn probe(&self) -> Result {
-        self.probe().await
+impl<E> StatusProbe for Handle<E>
+where
+    E: StatusProbe + Entity + Send + Sync,
+{
+    async fn probe(&self) -> StatusResult {
+        self.entity.probe().await
     }
 }
-
-impl<E> Handle<E> where E: StatusEntity+Send+Sync {
-    pub fn new(api: E, hold: tokio::sync::mpsc::Sender<()> ) -> Self {
-        /// hopefully the [Arc::from] does what I hope it does which is only create a new
-        /// [Arc<E>] if [E] is not already an instance of an [Arc<E>]
-        let api = From::from(api);
-        Self { entity: api, hold }
-    }
-}
-
-impl <E> Deref for Handle<E> where E: StatusEntity+Send+Sync {
-    type Target = Arc<E>;
+impl<E> Deref for Handle<E>
+where
+    E: Entity + Send + Sync,
+{
+    type Target = E;
 
     fn deref(&self) -> &Self::Target {
-        & self.entity
+        &self.entity
     }
 }
 
-
-
-
-
-/// the broad classification of a [StatusEntity]'s internal state.
-/// most importantly the desired variant of a [StatusEntity] is [Status::Ready]
+/// Indicate [Entity]'s internal state.
+/// most importantly the desired variant of a [StatusProbe] is [Status::Ready]
 /// and if that is the [Status] then there isn't a need to drill any deeper into
 /// the [StatusDetail]
-#[derive(Clone, Hash,Eq,PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum Status {
+    /// [Status::Unknown] is the default status
     Unknown,
-    /// [Status::Idle] is a healthy state of [StatusEntity] that indicates not [Status::Ready]
-    /// because the [StatusEntity::start] action has not been requested by the host
+    /// [Status::Idle] is a healthy state of [StatusProbe] that indicates not [Status::Ready]
+    /// because the [StatusProbe::start] action has not been requested by the host
     Idle,
-    /// meaning the [StatusEntity] is healthy and is working towards reaching a
-    /// [Status::Ready] state.
-    Working,
-    /// the [StatusEntity] is waiting on a prerequisite condition to be true before it can
-    /// return to [Status::Working] state and complete the [StatusEntity::start]
+    /// meaning the [StatusProbe] is healthy and is working towards reaching a
+    /// [Status::Ready] state... i.e. `readying` itself
+    Readying,
+    /// the [StatusProbe] is waiting on a prerequisite condition to be true before it can
+    /// return to [Status::Readying] state and complete the [StatusProbe::start]
     Pending,
-    /// [StatusEntity::start] procedure has been halted by a problem that the [StatusEntity]
+    /// [StatusProbe::start] procedure has been halted by a problem that the [StatusProbe]
     /// understands and perhaps can supply an [ActionRequest] so an external [Actor] can
     /// remedy the situation.  An example: a Database depends on a DatabaseConnectionPool
     /// to be [Status::Ready] state (in this case the actual Database is managed externally
     /// and is stopped) so the status is set to [Status::Blocked] prompting the host to
     /// see if there are any [ActionRequest]s from [StatusDetail]
     Blocked,
-    /// the [StatusEntity]s actually [Status] cannot be determined because it cannot
+    /// the [Entity]s actually [Status] cannot be determined because it cannot
     /// be reached over the network.
     Unreachable,
-    /// A non-fatal error occurred that [StatusEntity] does not compre
+    /// A non-fatal error occurred that [StatusProbe] does not compre
     Panic,
-    /// the [StatusEntity] reports that it cannot go on... [Status::Fatal] is a suggestion
-    /// leaving the [StatusEntity]'s [EntityReadier] with the choice to: delete and recreate the
-    /// [StatusEntity], abort its [EntityReadier::ready] attempt or kill the entire process
+    /// the [StatusProbe] reports that it cannot go on... [Status::Fatal] is a suggestion
+    /// leaving the [StatusProbe]'s [EntityReadier] with the choice to: delete and recreate the
+    /// [StatusProbe], abort its [EntityReadier::ready] attempt or kill the entire process
     /// with an error code
     Fatal,
-    Ready
+    /// the desired state
+    Ready,
 }
 
 impl Default for Status {
@@ -147,21 +182,31 @@ impl Default for Status {
     }
 }
 
-/// The verbose details of a [StatusEntity]'s [StatusDetail]
-#[derive( Clone, Debug, Serialize, Deserialize)]
+/// The verbose details of a [StatusProbe]'s [StatusDetail]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StatusDetail {
     pub stage: StageDetail,
     pub action: ActionDetail,
 }
-impl Default for StatusDetail {
-    fn default() -> Self {
-        Self {
-            stage: StageDetail::default(),
-            action: ActionDetail::default()
+
+impl Into<StatusResult> for StatusDetail {
+    fn into(self) -> StatusResult {
+        let stage: Stage = self.stage.stage();
+        match stage {
+            Stage::Ready => StatusResult::Ready,
+            _ => StatusResult::NotReady(self),
         }
     }
 }
 
+impl Default for StatusDetail {
+    fn default() -> Self {
+        Self {
+            stage: StageDetail::default(),
+            action: ActionDetail::default(),
+        }
+    }
+}
 
 impl StatusDetail {
     pub fn new(stage: StageDetail, action: ActionDetail) -> Self {
@@ -169,33 +214,27 @@ impl StatusDetail {
     }
 }
 
-
-
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(State))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize))]
-pub enum StateDetail{
+pub enum StateDetail {
     /// before the [Provider] [State] is queried and reported by the [Provider::synchronize]
     /// the state is not known
     Unknown,
     /// stage progression is halted until the depdendency conditions of [StateDetail::Pending]
     /// are rectified
     Pending(PendingDetail),
-    /// [StatusEntity] is halted described by [StateErrDetail]
+    /// [StatusProbe] is halted described by [StateErrDetail]
     Error(StateErrDetail),
-    /// [StatusEntity] is `provisioning` meaning it is progressing through it's [StageDetail] variants
+    /// [StatusProbe] is `provisioning` meaning it is progressing through it's [StageDetail] variants
     ///
     Provisioning,
-    /// [StatusEntity] is ready to be used
-    Ready
+    /// [StatusProbe] is ready to be used
+    Ready,
 }
 
-
-
-
-
-/// [StageDetail] describes the [StatusEntity]'s presently reached life cycle stage.
+/// [StageDetail] describes the [StatusProbe]'s presently reached life cycle stage.
 /// The [StageDetail] should progress through the variants in order although
 /// a [Provider] implementation may skip states that are not relative... such as
 /// the fetching and caching of an external config which would skip over the
@@ -213,21 +252,20 @@ pub enum StageDetail {
     /// signifies that all fetching/downloading stages have completed... and of course
     /// some providers don't have a cached stage at all
     Cached,
-    /// [StatusEntity] is installed
+    /// [StatusProbe] is installed
     Installed,
-    /// [StatusEntity] has completed its Initialize
+    /// [StatusProbe] has completed its Initialize
     Initialized,
     Started,
-    /// [StatusEntity] is ready to be used
-    Ready(),
+    /// [StatusProbe] is ready to be used
+    Ready,
 }
 
 impl StageDetail {
-    pub fn stage(&self) -> StageDetail {
+    pub fn stage(&self) -> Stage {
         self.clone().into()
     }
 }
-
 
 impl Default for StageDetail {
     fn default() -> Self {
@@ -235,23 +273,20 @@ impl Default for StageDetail {
     }
 }
 
-
-
 /// [Actor] can be an [Agent], [Particle], etc.
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ActorKind))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize))]
 pub enum Actor {
-  /// referencing
-  Agent(Agent),
-  Particle(Point)
+    /// referencing
+    Agent(Agent),
+    Particle(Point),
 }
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AwaitCondition {
-    ActionRequest(ActionRequest)
+    ActionRequest(ActionRequest),
 }
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
@@ -262,9 +297,9 @@ pub enum ActionDetail {
     /// Idle is the nominal action state in two cases:
     /// 1. the Status Entity
     Idle,
-    /// the ntity is attempting to make the [StatusEntity] model match the external resource
-    /// that the [StatusEntity] represent (this can mean changing the [StatusEntity] to match
-    /// the external model or changing the external model to match the [StatusEntity]...
+    /// the ntity is attempting to make the [StatusProbe] model match the external resource
+    /// that the [StatusProbe] represent (this can mean changing the [StatusProbe] to match
+    /// the external model or changing the external model to match the [StatusProbe]...
     /// the synchronizing strategy differs by implementation use case
     Synchronizing,
     Fetching,
@@ -275,24 +310,18 @@ pub enum ActionDetail {
     /// performing initial setup (in the case of a Database the sql schema (tables, indices, etc.)
     /// are being created
     Initializing,
-    /// Attempting to start the [StatusEntity] AFTER it has been initialized... If the status
-    /// [StatusEntity] is, for example a Postgres cluster instance managed by the Starlane foundation
+    /// Attempting to start the [StatusProbe] AFTER it has been initialized... If the status
+    /// [StatusProbe] is, for example a Postgres cluster instance managed by the Starlane foundation
     /// this action is being performed after the postgres start command has been issued until
     /// it is ready to accept requests
     Starting,
 }
-
-
 
 impl Default for ActionDetail {
     fn default() -> Self {
         Self::Idle
     }
 }
-
-
-
-
 
 /// The results of a `Status Probe` which may contain a `Status` or a `StatusErr`
 /// if for some reason the probe fails
@@ -302,19 +331,15 @@ pub enum Probe<S> {
     Unreachable,
 }
 
-
 /// stores a variety of Report each of which should be able to generate a colorful terminal
 /// message (and maybe in the future as HTML)
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ReportType))]
-#[strum_discriminants(
-    derive(Hash, Serialize, Deserialize)
-)] // information explaining why the StatusItem is in a [ActionDetail::Pending] state
+#[strum_discriminants(derive(Hash, Serialize, Deserialize))] // information explaining why the StatusItem is in a [ActionDetail::Pending] state
 pub enum Report {
-    Pending(PendingDetail)
+    Pending(PendingDetail),
 }
-
 
 /*
 /// information explaining why the StatusItem is in a [ActionDetail::Pending] state
@@ -331,19 +356,14 @@ pub enum PendingDetail {
 
  */
 
-#[derive(Clone, Debug,  Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PendingDetail {
-  request: Vec<ActionRequest>,
-  conditions: Vec<AwaitCondition>,
+    request: Vec<ActionRequest>,
+    conditions: Vec<AwaitCondition>,
 }
 
-
-
-
-
-
-/// a remedy action request for an [Actor] external to the [StatusEntity] (usually a flesh and
-/// blood human being)...  The [StatusEntity] cannot perform this remedy on its own and
+/// a remedy action request for an [Actor] external to the [StatusProbe] (usually a flesh and
+/// blood human being)...  The [StatusProbe] cannot perform this remedy on its own and
 /// making it therefore reliant on an external actor
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ActionRequest {
@@ -367,7 +387,7 @@ impl ActionRequest {
         self.items.push(item);
     }
 
-    pub fn print(&self) { }
+    pub fn print(&self) {}
 }
 
 impl Display for ActionRequest {
@@ -397,7 +417,7 @@ impl Display for ActionRequest {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize,Builder)]
+#[derive(Clone, Debug, Serialize, Deserialize, Builder)]
 pub struct ActionItem {
     pub title: String,
     #[builder(setter(into, strip_option), default)]
@@ -442,42 +462,40 @@ impl Display for ActionItem {
 #[strum_discriminants(name(StateErr))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize))]
 pub enum StateErrDetail {
-  /// The Panic signals an obstacle that the status [StatusEntity] doesn't know how to resolve.
-  /// A Panic state indicates that the Entity has Not reached the desired
-  /// [State::Ready] state and is now idle.
-  ///
-  /// An [StatusEntity] may recover from a Panic if the panic issue is externally resolved and then
-  /// `Entity::synchronize()` is invoked trigger another try-again loop.
-  Panic(String),
-  /// [StateErr::Fatal] signals an error condition that cannot be recovered from.
-  /// Depending upon the context of the status [StatusEntity] reporting [StateErr::Fatal] possible
-  /// actions might be deleting and recreating the [StatusEntity] or shutting down the entire
-  /// Starlane process
-  Fatal(String)
+    /// The Panic signals an obstacle that the status [StatusProbe] doesn't know how to resolve.
+    /// A Panic state indicates that the Entity has Not reached the desired
+    /// [State::Ready] state and is now idle.
+    ///
+    /// An [StatusProbe] may recover from a Panic if the panic issue is externally resolved and then
+    /// `Entity::synchronize()` is invoked trigger another try-again loop.
+    Panic(String),
+    /// [StateErr::Fatal] signals an error condition that cannot be recovered from.
+    /// Depending upon the context of the status [StatusProbe] reporting [StateErr::Fatal] possible
+    /// actions might be deleting and recreating the [StatusProbe] or shutting down the entire
+    /// Starlane process
+    Fatal(String),
 }
-
 
 /// a convenience result in cases where teh [Status::Entity] host
 /// wants to know if it is [Status::Ready] and only cares about the
 /// [StatusDetail] if it is not ready.
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
-#[strum_discriminants(name(ResultKind))]
+#[strum_discriminants(name(StatusResultKind))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize))]
-pub enum Result {
+pub enum StatusResult {
     Ready,
-    NotReady(StatusDetail)
+    NotReady(StatusDetail),
 }
 
-
-/// Similar to [Result] [EntityResult] is a convenience enum for [StatusEntity] hosts which
-/// may be responsible for keeping the [StatusEntity] in a [Status::Ready] state...
+/// Similar to [Result] [EntityResult] is a convenience enum for [StatusProbe] hosts which
+/// may be responsible for keeping the [StatusProbe] in a [Status::Ready] state...
 ///
 /// example:
 /// ```
-/// use starlane::status::EntityReadier;
-/// use starlane::status::Result;
-/// use starlane::status::EntityResult;
+/// use starlane::status::{EntityReadier, StatusProbe};
+/// use starlane::status::StatusResult;
+/// use starlane::status::ReadyResult;
 ///
 /// # pub mod util {
 /// #  use starlane::status::StatusDetail;
@@ -486,7 +504,6 @@ pub enum Result {
 /// #  pub fn generate_status_detail() -> StatusDetail { todo!() }
 /// # }
 /// #
-///
 /// # trait StatusEntity { }
 ///
 /// struct Connection;
@@ -498,23 +515,28 @@ pub enum Result {
 /// struct ConnectionFacilitator;
 ///
 /// impl ConnectionFacilitator {
-///    fn probe(&self) -> Result {
+///    fn probe(&self) -> StatusResult {
 ///        match util::check_ready() {
-///           true => Result::Ready,
-///           false => Result::NotReady(util::generate_status_detail())
+///           true => StatusResult::Ready,
+///           false => StatusResult::NotReady(util::generate_status_detail())
 ///        }
 ///     }
 /// }
 ///
+/// impl StatusProbe for ConnectionFacilitator {
+///   async fn probe(&self) -> StatusResult {
+///      // do some `probing` here
+///         # todo!()
+///    }
+/// }
+///
 /// impl EntityReadier for ConnectionFacilitator {
-///
 ///    type Entity = Connection;
-///
-///    async fn ready(&self) -> EntityResult<Self::Entity> {
+///    async fn ready(&self) -> ReadyResult<Self::Entity> {
 ///       if util::check_ready() {
-///          EntityResult::Ready(util::create())
+///          ReadyResult::Ready(util::create())
 ///       } else {
-///          EntityResult::NotReady(util::generate_status_detail())
+///          ReadyResult::NotReady(util::generate_status_detail())
 ///       }
 ///    }
 /// }
@@ -525,7 +547,22 @@ pub enum Result {
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(EntityResultKind))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize))]
-pub enum EntityResult<E> where E: StatusEntity {
-    Ready(E),
-    NotReady(StatusDetail)
+pub enum ReadyResult<E>
+where
+    E: Entity + Send + Sync + ?Sized,
+{
+    Ready(Arc<E>),
+    NotReady(StatusDetail),
+}
+
+impl<E> Into<StatusDetail> for ReadyResult<E>
+where
+    E: Entity + Clone + Send + Sync + ?Sized,
+{
+    fn into(self) -> StatusDetail {
+        match self {
+            ReadyResult::Ready(_) => StatusDetail::default(),
+            ReadyResult::NotReady(status) => status,
+        }
+    }
 }

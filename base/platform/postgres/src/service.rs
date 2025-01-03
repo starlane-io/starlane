@@ -26,7 +26,7 @@ use async_trait::async_trait;
 use sqlx::postgres::PgConnectOptions;
 use starlane_base::provider;
 use starlane_space::parse::{Domain, VarCase};
-use starlane_space::status::{Handle, StatusEntity};
+use starlane_space::status::{Entity, Handle, StatusProbe};
 use starlane_base::Foundation;
 use starlane_base::platform::prelude::Platform;
 use starlane_base::kind::ProviderKindDef;
@@ -44,17 +44,17 @@ pub trait ProviderConfig:  provider::config::ProviderConfig  {
 
 /// final [provider::Provider] trait definitions for [concrete::PostgresServiceProvider]
 #[async_trait]
-pub trait Provider:  provider::Provider<Entity=PostgresServiceHandle>  {
+pub trait Provider:  provider::Provider<Entity=Arc<dyn PostgresService>>  {
     type Config: ProviderConfig + ?Sized;
 }
 
 
 /// trait implementation [Provider::Entity]
 #[async_trait]
-pub trait PostgresService : StatusEntity {}
+pub trait PostgresService : Entity<Id=String>+StatusProbe+Send+Sync { }
 
 
-pub type PostgresServiceHandle = Handle<Arc<dyn PostgresService>>;
+pub type PostgresServiceHandle = Handle<dyn PostgresService>;
 
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -148,7 +148,8 @@ mod concrete {
     use starlane_base::Foundation;
     use starlane_base::platform::prelude::Platform;
     use starlane_space::status;
-    use status::{EntityResult,Handle, Status, StatusDetail, StatusEntity, StatusWatcher};
+    use starlane_space::status::{Entity, EntityReadier, StatusResult};
+    use status::{ReadyResult, Handle, Status, StatusDetail, StatusProbe, StatusWatcher};
 
     use crate::service::config::PostgresUtilizationConfig;
 
@@ -172,9 +173,17 @@ mod concrete {
     }
 
     #[async_trait]
+    impl EntityReadier for PostgresServiceProvider {
+        type Entity = dyn my::PostgresService;
+
+        async fn ready(&self) -> ReadyResult<Self::Entity> {
+            todo!()
+        }
+    }
+
+    #[async_trait]
     impl Provider for PostgresServiceProvider {
         type Config = PostgresProviderConfig;
-        type Entity = my::PostgresServiceHandle;
 
         fn kind(&self) -> ProviderKindDef {
             ProviderKindDef::PostgresService
@@ -183,43 +192,32 @@ mod concrete {
         fn config(&self) -> Arc<Self::Config> {
             self.config.clone()
         }
-
-        async fn ready(&self) -> EntityResult<Self::Entity> {
-            todo!()
-        }
     }
 
 
     #[async_trait]
-    impl StatusEntity for PostgresServiceProvider {
-        fn status(&self) -> Status {
-            todo!()
-        }
+    impl StatusProbe for PostgresServiceProvider {
 
-        fn status_detail(&self) -> status::Result {
-            todo!()
-        }
-
-        fn status_watcher(&self) -> StatusWatcher {
-            todo!()
-        }
-
-        async fn probe(&self) -> status::Result {
+        async fn probe(&self) -> status::StatusResult {
             todo!()
         }
     }
 
-    /// the [StatusEntity] implementation which tracks with a Postgres Connection Pool.
-    /// With any [StatusEntity] the goal is to get to a [Status::Ready] state.  [PostgresService]
+    /// the [StatusProbe] implementation which tracks with a Postgres Connection Pool.
+    /// With any [StatusProbe] the goal is to get to a [Status::Ready] state.  [PostgresService]
     /// should abstract the specific [Manager] details.  A [PostgresService] may be a
     /// [Manager::Foundation] in which the [PostgresService] would be responsible for
     /// downloading, installing, initializing and starting Postgres before it creates the pool or if
     /// [Manager::External] then Starlane's [Platform] is only responsible for maintaining
     /// a connection pool to the given Postgres Cluster
+    ///
+    #[derive(Clone)]
     pub struct PostgresService {
         config: PostgresProviderConfig,
-        connection: Mutex<sqlx::PgConnection>
+        connection: Arc<Mutex<sqlx::PgConnection>>
     }
+
+    impl Entity for PostgresService { type Id = String; }
 
     #[async_trait]
     impl my::PostgresService for PostgresService { }
@@ -227,7 +225,7 @@ mod concrete {
 
     impl PostgresService {
         async fn new(config: PostgresProviderConfig) -> Result<Self, sqlx::Error> {
-            let connection = Mutex::new(config.connect_options().connect().await?);
+            let connection = Arc::new(Mutex::new(config.connect_options().connect().await?));
             Ok(Self {
                 config,
                 connection
@@ -236,22 +234,8 @@ mod concrete {
     }
 
     #[async_trait]
-    impl StatusEntity for PostgresService {
-        fn status(&self) -> Status {
-            todo!()
-        }
-
-        fn status_detail(&self) -> StatusDetail {
-            todo!()
-        }
-
-        fn status_watcher(&self) -> StatusWatcher {
-            todo!()
-        }
-
-        async fn probe(&self) -> Status {
-            /// need to normalize the [PostgresService::probe]
-            self.connection.lock().await.ping().await.unwrap();
+    impl StatusProbe for PostgresService {
+        async fn probe(&self) -> StatusResult {
             todo!()
         }
     }
@@ -288,6 +272,5 @@ mod concrete {
             &ProviderKindDef::PostgresService
         }
     }
-
 
 }

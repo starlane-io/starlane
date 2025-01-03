@@ -3,7 +3,7 @@ pub mod database;
 mod err;
 
 use starlane_hyperspace::provider::Provider;
-use starlane_space::status::StatusEntity;
+use starlane_space::status::StatusProbe;
 use std::fmt::Display;
 use std::str::FromStr;
 use starlane_hyperspace::provider::config::ProviderConfig;

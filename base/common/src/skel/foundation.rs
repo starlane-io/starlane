@@ -163,7 +163,7 @@ pub mod concrete {
         use async_trait::async_trait;
         use starlane_hyperspace::provider::err::ProviderErr;
         use starlane_hyperspace::provider::ProviderKindDef;
-        use starlane_space::status::{StatusEntity, StatusWatcher};
+        use starlane_space::status::{StatusProbe, StatusWatcher};
         use crate::foundation;
         use crate::config;
         use crate::kind;
@@ -196,7 +196,7 @@ pub mod concrete {
 
         impl foundation::skel::Provider for Provider {}
 
-        impl StatusEntity for Provider {
+        impl StatusProbe for Provider {
             fn status(&self) -> Status {
                 todo!()
             }

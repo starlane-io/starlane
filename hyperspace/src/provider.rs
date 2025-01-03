@@ -1,13 +1,12 @@
 pub mod config;
 pub mod err;
-mod variants;
 
 use std::sync::Arc;
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 use starlane_space::parse::CamelCase;
-use starlane_space::status::{Action, ActionRequest, StatusEntity, PendingDetail};
+use starlane_space::status::{Action, ActionRequest, StatusProbe, PendingDetail, EntityReadier, Entity};
 use crate::provider::err::ProviderErr;
 
 use starlane_space::status::Status;
@@ -57,22 +56,22 @@ pub enum PostgresDatabaseKindDef{
 
 
 /// indicates which architecture layer manages this dependency or if management is external
-/// to starlane itself.  Managing entails: downloading, installing and starting the [StatusEntity]
+/// to starlane itself.  Managing entails: downloading, installing and starting the [StatusProbe]
 #[derive(Clone,Debug,Serialize, Deserialize)]
 pub enum Manager {
-    /// the [StatusEntity] is managed by Starlane's Foundation.  For example a running Starlane
+    /// the [StatusProbe] is managed by Starlane's Foundation.  For example a running Starlane
     /// local development cluster might use DockerDesktopFoundation to provide services like
     /// Postgres.
     Foundation,
 
-    /// The [StatusEntity] is managed by the Platform. Again a postgres example: instead of
-    /// being responsible for starting Postgres imagine that the [StatusEntity] is actually
+    /// The [StatusProbe] is managed by the Platform. Again a postgres example: instead of
+    /// being responsible for starting Postgres imagine that the [StatusProbe] is actually
     /// a `PostgresConnectionPool` ... The Platform is responsible for creating and maintaining
     /// and status reporting on the health of the connection pool (which isn't the same as
     /// Foundation which is responsible for making the service available and in a ready state)
     Platform,
 
-    /// A completely  external entity manages this [StatusEntity]
+    /// A completely  external entity manages this [StatusProbe]
     External
 }
 
@@ -83,19 +82,23 @@ pub enum Manager {
 /// is a Database server like Postgres... the Dependency will download, install, initialize and
 /// start the service whereas a Provider in this example would represent an individual Database
 #[async_trait]
-pub trait Provider: StatusEntity + Sync {
+pub trait Provider: StatusProbe+EntityReadier + Send+Sync {
     type Config: config::ProviderConfig + ?Sized;
 
+    /*
     /// [Provider::Entity]: either a `utilization` or `control` interface for this [Provider]'s
     /// [Status::Ready] state. The purpose of a [Provider] is to bring [Provider::Entity] into
     /// a useful [Status::Ready] state -- or provide useful error information as to why
     /// [Provider::ready] failed.
-    type Entity: StatusEntity + Send + Sync;
+    type Entity: Entity+Send+Sync;
+
+     */
 
     fn kind(&self) -> ProviderKindDef;
 
     fn config(&self) -> Arc<Self::Config>;
 
+    /*
     /// Returns an interface clone for [Provider::Entity] when it reaches [Status::Ready].
     ///
     /// If [Provider::Entity] is NOT ready [Provider::ready] will start the `readying` tasks
@@ -113,8 +116,9 @@ pub trait Provider: StatusEntity + Sync {
     /// [StateDetail::Fatal] should fail immediately.
     ///
     /// Progress [Status] of [Self::ready] can be tracked using: [Self::status_watcher]
-    async fn ready(&self) -> status::EntityResult<Self::Entity>;
+    async fn ready(&self) -> status::ReadyResult<Self::Entity>;
 
+     */
 }
 
 /*

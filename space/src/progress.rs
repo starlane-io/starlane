@@ -95,7 +95,7 @@ pub trait Task {
 pub mod private {
     use starlane_space::parse::SkewerCase;
     use crate::progress::TaskState;
-    use crate::status::{Status, StatusDetail, StatusEntity, StatusWatcher};
+    use crate::status::{Status, StatusDetail, StatusProbe, StatusWatcher};
 
     pub struct Task {
         name: &'static str,

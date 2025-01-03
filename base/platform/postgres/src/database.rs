@@ -6,8 +6,9 @@ mod concrete {
     use sqlx::postgres::PgConnectOptions;
     use starlane_base::foundation::config::ProviderConfig;
     use starlane_base::provider::{ProviderKindDef,ProviderKind};
-    use starlane_base::status::{Status,StatusDetail,Handle,StatusEntity,StatusWatcher};
+    use starlane_base::status::{Status, StatusDetail, Handle, StatusProbe, StatusWatcher};
     use starlane_base::provider::{Provider,err::ProviderErr};
+    use starlane_space::status::{Entity, EntityReadier, ReadyResult, StatusResult};
     use crate::service::{Pool, PostgresServiceHandle};
     use crate::service::config::{PostgresUtilizationConfig};
 
@@ -51,9 +52,17 @@ mod concrete {
     }
 
     #[async_trait]
+    impl EntityReadier for PostgresDatabaseProvider {
+        type Entity = PostgresDatabaseHandle;
+
+        async fn ready(&self) -> ReadyResult<Self::Entity> {
+            todo!()
+        }
+    }
+
+    #[async_trait]
     impl Provider for PostgresDatabaseProvider {
         type Config = Config;
-        type Entity = PostgresDatabase;
 
         fn kind(&self) -> ProviderKindDef {
             ProviderKindDef::PostgresService
@@ -63,28 +72,12 @@ mod concrete {
             self.config.clone()
         }
 
-
-        async fn ready(&self) -> Result<Self::Entity, ProviderErr> {
-            todo!()
-        }
     }
 
 
     #[async_trait]
-    impl StatusEntity for PostgresDatabaseProvider {
-        fn status(&self) -> Status {
-            todo!()
-        }
-
-        fn status_detail(&self) -> StatusDetail {
-            todo!()
-        }
-
-        fn status_watcher(&self) -> StatusWatcher {
-            todo!()
-        }
-
-        async fn probe(&self) -> Status {
+    impl StatusProbe for PostgresDatabaseProvider {
+        async fn probe(&self) -> StatusResult {
             todo!()
         }
     }
@@ -95,6 +88,7 @@ mod concrete {
         service: PostgresServiceHandle,
         pool: Pool
     }
+
 
     impl PostgresDatabase {
         /// create a new Postgres Connection `Pool`
@@ -109,29 +103,28 @@ mod concrete {
         }
     }
 
+    impl Entity for PostgresDatabase {
+        type Id = String;
+    }
+
     #[async_trait]
-    impl StatusEntity for PostgresDatabase {
-        fn status(&self) -> Status {
-            todo!()
-        }
+    impl StatusProbe for PostgresDatabase {
 
-        fn status_detail(&self) -> StatusDetail {
-            todo!()
-        }
-
-        fn status_watcher(&self) -> StatusWatcher {
-            todo!()
-        }
-
-        async fn probe(&self) -> Status{
+        async fn probe(&self) -> StatusResult {
             async fn ping(pool: & Pool) -> Result<Status,sqlx::Error> {
                 pool.acquire().await?.ping().await.map(|_| Status::Ready)
             }
 
+            todo!();
+
+            // need to do the hard work of building the actual `StatusDetail`
+           /*
             match ping(&self.pool).await {
                 Ok(_) => Status::Ready,
                 Err(_) => Status::Unknown
             }
+
+            */
 
         }
     }
