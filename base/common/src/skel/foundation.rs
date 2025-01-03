@@ -217,7 +217,7 @@ pub mod concrete {
         #[async_trait]
         impl foundation::Provider for Provider<> {
             type Config = ProviderConfig;
-            type Item = ();
+            type Entity = ();
 
             fn kind(&self) -> ProviderKindDef {
                 todo!()
@@ -231,7 +231,7 @@ pub mod concrete {
                 todo!()
             }
 
-            async fn ready(&self) -> Result<Self::Item, ProviderErr> {
+            async fn ready(&self) -> Result<Self::Entity, ProviderErr> {
                 todo!()
             }
         }

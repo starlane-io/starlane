@@ -14,6 +14,7 @@ use starlane_space::status::Status;
 use starlane_space::status::Stage;
 use starlane_space::status::StateDetail;
 use crate::registry::Registry;
+use starlane_space::status;
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
@@ -85,17 +86,19 @@ pub enum Manager {
 pub trait Provider: StatusEntity + Sync {
     type Config: config::ProviderConfig + ?Sized;
 
-    type Item;
+    /// [Provider::Entity]: either a `utilization` or `control` interface for this [Provider]'s
+    /// [Status::Ready] state. The purpose of a [Provider] is to bring [Provider::Entity] into
+    /// a useful [Status::Ready] state -- or provide useful error information as to why
+    /// [Provider::ready] failed.
+    type Entity: StatusEntity + Send + Sync;
 
     fn kind(&self) -> ProviderKindDef;
 
     fn config(&self) -> Arc<Self::Config>;
 
-
-
-    /// Returns an interface clone for [Provider::Item] when it reaches [Status::Ready].
+    /// Returns an interface clone for [Provider::Entity] when it reaches [Status::Ready].
     ///
-    /// If [Provider::Item] is NOT ready [Provider::ready] will start the `readying` tasks
+    /// If [Provider::Entity] is NOT ready [Provider::ready] will start the `readying` tasks
     /// and will not return until the [Status::Ready] state is reached or if a [ProviderErr]
     /// is encountered.
     ///
@@ -106,11 +109,11 @@ pub trait Provider: StatusEntity + Sync {
     ///
     /// Calling [Provider::ready] on a [Provider] that's current [StateDetail]'s variant is
     /// [StateDetail::Pending] should `un-panic` the [Provider] and cause it to retry readying
-    /// [Provider::Item]. A [Provider::ready] invocation on a [Provider] that is
+    /// [Provider::Entity]. A [Provider::ready] invocation on a [Provider] that is
     /// [StateDetail::Fatal] should fail immediately.
     ///
     /// Progress [Status] of [Self::ready] can be tracked using: [Self::status_watcher]
-    async fn ready(&self) -> Result<Self::Item,ProviderErr>;
+    async fn ready(&self) -> status::EntityResult<Self::Entity>;
 
 }
 

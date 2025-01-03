@@ -102,12 +102,12 @@ pub mod concrete {
                 use super::my;
                 use super::utilize;
                 use crate::Provider;
-                ///  [ProviderMode::Create] mode must also contain [ProviderMode::Utilize] mode's
+                ///  [ProviderMode::Control] mode must also contain [ProviderMode::Utilize] mode's
                 /// config since the foundation will want to Create the Provision (potentially
                 /// meaning: downloading, instancing, credential setup,  initializing...etc.)
                 /// and then will want to [ProviderMode::Utilize] the [Provider] (potentially meaning:
                 /// authenticating via the same credentials supplied from
-                /// [ProviderMode::Create], connecting to the same port that was set up etc.
+                /// [ProviderMode::Control], connecting to the same port that was set up etc.
                 pub trait ProviderConfig: my::ProviderConfig + utilize::ProviderConfig {}
             }
 

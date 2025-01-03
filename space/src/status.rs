@@ -20,15 +20,40 @@ pub type StatusReporter = tokio::sync::watch::Sender<Status>;
 pub trait StatusEntity {
     fn status(&self) -> Status;
 
-    fn status_detail(&self) -> StatusDetail;
+    /// Returns the most recent [Status] which is not guaranteed to be
+    /// in sync with the `real world` entity that this [StatusEntity] describes.
+    ///
+    /// call [StatusEntity::probe] to query the target entity and update the [StatusDetail]
+    fn status_detail(&self) -> Result;
 
     /// Returns a [StatusWatcher]
     fn status_watcher(&self) -> StatusWatcher;
 
-    /// query the [StatusEntity]'s  real world status and categorize it with a [Status]
-    async fn probe(&self) -> Status;
+    /// Returns:
+    /// * [Result::Ready] if status is determined to be [Status::Ready]
+    /// * [Result::NotReady] which wraps a *hopefully* useful [StatusDetail]
+    ///
+    /// [StatusEntity::probe] should synchronize the internal [StatusDetail] model to
+    /// describe the status of its target entity
+    async fn probe(&self) -> Result;
 }
 
+/*
+pub enum ReadyFacilitator<C, U>
+where
+    C: provider::mode::create::ProviderConfig,
+    U: provider::mode::utilize::ProviderConfig,
+{
+    Utilize(U),
+    Control(C),
+}
+
+ */
+/// trait for a `facilitator` which
+pub trait StatusEntityReadyFacilitator{
+   type Entity: StatusEntity+Send+Sync;
+   async fn ready(&self) -> EntityResult<Self::Entity>;
+}
 
 /// [Handle] contains [E]--which implements the [StatusEntity] trait--and a private
 /// `hold` reference which is a [tokio::sync::mpsc::Sender] created from the [StatusEntity]'s
@@ -56,6 +81,9 @@ impl <E> Deref for Handle<E> where E: StatusEntity {
         & self.entity
     }
 }
+
+
+
 
 
 /// the broad classification of a [StatusEntity]'s internal state.
@@ -403,4 +431,78 @@ pub enum StateErrDetail {
   /// actions might be deleting and recreating the [StatusEntity] or shutting down the entire
   /// Starlane process
   Fatal(String)
+}
+
+
+/// a convenience result in cases where teh [Status::Entity] host
+/// wants to know if it is [Status::Ready] and only cares about the
+/// [StatusDetail] if it is not ready.
+#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(ResultKind))]
+#[strum_discriminants(derive(Hash, Serialize, Deserialize))]
+pub enum Result {
+    Ready,
+    NotReady(StatusDetail)
+}
+
+
+/// Similar to [Result] [EntityResult] is a convenience enum for [StatusEntity] hosts which
+/// may be responsible for keeping the [StatusEntity] in a [Status::Ready] state...
+///
+/// example:
+/// ```
+/// use starlane::status::StatusEntityReadyFacilitator;
+/// use starlane::status::Result;
+/// use starlane::status::EntityResult;
+///
+/// # pub mod util {
+/// #  use starlane::status::StatusDetail;
+/// #  pub fn check_ready() -> bool { true }
+/// #  pub fn create() -> super::super::Connection { todo!() }
+/// #  pub fn generate_status_detail() -> StatusDetail { todo!() }
+/// # }
+/// #
+///
+/// # trait StatusEntity { }
+///
+/// struct Connection;
+///
+/// impl StatusEntity for Connection {
+///    // various concrete functions  defined...
+/// }
+///
+/// struct ConnectionFacilitator;
+///
+/// impl ConnectionFacilitator {
+///    fn probe(&self) -> Result {
+///        match util::check_ready() {
+///           true => Result::Ready,
+///           false => Result::NotReady(util::generate_status_detail())
+///        }
+///     }
+/// }
+///
+/// impl StatusEntityReadyFacilitator for ConnectionFacilitator {
+///
+///    type Entity = Connection;
+///
+///    async fn ready(&self) -> EntityResult<Self::Entity> {
+///       if util::check_ready() {
+///          EntityResult::Ready(util::create())
+///       } else {
+///          EntityResult::NotReady(util::generate_status_detail())
+///       }
+///    }
+/// }
+///
+/// ```
+
+#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(EntityResultKind))]
+#[strum_discriminants(derive(Hash, Serialize, Deserialize))]
+pub enum EntityResult<E> where E: StatusEntity {
+    Ready(E),
+    NotReady(StatusDetail)
 }

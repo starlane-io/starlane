@@ -1,134 +1,141 @@
-use std::sync::Arc;
-use async_trait::async_trait;
-use sqlx::{ConnectOptions, Error, PgPool};
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use sqlx::postgres::any::AnyConnectionBackend;
-use starlane_base::status::{Handle, Status, StatusDetail, StatusWatcher, StatusEntity};
-use starlane_base::provider::{Provider,ProviderKindDef,ProviderKind};
-use starlane_base::provider::err::ProviderErr;
-use crate::service::{ DbKey, Pool, PostgresConnectionConfig, PostgresService, PostgresServiceHandle};
 
-#[derive(Clone, Eq, PartialEq)]
-struct Config {
-    database: String,
-    connection: PostgresConnectionConfig
-}
+mod concrete {
+    use std::sync::Arc;
+    use async_trait::async_trait;
+    use sqlx::{Connection, PgPool};
+    use sqlx::postgres::PgConnectOptions;
+    use starlane_base::foundation::config::ProviderConfig;
+    use starlane_base::provider::{ProviderKindDef,ProviderKind};
+    use starlane_base::status::{Status,StatusDetail,Handle,StatusEntity,StatusWatcher};
+    use starlane_base::provider::{Provider,err::ProviderErr};
+    use crate::service::{Pool, PostgresServiceHandle};
+    use crate::service::config::{PostgresUtilizationConfig};
 
-impl Config {
-    pub(crate) fn connect_options(&self) -> PgConnectOptions {
-       let mut options = self.connection.connect_options();
-        options.database(&self.database.as_str())
+    #[derive(Clone, Eq, PartialEq)]
+    pub struct Config {
+        database: String,
+        connection: PostgresUtilizationConfig
     }
-}
 
-
-pub type PostgresDatabaseHandle = Handle<PostgresDatabase>;
-pub struct PostgresDatabaseProvider {
-    config: Arc<Config>,
-    status: tokio::sync::watch::Sender<Status>,
-}
-
-impl PostgresDatabaseProvider {
-    pub fn new(config: Arc<Config>) -> Self {
-        let (status_reporter, _ ) = tokio::sync::watch::channel(Default::default());
-
-        Self {
-            config,
-            status: status_reporter,
+    impl Config {
+        pub(crate) fn connect_options(&self) -> PgConnectOptions {
+            let mut options = self.connection.connect_options();
+            options.database(&self.database.as_str())
         }
     }
-}
 
-#[async_trait]
-impl Provider for PostgresDatabaseProvider{
-    type Config = Config;
-    type Item = PostgresDatabase;
-
-    fn kind(&self) -> ProviderKindDef {
-        ProviderKindDef::PostgresService
+    impl starlane_hyperspace::provider::config::ProviderConfig for Config {
+        fn kind(&self) -> &ProviderKindDef {
+            todo!()
+        }
     }
 
-    fn config(&self) -> Arc<Self::Config> {
-        self.config.clone()
+    impl ProviderConfig for Config {}
+
+
+    pub type PostgresDatabaseHandle = Handle<PostgresDatabase>;
+    pub struct PostgresDatabaseProvider {
+        config: Arc<Config>,
+        status: tokio::sync::watch::Sender<Status>,
     }
 
+    impl PostgresDatabaseProvider {
+        pub fn new(config: Arc<Config>) -> Self {
+            let (status_reporter, _) = tokio::sync::watch::channel(Default::default());
 
-    async fn ready(&self) -> Result<Self::Item, ProviderErr> {
-        todo!()
-    }
-}
-
-
-#[async_trait]
-impl StatusEntity for PostgresDatabaseProvider{
-    fn status(&self) -> Status {
-        todo!()
+            Self {
+                config,
+                status: status_reporter,
+            }
+        }
     }
 
-    fn status_detail(&self) -> StatusDetail {
-        todo!()
-    }
+    #[async_trait]
+    impl Provider for PostgresDatabaseProvider {
+        type Config = Config;
+        type Entity = PostgresDatabase;
 
-    fn status_watcher(&self) -> StatusWatcher {
-        todo!()
-    }
-
-    async fn probe(&self) -> Status{
-        todo!()
-    }
-}
-
-
-pub struct PostgresDatabase {
-    config: Config,
-    service: PostgresServiceHandle,
-    pool: Pool
-}
-
-impl PostgresDatabase {
-
-    /// create a new Postgres Connection `Pool`
-    async fn new(config: Config, service: PostgresServiceHandle   ) -> Result<Self,sqlx::Error>{
-            let pool= PgPool::connect_with(config.connect_options()).await?;
-
-        Ok(Self {
-            config,
-            service,
-            pool
-        })
-    }
-
-}
-
-#[async_trait]
-impl StatusEntity for PostgresDatabase {
-    fn status(&self) -> Status {
-        todo!()
-    }
-
-    fn status_detail(&self) -> StatusDetail {
-        todo!()
-    }
-
-    fn status_watcher(&self) -> StatusWatcher {
-        todo!()
-    }
-
-    async fn probe(&self) -> Status{
-        async fn ping(pool: & Pool) -> Result<Status,sqlx::Error> {
-            pool.acquire().await?.ping().await
+        fn kind(&self) -> ProviderKindDef {
+            ProviderKindDef::PostgresService
         }
 
-        match ping(&self.pool).await {
-            Ok(_) => Status::Ready,
-            Err(_) => Status::Unknown
+        fn config(&self) -> Arc<Self::Config> {
+            self.config.clone()
         }
 
-    }
-}
 
-impl PostgresDatabase {
-    pub fn key(&self) -> &DbKey {
-        &self.service.key()
+        async fn ready(&self) -> Result<Self::Entity, ProviderErr> {
+            todo!()
+        }
     }
+
+
+    #[async_trait]
+    impl StatusEntity for PostgresDatabaseProvider {
+        fn status(&self) -> Status {
+            todo!()
+        }
+
+        fn status_detail(&self) -> StatusDetail {
+            todo!()
+        }
+
+        fn status_watcher(&self) -> StatusWatcher {
+            todo!()
+        }
+
+        async fn probe(&self) -> Status {
+            todo!()
+        }
+    }
+
+
+    pub struct PostgresDatabase {
+        config: Config,
+        service: PostgresServiceHandle,
+        pool: Pool
+    }
+
+    impl PostgresDatabase {
+        /// create a new Postgres Connection `Pool`
+        async fn new(config: Config, service: PostgresServiceHandle) -> Result<Self, sqlx::Error> {
+            let pool = PgPool::connect_with(config.connect_options()).await?;
+
+            Ok(Self {
+                config,
+                service,
+                pool
+            })
+        }
+    }
+
+    #[async_trait]
+    impl StatusEntity for PostgresDatabase {
+        fn status(&self) -> Status {
+            todo!()
+        }
+
+        fn status_detail(&self) -> StatusDetail {
+            todo!()
+        }
+
+        fn status_watcher(&self) -> StatusWatcher {
+            todo!()
+        }
+
+        async fn probe(&self) -> Status{
+            async fn ping(pool: & Pool) -> Result<Status,sqlx::Error> {
+                pool.acquire().await?.ping().await.map(|_| Status::Ready)
+            }
+
+            match ping(&self.pool).await {
+                Ok(_) => Status::Ready,
+                Err(_) => Status::Unknown
+            }
+
+        }
+    }
+
+
+
 }

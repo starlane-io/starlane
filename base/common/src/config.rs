@@ -41,8 +41,8 @@ where
     C: provider::mode::create::ProviderConfig,
     U: provider::mode::utilize::ProviderConfig,
 {
-    Create(C),
     Utilize(U),
+    Control(C),
 }
 
 
@@ -55,11 +55,11 @@ pub mod provider {
             use super::utilize;
             use super::super::super::ProviderMode;
             use starlane_hyperspace::provider::Provider;
-            ///  [ProviderMode::Create] mode must also contain [ProviderMode::Utilize] mode's
+            ///  [ProviderMode::Control] mode must also contain [ProviderMode::Utilize] mode's
             /// properties since the foundation will want to Create the Provision
             /// (potentially meaning: downloading, instancing, credential setup,  initializing...
-            /// etc.) and then will want to [ProviderMode::Utilize] the [Provider::Item] (potentially meaning:
-            /// authenticating via the same credentials supplied from [ProviderMode::Create],
+            /// etc.) and then will want to [ProviderMode::Utilize] the [Provider::Entity] (potentially meaning:
+            /// authenticating via the same credentials supplied from [ProviderMode::Control],
             /// connecting to the same port that was set up etc.
             pub trait ProviderConfig: my::ProviderConfig + utilize::ProviderConfig {}
         }
