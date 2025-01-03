@@ -1,7 +1,57 @@
+use strum_macros::EnumDiscriminants;
 use starlane_space::parse::CamelCase;
 
 /// reexport from [starlane_hyperspace]
 pub use starlane_hyperspace::provider::{ProviderKind,ProviderKindDef};
+
+pub struct Exact {
+   strata: StrataDef
+}
+
+
+#[derive(Clone, Debug, EnumDiscriminants)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(Strata))]
+#[strum_discriminants(derive(Hash,strum_macros::Display))]
+pub enum StrataDef {
+   Super(SuperSubStrataDef),
+   Base(BaseSubStrataDef),
+}
+
+#[derive(Clone, Debug, EnumDiscriminants)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(SuperSubStrata))]
+#[strum_discriminants(derive(Hash,strum_macros::Display))]
+pub enum SuperSubStrataDef {
+   Space,
+   Hyper
+}
+
+#[derive(Clone, Debug, EnumDiscriminants)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(BaseSubStrata))]
+#[strum_discriminants(derive(Hash, strum_macros::Display))]
+pub enum BaseSubStrataDef {
+   Platform(PlatformKind),
+   Foundation(FoundationKind)
+}
+
+
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, strum_macros::Display)]
+#[non_exhaustive]
+pub enum PlatformKind {
+   Starlane
+}
+
+
+impl Default for PlatformKind {
+   fn default() -> Self {
+      PlatformKind::Starlane
+   }
+}
+
+
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, strum_macros::Display)]
 #[non_exhaustive]

@@ -4,8 +4,17 @@ use starlane_hyperspace::provider::{Provider, ProviderKind};
 use starlane_space::progress::Progress;
 use starlane_space::status::{Status, StatusReporter, StatusWatcher};
 use crate::{config, err, status};
+use crate::context;
 use crate::err::BaseErr;
 use crate::kind::FoundationKind;
+
+
+pub struct Base<P,F> where P:Platform, F: Foundation{
+  platform: P,
+  foundation: F
+}
+
+
 
 // ['Foundation'] is an abstraction for managing infrastructure.
 #[async_trait]
@@ -15,7 +24,8 @@ pub trait Foundation: Sync + Send {
     type Config: config::FoundationConfig + ?Sized;
 
     /// [crate::Foundation::Provider] Should be [Provider] or a custom `trait` that implements [Provider]
-    type Provider: Provider + ?Sized;
+    type Provider: Provider+ ?Sized;
+    /// a
 
     fn kind(&self) -> FoundationKind;
 

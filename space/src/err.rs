@@ -339,7 +339,7 @@ impl SpaceErr {
     }
 }
 
-impl StatusErr for SpaceErr {
+impl LegacyStatusErr for SpaceErr {
     fn status(&self) -> u16 {
         match self {
             SpaceErr::Status { status, .. } => status.clone(),
@@ -356,7 +356,7 @@ impl StatusErr for SpaceErr {
     }
 }
 
-pub trait StatusErr {
+pub trait LegacyStatusErr {
     fn status(&self) -> u16;
     fn message(&self) -> String;
 }

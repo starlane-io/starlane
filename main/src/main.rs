@@ -37,10 +37,6 @@ pub mod server;
 pub mod cli;
 
 
-pub mod env;
-
-pub mod server;
-
 
 
 
@@ -207,6 +203,7 @@ pub fn main() -> Result<(), anyhow::Error> {
     }
 }
 
+/*
 #[cfg(not(feature = "server"))]
 fn run() -> Result<(), anyhow::Error> {
     println!("'' feature is not enabled in this main installation");
@@ -214,6 +211,8 @@ fn run() -> Result<(), anyhow::Error> {
         "'machine' feature is not enabled in this main installation"
     ))
 }
+
+ */
 
 async fn run() -> Result<(), anyhow::Error> {
     let console = Console::new();

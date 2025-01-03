@@ -49,7 +49,7 @@ use crate::kind::{ProviderKind,ProviderKindDef,FoundationKind};
 
 
 pub mod config;
-
+pub mod context;
 
 /// disabled for now ...
 //pub mod util;

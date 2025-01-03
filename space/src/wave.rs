@@ -12,7 +12,7 @@ use self::core::http2::HttpMethod;
 use self::core::hyper::HypMethod;
 use self::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
 use crate::command::RawCommand;
-use crate::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError, StatusErr};
+use crate::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError, LegacyStatusErr};
 use crate::loc::{Surface, ToPoint, ToSurface, Uuid};
 use crate::log::{Spanner, Trackable, TrailSpanId};
 use crate::parse::model::Subst;

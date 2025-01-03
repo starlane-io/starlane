@@ -6,10 +6,14 @@ use std::ops::Deref;
 
 
 /// these reexports must come from [crate::service] since they are mocks when `#[cfg(test)]`
-use crate::service::Pool;
+use crate::service;
+use service::{Pool,PgConnection,PoolConnection};
+use crate::database::partial::pool::PostgresDatabaseConnectionPoolProvider;
+use crate::service::PostgresServiceHandle;
+
+pub type PostgresDatabaseHandle = Handle<dyn PostgresDatabase<DerefTarget=Pool>>;
 
 
-pub type PostgresDatabaseHandle = Handle<dyn PostgresDatabase>;
 
 
 /// tried to make [Handle] expose [Pool] by implementing
@@ -27,14 +31,12 @@ pub type PostgresDatabaseHandle = Handle<dyn PostgresDatabase>;
 /// }
 /// ```
 #[async_trait]
-pub trait PostgresDatabase: Entity+StatusProbe+Deref<Target=Pool>+Send+Sync {
-
-}
-
+pub trait PostgresDatabase: Entity+PostgresDatabaseConnectionPoolProvider+StatusProbe+Send+Sync { }
 
 
 
 mod concrete {
+    use std::future::Future;
     use super::base;
     mod my {
         pub use super::super::*;
@@ -49,12 +51,11 @@ mod concrete {
     use starlane_base::status::{Status, StatusProbe};
     use std::ops::Deref;
     use std::sync::Arc;
-
-    use super::Pool;
+    use tokio::sync::Mutex;
     use crate::service::config::PostgresUtilizationConfig;
-    use crate::service::{MockPool, PostgresServiceHandle};
-    use starlane_base::status::{Entity, EntityReadier, ReadyResult, StatusResult};
-
+    use starlane_base::status::{Entity, EntityReadier, EntityResult, StatusResult};
+    use crate::database::concrete::my::PostgresDatabaseConnectionPoolProvider;
+    use crate::service::{PgConnection, PostgresServiceHandle};
 
     #[derive(Clone, Eq, PartialEq)]
     pub struct Config {
@@ -68,6 +69,7 @@ mod concrete {
             options.database(&self.database.as_str())
         }
 
+        #[cfg(test)]
         pub fn mock() -> Self {
             let database = "registry".to_string();
             let connection = PostgresUtilizationConfig::mock();
@@ -110,16 +112,13 @@ mod concrete {
         }
     }
 
-    impl Deref for PostgresDatabase {
-        type Target = Pool;
 
-        fn deref(&self) -> &Self::Target {
-            &self.pool
+
+    impl PostgresDatabaseConnectionPoolProvider for PostgresDatabase {
+        fn pool(&self) -> &my::Pool {
+            & self.pool
         }
     }
-
-
-
 
     #[async_trait]
     impl my::PostgresDatabase for PostgresDatabase { }
@@ -129,7 +128,7 @@ mod concrete {
     impl EntityReadier for PostgresDatabaseProvider {
         type Entity = PostgresDatabase;
 
-        async fn ready(&self) -> ReadyResult<Self::Entity> {
+        async fn ready(&self) -> EntityResult<Self::Entity> {
             todo!()
         }
     }
@@ -160,7 +159,7 @@ mod concrete {
     pub struct PostgresDatabase {
         config: Config,
         service: PostgresServiceHandle,
-        pool: Pool
+        pool: my::Pool
     }
 
     impl PostgresDatabase {
@@ -177,6 +176,7 @@ mod concrete {
         }
 
         #[cfg(test)]
+        #[cfg(feature="test")]
         pub fn mock(service: PostgresServiceHandle) -> Self {
             let config = Config::mock();
             let pool : MockPool<sqlx::Postgres> = Pool::default();
@@ -190,7 +190,13 @@ mod concrete {
     }
 
 
-    impl Entity for PostgresDatabase { }
+    impl Entity for PostgresDatabase {
+        type DerefTarget = my::Pool;
+
+        fn deref_target(&self) -> &Self::DerefTarget {
+            todo!()
+        }
+    }
 
     #[async_trait]
     impl StatusProbe for PostgresDatabase {
@@ -198,26 +204,19 @@ mod concrete {
         async fn probe(&self) -> StatusResult {
 
             #[cfg(not(test))]
-            async fn ping(pool: & Pool) -> Result<Status,sqlx::Error> {
+            async fn ping(pool: & my::Pool) -> Result<Status,sqlx::Error> {
                 pool.acquire().await?.ping().await.map(|_| Status::Ready)
             }
 
             #[cfg(test)]
-            async fn ping(pool: & Pool) -> Result<Status,sqlx::Error> {
+            #[cfg(feature="test")]
+            async fn ping(pool: & my::Pool) -> Result<Status,sqlx::Error> {
                 Ok(Status::Ready)
             }
 
+            todo!()
 
-            todo!();
 
-            // need to do the hard work of building the actual `StatusDetail`
-           /*
-            match ping(&self.pool).await {
-                Ok(_) => Status::Ready,
-                Err(_) => Status::Unknown
-            }
-
-            */
 
         }
     }
@@ -228,6 +227,38 @@ mod concrete {
 
 }
 
+
+
+pub mod partial {
+    mod my { pub use super::super::*; }
+
+    /// connection pool support
+    pub mod pool {
+        use std::future::Future;
+        use std::sync::Arc;
+        use sqlx::{Acquire};
+        use tokio::sync::Mutex;
+        use super::my;
+
+        pub trait PostgresDatabaseConnectionPoolProvider  {
+            fn pool(&self) -> & my::Pool;
+            /*
+            async fn acquire(&self) -> impl Future<Output=Result<my::PgConnection, sqlx::Error>> + 'static
+            {
+                let con = self.pool();
+                async move  {
+                    let guard = con.lock().await.acquire().await.unwrap();
+                    guard.acquire().await
+                }
+            }
+
+             */
+        }
+    }
+
+}
+
+
 #[cfg(test)]
 pub mod tests {
     use super::concrete::{PostgresDatabase, PostgresDatabaseProvider};
@@ -237,11 +268,14 @@ pub mod tests {
 
     #[tokio::test]
     pub async fn test_handle_deref() {
-        let service_provider = PostgresServiceProvi::mock();
+        /*
+        let service_provider = ::mock();
         let service = service_provider.ready().await.to_res().unwrap();
         let database = PostgresDatabase::mock();
         let handle = Handle::mock(database);
         let deref = handle.deref();
+
+         */
 
     }
 }

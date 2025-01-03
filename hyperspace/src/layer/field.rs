@@ -8,7 +8,7 @@ use crate::star::{HyperStarSkel, TraverseToNextRouter};
 use starlane_space::artifact::asynch::ArtErr;
 use starlane_space::artifact::ArtRef;
 use starlane_space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
-use starlane_space::err::{CoreReflector, SpaceErr, StatusErr};
+use starlane_space::err::{CoreReflector, SpaceErr, LegacyStatusErr};
 use starlane_space::loc::{Layer, Surface, ToSurface};
 use starlane_space::log::{Logger, Trackable};
 use starlane_space::parse::model::{PipelineSegmentVar, PipelineVar};

@@ -76,6 +76,7 @@ derive-name = { workspace = true }
 tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-attributes", "async-await"] }
 tracing-core = { workspace = true, features = ["valuable", "default"] }
 url = { workspace = true }
+indexmap = {workspace = true}
 
 [dev-dependencies]
 starlane-space = { workspace = true, features = ["test"] }

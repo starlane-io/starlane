@@ -1,5 +1,7 @@
 pub mod config;
 pub mod err;
+pub mod context;
+mod detail;
 
 use std::sync::Arc;
 use async_trait::async_trait;
@@ -7,13 +9,9 @@ use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 use starlane_space::parse::CamelCase;
 use starlane_space::status::{Action, ActionRequest, StatusProbe, PendingDetail, EntityReadier, Entity};
-use crate::provider::err::ProviderErr;
 
 use starlane_space::status::Status;
-use starlane_space::status::Stage;
-use starlane_space::status::StateDetail;
 use crate::registry::Registry;
-use starlane_space::status;
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
@@ -85,14 +83,8 @@ pub enum Manager {
 pub trait Provider: StatusProbe+EntityReadier + Send+Sync {
     type Config: config::ProviderConfig + ?Sized;
 
-    /*
-    /// [Provider::Entity]: either a `utilization` or `control` interface for this [Provider]'s
-    /// [Status::Ready] state. The purpose of a [Provider] is to bring [Provider::Entity] into
-    /// a useful [Status::Ready] state -- or provide useful error information as to why
-    /// [Provider::ready] failed.
-    type Entity: Entity+Send+Sync;
 
-     */
+   // type Context: context::ProviderContext+ ?Sized;
 
     fn kind(&self) -> ProviderKindDef;
 

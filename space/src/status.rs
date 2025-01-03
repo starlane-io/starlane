@@ -1,4 +1,3 @@
-use crate::err::StatusErr;
 use crate::point::Point;
 use crate::wave::Agent;
 use ascii::AsciiChar::i;
@@ -29,8 +28,20 @@ use thiserror::Error;
 /// [starlane_hyperspace]: ../../starlane_hyperspace
 /// [Provider]: ../../starlane_hyperspace/src/provider.rs
 pub trait Entity {
-    //    type Id: Hash + Eq + PartialEq + Debug + Send + Sync + ?Sized;
+    type DerefTarget;
+
+    fn deref_target(&self) -> &Self::DerefTarget;
 }
+
+/// wonky impe
+impl <T> Deref for dyn Entity<DerefTarget=T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.deref_target()
+    }
+}
+
 
 /// [StatusWatcher] is type bound to [tokio::sync::watch::Receiver<StatusResult>]) can get the realtime
 /// [StatusDetail] of a [StatusProbe] by polling: [StatusWatcher::borrow] or by listening for
@@ -80,7 +91,7 @@ pub trait EntityReadier: StatusProbe {
     /// service managed by [DockerDaemonFoundation] the [EntityReadier] may take many
     /// steps such as: triggering and awaiting [ProviderKind::DockerDaemon] to reach [Status::Ready],
     /// pulling a postgres docker image, starting the postgres docker image... .
-    async fn ready(&self) -> ReadyResult<Self::Entity>;
+    async fn ready(&self) -> EntityResult<Self::Entity>;
 }
 
 /// [Handle] contains [E]--which implements the [Entity] trait--and a private
@@ -97,12 +108,14 @@ where
     hold: tokio::sync::mpsc::Sender<()>,
 }
 
-impl<E> Entity for Handle<E>
-where
-    E: Entity + Send + Sync,
-{
-    //    type Id = E::Id;
+impl<E> Deref for Handle<E> where E: Entity + Send + Sync + ?Sized {
+    type Target = E::DerefTarget;
+
+    fn deref(&self) -> &Self::Target {
+        self.entity.deref_target()
+    }
 }
+
 
 impl<E> Handle<E>
 where
@@ -151,16 +164,6 @@ where
     }
 }
 
-impl<E, D> Deref for Handle<E>
-where
-    E: Deref<Target = D> + Entity + Send + Sync,
-{
-    type Target = D;
-
-    fn deref(&self) -> &Self::Target {
-        self.entity.deref()
-    }
-}
 
 #[async_trait]
 impl<E> StatusProbe for Handle<E>
@@ -176,7 +179,17 @@ where
 /// most importantly the desired variant of a [StatusProbe] is [Status::Ready]
 /// and if that is the [Status] then there isn't a need to drill any deeper into
 /// the [StatusDetail]
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, strum_macros::Display,strum_macros::EnumString)]
+#[derive(
+    Clone,
+    Debug,
+    Hash,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    strum_macros::Display,
+    strum_macros::EnumString,
+)]
 pub enum Status {
     /// [Status::Unknown] is the default status
     Unknown,
@@ -226,7 +239,7 @@ pub struct StatusDetail {
 
 impl Into<Status> for StatusDetail {
     fn into(self) -> Status {
-       self.status
+        self.status
     }
 }
 
@@ -252,7 +265,11 @@ impl Default for StatusDetail {
 
 impl StatusDetail {
     pub fn new(status: Status, stage: StageDetail, action: ActionDetail) -> Self {
-        Self { status, stage, action }
+        Self {
+            status,
+            stage,
+            action,
+        }
     }
 }
 
@@ -537,7 +554,7 @@ impl Default for StatusResult {
 }
 
 impl StatusResult {
-    pub fn to_res(self) -> Result<(),SpaceErr> {
+    pub fn to_res(self) -> Result<(), SpaceErr> {
         match self {
             StatusResult::Ready => Ok(()),
             StatusResult::NotReady(detail) => {
@@ -548,8 +565,8 @@ impl StatusResult {
     }
 }
 
-impl Into<Result<(),SpaceErr>> for StatusResult {
-    fn into(self) -> Result<(),SpaceErr> {
+impl Into<Result<(), SpaceErr>> for StatusResult {
+    fn into(self) -> Result<(), SpaceErr> {
         self.to_res()
     }
 }
@@ -561,7 +578,7 @@ impl Into<Result<(),SpaceErr>> for StatusResult {
 /// ```
 /// use starlane::status::{EntityReadier, StatusProbe};
 /// use starlane::status::StatusResult;
-/// use starlane::status::ReadyResult;
+/// use starlane::status::EntityResult;
 ///
 /// # pub mod util {
 /// #  use starlane::status::StatusDetail;
@@ -598,11 +615,11 @@ impl Into<Result<(),SpaceErr>> for StatusResult {
 ///
 /// impl EntityReadier for ConnectionFacilitator {
 ///    type Entity = Connection;
-///    async fn ready(&self) -> ReadyResult<Self::Entity> {
+///    async fn ready(&self) -> EntityResult<Self::Entity> {
 ///       if util::check_ready() {
-///          ReadyResult::Ready(util::create())
+///          EntityResult::Ready(util::create())
 ///       } else {
-///          ReadyResult::NotReady(util::generate_status_detail())
+///          EntityResult::StatusErr(util::generate_status_detail())
 ///       }
 ///    }
 /// }
@@ -613,22 +630,22 @@ impl Into<Result<(),SpaceErr>> for StatusResult {
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(EntityResultKind))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize))]
-pub enum ReadyResult<E>
+pub enum EntityResult<E>
 where
     E: Entity + Send + Sync + ?Sized,
 {
     Ready(Arc<E>),
-    NotReady(StatusDetail),
+    StatusErr(StatusDetail),
 }
 
-impl<E> ReadyResult<E>
+impl<E> EntityResult<E>
 where
     E: Entity + Send + Sync + ?Sized,
 {
     pub fn to_res(self) -> Result<Arc<E>, SpaceErr> {
         match self {
-            ReadyResult::Ready(entity) => Ok(entity),
-            ReadyResult::NotReady(detail    ) => {
+            EntityResult::Ready(entity) => Ok(entity),
+            EntityResult::StatusErr(detail) => {
                 let err = detail.into();
                 Err(err)
             }
@@ -636,7 +653,7 @@ where
     }
 }
 
-impl<E> Into<Result<Arc<E>, SpaceErr>> for ReadyResult<E>
+impl<E> Into<Result<Arc<E>, SpaceErr>> for EntityResult<E>
 where
     E: Entity + Send + Sync + ?Sized,
 {
@@ -644,14 +661,14 @@ where
         self.to_res()
     }
 }
-impl<E> Into<StatusDetail> for ReadyResult<E>
+impl<E> Into<StatusDetail> for EntityResult<E>
 where
     E: Entity + Clone + Send + Sync + ?Sized,
 {
     fn into(self) -> StatusDetail {
         match self {
-            ReadyResult::Ready(_) => StatusDetail::default(),
-            ReadyResult::NotReady(status) => status,
+            EntityResult::Ready(_) => StatusDetail::default(),
+            EntityResult::StatusErr(status) => status,
         }
     }
 }
@@ -668,6 +685,10 @@ pub mod test {
         struct Mock {
             pub value: String,
         }
+        impl Entity for Mock {
+            type DerefTarget = String;
+        }
+
         impl Default for Mock {
             fn default() -> Self {
                 Self {
@@ -684,7 +705,7 @@ pub mod test {
             }
         }
 
-        impl Entity for Mock {}
+        impl Entity for Mock { type DerefTarget = (); }
 
         let mock = Mock::default();
 

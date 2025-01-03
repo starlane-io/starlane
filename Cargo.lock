@@ -3047,6 +3047,7 @@ dependencies = [
  "derive_builder",
  "enum-ordinalize",
  "futures",
+ "indexmap 2.7.0",
  "itertools 0.13.0",
  "lazy_static",
  "nom",

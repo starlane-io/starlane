@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::command::Command;
 use crate::err::{ParseErrs, SpaceErr};
-use crate::err::StatusErr;
+use crate::err::LegacyStatusErr;
 use crate::loc::{Surface, ToSurface};
 use crate::substance::{FormErrs, Substance, ToSubstance};
 use crate::util::{ValueMatcher, ValuePattern};
@@ -606,7 +606,7 @@ impl DirectedCore {
         }
     }
 
-    pub fn err<E: StatusErr>(&self, error: E) -> ReflectedCore {
+    pub fn err<E: LegacyStatusErr>(&self, error: E) -> ReflectedCore {
         let errors = FormErrs::default(error.message().as_str());
         let status = match StatusCode::from_u16(error.status()) {
             Ok(status) => status,

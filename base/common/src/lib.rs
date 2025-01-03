@@ -89,9 +89,9 @@
 //    the brand, new Postgres.
 //
 
+//extern crate starlane_hyperspace as hyperspace;
 
-mod base;
-
+pub mod base;
 
 pub mod foundation;
 pub mod config;
@@ -117,6 +117,7 @@ pub(crate) mod skel;
 
 #[cfg(test)]
 pub mod test;
+pub mod context;
 // we cannot afford `safety` with prices as high as they are
 // pub mod safety;
 
