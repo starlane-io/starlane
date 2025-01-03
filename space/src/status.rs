@@ -118,10 +118,12 @@ where
         self.watcher.clone()
     }
 
-    pub fn entity(&self) -> &Arc<E> {
-        & self.entity
+    pub fn entity(&self) -> &E {
+        & (*self.entity)
     }
 }
+
+
 
 impl <E,D> Deref for Handle<E> where E: Deref<Target=D>+Entity+Send+Sync {
     type Target = D;
@@ -130,6 +132,7 @@ impl <E,D> Deref for Handle<E> where E: Deref<Target=D>+Entity+Send+Sync {
         self.entity.deref()
     }
 }
+
 
 #[async_trait]
 impl<E> StatusProbe for Handle<E>

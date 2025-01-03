@@ -38,10 +38,11 @@ use starlane_space::HYPERUSER;
 use async_trait::async_trait;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
-use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
+use sqlx::{Acquire, Executor,  Postgres, Row, Transaction};
 use starlane_macros::push_loc;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
+use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use serde_derive::{Deserialize, Serialize};
@@ -50,10 +51,12 @@ use starlane_hyperspace::registry::{Registration, RegistryApi};
 use starlane_platform_for_postgres::service::{DbKey, PostgresServiceHandle, PostgresService};
 use starlane_space::status::Handle;
 use starlane_platform_for_postgres::database::{PostgresDatabaseHandle};
+use sqlx::Pool;
+
 
 pub struct PostgresRegistry {
     logger: Logger,
-    handle: PostgresServiceHandle
+    handle: PostgresDatabaseHandle
 }
 
 impl PostgresRegistry {
@@ -76,6 +79,7 @@ impl PostgresRegistry {
 
         Ok(registry)
     }
+
 
     async fn setup(&self) -> Result<(), RegErr> {
         //        let database= format!("CREATE DATABASE IF NOT EXISTS {}", REGISTRY_DATABASE );

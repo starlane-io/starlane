@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::ops::Deref;
+use async_trait::async_trait;
 use sqlx::Error;
 use sqlx::pool::PoolConnection;
 use starlane_space::status::{Entity, Handle, StatusProbe};
@@ -23,14 +24,12 @@ pub type PostgresDatabaseHandle = Handle<dyn PostgresDatabase>;
 ///     }
 /// }
 /// ```
-pub trait PostgresDatabase: Entity<Id=String>+StatusProbe+Send+Sync+Deref<Target=Pool> {
-    fn pool(&self) -> &Pool;
+#[async_trait]
+pub trait PostgresDatabase: Entity<Id=String>+StatusProbe+Deref<Target=Pool>+Send+Sync {
 
-    fn acquire(&self) -> impl Future<Output = Result<PoolConnection<sqlx::Postgres>, Error>> + 'static {
-        self.pool().acquire()
-    }
 }
 
+//pub trait PostgresService : Entity<Id=String>+StatusProbe+Send+Sync { }
 
 mod concrete {
     mod my { pub use super::super::*; }
@@ -89,20 +88,30 @@ mod concrete {
         }
     }
 
-    impl my::PostgresDatabase for PostgresDatabase {
-        fn pool(&self) -> &Pool {
+    impl Deref for PostgresDatabase {
+        type Target = Pool;
+
+        fn deref(&self) -> &Self::Target {
             &self.pool
         }
     }
 
+
+
+
+    #[async_trait]
+    impl my::PostgresDatabase for PostgresDatabase { }
+
+
     #[async_trait]
     impl EntityReadier for PostgresDatabaseProvider {
-        type Entity = dyn my::PostgresDatabase;
+        type Entity = PostgresDatabase;
 
         async fn ready(&self) -> ReadyResult<Self::Entity> {
             todo!()
         }
     }
+
 
     #[async_trait]
     impl Provider for PostgresDatabaseProvider {
@@ -117,7 +126,6 @@ mod concrete {
         }
 
     }
-
 
     #[async_trait]
     impl StatusProbe for PostgresDatabaseProvider {
@@ -146,13 +154,6 @@ mod concrete {
         }
     }
 
-    impl Deref for PostgresDatabase {
-        type Target = Pool;
-
-        fn deref(&self) -> &Self::Target {
-            & self.pool
-        }
-    }
 
     impl Entity for PostgresDatabase {
         type Id = String;
