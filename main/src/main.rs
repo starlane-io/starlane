@@ -1,7 +1,6 @@
 #![allow(warnings)]
 #![feature()]
 
-
 #[macro_use]
 extern crate async_trait;
 #[macro_use]
@@ -19,7 +18,6 @@ pub extern crate starlane_hyperspace as hyperspace;
 
 pub mod base;
 
-
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
 
@@ -30,9 +28,6 @@ pub mod install;
 
 pub mod env;
 pub mod server;
-
-
-
 
 pub mod cli;
 
@@ -75,7 +70,8 @@ use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::{FileOptionExtension, FileOptions};
-use crate::env::{context_dir, ensure_global_settings, save_global_settings, STARLANE_HOME};
+use crate::cli::{Cli, Commands, ContextCmd};
+use crate::env::{context_dir, ensure_global_settings, save_global_settings, set_context, STARLANE_HOME};
 /*
 let config = Default::default();
 

@@ -1,10 +1,6 @@
 
-use starlane_platform_for_postgres::PostgresPlatform;
 
-use starlane_platform_for_postgres_registry::registry::{
-    PostgresRegistry, PostgresRegistryContext,
-    PostgresRegistryContextHandle,
-};
+;
 
 use starlane_hyperspace::driver::base::BaseDriverFactory;
 use starlane_hyperspace::driver::control::ControlDriverFactory;
@@ -37,9 +33,6 @@ use serde::{Deserialize, Serialize};
 use starlane_macros::{logger, push_loc};
 use std::collections::HashSet;
 use std::ops::Deref;
-use starlane_hyperspace::database::LiveDatabase;
-use starlane_hyperspace::registry::Registry;
-use starlane_platform_for_postgres::service::Config;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
@@ -315,39 +308,6 @@ where
 }
 
 
-#[derive(Clone)]
-pub struct PostgresLookups(LiveDatabase);
-
-
-impl PostgresLookups {
-    pub fn new(database: LiveDatabase) -> Self {
-        Self(database)
-    }
-}
-
-/*
-
-impl Default for PostgresLookups {
-    fn default() -> Self {
-        Self::new(PgR)
-    }
-}
-
- */
-
-
-impl PostgresPlatform for PostgresLookups {
-    fn lookup_registry_db(&self) -> Result<Database<Config>, RegErr> {
-        Ok(self.0.clone().into())
-    }
-
-    fn lookup_star_db(&self, star: &StarKey) -> Result<Database<Config>, RegErr> {
-        let mut rtn: Database<Config> = self.0.clone().into();
-        rtn.database = star.to_sql_name();
-        Ok(rtn)
-    }
-}
-
 pub struct StarlaneContext {
     pub context: String,
     pub home: String,
@@ -355,23 +315,4 @@ pub struct StarlaneContext {
     pub config: StarlaneConfig,
 }
 
-#[derive(Clone)]
-pub struct PostgresLookups(LiveDatabase);
 
-impl PostgresLookups {
-    pub fn new(database: LiveDatabase) -> Self {
-        Self(database)
-    }
-}
-
-impl PostgresPlatform for PostgresLookups {
-    fn lookup_registry_db(&self) -> Result<Database<Config>, RegErr> {
-        Ok(self.0.clone().into())
-    }
-
-    fn lookup_star_db(&self, star: &StarKey) -> Result<Database<Config>, RegErr> {
-        let mut rtn: Database<Config> = self.0.clone().into();
-        rtn.database = star.to_sql_name();
-        Ok(rtn)
-    }
-}
