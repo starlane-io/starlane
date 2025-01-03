@@ -1,16 +1,55 @@
+use std::future::Future;
+use std::ops::Deref;
+use sqlx::Error;
+use sqlx::pool::PoolConnection;
+use starlane_space::status::{Entity, Handle, StatusProbe};
+use crate::service;
+use crate::service::Pool;
+
+pub type PostgresDatabaseHandle = Handle<dyn PostgresDatabase>;
+
+
+/// tried to make [Handle] expose [Pool] by implementing
+/// ```
+/// # use std::ops::Deref;
+/// # trait Entity {}
+/// # struct Handle<E> where E: Entity+Send+Sync { entity: E };
+///
+/// impl <E,D> Deref for Handle<E> where E: Deref<Target=D>+Entity+Send+Sync {
+///     type Target = D;
+///
+///     fn deref(&self) -> &Self::Target {
+///         self.entity.deref()
+///     }
+/// }
+/// ```
+pub trait PostgresDatabase: Entity<Id=String>+StatusProbe+Send+Sync+Deref<Target=Pool> {
+    fn pool(&self) -> &Pool;
+
+    fn acquire(&self) -> impl Future<Output = Result<PoolConnection<sqlx::Postgres>, Error>> + 'static {
+        self.pool().acquire()
+    }
+}
+
 
 mod concrete {
+    mod my { pub use super::super::*; }
+
+    use std::ops::Deref;
     use std::sync::Arc;
     use async_trait::async_trait;
     use sqlx::{Connection, PgPool};
     use sqlx::postgres::PgConnectOptions;
     use starlane_base::foundation::config::ProviderConfig;
-    use starlane_base::provider::{ProviderKindDef,ProviderKind};
     use starlane_base::status::{Status, StatusDetail, Handle, StatusProbe, StatusWatcher};
-    use starlane_base::provider::{Provider,err::ProviderErr};
-    use starlane_space::status::{Entity, EntityReadier, ReadyResult, StatusResult};
+    use starlane_base::config;
+    use starlane_base::provider;
+    use provider::{Provider,err::ProviderErr,ProviderKindDef};
+
+    use starlane_base::status::{Entity, EntityReadier, ReadyResult, StatusResult};
     use crate::service::{Pool, PostgresServiceHandle};
     use crate::service::config::{PostgresUtilizationConfig};
+
 
     #[derive(Clone, Eq, PartialEq)]
     pub struct Config {
@@ -34,7 +73,6 @@ mod concrete {
     impl ProviderConfig for Config {}
 
 
-    pub type PostgresDatabaseHandle = Handle<PostgresDatabase>;
     pub struct PostgresDatabaseProvider {
         config: Arc<Config>,
         status: tokio::sync::watch::Sender<Status>,
@@ -51,9 +89,15 @@ mod concrete {
         }
     }
 
+    impl my::PostgresDatabase for PostgresDatabase {
+        fn pool(&self) -> &Pool {
+            &self.pool
+        }
+    }
+
     #[async_trait]
     impl EntityReadier for PostgresDatabaseProvider {
-        type Entity = PostgresDatabaseHandle;
+        type Entity = dyn my::PostgresDatabase;
 
         async fn ready(&self) -> ReadyResult<Self::Entity> {
             todo!()
@@ -89,7 +133,6 @@ mod concrete {
         pool: Pool
     }
 
-
     impl PostgresDatabase {
         /// create a new Postgres Connection `Pool`
         async fn new(config: Config, service: PostgresServiceHandle) -> Result<Self, sqlx::Error> {
@@ -100,6 +143,14 @@ mod concrete {
                 service,
                 pool
             })
+        }
+    }
+
+    impl Deref for PostgresDatabase {
+        type Target = Pool;
+
+        fn deref(&self) -> &Self::Target {
+            & self.pool
         }
     }
 

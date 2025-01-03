@@ -117,7 +117,20 @@ where
     pub fn watcher(&self) -> StatusWatcher {
         self.watcher.clone()
     }
+
+    pub fn entity(&self) -> &Arc<E> {
+        & self.entity
+    }
 }
+
+impl <E,D> Deref for Handle<E> where E: Deref<Target=D>+Entity+Send+Sync {
+    type Target = D;
+
+    fn deref(&self) -> &Self::Target {
+        self.entity.deref()
+    }
+}
+
 #[async_trait]
 impl<E> StatusProbe for Handle<E>
 where
@@ -127,16 +140,7 @@ where
         self.entity.probe().await
     }
 }
-impl<E> Deref for Handle<E>
-where
-    E: Entity + Send + Sync,
-{
-    type Target = E;
 
-    fn deref(&self) -> &Self::Target {
-        &self.entity
-    }
-}
 
 /// Indicate [Entity]'s internal state.
 /// most importantly the desired variant of a [StatusProbe] is [Status::Ready]

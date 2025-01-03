@@ -49,36 +49,19 @@ use starlane_hyperspace::registry::err::RegErr;
 use starlane_hyperspace::registry::{Registration, RegistryApi};
 use starlane_platform_for_postgres::service::{DbKey, PostgresServiceHandle, PostgresService};
 use starlane_space::status::Handle;
+use starlane_platform_for_postgres::database::{PostgresDatabaseHandle};
 
 pub struct PostgresRegistry {
     logger: Logger,
-    ctx: PostgresRegistryContextHandle,
+    handle: PostgresServiceHandle
 }
 
 impl PostgresRegistry {
-    pub async fn new2(database: PostgresServiceHandle, logger: Logger) -> Result<Self, RegErr> {
+    pub async fn new(handle: PostgresDatabaseHandle, logger: Logger) -> Result<Self, RegErr> {
         let logger = push_loc!((logger, Point::global_registry()));
-        let mut set = HashSet::new();
-        set.insert(database.clone());
-        let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookups.clone())).await?);
-        let handle = PostgresRegistryContextHandle::new(database, ctx);
-        PostgresRegistry::new(handle, logger).await
-    }
-    pub async fn new(
-        ctx: PostgresRegistryContextHandle,
-        logger: Logger,
-    ) -> Result<Self, RegErr> {
-        let logger = push_loc!((logger, Point::global_registry()));
-        /*
-        let pool = PgPoolOptions::new()
-            .max_connections(5)
-            .connect(
-                db.to_uri().as_str(),
-            )
-            .await?;
-         */
+
         let registry = Self {
-            ctx,
+            handle,
             logger: logger.clone(),
         };
 
@@ -172,7 +155,7 @@ w                           INSERT INTO reset_mode VALUES ('None');"#;
         let point_segment_parent_index = "CREATE UNIQUE INDEX IF NOT EXISTS resource_point_segment_parent_index ON particles(parent,point_segment)";
         let access_grants_index =
             "CREATE INDEX IF NOT EXISTS query_root_index ON access_grants(query_root)";
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         let mut transaction = conn.begin().await?;
         transaction.execute(particles).await?;
         transaction.execute(access_grants).await?;
@@ -195,7 +178,7 @@ w                           INSERT INTO reset_mode VALUES ('None');"#;
 impl RegistryApi for PostgresRegistry {
     async fn scorch<'a>(&'a self) -> Result<(), RegErr> {
         self.logger.info("scorching database!");
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
 
         let mut trans = conn.begin().await?;
 
@@ -256,7 +239,7 @@ impl RegistryApi for PostgresRegistry {
             }
         }
 
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         let mut trans = conn.begin().await?;
         let params = RegistryParams::from_registration(registration)?;
 
@@ -309,7 +292,7 @@ impl RegistryApi for PostgresRegistry {
 
         let statement = "UPDATE particles SET star=$1 WHERE parent=$2 AND point_segment=$3";
 
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         let mut trans = conn.begin().await?;
 
         trans
@@ -331,7 +314,7 @@ impl RegistryApi for PostgresRegistry {
 
         let statement = "UPDATE particles SET host=$1, WHERE parent=$2 AND point_segment=$3";
 
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         let mut trans = conn.begin().await?;
 
         trans
@@ -363,7 +346,7 @@ impl RegistryApi for PostgresRegistry {
             parent,
             point_segment
         );
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         let mut trans = conn.begin().await?;
         trans.execute(statement.as_str()).await?;
         trans.commit().await?;
@@ -375,7 +358,7 @@ impl RegistryApi for PostgresRegistry {
         point: &'a Point,
         properties: &'a SetProperties,
     ) -> Result<(), RegErr> {
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         let mut trans = conn.begin().await?;
         let parent = point
             .parent()
@@ -417,7 +400,7 @@ impl RegistryApi for PostgresRegistry {
             }
         }
 
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         let mut trans = conn.begin().await?;
         let parent = point
             .parent()
@@ -451,7 +434,7 @@ impl RegistryApi for PostgresRegistry {
             .ok_or("expected last point_segment")?
             .to_string();
 
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         let properties = sqlx::query_as::<Postgres, LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(&mut *conn).await?;
         let mut map = HashMap::new();
         for p in properties {
@@ -465,7 +448,7 @@ impl RegistryApi for PostgresRegistry {
             return Ok(ParticleRecord::root());
         }
 
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         let parent = point.parent().ok_or("expected a parent")?;
         let point_segment = point
             .last_segment()
@@ -534,7 +517,7 @@ impl RegistryApi for PostgresRegistry {
                 }
             }
 
-            let mut conn = self.ctx.acquire().await?;
+            let mut conn = self.handle.acquire().await?;
             let statement = format!("DELETE FROM particles WHERE point IN [{}]", points);
             sqlx::query(statement.as_str()).execute(&mut *conn).await?;
         }
@@ -647,7 +630,7 @@ impl RegistryApi for PostgresRegistry {
             query = query.bind(param);
         }
 
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         let mut matching_so_far = query.fetch_all(&mut *conn).await?;
 
         let mut matching_so_far: Vec<ParticleRecord> =
@@ -711,7 +694,7 @@ impl RegistryApi for PostgresRegistry {
     }
 
     async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), RegErr> {
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         match &access_grant.kind {
             AccessGrantKind::Super => {
                 sqlx::query("INSERT INTO access_grants (kind,query_root,on_point,to_point,by_particle) VALUES ('super',$1,$2,$3,(SELECT id FROM particles WHERE point=$4))")
@@ -743,7 +726,7 @@ impl RegistryApi for PostgresRegistry {
 
     //    #[async_recursion]
     async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, RegErr> {
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
 
         struct Owner(bool);
 
@@ -885,7 +868,7 @@ impl RegistryApi for PostgresRegistry {
         };
 
         let selection = self.select(&mut select).await?;
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         let mut trans = conn.begin().await?;
         for on in selection.list {
             let on = (*on).try_into()?;
@@ -930,7 +913,7 @@ impl RegistryApi for PostgresRegistry {
 
         let selection = self.select(&mut select).await?;
         let mut all_access_grants = HashMap::new();
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         for on in selection.list {
             let on: Point = (*on).try_into()?;
             let access_grants = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(on.to_string()).fetch_all(&mut *conn).await?;
@@ -957,7 +940,7 @@ impl RegistryApi for PostgresRegistry {
     }
 
     async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), RegErr> {
-        let mut conn = self.ctx.acquire().await?;
+        let mut conn = self.handle.acquire().await?;
         let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.id=$1 AND particles.id=access_grants.by_particle").bind(id).fetch_one(&mut *conn).await?.into();
         let access = self.access(to, &access_grant.by_particle).await?;
         if access.has_full() {
@@ -1331,85 +1314,9 @@ impl PostgresRegistry {
     }
 }
 
-pub struct PostRegApi {
-    ctx: PostgresRegistryContext,
-}
 
-impl PostRegApi {
-    pub fn new(ctx: PostgresRegistryContext) -> Self {
-        Self { ctx }
-    }
 
-    fn ctx(&self) -> &PostgresRegistryContext {
-        &self.ctx
-    }
-}
 
-#[derive(Clone)]
-pub struct PostgresRegistryContextHandle {
-    key: DbKey,
-    pool: Arc<PostgresRegistryContext>,
-    pub schema: String,
-}
-
-impl PostgresRegistryContextHandle {
-    pub fn new(db: PostgresServiceHandle, pool: Arc<PostgresRegistryContext>) -> Self {
-        Self {
-            key: db.database.to_key(),
-            schema: db.database.schema.clone(),
-            pool,
-        }
-    }
-
-    pub async fn acquire(&self) -> Result<PoolConnection<Postgres>, RegErr> {
-        self.pool.acquire(&self.key).await
-    }
-
-    pub async fn begin(&self) -> Result<Transaction<Postgres>, RegErr> {
-        self.pool.begin(&self.key).await
-    }
-}
-
-pub struct PostgresRegistryContext {
-    pools: HashMap<DbKey, PostgresServiceHandle>,
-}
-
-impl PostgresRegistryContext {
-    pub async fn new(
-        handle: Handle<PostgresService>,
-    ) -> Result<Self, RegErr> {
-
-        for db in dbs {
-
-            pools.insert(db.database.to_key(), pool);
-        }
-        Ok(Self { pools, platform })
-    }
-
-    pub async fn acquire<'a>(
-        &'a self,
-        key: &'a DbKey,
-    ) -> Result<PoolConnection<Postgres>, RegErr> {
-        let pool = self.pools.get(key);
-
-        let pool = pool.unwrap();
-        //let pool = pool.ok_or(SpaceErr::str("could not acquire db connection"));
-
-        Ok(pool.acquire().await?)
-    }
-
-    pub async fn begin<'a>(
-        &'a self,
-        key: &'a DbKey,
-    ) -> Result<Transaction<Postgres>, RegErr> {
-        Ok(self
-            .pools
-            .get(key)
-            .ok_or(RegErr::pool_not_found(key))?
-            .begin()
-            .await?)
-    }
-}
 
 #[cfg(all(test, feature = "postgres-tests"))]
 pub mod test {
