@@ -159,24 +159,53 @@ where
 //pub type OwnedSpan<'a> = LocatedSpan<&'a str, SpanExtra>;
 pub type SpanExtra = Arc<String>;
 
+
+
+mod span_serde {
+    use std::sync::Arc;
+    use serde::{Deserialize, Deserializer, Serializer};
+    use crate::parse::util::SpanExtra;
+
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<SpanExtra, D::Error>
+    where D: Deserializer<'de> {
+        Ok(Arc::new(String::deserialize(deserializer)?))
+    }
+
+    pub(super) fn serialize<S>(span: &SpanExtra, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        s.serialize_str(span.as_str())
+    }
+
+}
+
 pub fn new_span<'a>(s: &'a str) -> Wrap<LocatedSpan<&'a str, Arc<String>>> {
     let extra = Arc::new(s.to_string());
     let span = LocatedSpan::new_extra(s, extra);
     Wrap::new(span)
 }
 
-pub fn span_with_extra<'a>(
-    s: &'a str,
+pub fn span_with_extra(
+    s: &str,
     extra: Arc<String>,
-) -> Wrap<LocatedSpan<&'a str, Arc<String>>> {
+) -> Wrap<LocatedSpan<&str, Arc<String>>> {
     Wrap::new(LocatedSpan::new_extra(s, extra))
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct Trace {
     pub range: Range<usize>,
+
+    #[serde(serialize_with = "span_serde::serialize", deserialize_with = "span_serde::deserialize")]
     pub extra: SpanExtra,
 }
+
+
+
+
+
+
 
 impl Trace {
     pub fn new(range: Range<usize>, extra: SpanExtra) -> Self {

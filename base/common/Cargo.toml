@@ -20,6 +20,8 @@ repository.workspace = true
 # 'skel' enables the various starter implentatation templates. Activate this feature so your can review
 # the skel code in your IDE
 skel=[]
+# for testsing
+mock=[]
 
 
 [dependencies]

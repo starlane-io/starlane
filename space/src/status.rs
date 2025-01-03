@@ -161,35 +161,7 @@ impl <E,D> Deref for Handle<E> where E: Deref<Target=D>+Entity+Send+Sync {
     }
 }
 
-#[test]
-pub fn test_handle_deref() {
-   struct Mock {
-       value: String
-   }
-   impl Default for Mock {
-       fn default() -> Self {
-           Self { value: "blah".to_string() }
-       }
-   }
 
-
-   impl Deref for Mock {
-       type Target = String;
-
-       fn deref(&self) -> &Self::Target {
-           &self.value
-       }
-   }
-
-   impl Entity for Mock {}
-
-   let mock = Mock::default();
-
-   let handle = Handle::mock(mock);
-
-   let x = handle.deref();
-
-}
 
 
 
@@ -637,5 +609,43 @@ where
             ReadyResult::Ready(_) => StatusDetail::default(),
             ReadyResult::NotReady(status) => status,
         }
+    }
+}
+
+
+#[cfg(test)]
+pub mod test {
+    use std::ops::Deref;
+    use crate::status::{Entity, Handle};
+
+    #[tokio::test]
+    pub async fn test_handle_deref() {
+        let value = "blah";
+        struct Mock {
+            pub value: String
+        }
+        impl Default for Mock {
+            fn default() -> Self {
+                Self { value: "blah".to_string() }
+            }
+        }
+
+
+        impl Deref for Mock {
+            type Target = String;
+
+            fn deref(&self) -> &Self::Target {
+                &self.value
+            }
+        }
+
+        impl Entity for Mock {}
+
+        let mock = Mock::default();
+
+        let handle = Handle::mock(mock);
+
+        assert_eq!(handle.as_str(),value);
+
     }
 }
