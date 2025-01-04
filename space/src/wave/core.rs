@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::command::Command;
-use crate::err::{ParseErrs, SpaceErr};
 use crate::err::LegacyStatusErr;
+use crate::err::{ParseErrs, SpaceErr};
 use crate::loc::{Surface, ToSurface};
 use crate::substance::{FormErrs, Substance, ToSubstance};
 use crate::util::{ValueMatcher, ValuePattern};
@@ -13,8 +13,8 @@ use crate::wave::core::ext::ExtMethod;
 use crate::wave::core::http2::{HttpMethod, StatusCode};
 use crate::wave::core::hyper::HypMethod;
 use crate::wave::{Bounce, PingCore, PongCore, ToRecipients, WaveId};
-use url::Url;
 use starlane_macros::Autobox;
+use url::Url;
 
 pub mod cmd;
 pub mod ext;
@@ -281,7 +281,6 @@ pub enum Method {
 }
 
 pub trait BodyExpect {}
-
 
 impl Method {
     pub fn to_deep_string(&self) -> String {
@@ -645,7 +644,7 @@ impl TryFrom<ReflectedCore> for Surface {
                     "expecting Surface received {}",
                     substance.kind().to_string()
                 )
-                    .into()),
+                .into()),
             }
         }
     }

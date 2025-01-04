@@ -1,10 +1,17 @@
-
-
+use async_trait::async_trait;
+use serde_derive::{Deserialize, Serialize};
+use sqlx::pool::PoolConnection;
+use sqlx::postgres::{PgPoolOptions, PgRow};
+use sqlx::Pool;
+use sqlx::{Acquire, Executor, Postgres, Row, Transaction};
+use starlane_hyperspace::registry::err::RegErr;
+use starlane_hyperspace::registry::{Registration, RegistryApi};
+use starlane_macros::push_loc;
+use starlane_platform_for_postgres::database::PostgresDatabaseHandle;
+use starlane_platform_for_postgres::service::{DbKey, PostgresService, PostgresServiceHandle};
 /// embedded postgres for local development environments is slated to be removed in favor of
 /// Postgres provided by `DockerDesktopFoundation`
 // pub mod embed;
-
-
 use starlane_space::command::common::{PropertyMod, SetProperties};
 use starlane_space::command::direct::create::Strategy;
 use starlane_space::command::direct::delete::Delete;
@@ -32,31 +39,19 @@ use starlane_space::selector::{
     ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector,
     SubKindSelector,
 };
+use starlane_space::status::Handle;
 use starlane_space::substance::{Substance, SubstanceList, SubstanceMap};
 use starlane_space::util::ValuePattern;
 use starlane_space::HYPERUSER;
-use async_trait::async_trait;
-use sqlx::pool::PoolConnection;
-use sqlx::postgres::{PgPoolOptions, PgRow};
-use sqlx::{Acquire, Executor,  Postgres, Row, Transaction};
-use starlane_macros::push_loc;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
-use serde_derive::{Deserialize, Serialize};
-use starlane_hyperspace::registry::err::RegErr;
-use starlane_hyperspace::registry::{Registration, RegistryApi};
-use starlane_platform_for_postgres::service::{DbKey, PostgresServiceHandle, PostgresService};
-use starlane_space::status::Handle;
-use starlane_platform_for_postgres::database::{PostgresDatabaseHandle};
-use sqlx::Pool;
-
 
 pub struct PostgresRegistry {
     logger: Logger,
-    handle: PostgresDatabaseHandle
+    handle: PostgresDatabaseHandle,
 }
 
 impl PostgresRegistry {
@@ -79,7 +74,6 @@ impl PostgresRegistry {
 
         Ok(registry)
     }
-
 
     async fn setup(&self) -> Result<(), RegErr> {
         //        let database= format!("CREATE DATABASE IF NOT EXISTS {}", REGISTRY_DATABASE );
@@ -206,8 +200,8 @@ impl RegistryApi for PostgresRegistry {
         let scorch = sqlx::query_as::<Postgres, CanScorch>(
             "SELECT count(*) FROM reset_mode WHERE mode=('Scorch')",
         )
-            .fetch_one(&mut *trans)
-            .await?;
+        .fetch_one(&mut *trans)
+        .await?;
 
         if !scorch.can() {
             let err = "database has scorch guard enabled.  To change this: 'INSERT INTO reset_mode VALUES ('Scorch')'";
@@ -251,9 +245,9 @@ impl RegistryApi for PostgresRegistry {
         let count = sqlx::query_as::<Postgres, Count>(
             "SELECT count(*) as count from particles WHERE point=$1",
         )
-            .bind(params.point.clone())
-            .fetch_one(&mut *trans)
-            .await?;
+        .bind(params.point.clone())
+        .fetch_one(&mut *trans)
+        .await?;
 
         if count.0 > 0 {
             // returning ok on Override for now which is the expected behavior but not the desired
@@ -423,10 +417,10 @@ impl RegistryApi for PostgresRegistry {
         let sequence = sqlx::query_as::<Postgres, Sequence>(
             "SELECT DISTINCT sequence FROM particles WHERE parent=$1 AND point_segment=$2",
         )
-            .bind(parent.to_string())
-            .bind(point_segment.to_string())
-            .fetch_one(&mut *trans)
-            .await?;
+        .bind(parent.to_string())
+        .bind(point_segment.to_string())
+        .fetch_one(&mut *trans)
+        .await?;
         trans.commit().await?;
 
         Ok(sequence.0)
@@ -463,10 +457,10 @@ impl RegistryApi for PostgresRegistry {
         let mut record = sqlx::query_as::<Postgres, PostgresParticleRecord>(
             "SELECT DISTINCT * FROM particles as r WHERE parent=$1 AND point_segment=$2",
         )
-            .bind(parent.to_string())
-            .bind(point_segment.clone())
-            .fetch_one(&mut *conn)
-            .await?;
+        .bind(parent.to_string())
+        .bind(point_segment.clone())
+        .fetch_one(&mut *conn)
+        .await?;
         let mut record: ParticleRecord = record.into();
         let properties = sqlx::query_as::<Postgres, LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(&mut *conn).await?;
         let mut map = HashMap::new();
@@ -745,11 +739,11 @@ impl RegistryApi for PostgresRegistry {
         let has_owner = sqlx::query_as::<Postgres, Owner>(
             "SELECT count(*) > 0 as owner FROM particles WHERE point=$1 AND owner=$2",
         )
-            .bind(on.to_string())
-            .bind(to.to_string())
-            .fetch_one(&mut *conn)
-            .await?
-            .0;
+        .bind(on.to_string())
+        .bind(to.to_string())
+        .fetch_one(&mut *conn)
+        .await?
+        .0;
 
         if *HYPERUSER == *to {
             if has_owner {
@@ -1319,10 +1313,6 @@ impl PostgresRegistry {
     }
 }
 
-
-
-
-
 #[cfg(all(test, feature = "postgres-tests"))]
 pub mod test {
     use std::collections::HashSet;
@@ -1799,5 +1789,3 @@ pub mod test {
         Ok(())
     }
 }
-
-

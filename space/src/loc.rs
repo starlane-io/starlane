@@ -1,16 +1,3 @@
-use core::fmt::Formatter;
-use core::str::FromStr;
-use std::collections::HashMap;
-use std::fmt::Display;
-use std::ops::{Deref, DerefMut};
-use async_trait::async_trait;
-use convert_case::Casing;
-use enum_ordinalize::Ordinalize;
-use nom::combinator::all_consuming;
-use once_cell::sync::Lazy;
-use serde::de::{Error, Visitor};
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use starlane_macros::ToBase;
 use crate::err::{ParseErrs, SpaceErr};
 use crate::kind::BaseKind;
 use crate::log::Trackable;
@@ -21,6 +8,19 @@ use crate::particle::traversal::TraversalPlan;
 use crate::point::{Point, PointSeg, PointSegKind, PointSegPairDef, RouteSeg};
 use crate::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
 use crate::wave::{Recipients, ToRecipients};
+use async_trait::async_trait;
+use convert_case::Casing;
+use core::fmt::Formatter;
+use core::str::FromStr;
+use enum_ordinalize::Ordinalize;
+use nom::combinator::all_consuming;
+use once_cell::sync::Lazy;
+use serde::de::{Error, Visitor};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use starlane_macros::ToBase;
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::ops::{Deref, DerefMut};
 
 pub static CENTRAL: Lazy<Point> = Lazy::new(|| StarKey::central().to_point());
 pub static GLOBAL_LOGGER: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::logger").unwrap());
@@ -187,7 +187,6 @@ impl<'de> Deserialize<'de> for Version {
     }
 }
 
-
 impl TryInto<semver::Version> for Version {
     type Error = ParseErrs;
 
@@ -238,7 +237,7 @@ impl<V> TryInto<Variable> for VarVal<V> {
 
 impl<V> ToResolved<V> for VarVal<V>
 where
-    V: FromStr<Err=ParseErrs>,
+    V: FromStr<Err = ParseErrs>,
 {
     fn to_resolved(self, env: &Env) -> Result<V, ParseErrs> {
         match self {
@@ -256,14 +255,14 @@ where
                             trace.range,
                             trace.extra,
                         )
-                            .into()),
+                        .into()),
                         ResolverErr::NotFound => Err(ParseErrs::from_range(
                             format!("variable '{}' not found", var.unwrap().to_string()).as_str(),
                             "not found",
                             trace.range,
                             trace.extra,
                         )
-                            .into()),
+                        .into()),
                     }
                 }
             },

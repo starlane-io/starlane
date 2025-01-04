@@ -3,14 +3,6 @@ use core::str::FromStr;
 use nom::combinator::all_consuming;
 use serde_derive::{Deserialize, Serialize};
 
-use direct::create::{Create, CreateCtx, CreateVar};
-use direct::delete::{DeleteCtx, DeleteVar};
-use direct::get::{Get, GetCtx, GetVar};
-use direct::read::{Read, ReadCtx, ReadVar};
-use direct::select::{SelectCtx, SelectVar};
-use direct::set::{Set, SetCtx, SetVar};
-use direct::write::{Write, WriteCtx, WriteVar};
-use starlane_macros::Autobox;
 use crate::command::direct::delete::Delete;
 use crate::command::direct::select::Select;
 use crate::err::ParseErrs;
@@ -19,6 +11,14 @@ use crate::parse::{command_line, Env};
 use crate::substance::{Bin, ChildSubstance};
 use crate::util::ToResolved;
 use crate::wave::core::cmd::CmdMethod;
+use direct::create::{Create, CreateCtx, CreateVar};
+use direct::delete::{DeleteCtx, DeleteVar};
+use direct::get::{Get, GetCtx, GetVar};
+use direct::read::{Read, ReadCtx, ReadVar};
+use direct::select::{SelectCtx, SelectVar};
+use direct::set::{Set, SetCtx, SetVar};
+use direct::write::{Write, WriteCtx, WriteVar};
+use starlane_macros::Autobox;
 
 pub mod common {
     use std::collections::hash_map::Iter;
@@ -357,11 +357,6 @@ pub mod direct {
     }
 
     pub mod create {
-        use std::convert::TryInto;
-        use std::fmt::Display;
-        use std::sync::atomic::{AtomicU64, Ordering};
-        use std::sync::Arc;
-        use async_trait::async_trait;
         use crate::command::common::{SetProperties, StateSrc, StateSrcVar};
         use crate::command::Command;
         use crate::err::{ParseErrs, SpaceErr};
@@ -377,7 +372,12 @@ pub mod direct {
         use crate::wave::core::ext::ExtMethod;
         use crate::wave::core::DirectedCore;
         use crate::wave::DirectedProto;
+        use async_trait::async_trait;
         use serde::{Deserialize, Serialize};
+        use std::convert::TryInto;
+        use std::fmt::Display;
+        use std::sync::atomic::{AtomicU64, Ordering};
+        use std::sync::Arc;
         use thiserror::__private::AsDisplay;
 
         pub enum PointTemplateSeg {
@@ -446,7 +446,6 @@ pub mod direct {
             pub sub: Option<CamelCase>,
             pub specific: Option<SpecificSelector>,
         }
-
 
         impl Display for KindTemplate {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

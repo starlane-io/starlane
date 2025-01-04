@@ -1,10 +1,13 @@
 pub mod tcp;
 
-
+use async_trait::async_trait;
+use dashmap::DashMap;
+use derive_name::Name;
+use once_cell::sync::Lazy;
+use starlane_macros::{push_loc, push_mark};
 /// `quic` is meant to be a drop in replacement for `tcp`.  the Quic networking protocol
 /// has many advantages over TCP and Starlane will benefit from quic immensely...
 //pub mod quic;
-
 use starlane_space::err::SpaceErr;
 use starlane_space::hyper::{Greet, InterchangeKind, Knock};
 use starlane_space::loc::{Layer, PointFactory, Surface, ToSurface};
@@ -18,11 +21,6 @@ use starlane_space::wave::exchange::asynch::{
 use starlane_space::wave::exchange::SetStrategy;
 use starlane_space::wave::{Agent, DirectedProto, HyperWave, Wave};
 use starlane_space::VERSION;
-use async_trait::async_trait;
-use dashmap::DashMap;
-use derive_name::Name;
-use once_cell::sync::Lazy;
-use starlane_macros::{push_loc, push_mark};
 use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
 use std::process;
@@ -483,7 +481,8 @@ impl Hyperlane {
                                     }
                                 }
                             }
-                        } else {}
+                        } else {
+                        }
                     }
                 }
             });
@@ -599,7 +598,7 @@ impl HyperwayInterchange {
                                     "hyperway {} not found",
                                     stub.remote.to_string()
                                 )
-                                    .into()));
+                                .into()));
                             }
                             Some(hyperway) => {
                                 let endpoint = hyperway.hyperway_endpoint_far(init_wave).await;
@@ -1480,8 +1479,8 @@ impl HyperClient {
                     exchanger,
                     logger.clone(),
                 )
-                    .await
-                    .unwrap_or_default();
+                .await
+                .unwrap_or_default();
             });
         }
 
@@ -1711,7 +1710,7 @@ impl HyperClientRunner {
                             Duration::from_secs(30),
                             runner.factory.create(details_tx.clone()),
                         )
-                            .await,
+                        .await,
                     ) {
                         Ok(Ok(ext)) => {
                             runner.ext.replace(ext);
@@ -1929,8 +1928,8 @@ impl Bridge {
 #[cfg(test)]
 mod tests {
     use crate::hyperlane::HyperRouter;
-    use starlane_space::wave::HyperWave;
     use async_trait::async_trait;
+    use starlane_space::wave::HyperWave;
 
     /*
     #[no_mangle]
@@ -2003,6 +2002,7 @@ pub mod test_util {
         HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
         MountInterchangeGate,
     };
+    use starlane_macros::{create_mark, logger, push_loc, push_mark};
     use starlane_space::err::SpaceErr;
     use starlane_space::hyper::{Greet, InterchangeKind, Knock};
     use starlane_space::loc::{Layer, Surface, ToSurface};
@@ -2015,7 +2015,6 @@ pub mod test_util {
     use starlane_space::wave::{
         DirectedProto, PongCore, ReflectedKind, ReflectedProto, WaveVariantDef,
     };
-    use starlane_macros::{create_mark, logger, push_loc, push_mark};
 
     pub static LESS: Lazy<Point> =
         Lazy::new(|| Point::from_str("space:users:less").expect("point"));
@@ -2110,14 +2109,14 @@ pub mod test_util {
                 Some(less_exchanger.clone()),
                 logger.clone(),
             )
-                .unwrap();
+            .unwrap();
             let logger = push_loc!((logger, Point::from_str("fae-client").unwrap()));
             let fae_client = HyperClient::new_with_exchanger(
                 self.fae_factory,
                 Some(fae_exchanger.clone()),
                 logger,
             )
-                .unwrap();
+            .unwrap();
 
             let mut less_rx = less_client.rx();
             let mut fae_rx = fae_client.rx();
@@ -2209,14 +2208,14 @@ pub mod test_util {
                 Some(less_exchanger.clone()),
                 logger.clone(),
             )
-                .unwrap();
+            .unwrap();
             let logger = push_loc!((logger.clone(), Point::from_str("fae-client").unwrap()));
             let fae_client = HyperClient::new_with_exchanger(
                 self.fae_factory,
                 Some(fae_exchanger.clone()),
                 logger,
             )
-                .unwrap();
+            .unwrap();
 
             let mut less_rx = less_client.rx();
             let mut fae_rx = fae_client.rx();
@@ -2302,15 +2301,14 @@ pub mod test {
     use std::time::Duration;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
-    use crate::hyperlane::test_util::{
-        SingleInterchangePlatform, TestGreeter, WaveTest,
-    };
+    use crate::hyperlane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest};
     use crate::hyperlane::{
         AnonHyperAuthenticator, Bridge, HyperClient, HyperConnectionDetails, HyperGate,
         HyperGateSelector, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint,
         HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
         MountInterchangeGate,
     };
+    use starlane_macros::{create_mark, logger, push_mark};
     use starlane_space::err::SpaceErr;
     use starlane_space::hyper::InterchangeKind;
     use starlane_space::loc::{Layer, ToSurface};
@@ -2328,7 +2326,6 @@ pub mod test {
         Agent, DirectedProto, HyperWave, PongCore, ReflectedKind, ReflectedProto, Wave,
         WaveVariantDef,
     };
-    use starlane_macros::{create_mark, logger, push_mark};
     pub static LESS: Lazy<Point> =
         Lazy::new(|| Point::from_str("space:users:less").expect("point"));
     pub static FAE: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:fae").expect("point"));
@@ -2382,9 +2379,9 @@ pub mod test {
             Duration::from_secs(5u64),
             hyperway.outbound.rx(None).await.recv(),
         )
-            .await
-            .unwrap()
-            .unwrap();
+        .await
+        .unwrap()
+        .unwrap();
 
         let wave = hello_wave();
         let wave_id = wave.id().clone();
@@ -2393,9 +2390,9 @@ pub mod test {
             Duration::from_secs(5u64),
             hyperway.inbound.rx(None).await.recv(),
         )
-            .await
-            .unwrap()
-            .unwrap();
+        .await
+        .unwrap()
+        .unwrap();
         assert_eq!(wave.id(), wave_id);
     }
 

@@ -1,15 +1,13 @@
 #![allow(warnings)]
 
-use std::str::FromStr;
-use once_cell::sync::Lazy;
 use crate::point::Point;
-
+use once_cell::sync::Lazy;
+use std::str::FromStr;
 
 // so macros will work
 extern crate self as starlane_space;
 
-
-#[allow(missing_docs, unused_imports,warnings)]
+#[allow(missing_docs, unused_imports, warnings)]
 pub(crate) mod lib {
     mod core {
         #[cfg(not(feature = "std"))]
@@ -161,6 +159,7 @@ pub mod wasm;
 pub mod prelude;
 pub mod progress;
 
+pub mod status;
 /// `types` mod is a work in progress for the proposed new type system
 /// its having some compile problems and isn't as-of-yet used by
 /// anything so makes sense to disable it for a while, so I can focus
@@ -169,7 +168,6 @@ pub mod progress;
 
 #[cfg(test)]
 pub mod test;
-pub mod status;
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
@@ -178,4 +176,3 @@ pub static HYPERUSER: Lazy<Point> =
     Lazy::new(|| Point::from_str("hyperspace:users:hyperuser").expect("point"));
 pub static ANONYMOUS: Lazy<Point> =
     Lazy::new(|| Point::from_str("hyperspace:users:anonymous").expect("point"));
-

@@ -1,16 +1,20 @@
 use crate::artifact::builtin::BUILTIN_FETCHER;
 use crate::artifact::ArtRef;
+use crate::config::bind::BindConfig;
 use crate::config::mechtron::MechtronConfig;
 use crate::err::{ParseErrs, PrintErr};
 use crate::loc::ToSurface;
+use crate::particle::Stub;
 use crate::point::Point;
 use crate::selector::{PointSelector, Selector};
 use crate::settings::Timeouts;
+use crate::substance::{Bin, Substance};
 use crate::util::{ValueMatcher, ValuePattern};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::exchange::asynch::ProtoTransmitter;
 use crate::wave::{DirectedProto, WaitTime};
 use anyhow::anyhow;
+use async_trait::async_trait;
 use core::fmt::Display;
 use core::str::FromStr;
 use dashmap::DashMap;
@@ -21,13 +25,9 @@ use std::ops::{Deref, DerefMut};
 use std::string::FromUtf8Error;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use async_trait::async_trait;
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, watch};
 use tokio::time::error::Elapsed;
-use crate::config::bind::BindConfig;
-use crate::particle::Stub;
-use crate::substance::{Bin, Substance};
 
 #[derive(Clone, Error, Debug)]
 pub enum ArtErr {
@@ -193,7 +193,7 @@ impl<A> Into<Result<ArtRef<A>, ArtErr>> for ArtStatus<A> {
 
 pub struct ArtifactPipeline<A>
 where
-    A: FromStr<Err=ParseErrs>,
+    A: FromStr<Err = ParseErrs>,
 {
     watch: watch::Receiver<ArtStatus<A>>,
 }
@@ -215,7 +215,7 @@ impl Default for ArtifactsSkel {
 
 impl<A> ArtifactPipeline<A>
 where
-    A: FromStr<Err=ParseErrs> + 'static,
+    A: FromStr<Err = ParseErrs> + 'static,
 {
     pub fn new(point: &Point, fetcher: Arc<dyn ArtifactFetcher>) -> ArtifactPipeline<A> {
         let runner = ArtifactPipelineRunner::new(point.clone(), fetcher);
@@ -244,7 +244,7 @@ struct ArtifactPipelineRunner<A> {
 
 impl<A> ArtifactPipelineRunner<A>
 where
-    A: FromStr<Err=ParseErrs> + 'static,
+    A: FromStr<Err = ParseErrs> + 'static,
 {
     pub fn new(point: Point, fetcher: Arc<dyn ArtifactFetcher>) -> Self {
         let (watch_tx, watch_rx) = watch::channel(ArtStatus::Unknown);
@@ -301,7 +301,7 @@ where
 
 struct ArtifactCache<A>
 where
-    A: FromStr<Err=ParseErrs>,
+    A: FromStr<Err = ParseErrs>,
 {
     skel: ArtifactsSkel,
     artifacts: DashMap<Point, ArtRef<A>>,
@@ -312,7 +312,7 @@ where
 
 impl<A> ArtifactCache<A>
 where
-    A: FromStr<Err=ParseErrs> + 'static,
+    A: FromStr<Err = ParseErrs> + 'static,
 {
     pub fn new(fetcher: Arc<dyn ArtifactFetcher>, skel: ArtifactsSkel) -> ArtifactCache<A> {
         ArtifactCache {
@@ -363,7 +363,7 @@ where
                 _ => false,
             }),
         )
-            .await??;
+        .await??;
 
         match &*status {
             ArtStatus::Unknown => Err(ArtErr::UnknownStatus),

@@ -1,29 +1,20 @@
-
 //#![starlane_macros::silly]
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use starlane_macros::{ route, show_streams};
-
+use starlane_macros::{route, show_streams};
 
 #[test]
-pub fn test()
-{
-
-}
+pub fn test() {}
 pub struct MyStr {
-  meat_ball: bool
+    meat_ball: bool,
 }
-
-
 
 #[show_streams]
 trait MyTrait {}
 
-
 #[show_streams(i_have_things_to_say)]
-trait Trait2{}
-
+trait Trait2 {}
 
 /*
 #[proxy]
@@ -35,13 +26,11 @@ impl MyStr {
 
  */
 
-
 /*
 
 
 
- */
-
+*/
 
 /*
 #[proxy]

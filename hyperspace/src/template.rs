@@ -1,6 +1,6 @@
 use crate::service::{ServiceSelector, ServiceTemplate};
-use starlane_space::selector::KindSelector;
 use itertools::Itertools;
+use starlane_space::selector::KindSelector;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 

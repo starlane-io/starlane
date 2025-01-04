@@ -1,13 +1,14 @@
+pub mod config;
+pub mod context;
+
 use std::sync::Arc;
 use async_trait::async_trait;
 use starlane_hyperspace::provider::{Provider, ProviderKind};
 use starlane_space::progress::Progress;
 use starlane_space::status::{Status, StatusReporter, StatusWatcher};
-use crate::{config, err, status};
-use crate::context;
+use crate::{err, status};
 use crate::err::BaseErr;
 use crate::kind::FoundationKind;
-
 
 
 pub struct Base<P,F> where P:Platform, F: Foundation{
@@ -16,9 +17,12 @@ pub struct Base<P,F> where P:Platform, F: Foundation{
 }
 
 
+
+
 // ['Foundation'] is an abstraction for managing infrastructure.
 #[async_trait]
 pub trait Foundation: Sync + Send {
+
 
     /// [crate::Foundation::Config] should be a `concrete` implementation of [config::FoundationConfig]
     type Config: config::FoundationConfig + ?Sized;
@@ -58,3 +62,8 @@ pub trait Platform:  {
     type Provider: Provider+Send+Sync;
 
 }
+
+
+
+
+

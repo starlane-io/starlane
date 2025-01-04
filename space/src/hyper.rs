@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 
-use serde::{Deserialize, Serialize};
-use starlane_macros::Autobox;
 use crate::command::common::StateSrc;
 use crate::config::mechtron::MechtronConfig;
 use crate::err::ParseErrs;
@@ -16,7 +14,11 @@ use crate::selector::KindSelector;
 use crate::substance::{Substance, SubstanceKind};
 use crate::wave::core::hyper::HypMethod;
 use crate::wave::core::{DirectedCore, ReflectedCore};
-use crate::wave::{Agent, PingCore, ReflectedKind, ReflectedProto, Wave, WaveId, WaveKind, WaveVariantDef};
+use crate::wave::{
+    Agent, PingCore, ReflectedKind, ReflectedProto, Wave, WaveId, WaveKind, WaveVariantDef,
+};
+use serde::{Deserialize, Serialize};
+use starlane_macros::Autobox;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {

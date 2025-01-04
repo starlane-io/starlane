@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use bincode::ErrorKind;
 use nom::error::{FromExternalError, VerboseError};
+use nom_supreme::error::BaseErrorKind;
 use serde::de::Error;
 use std::convert::Infallible;
 use std::fmt::{Debug, Display, Formatter};
@@ -9,7 +10,6 @@ use std::num::ParseIntError;
 use std::ops::Range;
 use std::string::FromUtf8Error;
 use std::sync::{Arc, PoisonError};
-use nom_supreme::error::BaseErrorKind;
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
@@ -19,20 +19,20 @@ use crate::parse::util::SpanExtra;
 
 use crate::artifact::asynch::ArtErr;
 use crate::command::direct::create::KindTemplate;
+use crate::err::report::{Label, Report, ReportKind};
 use crate::kind::BaseKind;
 use crate::parse::ResolverErr;
+use crate::particle::StatusDetail;
 use crate::point::PointSegKind;
+use crate::status::Status;
 use crate::substance::{Substance, SubstanceErr, SubstanceKind};
 use crate::wave::core::http2::StatusCode;
 use crate::wave::core::{Method, ReflectedCore};
 use serde::{Deserialize, Serialize};
-use strum::{IntoEnumIterator, ParseError};
-use thiserror::Error;
 use starlane_space::parse::SpaceTree;
 use starlane_space::status;
-use crate::err::report::{Label, Report, ReportKind};
-use crate::particle::StatusDetail;
-use crate::status::Status;
+use strum::{IntoEnumIterator, ParseError};
+use thiserror::Error;
 /*
 #[macro_export]
 macro_rules! err {
@@ -42,7 +42,6 @@ macro_rules! err {
 }
 
  */
-
 
 #[derive(Debug, Clone, Error)]
 pub enum SpaceErr {
@@ -104,12 +103,10 @@ impl From<status::Status> for SpaceErr {
 
 impl From<status::StatusDetail> for SpaceErr {
     fn from(detail: status::StatusDetail) -> Self {
-         let status: status::Status = detail.into();
-         status.into()
+        let status: status::Status = detail.into();
+        status.into()
     }
 }
-
-
 
 /*    #[error("artifact error: '{0}'")]
     #[serde(skip_serializing)]
@@ -587,12 +584,9 @@ impl From<io::Error> for SpaceErr {
 /// frustrated with this particular FromStr::from_str err...
 impl From<Report> for ParseErrs {
     fn from(report: Report) -> Self {
-        ParseErrs::new(format!("{:?}",report))
+        ParseErrs::new(format!("{:?}", report))
     }
 }
-
-
-
 
 #[derive(Debug, Clone, Error, Serialize, Deserialize)]
 pub struct ParseErrs {
@@ -613,7 +607,6 @@ impl ParseErrs {
         A: AsRef<str>,
         B: AsRef<str>,
         C: AsRef<str>,
-
     {
         let report = Report::build(ReportKind::Error, (), 0)
             .with_message(format!(
@@ -1070,7 +1063,6 @@ pub mod report {
         RGB(u8, u8, u8),
     }
 }
-
 
 pub trait PrintErr {
     fn print(&self);

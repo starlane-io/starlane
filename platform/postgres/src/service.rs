@@ -10,15 +10,15 @@
 //! [Platform]
 
 #[cfg(not(test))]
-#[cfg(not(feature="test"))]
+#[cfg(not(feature = "test"))]
 pub use types::*;
 
 #[cfg(test)]
-#[cfg(feature="test")]
+#[cfg(feature = "test")]
 pub use tests::types::*;
 
 #[cfg(not(test))]
-#[cfg(not(feature="test"))]
+#[cfg(not(feature = "test"))]
 pub(super) mod types {
     pub type Pool = sqlx::Pool<sqlx::Postgres>;
 
@@ -34,27 +34,27 @@ pub type DbName = VarCase;
 pub type SchemaName = VarCase;
 pub type Hostname = Domain;
 
+use crate::service::partial::connection::PostgresConnectionProvider;
+use async_trait::async_trait;
+use sqlx::postgres::PgConnectOptions;
+use sqlx::Error;
+use starlane_base as base;
+use starlane_base::kind::ProviderKindDef;
+use starlane_base::provider;
+use starlane_base::Foundation;
+use starlane_base::Platform;
+use starlane_space::parse::{Domain, VarCase};
+use starlane_space::status;
+use starlane_space::status::{Handle, StatusProbe};
 use std::fmt::Display;
 use std::future::Future;
 use std::sync::Arc;
-use async_trait::async_trait;
-use sqlx::Error;
-use sqlx::postgres::PgConnectOptions;
 use tokio::sync::Mutex;
-use starlane_base::provider;
-use starlane_space::parse::{Domain, VarCase};
-use starlane_space::status::{Handle, StatusProbe};
-use starlane_space::status;
-use starlane_base::Foundation;
-use starlane_base::Platform;
-use starlane_base::kind::ProviderKindDef;
-use starlane_base as base;
-use crate::service::partial::connection::PostgresConnectionProvider;
 
 /// final [starlane::config::ProviderConfig] trait definitions for [concrete::PostgresProviderConfig]
 #[async_trait]
 pub trait ProviderConfig: config::ProviderConfig {
-    fn utilization_config(&self) ->  & config::PostgresUtilizationConfig;
+    fn utilization_config(&self) -> &config::PostgresUtilizationConfig;
 
     /// reexport [config::PostgresUtilizationConfig::connect_options]
     fn connect_options(&self) -> PgConnectOptions {
@@ -64,23 +64,22 @@ pub trait ProviderConfig: config::ProviderConfig {
 
 /// final [provider::Provider] trait definitions for [concrete::PostgresServiceProvider]
 #[async_trait]
-pub trait Provider:  provider::Provider<Entity=Arc<dyn PostgresService>>  {
+pub trait Provider: provider::Provider<Entity = Arc<dyn PostgresService>> {
     type Config: ProviderConfig + ?Sized;
 }
 
-
-
-
-
 /// trait implementation [Provider::Entity]
 #[async_trait]
-pub trait PostgresService : status::Entity<DerefTarget=Arc<PgConnection>>+StatusProbe+Send+Sync+PostgresConnectionProvider { }
-
+pub trait PostgresService:
+    status::Entity<DerefTarget = Arc<PgConnection>>
+    + StatusProbe
+    + Send
+    + Sync
+    + PostgresConnectionProvider
+{
+}
 
 pub type PostgresServiceHandle = Handle<dyn PostgresService>;
-
-
-
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct DbKey {
@@ -102,14 +101,16 @@ impl Display for DbKey {
 }
 
 pub mod config {
-    mod my { pub use super::super::*; }
-    use std::str::FromStr;
-    use sqlx::postgres::PgConnectOptions;
+    mod my {
+        pub use super::super::*;
+    }
     use crate::err::PostErr;
-    use starlane_base as base;
     use crate::service::{Hostname, Password, Username};
+    use sqlx::postgres::PgConnectOptions;
+    use starlane_base as base;
+    use std::str::FromStr;
 
-    pub trait ProviderConfig: base::config::ProviderConfig { }
+    pub trait ProviderConfig: base::config::ProviderConfig {}
 
     #[derive(Clone, Eq, PartialEq)]
     pub struct PostgresUtilizationConfig {
@@ -148,7 +149,6 @@ pub mod config {
                 .password(self.password.as_str())
         }
 
-
         #[cfg(test)]
         pub fn mock() -> Self {
             Self {
@@ -159,66 +159,60 @@ pub mod config {
             }
         }
     }
-
-
 }
-
-
 
 pub mod partial {
 
-    mod my { pub use super::super::*; }
+    mod my {
+        pub use super::super::*;
+    }
 
     /// connection pool support
     pub mod connection {
-        use std::future::Future;
-        use tokio::sync::Mutex;
-        use std::sync::{Arc};
+        use super::my;
         use async_trait::async_trait;
         use starlane_space::status::Entity;
-        use super::my;
+        use std::future::Future;
+        use std::sync::Arc;
+        use tokio::sync::Mutex;
 
         #[async_trait]
         pub trait PostgresConnectionProvider {
             fn connection(&self) -> &Arc<my::PgConnection>;
         }
     }
-    pub mod mount {
-    }
+    pub mod mount {}
 }
 
-
-
-
 mod concrete {
-    use std::fmt::Display;
-    use std::future::Future;
-    use std::ops::Deref;
-    use std::sync::Arc;
+    use super::base;
+    use super::config;
     use async_trait::async_trait;
-    use starlane_base::provider::{Manager, Provider, ProviderKindDef};
-    use std::str::FromStr;
     use sqlx;
     use sqlx::{Acquire, ConnectOptions, Connection, Postgres};
+    use starlane_base::provider::{Manager, Provider, ProviderKindDef};
     use starlane_base::Foundation;
     use starlane_base::Platform;
     use starlane_space::status;
     use starlane_space::status::{Entity, EntityReadier, StatusReporter, StatusResult};
     use status::{EntityResult, Handle, Status, StatusDetail, StatusProbe, StatusWatcher};
-    use super::config;
-    use super::base;
+    use std::fmt::Display;
+    use std::future::Future;
+    use std::ops::Deref;
+    use std::str::FromStr;
+    use std::sync::Arc;
 
-
+    use crate::service::concrete::my::{Error, PostgresConnectionProvider};
     use config::PostgresUtilizationConfig;
     use starlane_base::config::ProviderConfig;
-    use crate::service::concrete::my::{Error, PostgresConnectionProvider};
 
-    pub mod my { pub use super::super::*; }
-
+    pub mod my {
+        pub use super::super::*;
+    }
 
     pub struct PostgresServiceProvider {
         config: Arc<PostgresProviderConfig>,
-        status_reporter: StatusReporter
+        status_reporter: StatusReporter,
     }
 
     impl PostgresServiceProvider {
@@ -227,17 +221,15 @@ mod concrete {
 
             Self {
                 config,
-                status_reporter
+                status_reporter,
             }
         }
 
         #[cfg(test)]
         pub fn mock() -> PostgresServiceProvider {
-
-          let config = Arc::new(PostgresProviderConfig::mock());
-           Self::new(config)
+            let config = Arc::new(PostgresProviderConfig::mock());
+            Self::new(config)
         }
-
     }
 
     #[async_trait]
@@ -262,14 +254,12 @@ mod concrete {
         }
     }
 
-
     #[async_trait]
     impl StatusProbe for PostgresServiceProvider {
         async fn probe(&self) -> status::StatusResult {
             todo!()
         }
     }
-
 
     /// the [StatusProbe] implementation which tracks with a Postgres Connection [Pool].
     /// With any [StatusProbe] the goal is to get to a [Status::Ready] state.  [PostgresService]
@@ -282,9 +272,8 @@ mod concrete {
     #[derive(Clone)]
     pub struct PostgresService {
         config: PostgresProviderConfig,
-        connection: Arc<my::PgConnection>
+        connection: Arc<my::PgConnection>,
     }
-
 
     impl Entity for PostgresService {
         type DerefTarget = Arc<my::PgConnection>;
@@ -296,34 +285,27 @@ mod concrete {
 
     #[async_trait]
     impl PostgresConnectionProvider for PostgresService {
-        fn connection(&self) -> & <Self as Entity>::DerefTarget  {
-            & self.connection
+        fn connection(&self) -> &<Self as Entity>::DerefTarget {
+            &self.connection
         }
     }
 
     #[async_trait]
-    impl my::PostgresService for PostgresService { }
-
+    impl my::PostgresService for PostgresService {}
 
     impl PostgresService {
         #[cfg(not(test))]
         async fn new(config: PostgresProviderConfig) -> Result<Self, sqlx::Error> {
             let connection = Arc::new(config.connect_options().connect().await?);
-            Ok(Self {
-                config,
-                connection
-            })
+            Ok(Self { config, connection })
         }
 
         #[cfg(test)]
-        #[cfg(feature="test")]
+        #[cfg(feature = "test")]
         pub fn mock() -> Self {
             let connection = Arc::new(PgConnection::default());
             let config = PostgresProviderConfig::mock();
-            Self {
-                config,
-                connection
-            }
+            Self { config, connection }
         }
     }
 
@@ -334,18 +316,16 @@ mod concrete {
         }
     }
 
-
     #[derive(Clone, Eq, PartialEq)]
     pub struct PostgresProviderConfig {
-        connection_info: my::config::PostgresUtilizationConfig
+        connection_info: my::config::PostgresUtilizationConfig,
     }
-
 
     #[cfg(test)]
     impl PostgresProviderConfig {
         pub fn mock() -> Self {
             Self {
-                connection_info: PostgresUtilizationConfig::mock()
+                connection_info: PostgresUtilizationConfig::mock(),
             }
         }
     }
@@ -355,7 +335,6 @@ mod concrete {
         fn utilization_config(&self) -> &PostgresUtilizationConfig {
             &self.connection_info
         }
-
     }
 
     impl Deref for PostgresProviderConfig {
@@ -366,7 +345,6 @@ mod concrete {
         }
     }
 
-
     #[async_trait]
     impl base::config::ProviderConfig for PostgresProviderConfig {
         fn kind(&self) -> &ProviderKindDef {
@@ -375,17 +353,14 @@ mod concrete {
     }
 
     #[async_trait]
-    impl config::ProviderConfig for PostgresProviderConfig { }
+    impl config::ProviderConfig for PostgresProviderConfig {}
 }
-
-
-
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use base::status::Handle;
-    use crate::service::concrete::my::base;
     use super::concrete::{PostgresService, PostgresServiceProvider};
+    use crate::service::concrete::my::base;
+    use base::status::Handle;
 
     pub(crate) mod types {
         use std::marker::PhantomData;
@@ -394,7 +369,9 @@ pub(crate) mod tests {
         pub type PoolConnection = MockPoolConnection<sqlx::Postgres>;
         pub type PgConnection = MockPgConnection<sqlx::Postgres>;
 
-        pub struct MockPool<Db> (PhantomData<Db>) where Db : sqlx::Database;
+        pub struct MockPool<Db>(PhantomData<Db>)
+        where
+            Db: sqlx::Database;
 
         impl Default for MockPool<sqlx::Postgres> {
             fn default() -> Self {
@@ -402,14 +379,18 @@ pub(crate) mod tests {
             }
         }
 
-        pub struct MockPoolConnection<Db> (PhantomData<Db>) where Db : sqlx::Database;
+        pub struct MockPoolConnection<Db>(PhantomData<Db>)
+        where
+            Db: sqlx::Database;
         impl Default for MockPoolConnection<sqlx::Postgres> {
             fn default() -> Self {
                 Self(PhantomData::default())
             }
         }
 
-        pub struct MockPgConnection<Db> (PhantomData<Db>) where Db : sqlx::Database;
+        pub struct MockPgConnection<Db>(PhantomData<Db>)
+        where
+            Db: sqlx::Database;
 
         impl Default for MockPgConnection<sqlx::Postgres> {
             fn default() -> Self {

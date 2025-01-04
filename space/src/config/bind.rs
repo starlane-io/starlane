@@ -6,9 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::err::{ParseErrs, SpaceErr};
 use crate::loc::Topic;
-use crate::parse::model::{
-    BindScope, MethodScope, PipelineSegmentDef, RouteScope, ScopeFilters,
-};
+use crate::parse::model::{BindScope, MethodScope, PipelineSegmentDef, RouteScope, ScopeFilters};
 use crate::parse::{bind_config, Env};
 use crate::point::{Point, PointCtx, PointVar};
 use crate::selector::PayloadBlockDef;

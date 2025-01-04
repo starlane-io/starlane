@@ -2,10 +2,10 @@ use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::cli::HostEnv;
 use crate::executor::Executor;
 use crate::host::err::HostErr;
-use starlane_space::wave::exchange::asynch::DirectedHandler;
 use clap::CommandFactory;
 use itertools::Itertools;
 use nom::AsBytes;
+use starlane_space::wave::exchange::asynch::DirectedHandler;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::io::Read;
@@ -77,7 +77,7 @@ impl Host {
     }
     pub fn create<D>(&self) -> Result<D, HostErr>
     where
-        D: TryFrom<CliOsExecutor, Error=HostErr>,
+        D: TryFrom<CliOsExecutor, Error = HostErr>,
     {
         match self {
             Host::Cli(host) => host.create(),
@@ -106,7 +106,7 @@ impl HostCli {
 
     pub fn create<D>(&self) -> Result<D, HostErr>
     where
-        D: TryFrom<CliOsExecutor, Error=HostErr>,
+        D: TryFrom<CliOsExecutor, Error = HostErr>,
     {
         match self {
             HostCli::Os(stub) => Ok(D::try_from(CliOsExecutor::new(stub.clone()))?),

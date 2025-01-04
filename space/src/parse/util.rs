@@ -28,20 +28,20 @@ mod tests {
 }
 
 pub trait Span:
-Clone
-+ ToString
-+ AsBytes
-+ Slice<Range<usize>>
-+ Slice<RangeTo<usize>>
-+ Slice<RangeFrom<usize>>
-+ InputLength
-+ Offset
-+ InputTake
-+ InputIter<Item=char>
-+ InputTakeAtPosition<Item=char>
-+ Compare<&'static str>
-+ FindSubstring<&'static str>
-+ core::fmt::Debug
+    Clone
+    + ToString
+    + AsBytes
+    + Slice<Range<usize>>
+    + Slice<RangeTo<usize>>
+    + Slice<RangeFrom<usize>>
+    + InputLength
+    + Offset
+    + InputTake
+    + InputIter<Item = char>
+    + InputTakeAtPosition<Item = char>
+    + Compare<&'static str>
+    + FindSubstring<&'static str>
+    + core::fmt::Debug
 where
     Self: Sized,
     <Self as InputTakeAtPosition>::Item: AsChar,
@@ -159,15 +159,15 @@ where
 //pub type OwnedSpan<'a> = LocatedSpan<&'a str, SpanExtra>;
 pub type SpanExtra = Arc<String>;
 
-
-
 mod span_serde {
-    use std::sync::Arc;
-    use serde::{Deserialize, Deserializer, Serializer};
     use crate::parse::util::SpanExtra;
+    use serde::{Deserialize, Deserializer, Serializer};
+    use std::sync::Arc;
 
     pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<SpanExtra, D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         Ok(Arc::new(String::deserialize(deserializer)?))
     }
 
@@ -177,7 +177,6 @@ mod span_serde {
     {
         s.serialize_str(span.as_str())
     }
-
 }
 
 pub fn new_span<'a>(s: &'a str) -> Wrap<LocatedSpan<&'a str, Arc<String>>> {
@@ -186,10 +185,7 @@ pub fn new_span<'a>(s: &'a str) -> Wrap<LocatedSpan<&'a str, Arc<String>>> {
     Wrap::new(span)
 }
 
-pub fn span_with_extra(
-    s: &str,
-    extra: Arc<String>,
-) -> Wrap<LocatedSpan<&str, Arc<String>>> {
+pub fn span_with_extra(s: &str, extra: Arc<String>) -> Wrap<LocatedSpan<&str, Arc<String>>> {
     Wrap::new(LocatedSpan::new_extra(s, extra))
 }
 
@@ -197,15 +193,12 @@ pub fn span_with_extra(
 pub struct Trace {
     pub range: Range<usize>,
 
-    #[serde(serialize_with = "span_serde::serialize", deserialize_with = "span_serde::deserialize")]
+    #[serde(
+        serialize_with = "span_serde::serialize",
+        deserialize_with = "span_serde::deserialize"
+    )]
     pub extra: SpanExtra,
 }
-
-
-
-
-
-
 
 impl Trace {
     pub fn new(range: Range<usize>, extra: SpanExtra) -> Self {
@@ -536,17 +529,17 @@ pub mod test {
 pub struct Wrap<I>
 where
     I: Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item=char>
-    + core::fmt::Debug
-    + InputTakeAtPosition<Item=char>,
+        + ToString
+        + AsBytes
+        + Slice<Range<usize>>
+        + Slice<RangeTo<usize>>
+        + Slice<RangeFrom<usize>>
+        + InputLength
+        + Offset
+        + InputTake
+        + InputIter<Item = char>
+        + core::fmt::Debug
+        + InputTakeAtPosition<Item = char>,
 {
     input: I,
 }
@@ -554,17 +547,17 @@ where
 impl<I> Wrap<I>
 where
     I: Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item=char>
-    + core::fmt::Debug
-    + InputTakeAtPosition<Item=char>,
+        + ToString
+        + AsBytes
+        + Slice<Range<usize>>
+        + Slice<RangeTo<usize>>
+        + Slice<RangeFrom<usize>>
+        + InputLength
+        + Offset
+        + InputTake
+        + InputIter<Item = char>
+        + core::fmt::Debug
+        + InputTakeAtPosition<Item = char>,
 {
     pub fn new(input: I) -> Self {
         Self { input }
@@ -574,17 +567,17 @@ where
 impl<I> Deref for Wrap<I>
 where
     I: Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item=char>
-    + core::fmt::Debug
-    + InputTakeAtPosition<Item=char>,
+        + ToString
+        + AsBytes
+        + Slice<Range<usize>>
+        + Slice<RangeTo<usize>>
+        + Slice<RangeFrom<usize>>
+        + InputLength
+        + Offset
+        + InputTake
+        + InputIter<Item = char>
+        + core::fmt::Debug
+        + InputTakeAtPosition<Item = char>,
 {
     type Target = I;
 
@@ -596,17 +589,17 @@ where
 impl<I> AsBytes for Wrap<I>
 where
     I: Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item=char>
-    + core::fmt::Debug
-    + InputTakeAtPosition<Item=char>,
+        + ToString
+        + AsBytes
+        + Slice<Range<usize>>
+        + Slice<RangeTo<usize>>
+        + Slice<RangeFrom<usize>>
+        + InputLength
+        + Offset
+        + InputTake
+        + InputIter<Item = char>
+        + core::fmt::Debug
+        + InputTakeAtPosition<Item = char>,
 {
     fn as_bytes(&self) -> &[u8] {
         self.input.as_bytes()
@@ -616,17 +609,17 @@ where
 impl<I> Slice<Range<usize>> for Wrap<I>
 where
     I: Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item=char>
-    + core::fmt::Debug
-    + InputTakeAtPosition<Item=char>,
+        + ToString
+        + AsBytes
+        + Slice<Range<usize>>
+        + Slice<RangeTo<usize>>
+        + Slice<RangeFrom<usize>>
+        + InputLength
+        + Offset
+        + InputTake
+        + InputIter<Item = char>
+        + core::fmt::Debug
+        + InputTakeAtPosition<Item = char>,
 {
     fn slice(&self, range: Range<usize>) -> Self {
         Self::new(self.input.slice(range))
@@ -636,17 +629,17 @@ where
 impl<I> Slice<RangeFrom<usize>> for Wrap<I>
 where
     I: Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item=char>
-    + core::fmt::Debug
-    + InputTakeAtPosition<Item=char>,
+        + ToString
+        + AsBytes
+        + Slice<Range<usize>>
+        + Slice<RangeTo<usize>>
+        + Slice<RangeFrom<usize>>
+        + InputLength
+        + Offset
+        + InputTake
+        + InputIter<Item = char>
+        + core::fmt::Debug
+        + InputTakeAtPosition<Item = char>,
 {
     fn slice(&self, range: RangeFrom<usize>) -> Self {
         Self::new(self.input.slice(range))
@@ -656,17 +649,17 @@ where
 impl<I> Slice<RangeTo<usize>> for Wrap<I>
 where
     I: Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item=char>
-    + core::fmt::Debug
-    + InputTakeAtPosition<Item=char>,
+        + ToString
+        + AsBytes
+        + Slice<Range<usize>>
+        + Slice<RangeTo<usize>>
+        + Slice<RangeFrom<usize>>
+        + InputLength
+        + Offset
+        + InputTake
+        + InputIter<Item = char>
+        + core::fmt::Debug
+        + InputTakeAtPosition<Item = char>,
 {
     fn slice(&self, range: RangeTo<usize>) -> Self {
         Self::new(self.input.slice(range))
@@ -686,17 +679,17 @@ impl<'a> Compare<&'static str> for Wrap<LocatedSpan<&'a str, Arc<String>>> {
 impl<I> InputLength for Wrap<I>
 where
     I: Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item=char>
-    + core::fmt::Debug
-    + InputTakeAtPosition<Item=char>,
+        + ToString
+        + AsBytes
+        + Slice<Range<usize>>
+        + Slice<RangeTo<usize>>
+        + Slice<RangeFrom<usize>>
+        + InputLength
+        + Offset
+        + InputTake
+        + InputIter<Item = char>
+        + core::fmt::Debug
+        + InputTakeAtPosition<Item = char>,
 {
     fn input_len(&self) -> usize {
         self.input.input_len()
@@ -706,17 +699,17 @@ where
 impl<I> Offset for Wrap<I>
 where
     I: Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item=char>
-    + core::fmt::Debug
-    + InputTakeAtPosition<Item=char>,
+        + ToString
+        + AsBytes
+        + Slice<Range<usize>>
+        + Slice<RangeTo<usize>>
+        + Slice<RangeFrom<usize>>
+        + InputLength
+        + Offset
+        + InputTake
+        + InputIter<Item = char>
+        + core::fmt::Debug
+        + InputTakeAtPosition<Item = char>,
 {
     fn offset(&self, second: &Self) -> usize {
         self.input.offset(&second.input)
@@ -726,17 +719,17 @@ where
 impl<I> InputIter for Wrap<I>
 where
     I: Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item=char>
-    + core::fmt::Debug
-    + InputTakeAtPosition<Item=char>,
+        + ToString
+        + AsBytes
+        + Slice<Range<usize>>
+        + Slice<RangeTo<usize>>
+        + Slice<RangeFrom<usize>>
+        + InputLength
+        + Offset
+        + InputTake
+        + InputIter<Item = char>
+        + core::fmt::Debug
+        + InputTakeAtPosition<Item = char>,
 {
     type Item = <I as InputIter>::Item;
     type Iter = <I as InputIter>::Iter;
@@ -765,17 +758,17 @@ where
 impl<I> InputTake for Wrap<I>
 where
     I: Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item=char>
-    + core::fmt::Debug
-    + InputTakeAtPosition<Item=char>,
+        + ToString
+        + AsBytes
+        + Slice<Range<usize>>
+        + Slice<RangeTo<usize>>
+        + Slice<RangeFrom<usize>>
+        + InputLength
+        + Offset
+        + InputTake
+        + InputIter<Item = char>
+        + core::fmt::Debug
+        + InputTakeAtPosition<Item = char>,
 {
     fn take(&self, count: usize) -> Self {
         Wrap::new(self.input.take(count))
@@ -790,17 +783,17 @@ where
 impl<I> ToString for Wrap<I>
 where
     I: Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item=char>
-    + core::fmt::Debug
-    + InputTakeAtPosition<Item=char>,
+        + ToString
+        + AsBytes
+        + Slice<Range<usize>>
+        + Slice<RangeTo<usize>>
+        + Slice<RangeFrom<usize>>
+        + InputLength
+        + Offset
+        + InputTake
+        + InputIter<Item = char>
+        + core::fmt::Debug
+        + InputTakeAtPosition<Item = char>,
 {
     fn to_string(&self) -> String {
         self.input.to_string()
@@ -816,17 +809,17 @@ impl<'a> FindSubstring<&str> for Wrap<LocatedSpan<&'a str, Arc<String>>> {
 impl<I> InputTakeAtPosition for Wrap<I>
 where
     I: Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item=char>
-    + core::fmt::Debug
-    + InputTakeAtPosition<Item=char>,
+        + ToString
+        + AsBytes
+        + Slice<Range<usize>>
+        + Slice<RangeTo<usize>>
+        + Slice<RangeFrom<usize>>
+        + InputLength
+        + Offset
+        + InputTake
+        + InputIter<Item = char>
+        + core::fmt::Debug
+        + InputTakeAtPosition<Item = char>,
 {
     type Item = <I as InputIter>::Item;
 
@@ -890,7 +883,7 @@ where
 }
 
 type Res<I: Span, O, C, E: std::error::Error + Send + Sync + 'static> =
-IResult<I, O, GenericErrorTree<I, &'static str, C, E>>;
+    IResult<I, O, GenericErrorTree<I, &'static str, C, E>>;
 
 pub fn wrap<I, F, O, C, E>(mut f: F) -> impl FnMut(I) -> Res<I, O, C, E>
 where

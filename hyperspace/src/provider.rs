@@ -1,61 +1,61 @@
 pub mod config;
-pub mod err;
 pub mod context;
 mod detail;
+pub mod err;
 
-use std::sync::Arc;
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
-use strum_macros::EnumDiscriminants;
 use starlane_space::parse::CamelCase;
-use starlane_space::status::{Action, ActionRequest, StatusProbe, PendingDetail, EntityReadier, Entity};
+use starlane_space::status::{
+    Action, ActionRequest, Entity, EntityReadier, PendingDetail, StatusProbe,
+};
+use std::sync::Arc;
+use strum_macros::EnumDiscriminants;
 
-use starlane_space::status::Status;
 use crate::registry::Registry;
+use starlane_space::status::Status;
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ProviderKind))]
-#[strum_discriminants(derive(Hash, Serialize, Deserialize,strum_macros::Display))]
+#[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
 pub enum ProviderKindDef {
-  /// [Provider::probe] should ascertain if the docker daemon is installed and running.
-  /// If the DockerDaemon is accessible set [Status::Ready].
-  /// If not accessible set [Status::Pending] with an [ActionRequest] providing helpful guidance
-  /// to the Starlane admin on how to rectify the issue.
-  ///
-  /// Note: that the DockerDaemon [Provider] should take any steps to install or start Docker
-  /// Daemon because Starlane is not keen on installing raw binaries for purposes of security...
-  /// The whole point of the DockerDaemon dependency is to provide a way to extend Starlane using
-  /// secure containers
-  DockerDaemon,
-  /// Represents a postgres cluster instance that serves [ProviderKindDef::PostgresDatabase]
-  PostgresService,
-  /// depends upon a readied [ProviderKindDef::PostgresService]
-  PostgresDatabase(PostgresDatabaseKind),
-  /// depends upon [ProviderKindDef::PostgresDatabase]::[PostgresDatabaseKindDef::Registry]
-  Registry,
-  /// [ProviderKindDef::_Ext] defines a new [ProviderKind] that is not builtin to Starlane
-  _Ext(CamelCase)
+    /// [Provider::probe] should ascertain if the docker daemon is installed and running.
+    /// If the DockerDaemon is accessible set [Status::Ready].
+    /// If not accessible set [Status::Pending] with an [ActionRequest] providing helpful guidance
+    /// to the Starlane admin on how to rectify the issue.
+    ///
+    /// Note: that the DockerDaemon [Provider] should take any steps to install or start Docker
+    /// Daemon because Starlane is not keen on installing raw binaries for purposes of security...
+    /// The whole point of the DockerDaemon dependency is to provide a way to extend Starlane using
+    /// secure containers
+    DockerDaemon,
+    /// Represents a postgres cluster instance that serves [ProviderKindDef::PostgresDatabase]
+    PostgresService,
+    /// depends upon a readied [ProviderKindDef::PostgresService]
+    PostgresDatabase(PostgresDatabaseKind),
+    /// depends upon [ProviderKindDef::PostgresDatabase]::[PostgresDatabaseKindDef::Registry]
+    Registry,
+    /// [ProviderKindDef::_Ext] defines a new [ProviderKind] that is not builtin to Starlane
+    _Ext(CamelCase),
 }
-
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(PostgresDatabaseKind))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize))]
-pub enum PostgresDatabaseKindDef{
+pub enum PostgresDatabaseKindDef {
     /// just a plain, empty postgres database full of potential
     Default,
     /// a variant of [ProviderKindDef::PostgresDatabase] that is initialized with the [Registry]
     /// sql schema to be utilized by a
     Registry,
-    _Ext(CamelCase)
+    _Ext(CamelCase),
 }
-
 
 /// indicates which architecture layer manages this dependency or if management is external
 /// to starlane itself.  Managing entails: downloading, installing and starting the [StatusProbe]
-#[derive(Clone,Debug,Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Manager {
     /// the [StatusProbe] is managed by Starlane's Foundation.  For example a running Starlane
     /// local development cluster might use DockerDesktopFoundation to provide services like
@@ -70,7 +70,7 @@ pub enum Manager {
     Platform,
 
     /// A completely  external entity manages this [StatusProbe]
-    External
+    External,
 }
 
 /// A [`Provider`] is an add-on to the [`Foundation`] infrastructure which may need to be
@@ -80,11 +80,10 @@ pub enum Manager {
 /// is a Database server like Postgres... the Dependency will download, install, initialize and
 /// start the service whereas a Provider in this example would represent an individual Database
 #[async_trait]
-pub trait Provider: StatusProbe+EntityReadier + Send+Sync {
+pub trait Provider: StatusProbe + EntityReadier + Send + Sync {
     type Config: config::ProviderConfig + ?Sized;
 
-
-   // type Context: context::ProviderContext+ ?Sized;
+    // type Context: context::ProviderContext+ ?Sized;
 
     fn kind(&self) -> ProviderKindDef;
 

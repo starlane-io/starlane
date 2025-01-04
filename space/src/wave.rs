@@ -12,7 +12,7 @@ use self::core::http2::HttpMethod;
 use self::core::hyper::HypMethod;
 use self::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
 use crate::command::RawCommand;
-use crate::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError, LegacyStatusErr};
+use crate::err::{CoreReflector, LegacyStatusErr, ParseErrs, SpaceErr, SpatialError};
 use crate::loc::{Surface, ToPoint, ToSurface, Uuid};
 use crate::log::{Spanner, Trackable, TrailSpanId};
 use crate::parse::model::Subst;
@@ -49,10 +49,10 @@ pub enum WaveKind {
     Ripple, // Broadcast
     Echo,   // Broadcast Response
     Signal, // Notification
-    /*
-    Photon, // Ack
-           Reverb,  // Ack
-          */
+            /*
+            Photon, // Ack
+                   Reverb,  // Ack
+                  */
 }
 
 impl WaveKind {
@@ -838,7 +838,7 @@ where
 
     pub fn require_body<B>(self) -> Result<B, SpaceErr>
     where
-        B: TryFrom<Substance, Error=SpaceErr>,
+        B: TryFrom<Substance, Error = SpaceErr>,
     {
         match B::try_from(self.body.clone()) {
             Ok(body) => Ok(body),
@@ -985,7 +985,7 @@ impl PingCore {
 
     pub fn require_body<B>(self) -> Result<B, SpaceErr>
     where
-        B: TryFrom<Substance, Error=SpaceErr>,
+        B: TryFrom<Substance, Error = SpaceErr>,
     {
         match B::try_from(self.clone().core.body) {
             Ok(body) => Ok(body),
@@ -3271,7 +3271,7 @@ pub enum Bounce<W> {
 impl<W> Bounce<W> {
     pub fn to_core_bounce(self) -> CoreBounce
     where
-        W: TryInto<ReflectedCore, Error=SpaceErr>,
+        W: TryInto<ReflectedCore, Error = SpaceErr>,
     {
         match self {
             Bounce::Absorbed => Bounce::Absorbed,

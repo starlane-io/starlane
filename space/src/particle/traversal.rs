@@ -1,6 +1,3 @@
-use std::ops::{Deref, DerefMut};
-use async_trait::async_trait;
-use enum_ordinalize::Ordinalize;
 use crate::err::SpaceErr;
 use crate::hyper::ParticleRecord;
 use crate::loc::{Layer, Surface};
@@ -10,6 +7,9 @@ use crate::wave::exchange::asynch::Exchanger;
 use crate::wave::{
     DirectedWave, PingCore, PongCore, ReflectedWave, SingularDirectedWave, Wave, WaveVariantDef,
 };
+use async_trait::async_trait;
+use enum_ordinalize::Ordinalize;
+use std::ops::{Deref, DerefMut};
 
 #[async_trait]
 pub trait TraversalLayer {
@@ -39,7 +39,8 @@ pub trait TraversalLayer {
                     self.deliver_reflected(traversal.unwrap_reflected()).await?;
                 }
                 return Ok(());
-            } else {}
+            } else {
+            }
         }
 
         if traversal.is_directed() && traversal.dir == TraversalDirection::Fabric {

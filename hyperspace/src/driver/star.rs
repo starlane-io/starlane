@@ -2,9 +2,14 @@ use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory,
     Particle, ParticleSphere, ParticleSphereInner, ParticleStarErr,
 };
-use crate::platform::Platform;
+use crate::base::Platform;
 use crate::registry::Registration;
 use crate::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
+use async_trait::async_trait;
+use dashmap::DashMap;
+use once_cell::sync::Lazy;
+use starlane_macros::push_mark;
+use starlane_macros::{handler, route, DirectedHandler};
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::Strategy;
@@ -36,11 +41,6 @@ use starlane_space::wave::{
     Recipients, Retries, WaitTime, Wave, WaveVariantDef,
 };
 use starlane_space::HYPERUSER;
-use async_trait::async_trait;
-use dashmap::DashMap;
-use once_cell::sync::Lazy;
-use starlane_macros::{handler, route, DirectedHandler};
-use starlane_macros::push_mark;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::marker::PhantomData;
@@ -411,7 +411,7 @@ impl Star {
                         self.skel.kind.to_string(),
                         assign.details.stub.kind.to_string()
                     ))
-                        .into()))?;
+                    .into()))?;
             }
 
             self.skel
@@ -528,7 +528,7 @@ impl Star {
                                 ctx.wave().history(),
                                 search.clone(),
                             )
-                                .await,
+                            .await,
                         ));
                     }
                 }
@@ -601,7 +601,7 @@ impl StarWrangles {
                     "star must be able to wrangle at least one {}",
                     kind.to_string()
                 )
-                    .into());
+                .into());
             }
         }
         Ok(())

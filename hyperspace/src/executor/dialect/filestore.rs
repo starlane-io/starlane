@@ -2,10 +2,10 @@ use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::cli::{CliErr, CliIn, CliOut};
 use crate::executor::Executor;
 use crate::host::err::HostErr;
-use starlane_space::substance::Bin;
 use clap::{Parser, Subcommand};
 use itertools::Itertools;
 use path_clean::PathClean;
+use starlane_space::substance::Bin;
 use std::io::BufRead;
 use std::path::{PathBuf, StripPrefixError};
 use std::str::FromStr;
@@ -57,7 +57,7 @@ impl From<Box<CliOsExecutor>> for FileStore {
 }
 
 pub enum FileStore {
-    Cli(Box<dyn Executor<In=CliIn, Out=CliOut, Err=CliErr> + Send + Sync>),
+    Cli(Box<dyn Executor<In = CliIn, Out = CliOut, Err = CliErr> + Send + Sync>),
 }
 
 impl FileStore {

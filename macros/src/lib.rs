@@ -1,7 +1,6 @@
 #![crate_type = "lib"]
 #![allow(warnings)]
 
-
 use proc_macro::TokenStream;
 use std::str::FromStr;
 
@@ -11,7 +10,11 @@ use quote::{format_ident, quote, ToTokens};
 use syn::__private::TokenStream2;
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, parse_quote, Attribute, Data, DeriveInput, Expr, ExprTuple, File, FnArg, GenericArgument, ImplItem, ItemImpl, ItemMod, ItemTrait, LitStr, Meta, PathArguments, PathSegment, ReturnType, Type, Visibility};
+use syn::{
+    parse_macro_input, parse_quote, Attribute, Data, DeriveInput, Expr, ExprTuple, File, FnArg,
+    GenericArgument, ImplItem, ItemImpl, ItemMod, ItemTrait, LitStr, Meta, PathArguments,
+    PathSegment, ReturnType, Type, Visibility,
+};
 
 /// This macro will auto implement the `#crt::wave::exchange::asynch::DirectedHandler` trait.
 /// In order to finalize the core a `#[handler]` attribute must also be specified
@@ -218,11 +221,9 @@ u}
 
 #[proc_macro_attribute]
 pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
-
     let crt = crt_name();
 
     let input = parse_macro_input!(input as syn::ImplItemFn);
-
 
     //    log(route_attribute_value(attr.to_string().as_str())).expect("valid route selector");
 
@@ -286,7 +287,6 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
     //println!("{}", expanded.to_string());
     TokenStream::from(expanded)
 }
-
 
 pub(crate) enum Item {
     Request,
@@ -448,15 +448,10 @@ mod test {
     pub fn test() {}
 }
 
-
-
 ///
 /// FORMERLY 'starlane-primitive-macros'
 ///
 ///
-
-
-
 
 /// Takes a given enum (which in turn accepts child enums) and auto generates a `Parent::From` so the child
 /// can turn into the parent and a `TryInto<Child> for Parent` so the Parent can attempt to turn into the child.
@@ -1077,11 +1072,10 @@ fn find_impl_type(item_impl: &ItemImpl) -> Ident {
 }
 
 fn find_log_attr(attrs: &Vec<Attribute>) -> TokenStream {
-    let logger = find_attr("logger",attrs).expect("logger attribute");
+    let logger = find_attr("logger", attrs).expect("logger attribute");
     let rtn = quote!(logger);
     rtn.into()
 }
-
 
 mod parse;
 
@@ -1098,17 +1092,15 @@ pub fn proxy(attr: TokenStream, item: TokenStream,) -> TokenStream {
 
  */
 
-
-
 #[proc_macro_attribute]
 pub fn show_streams(attr: TokenStream, item: TokenStream) -> TokenStream {
     println!("attr: \"{attr}\"");
     println!("item: \"{item}\"");
     //let meta: syn::Result<Meta> = parse_macro_input!(attr as Meta);
-    let res : syn::Result<Meta> = syn::parse(attr);
+    let res: syn::Result<Meta> = syn::parse(attr);
     match res {
-        Ok(meta) => println!("meta: {:?}", meta ),
-        Err(_) => eprintln!("nothing to read")
+        Ok(meta) => println!("meta: {:?}", meta),
+        Err(_) => eprintln!("nothing to read"),
     }
 
     item
@@ -1123,21 +1115,16 @@ pub fn stubby(attr: TokenStream, input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn silly(attr: TokenStream, input: TokenStream) -> TokenStream {
-
-    eprint!("ATTR: \n\n{}\n\n",attr.to_string());
-    eprint!("INPUT: \n\n{}\n\n",input.to_string());
-
+    eprint!("ATTR: \n\n{}\n\n", attr.to_string());
+    eprint!("INPUT: \n\n{}\n\n", input.to_string());
 
     panic!("REACHED THE SILLY ATTRIBUTE!");
 }
 
-
-
-
-fn find_attr(name:&'static str, attrs: &Vec<Attribute>) -> Option<Attribute> {
+fn find_attr(name: &'static str, attrs: &Vec<Attribute>) -> Option<Attribute> {
     for attr in attrs {
         if let Meta::Path(path) = &attr.meta {
-           if path
+            if path
                 .segments
                 .last()
                 .expect("segment")
@@ -1153,25 +1140,20 @@ fn find_attr(name:&'static str, attrs: &Vec<Attribute>) -> Option<Attribute> {
     None
 }
 
-
 #[test]
 fn test() {
-
-
-    let attr: ItemTrait= parse_quote! {
-    #[doc = r" Single line doc comments"]
-    #[doc = r" We write so many!"]
-    #[doc = r"
+    let attr: ItemTrait = parse_quote! {
+        #[doc = r" Single line doc comments"]
+        #[doc = r" We write so many!"]
+        #[doc = r"
      * Multi-line comments...
      * May span many lines
      "]
-    trait Example{
-        #![doc = r" Of course, they can be inner too"]
-        #![doc = r" And fit in a single line "]
-    }
-};
+        trait Example{
+            #![doc = r" Of course, they can be inner too"]
+            #![doc = r" And fit in a single line "]
+        }
+    };
 
-    print!("attr: \n\n{}\n\n",attr.attrs.len());
-
-
+    print!("attr: \n\n{}\n\n", attr.attrs.len());
 }

@@ -1,6 +1,5 @@
 use crate::point::Point;
 use crate::wave::Agent;
-use ascii::AsciiChar::i;
 use async_trait::async_trait;
 use derive_builder::Builder;
 use futures::task::Spawn;
@@ -11,7 +10,6 @@ use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::Arc;
 use strum_macros::EnumDiscriminants;
-use thiserror::Error;
 
 /// [Entity] provides a utilization interface for `anything` that can be described by the [Status]
 /// model be it `resource` or `service` ... anything!
@@ -34,14 +32,13 @@ pub trait Entity {
 }
 
 /// wonky impe
-impl <T> Deref for dyn Entity<DerefTarget=T> {
+impl<T> Deref for dyn Entity<DerefTarget = T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
         self.deref_target()
     }
 }
-
 
 /// [StatusWatcher] is type bound to [tokio::sync::watch::Receiver<StatusResult>]) can get the realtime
 /// [StatusDetail] of a [StatusProbe] by polling: [StatusWatcher::borrow] or by listening for
@@ -108,14 +105,16 @@ where
     hold: tokio::sync::mpsc::Sender<()>,
 }
 
-impl<E> Deref for Handle<E> where E: Entity + Send + Sync + ?Sized {
+impl<E> Deref for Handle<E>
+where
+    E: Entity + Send + Sync + ?Sized,
+{
     type Target = E::DerefTarget;
 
     fn deref(&self) -> &Self::Target {
         self.entity.deref_target()
     }
 }
-
 
 impl<E> Handle<E>
 where
@@ -163,7 +162,6 @@ where
         }
     }
 }
-
 
 #[async_trait]
 impl<E> StatusProbe for Handle<E>
@@ -705,7 +703,9 @@ pub mod test {
             }
         }
 
-        impl Entity for Mock { type DerefTarget = (); }
+        impl Entity for Mock {
+            type DerefTarget = ();
+        }
 
         let mock = Mock::default();
 

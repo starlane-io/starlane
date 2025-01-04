@@ -110,7 +110,7 @@ impl Default for ExtDirected {
 impl ExtDirected {
     pub fn new<M>(method: M) -> Result<Self, SpaceErr>
     where
-        M: TryInto<ExtMethod, Error=SpaceErr>,
+        M: TryInto<ExtMethod, Error = SpaceErr>,
     {
         Ok(ExtDirected {
             method: method.try_into()?,

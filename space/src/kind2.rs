@@ -13,7 +13,7 @@ pub struct SubTypeDef<Part, SubType> {
 }
 
 impl<Part, SubType, IsMatchPart, IsMatchSubType> IsMatch<SubTypeDef<Part, SubType>>
-for SubTypeDef<IsMatchPart, IsMatchSubType>
+    for SubTypeDef<IsMatchPart, IsMatchSubType>
 where
     IsMatchPart: IsMatch<Part>,
     IsMatchSubType: IsMatch<SubType>,
@@ -52,7 +52,7 @@ pub struct ParentChildDef<Parent, Child> {
 }
 
 impl<Parent, Child, IsMatchParent, IsMatchChild> IsMatch<ParentChildDef<Parent, Child>>
-for ParentChildDef<IsMatchParent, IsMatchChild>
+    for ParentChildDef<IsMatchParent, IsMatchChild>
 where
     IsMatchParent: IsMatch<Parent>,
     IsMatchChild: IsMatch<Child>,
@@ -91,7 +91,7 @@ impl Variant {
                 kind.to_string(),
                 variant.to_string()
             )
-                .into()),
+            .into()),
         }
     }
 }
@@ -301,7 +301,7 @@ pub type KindFull = KindDef<KindSubTypes, Option<VariantFull>>;
 pub type ProtoKind = KindDef<CamelCaseSubTypes, Option<ProtoVariant>>;
 
 pub type ParentMatcherDef<Matcher, Child, SubTypeMatcher> =
-ParentChildDef<SubTypeDef<Matcher, SubTypeMatcher>, Child>;
+    ParentChildDef<SubTypeDef<Matcher, SubTypeMatcher>, Child>;
 
 pub trait IsMatch<X>
 where
@@ -411,9 +411,9 @@ impl IsMatch<Specific> for SpecificSelector {
 }
 
 pub type VariantFullSelector =
-ParentMatcherDef<Pattern<Variant>, OptPattern<SpecificSubTypes>, OptPattern<CamelCase>>;
+    ParentMatcherDef<Pattern<Variant>, OptPattern<SpecificSubTypes>, OptPattern<CamelCase>>;
 pub type KindFullSelector =
-ParentMatcherDef<Pattern<Kind>, OptPattern<VariantFullSelector>, OptPattern<CamelCase>>;
+    ParentMatcherDef<Pattern<Kind>, OptPattern<VariantFullSelector>, OptPattern<CamelCase>>;
 
 pub mod parse {
     use crate::kind2::{
@@ -529,20 +529,20 @@ pub mod parse {
                 tag(":"),
                 fn_version,
             ))(input)
-                .map(
-                    |(next, (provider, _, vendor, _, product, _, variant, _, version))| {
-                        (
-                            next,
-                            SpecificDef {
-                                provider,
-                                vendor,
-                                product,
-                                variant,
-                                version,
-                            },
-                        )
-                    },
-                )
+            .map(
+                |(next, (provider, _, vendor, _, product, _, variant, _, version))| {
+                    (
+                        next,
+                        SpecificDef {
+                            provider,
+                            vendor,
+                            product,
+                            variant,
+                            version,
+                        },
+                    )
+                },
+            )
         }
     }
 
@@ -677,7 +677,7 @@ pub mod parse {
             let r = result(expect(camel_case_sub_types)(new_span(
                 "SomeCamelCase:Sub:Type",
             )))
-                .unwrap();
+            .unwrap();
         }
 
         #[test]
@@ -685,7 +685,7 @@ pub mod parse {
             let r = result(camel_case_sub_types_selector(new_span(
                 "SomeCamelCase:*:Type",
             )))
-                .unwrap();
+            .unwrap();
             match r.sub {
                 OptPattern::Any => {}
                 _ => assert!(false),
@@ -703,7 +703,7 @@ pub mod parse {
             let sub = log(result(preceded_opt_pattern(|i| tag(":")(i), camel_case)(
                 new_span(":MySub"),
             )))
-                .unwrap();
+            .unwrap();
             assert_eq!(
                 sub,
                 OptPattern::Matches(CamelCase::from_str("MySub").unwrap())
@@ -713,14 +713,14 @@ pub mod parse {
                 camel_case,
                 opt(preceded(tag(":"), camel_case)),
             )(new_span("Blah:MySub"))))
-                .unwrap();
+            .unwrap();
             assert!(sub.is_some());
 
             let (blah, sub) = log(result(pair(
                 camel_case,
                 preceded_opt_pattern(|i| tag(":")(i), camel_case),
             )(new_span("Blah:MySub"))))
-                .unwrap();
+            .unwrap();
             assert!(sub.is_match(&Some(CamelCase::from_str("MySub").unwrap())))
         }
 
@@ -729,7 +729,7 @@ pub mod parse {
             let specific = result(specific(new_span(
                 "my-domain.io:vendor.io:product:variant:1.0.0",
             )))
-                .unwrap();
+            .unwrap();
         }
 
         #[test]
@@ -737,7 +737,7 @@ pub mod parse {
             let selector = log(result(specific_selector(new_span(
                 "my-domain.io:*:product:variant:(1.0.0)",
             ))))
-                .unwrap();
+            .unwrap();
         }
 
         #[test]
@@ -745,7 +745,7 @@ pub mod parse {
             let specific = result(specific_sub_types(new_span(
                 "my-domain.io:vendor.io:product:variant:1.0.0:Sub:Type",
             )))
-                .unwrap();
+            .unwrap();
             assert_eq!(specific.sub, Some(CamelCase::from_str("Sub").unwrap()));
             assert_eq!(specific.r#type, Some(CamelCase::from_str("Type").unwrap()));
         }
@@ -755,7 +755,7 @@ pub mod parse {
             let selector = log(result(specific_full_selector(new_span(
                 "my-domain.io:*:product:variant:(1.0.0)",
             ))))
-                .unwrap();
+            .unwrap();
 
             assert_eq!(selector.sub, OptPattern::None);
             assert_eq!(selector.part.variant.to_string(), "variant".to_string());
@@ -764,7 +764,7 @@ pub mod parse {
             let selector = log(result(specific_full_selector(new_span(
                 "my-domain.io:*:product:variant:(1.0.0):MySub",
             ))))
-                .unwrap();
+            .unwrap();
 
             assert_eq!(
                 selector.sub,
@@ -780,7 +780,7 @@ pub mod parse {
             let variant = log(result(proto_variant(new_span(
                 "Variant<some.com:go.com:yesterday:tomorrow:1.0.0>",
             ))))
-                .unwrap();
+            .unwrap();
             assert!(variant.child.is_some());
 
             let variant = log(result(proto_variant(new_span("Variant:Sub")))).unwrap();
@@ -790,7 +790,7 @@ pub mod parse {
             let variant = log(result(proto_variant(new_span(
                 "Variant:Sub<some.com:go.com:yesterday:tomorrow:1.0.0>",
             ))))
-                .unwrap();
+            .unwrap();
             assert!(variant.child.is_some());
             assert!(variant.parent.sub.is_some());
         }
@@ -811,7 +811,7 @@ pub mod parse {
             assert!(log(result(expect(camel_case_sub_types)(new_span(
                 "someCamelCase:Sub:Type"
             ))))
-                .is_err());
+            .is_err());
         }
     }
 }

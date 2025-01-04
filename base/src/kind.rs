@@ -1,8 +1,19 @@
+use std::hash::Hash;
 use strum_macros::EnumDiscriminants;
 use starlane_space::parse::CamelCase;
 
-/// reexport from [starlane_hyperspace]
-pub use starlane_hyperspace::provider::{ProviderKind,ProviderKindDef};
+pub use crate::provider::{ProviderKind,ProviderKindDef};
+
+
+/// used by the [
+pub trait BaseKinds {
+   type FoundationKind: Clone+Eq+PartialEq+Hash+Send+Sync+?Sized;
+   type PlatformKind: Clone+Eq+PartialEq+Hash+Send+Sync+?Sized;
+   type ProviderKind: Clone+Eq+PartialEq+Hash+Send+Sync+?Sized;
+}
+
+
+
 
 pub struct Exact {
    strata: StrataDef
@@ -71,4 +82,17 @@ pub enum FoundationKind {
    #[cfg(feature = "skel")]
    Skel,
    _Ext(CamelCase)
+}
+
+mod concrete {
+   mod root { pub use super::super::*; }
+
+   pub struct BaseKinds;
+
+   impl root::BaseKinds for BaseKinds {
+      type FoundationKind = ();
+      type PlatformKind = ();
+      type ProviderKind = ();
+   }
+
 }

@@ -7,11 +7,17 @@ use crate::hyperlane::{
 use crate::layer::field::Field;
 use crate::layer::shell::{Shell, ShellState};
 use crate::machine::{MachineApi, MachineErr, MachineSkel};
-use crate::platform::Platform;
-use crate::registry::{Registration, Registry};
+use crate::base::Platform;
 use crate::registry::err::RegErr;
+use crate::registry::{Registration, Registry};
 use crate::service::ServiceTemplate;
 use crate::template::Templates;
+use anyhow::{Context, Error};
+use async_recursion::async_recursion;
+use async_trait::async_trait;
+use dashmap::DashMap;
+use itertools::Itertools;
+use starlane_macros::{log_span, push_loc, push_mark};
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{Create, Strategy};
 use starlane_space::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError};
@@ -43,12 +49,6 @@ use starlane_space::wave::{
     ReflectedWave, Retries, Ripple, Scope, SignalCore, SingularRipple, ToReflected, WaitTime,
     WaveId, WaveKind, WaveVariantDef,
 };
-use anyhow::{Context, Error};
-use async_recursion::async_recursion;
-use async_trait::async_trait;
-use dashmap::DashMap;
-use itertools::Itertools;
-use starlane_macros::{log_span, push_loc, push_mark};
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -1790,7 +1790,8 @@ async fn shard_ripple_by_location(
             let mut ripple = ripple.clone();
             ripple.variant.to = recipients;
             map.insert(star, ripple);
-        } else {}
+        } else {
+        }
     }
     Ok(map)
 }

@@ -4,7 +4,7 @@ use starlane_hyperspace::driver::{DriverAvail, DriversBuilder};
 use starlane_hyperspace::err::HypErr;
 use starlane_hyperspace::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
 use starlane_hyperspace::machine::MachineTemplate;
-use starlane_hyperspace::platform::{Platform, PlatformConfig};
+use starlane_hyperspace::base::{Platform, PlatformConfig};
 use starlane_space::artifact::asynch::Artifacts;
 use starlane_space::kind::StarSub;
 use starlane_space::loc::{MachineName, StarKey};
@@ -15,69 +15,28 @@ use starlane_hyperspace::driver::root::RootDriverFactory;
 use starlane_hyperspace::driver::space::SpaceDriverFactory;
 use std::fs;
 use std::path::Path;
+use std::str::FromStr;
 use port_check::is_local_ipv4_port_free;
 use anyhow::anyhow;
 use starlane_hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
 use starlane_hyperspace::shutdown::panic_shutdown;
+use starlane_macros::push_loc;
+use starlane_space::point::Point;
+use crate::env::STARLANE_CONTROL_PORT;
+use crate::registry;
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct StarlaneConfig {
-    pub context: String,
-    pub home: String,
-    pub can_nuke: bool,
-    pub can_scorch: bool,
-    pub control_port: u16,
-    //    pub config: ProtoFoundationConfig,
-    pub registry: (),
+pub mod config {
+    use starlane_hyperspace::base::PlatformConfig;
+    use starlane_hyperspace::registry;
+    pub trait RegistryConfig:  registry::RegistryConfig { }
 }
 
-impl PlatformConfig for StarlaneConfig {
-    type RegistryConfig = ();
-
-    fn can_scorch(&self) -> bool {
-        self.can_scorch
-    }
-
-    fn can_nuke(&self) -> bool {
-        self.can_nuke
-    }
-
-    fn registry(&self) -> &Self::RegistryConfig {
-        &self.registry
-    }
-
-    fn home(&self) -> &String {
-        &self.home
-    }
-
-    fn data_dir(&self) -> &String {
-        todo!()
-    }
-}
-
-impl Default for StarlaneConfig {
-    fn default() -> StarlaneConfig {
-        todo!()
-        /*
-        Self {
-            context: "default".to_string(),
-            home: STARLANE_HOME.to_string(),
-            can_nuke: false,
-            can_scorch: false,
-            control_port: 4343u16,
-            registry: PgRegistryConfig::default(),
-        }
-
-         */
-    }
-}
 
 #[derive(Clone)]
-pub struct Starlane {
-    config: StarlaneConfig,
+pub struct Starlane<P> where P: Platform {
+    platform: P,
     artifacts: Artifacts,
-    registry: Registry,
-    //    config: DockerDesktopFoundation,
+    registry: Arc<dyn config::RegistryConfig>
 }
 
 impl Starlane {
@@ -272,9 +231,60 @@ where
     }
 }
 
-pub struct StarlaneContext {
-    pub context: String,
-    pub home: String,
-    pub log_dir: String,
-    pub config: StarlaneConfig,
+
+mod partial {
+    mod my { pub use super::super::*; }
+
+    pub(super) mod config {
+        use serde_derive::{Deserialize, Serialize};
+        use starlane_hyperspace::registry;
+        use super::my;
+
+
+        /// this [PlatformConfig] is a `partial` because it doesn't have all the necessary
+        /// configuration to produce *any* present version of the [registry::Registry].
+        /// At the time of this writing the only available registry uses `Postgres` where
+        /// this configuration is wrapped with another [PlatformConfig] which then has
+        /// all the information it needs to stand up a [registry::Registry] backed by
+        /// `Postgres`
+        #[derive(Clone, Serialize, Deserialize)]
+        pub struct PlatformConfig {
+            pub enviro: String,
+            pub registry: <Self as starlane_hyperspace::base::PlatformConfig>::RegistryConfig,
+            pub home: String,
+            pub can_nuke: bool,
+            pub can_scorch: bool,
+            pub control_port: u16,
+        }
+
+        impl <R> my::PlatformConfig for PlatformConfig where R: my::config::RegistryConfig {
+            type RegistryConfig = R;
+
+            fn can_scorch(&self) -> bool {
+                self.can_scorch
+            }
+
+            fn can_nuke(&self) -> bool {
+                self.can_nuke
+            }
+
+            fn registry(&self) -> &Self::RegistryConfig {
+                & self.registry
+            }
+
+            fn home(&self) -> &String {
+                & self.home
+            }
+
+            fn enviro(&self) -> &String {
+                & self.enviro
+            }
+        }
+
+
+
+
+}
+
+
 }

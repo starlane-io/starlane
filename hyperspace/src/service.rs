@@ -1,34 +1,31 @@
-
 pub mod standard;
 
 use crate::executor::dialect::filestore::{FileStore, FileStoreErr};
 use crate::executor::{ExeConf, Executor};
 use crate::host::err::HostErr;
 use crate::machine::MachineErr;
+use crate::service::private::ServiceCall;
+use itertools::Itertools;
+use nom::AsBytes;
+use serde_derive::{Deserialize, Serialize};
 use starlane_space::err::SpaceErr;
 use starlane_space::kind::Kind;
 use starlane_space::loc::ToBaseKind;
+use starlane_space::parse::CamelCase;
 use starlane_space::particle::Status;
 use starlane_space::point::Point;
 use starlane_space::selector::KindSelector;
 use starlane_space::util::{IdSelector, OptSelector, ValueMatcher};
 use starlane_space::wave::exchange::asynch::{DirectedHandler, Router};
-use itertools::Itertools;
-use nom::AsBytes;
 use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::hash::Hash;
 use std::io::Read;
 use std::ops::{Deref, DerefMut};
-use serde_derive::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use starlane_space::parse::CamelCase;
-use crate::service::private::ServiceCall;
 
 pub type FileStoreService = Service<FileStore>;
-
-
 
 #[derive(Clone)]
 pub struct ServiceStub<I, O> {
@@ -86,7 +83,7 @@ impl ServiceRunnerConf {
 ///
 /// [ServiceKind] defines some builtin variants that every version of Starlane must know to use and
 /// additional variants can be added via [ServiceKind::_Ext]
-#[derive(Hash, Clone, Eq, PartialEq, Debug, strum_macros::Display, Serialize,Deserialize)]
+#[derive(Hash, Clone, Eq, PartialEq, Debug, strum_macros::Display, Serialize, Deserialize)]
 
 pub enum ServiceKind {
     FileStore,
@@ -284,9 +281,7 @@ pub mod tests {
     use crate::executor::dialect::filestore::{FileStore, FileStoreIn, FileStoreOut};
     use crate::executor::{ExeConf, Executor};
     use crate::host::HostCli;
-    use crate::service::{
-        service_conf, Service, ServiceErr, ServiceKind, ServiceTemplate,
-    };
+    use crate::service::{service_conf, Service, ServiceErr, ServiceKind, ServiceTemplate};
     use starlane_space::kind::BaseKind;
     use starlane_space::selector::KindSelector;
     use starlane_space::util::OptSelector;
@@ -485,7 +480,6 @@ pub enum ServiceErr {
     #[error("call not processed")]
     CallRecvErr(#[from] tokio::sync::oneshot::error::RecvError),
 }
-
 
 pub(super) mod private {
     use crate::service::ServiceErr;

@@ -1,4 +1,6 @@
-use crate::env::STARLANE_HOME;
+use clap::clap_derive::{Args, Subcommand};
+use clap::Parser;
+use starlane_base::env::STARLANE_HOME;
 use starlane_hyperspace::driver::control::{ControlCliSession, ControlClient};
 use starlane_hyperspace::hyperlane::tcp::HyperlaneTcpClient;
 use starlane_hyperspace::hyperlane::HyperwayEndpointFactory;
@@ -11,8 +13,6 @@ use starlane_space::parse::{upload_blocks, SkewerCase};
 use starlane_space::point::Point;
 use starlane_space::substance::Substance;
 use starlane_space::wave::core::ReflectedCore;
-use clap::clap_derive::{Args, Subcommand};
-use clap::Parser;
 use std::fs::File;
 use std::io::{Cursor, Read, Seek, Write};
 use std::path::Path;
@@ -264,7 +264,7 @@ impl Session {
 }
 
 fn zip_dir<T>(
-    it: impl Iterator<Item=DirEntry>,
+    it: impl Iterator<Item = DirEntry>,
     prefix: &str,
     writer: T,
     method: zip::CompressionMethod,

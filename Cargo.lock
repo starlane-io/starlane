@@ -3006,6 +3006,7 @@ dependencies = [
  "rustyline",
  "semver",
  "serde",
+ "serde_derive",
  "serde_with",
  "serde_with_macros",
  "serde_yaml",
@@ -3030,6 +3031,12 @@ dependencies = [
 [[package]]
 name = "starlane-foundation-for-docker-desktop"
 version = "0.3.20"
+dependencies = [
+ "starlane-base",
+ "starlane-hyperspace",
+ "starlane-macros",
+ "starlane-space",
+]
 
 [[package]]
 name = "starlane-hyperspace"

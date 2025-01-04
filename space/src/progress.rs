@@ -1,38 +1,37 @@
-use indexmap::IndexMap;
 use crate::parse::SkewerCase;
 use crate::status::{Status, StatusDetail, StatusWatcher};
 use crate::wasm::Timestamp;
+use indexmap::IndexMap;
 
 pub type Watcher = tokio::sync::mpsc::Receiver<TaskState>;
 
 pub struct Tracker {
     watcher: Watcher,
-
 }
 
 impl Tracker {
-    pub fn states(&self) -> &IndexMap<&'static str,TaskState> {
+    pub fn states(&self) -> &IndexMap<&'static str, TaskState> {
         todo!()
     }
 }
 
 enum TrackerCall {
     State(TaskState),
-    TaskStates(tokio::sync::oneshot::Sender<IndexMap<SkewerCase,TaskState>>),
+    TaskStates(tokio::sync::oneshot::Sender<IndexMap<SkewerCase, TaskState>>),
 }
 
 struct TrackerRunner {
-  rx: tokio::sync::mpsc::Receiver<TaskState>,
-  tasks: IndexMap<SkewerCase,TaskState>
+    rx: tokio::sync::mpsc::Receiver<TaskState>,
+    tasks: IndexMap<SkewerCase, TaskState>,
 }
 
 impl TrackerRunner {
     fn new() -> tokio::sync::mpsc::Sender<TaskState> {
-        let (tx,rx ) = tokio::sync::mpsc::channel(1);
+        let (tx, rx) = tokio::sync::mpsc::channel(1);
         let tasks = IndexMap::new();
-        let runner =  Self { rx, tasks };
+        let runner = Self { rx, tasks };
 
-        tokio::spawn( async move {
+        tokio::spawn(async move {
             runner.run().await;
         });
 
@@ -40,10 +39,8 @@ impl TrackerRunner {
     }
 
     async fn run(mut self) {
-        while let Some(state) = self.rx.recv().await {
-        }
+        while let Some(state) = self.rx.recv().await {}
     }
-
 }
 
 #[derive(Clone)]
@@ -69,7 +66,12 @@ pub struct TaskState {
 impl TaskState {
     pub fn new(name: &'static str, step: &'static str, inc: u16) -> Self {
         let status = Status::default();
-        Self { name, step, inc, status }
+        Self {
+            name,
+            step,
+            inc,
+            status,
+        }
     }
 }
 
@@ -90,24 +92,21 @@ pub trait Task {
     fn end(self);
 }
 
-
-
 pub mod private {
-    use starlane_space::parse::SkewerCase;
     use crate::progress::TaskState;
     use crate::status::{Status, StatusDetail, StatusProbe, StatusWatcher};
+    use starlane_space::parse::SkewerCase;
 
     pub struct Task {
         name: &'static str,
         step: &'static str,
         inc: u16,
         tx: tokio::sync::mpsc::Sender<TaskState>,
-        status: Status
+        status: Status,
     }
 
     impl Task {
         pub fn new(name: &'static str, tx: tokio::sync::mpsc::Sender<TaskState>) -> Self {
-
             let task = name.to_string();
             let status = Status::default();
             let task = Self {
@@ -129,8 +128,6 @@ pub mod private {
             self.tx.try_send(state).unwrap_or_default();
         }
     }
-
-
 
     impl super::Task for Task {
         fn step(&mut self, step: &'static str) {

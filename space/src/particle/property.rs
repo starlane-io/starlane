@@ -2,15 +2,14 @@ use core::str::FromStr;
 use std::collections::HashMap;
 use std::ops::Deref;
 
-
 use crate::command::common::{PropertyMod, SetProperties};
+use crate::err::SpaceErr;
+use crate::kind::Kind;
 use crate::parse::SkewerCase;
 use crate::point::Point;
 use serde::Deserialize;
 use serde::Serialize;
 use validator::ValidateEmail;
-use crate::err::SpaceErr;
-use crate::kind::Kind;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PropertyDef {
@@ -187,7 +186,7 @@ impl PropertiesConfig {
                     self.kind.to_string(),
                     req
                 )
-                    .into());
+                .into());
             }
         }
 
@@ -205,7 +204,7 @@ impl PropertiesConfig {
                             self.kind.to_string(),
                             key
                         )
-                            .into());
+                        .into());
                     }
                     match def.source {
                         PropertySource::CoreReadOnly => {
@@ -267,7 +266,7 @@ impl PropertiesConfig {
                         "property '{}' is flagged CoreSecret and cannot be read within the Mesh",
                         key
                     )
-                        .into());
+                    .into());
                 }
                 _ => {}
             }

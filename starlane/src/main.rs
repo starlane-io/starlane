@@ -1,6 +1,7 @@
 #![allow(warnings)]
 #![feature()]
 
+/*
 #[macro_use]
 extern crate async_trait;
 #[macro_use]
@@ -10,13 +11,13 @@ extern crate lazy_static;
 #[macro_use]
 extern crate starlane_macros;
 
+ */
+
 shadow!(build);
 
+pub extern crate starlane_hyperspace as hyperspace;
 pub extern crate starlane_macros as macros;
 pub extern crate starlane_space as space;
-pub extern crate starlane_hyperspace as hyperspace;
-
-pub mod base;
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
@@ -26,24 +27,10 @@ pub mod test;
 
 pub mod install;
 
-pub mod env;
-pub mod server;
-
 pub mod cli;
 
-
-
-
-
-pub use starlane_hyperspace::platform::Platform;
-use starlane_hyperspace::shutdown::shutdown;
+use crate::cli::{Cli, Commands, ContextCmd};
 use crate::install::{Console, StarlaneTheme};
-use starlane_base::starlane::Starlane;
-use starlane_space::err::PrintErr;
-use starlane_space::loc::ToBaseKind;
-use starlane_space::log::push_scope;
-use starlane_space::parse::SkewerCase;
-use starlane_space::particle::Status;
 use anyhow::{anyhow, ensure};
 use clap::Parser;
 use cliclack::log::{error, success};
@@ -55,7 +42,19 @@ use lerp::Lerp;
 use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
 use shadow_rs::shadow;
+use starlane_base::env;
+use starlane_base::env::{
+    enviro_dir, ensure_global_settings, save_global_settings, set_enviro, STARLANE_HOME,
+};
+use starlane_base::starlane::Starlane;
+pub use starlane_hyperspace::base::Platform;
+use starlane_hyperspace::shutdown::shutdown;
 use starlane_macros::{create_mark, ToBase};
+use starlane_space::err::PrintErr;
+use starlane_space::loc::ToBaseKind;
+use starlane_space::log::push_scope;
+use starlane_space::parse::SkewerCase;
+use starlane_space::particle::Status;
 use std::any::Any;
 use std::fmt::Display;
 use std::fs::File;
@@ -70,8 +69,6 @@ use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::{FileOptionExtension, FileOptions};
-use crate::cli::{Cli, Commands, ContextCmd};
-use crate::env::{context_dir, ensure_global_settings, save_global_settings, set_context, STARLANE_HOME};
 /*
 let config = Default::default();
 
@@ -80,7 +77,6 @@ config
  */
 
 pub fn init() {
-
     {
         use rustls::crypto::aws_lc_rs::default_provider;
         default_provider()
@@ -88,7 +84,6 @@ pub fn init() {
             .expect("crypto provider could not be installed");
     }
 }
-
 
 pub fn main() -> Result<(), anyhow::Error> {
     ctrlc::set_handler(move || shutdown(1)).unwrap();
@@ -144,7 +139,7 @@ pub fn main() -> Result<(), anyhow::Error> {
                             e.print();
                             anyhow!("illegal context name")
                         })?;
-                    set_context(context_name.as_str())?;
+                    set_enviro(context_name.as_str())?;
                     if config_exists(context_name.to_string()) {
                         Err(anyhow!("context '{}' already exists", context_name))?;
                     }
@@ -163,10 +158,10 @@ pub fn main() -> Result<(), anyhow::Error> {
                             e.print();
                             anyhow!("illegal context name")
                         })?;
-                    set_context(context_name.as_str());
+                    set_enviro(context_name.as_str());
                 }
                 ContextCmd::Default => {
-                    set_context("default").unwrap_or_default();
+                    set_enviro("default").unwrap_or_default();
                 }
                 ContextCmd::Which => {
                     println!("{}", context());
@@ -278,7 +273,6 @@ async fn run() -> Result<(), anyhow::Error> {
             })
             .unwrap();
 
-
         spinner.next("registry status: [Ready]", "acquiring machine API");
 
         let machine_api = starlane.machine();
@@ -312,8 +306,7 @@ async fn run() -> Result<(), anyhow::Error> {
         }
 
         Ok(())
-    }
-    ;
+    };
 
     match runner(&console).await {
         Ok(_) => {}
@@ -322,7 +315,7 @@ async fn run() -> Result<(), anyhow::Error> {
                 "starlane halted due to an error: {}",
                 err.to_string()
             ))
-                .unwrap_or_default();
+            .unwrap_or_default();
 
             console.outro("runner failed").unwrap();
             console.newlines(3);
@@ -503,7 +496,7 @@ async fn cli() -> Result<(), SpaceErr> {
  */
 
 pub fn zip_dir<T>(
-    it: impl Iterator<Item=DirEntry>,
+    it: impl Iterator<Item = DirEntry>,
     prefix: &str,
     writer: T,
     method: zip::CompressionMethod,
@@ -512,7 +505,7 @@ where
     T: Write + Seek,
 {
     let mut zip = zip::ZipWriter::new(writer);
-    let options: FileOptions<'_,FileOptionExtension> = FileOptions::default()
+    let options: FileOptions<'_, FileOptionExtension> = FileOptions::default()
         .compression_method(method)
         .unix_permissions(0o755);
 
@@ -650,7 +643,7 @@ fn nuke(all: bool) {
                 env::config_path()
             );
         } else {
-            std::fs::remove_dir_all(context_dir()).unwrap();
+            std::fs::remove_dir_all(enviro_dir()).unwrap();
         }
     }
 }

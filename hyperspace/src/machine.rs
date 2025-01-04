@@ -5,15 +5,18 @@ use crate::hyperlane::{
     HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
     SimpleGreeter,
 };
-use crate::platform::Platform;
+use crate::base::Platform;
 use crate::registry::Registry;
 use crate::service::{
     service_conf, Service, ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate,
 };
-use crate::star::{
-    HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
-};
+use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 use crate::template::Templates;
+use async_trait::async_trait;
+use dashmap::DashMap;
+use futures::future::{join_all, select_all, BoxFuture};
+use futures::{FutureExt, TryFutureExt};
+use starlane_macros::{push_loc, push_mark};
 use starlane_space::artifact::asynch::{ArtErr, ArtifactFetcher, Artifacts};
 use starlane_space::command::direct::create::KindTemplate;
 use starlane_space::err::{HyperSpatialError, SpaceErr, SpatialError};
@@ -31,11 +34,6 @@ use starlane_space::util::{OptSelector, ValuePattern};
 use starlane_space::wave::core::cmd::CmdMethod;
 use starlane_space::wave::exchange::asynch::Exchanger;
 use starlane_space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
-use async_trait::async_trait;
-use dashmap::DashMap;
-use futures::future::{join_all, select_all, BoxFuture};
-use futures::{FutureExt, TryFutureExt};
-use starlane_macros::{push_loc, push_mark};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::mpsc::SendError;
@@ -334,7 +332,7 @@ where
                 interchange.clone(),
                 star_tx,
             )
-                .await?;
+            .await?;
             stars.insert(star_point.clone(), star_api);
         }
 
@@ -527,7 +525,7 @@ where
                             .ok_or(format!("could not find star: {}", key.to_string()).into())
                             .cloned(),
                     )
-                        .unwrap_or_default();
+                    .unwrap_or_default();
                 }
                 #[cfg(test)]
                 MachineCall::GetRegistry(rtn) => {

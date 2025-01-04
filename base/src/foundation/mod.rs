@@ -28,7 +28,7 @@
 /// There is one special core that the Foundation must manage which is the [crate::Foundation::registry]
 /// the Starlane Registry is the only required core from the vanilla Starlane installation
 
-use starlane_hyperspace::platform::PlatformConfig;
+use starlane_hyperspace::base::PlatformConfig;
 use downcast_rs::{Downcast, DowncastSync};
 use futures::TryFutureExt;
 use itertools::Itertools;

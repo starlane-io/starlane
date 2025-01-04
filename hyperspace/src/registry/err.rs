@@ -1,4 +1,3 @@
-
 use sqlx::Error;
 
 use starlane_space::err::{HyperSpatialError, ParseErrs, SpaceErr, SpatialError};
@@ -29,14 +28,11 @@ pub enum RegErr {
     #[error("{0}")]
     Msg(String),
 
-
     #[error("postgres error: {0}")]
     SqlxErr(#[from] Arc<sqlx::Error>),
 
     #[error("postgres registry db connection pool '{0}' not found")]
     PoolNotFound(String),
-
-
 
     #[error(transparent)]
     IoErr(Arc<std::io::Error>),
@@ -69,7 +65,6 @@ impl From<&String> for RegErr {
         Self::Msg(err.to_string())
     }
 }
-
 
 impl From<sqlx::Error> for RegErr {
     fn from(value: Error) -> Self {

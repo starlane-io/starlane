@@ -11,7 +11,7 @@ use std::time::Duration;
 use crate::driver::control::ControlClient;
 use crate::hyperlane::HyperClient;
 use crate::machine::MachineApiExtFactory;
-use crate::platform::Platform;
+use crate::base::Platform;
 use crate::star::HyperStarApi;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{
@@ -35,13 +35,10 @@ use starlane_space::wave::exchange::asynch::Exchanger;
 use starlane_space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
 use starlane_space::HYPERUSER;
 
-
 /// just a convenience function for testing if the build is sound so the Rust Rover IDE
 /// will create a test_build run configuration that can be triggered by clicking a button
 #[test]
-pub fn test_build() {
-
-}
+pub fn test_build() {}
 
 pub static LESS: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:less").expect("point"));
 pub static FAE: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:fae").expect("point"));
@@ -118,7 +115,6 @@ async fn create(
     star_api.to_gravity(wave).await;
     Ok(())
 }
-
 
 #[test]
 fn test_control() -> Result<(), OldStarErr> {

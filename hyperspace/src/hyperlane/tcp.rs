@@ -2,16 +2,16 @@ use crate::hyperlane::{
     HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
     HyperwayEndpointFactory,
 };
+use async_trait::async_trait;
+use rcgen::{generate_simple_self_signed, RcgenError};
+use rustls::pki_types::ServerName;
+use rustls::{RootCertStore, ServerConfig};
 use starlane_space::err::SpaceErr;
 use starlane_space::hyper::Knock;
 use starlane_space::log::Logger;
 use starlane_space::substance::Substance;
 use starlane_space::wave::{PingCore, Wave, WaveVariantDef};
 use starlane_space::VERSION;
-use async_trait::async_trait;
-use rcgen::{generate_simple_self_signed, RcgenError};
-use rustls::pki_types::ServerName;
-use rustls::{RootCertStore, ServerConfig};
 use std::io;
 use std::io::{BufReader, Read};
 use std::str::FromStr;
@@ -64,7 +64,7 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
         let certs = rustls_pemfile::certs(&mut BufReader::new(
             &mut std::fs::File::open(ca_file).expect("cert file"),
         ))
-            .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()?;
         /*        let private_key =
                    rustls_pemfile::private_key(&mut BufReader::new(&mut File::open(key_file)?))?
                        .unwrap();
@@ -262,7 +262,7 @@ impl FrameMuxer {
                 "remote did not indicate Ok. expected: 'Ok' encountered '{}'",
                 result
             )
-                .into()));
+            .into()));
         }
 
         Ok(Self::new(stream, logger))
@@ -576,19 +576,17 @@ impl From<&str> for Error {
 
 #[cfg(test)]
 mod tests {
-    use crate::hyperlane::tcp::{
-        CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer,
-    };
+    use crate::hyperlane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
     use crate::hyperlane::test_util::{
         LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
     };
+    use anyhow::anyhow;
+    use chrono::{DateTime, Utc};
+    use starlane_macros::{logger, push_loc};
     use starlane_space::err::SpaceErr;
     use starlane_space::loc::ToSurface;
     use starlane_space::log::{LogAppender, StdOutAppender};
     use starlane_space::point::Point;
-    use anyhow::anyhow;
-    use chrono::{DateTime, Utc};
-    use starlane_macros::{logger, push_loc};
     use std::str::FromStr;
     use std::sync::Arc;
 

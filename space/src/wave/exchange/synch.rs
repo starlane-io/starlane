@@ -1,16 +1,20 @@
+use crate::err::SpaceErr;
 use crate::loc::{Surface, ToPoint};
+use crate::substance::{Substance, ToSubstance};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::{CoreBounce, ReflectedCore};
 use crate::wave::exchange::{
     DirectedHandlerShellDef, InCtxDef, ProtoTransmitterBuilderDef, ProtoTransmitterDef,
     RootInCtxDef, SetStrategy,
 };
-use crate::wave::{Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, FromReflectedAggregate, Handling, PongCore, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave, Scope, Wave, WaveVariantDef};
+use crate::wave::{
+    Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore,
+    FromReflectedAggregate, Handling, PongCore, RecipientSelector, ReflectedAggregate,
+    ReflectedProto, ReflectedWave, Scope, Wave, WaveVariantDef,
+};
+use starlane_macros::log_span;
 use std::borrow::Cow;
 use std::sync::Arc;
-use starlane_macros::log_span;
-use crate::err::SpaceErr;
-use crate::substance::{Substance, ToSubstance};
 
 pub trait ExchangeRouter: Send + Sync {
     fn route(&self, wave: Wave);
@@ -231,7 +235,7 @@ impl DirectedHandler for DirectedHandlerProxy {
 }
 
 pub type DirectedHandlerShell =
-DirectedHandlerShellDef<Box<dyn DirectedHandler>, ProtoTransmitterBuilder>;
+    DirectedHandlerShellDef<Box<dyn DirectedHandler>, ProtoTransmitterBuilder>;
 
 impl DirectedHandlerShell {
     pub fn handle(&self, wave: DirectedWave) -> Bounce<ReflectedWave> {

@@ -103,7 +103,7 @@ impl From<Status> for ReflectedCore {
             Status::Resuming => 205u16,
             Status::Done => 200u16,
         })
-            .unwrap_or(StatusCode::fail());
+        .unwrap_or(StatusCode::fail());
 
         let body = Substance::Status(status);
         let status = code;

@@ -10,16 +10,14 @@ use crate::parse::{
     consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, Env,
     ResolverErr,
 };
-use crate::selector::{
-    PointHierarchyOpt, PointKindSegOpt, Selector,
-};
+use crate::selector::{PointHierarchyOpt, PointKindSegOpt, Selector};
 use crate::util::ToResolved;
 use crate::wave::{Agent, Recipients, ToRecipients};
 use crate::{ANONYMOUS, HYPERUSER};
 use core::str::FromStr;
-use std::fmt::Display;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 use std::path::PathBuf;
 use thiserror::__private::AsDisplay;
 
@@ -104,7 +102,7 @@ impl TryInto<RouteSeg> for RouteSegVar {
                 var.trace.range,
                 var.trace.extra,
             )
-                .into()),
+            .into()),
             RouteSegVar::Remote => Ok(RouteSeg::Remote),
         }
     }
@@ -443,21 +441,21 @@ impl TryInto<PointSegCtx> for PointSegVar {
                 trace.range,
                 trace.extra,
             )
-                .into()),
+            .into()),
             PointSegVar::Pop(trace) => Err(ParseErrs::from_range(
                 "point pop not available in this context",
                 "point pop not available",
                 trace.range,
                 trace.extra,
             )
-                .into()),
+            .into()),
             PointSegVar::Var(var) => Err(ParseErrs::from_range(
                 "variable substitution not available in this context",
                 "var subst not available",
                 var.trace.range,
                 var.trace.extra,
             )
-                .into()),
+            .into()),
         }
     }
 }
@@ -480,14 +478,14 @@ impl TryInto<PointSeg> for PointSegCtx {
                 trace.range,
                 trace.extra,
             )
-                .into()),
+            .into()),
             PointSegCtx::Pop(trace) => Err(ParseErrs::from_range(
                 "point pop not available in this context",
                 "point pop not available",
                 trace.range,
                 trace.extra,
             )
-                .into()),
+            .into()),
         }
     }
 }
@@ -559,8 +557,6 @@ impl PointSeg {
         self.kind().preceding_delim(post_fileroot)
     }
 }
-
-
 
 impl ToString for PointSeg {
     fn to_string(&self) -> String {
@@ -702,7 +698,7 @@ impl ToResolved<PointCtx> for PointVar {
                                 "variables not available in this context '{}'",
                                 var.name.clone()
                             )
-                                .as_str(),
+                            .as_str(),
                             "Not Available",
                             var.trace.range.clone(),
                             var.trace.extra.clone(),
@@ -766,7 +762,7 @@ impl ToResolved<PointCtx> for PointVar {
                                     "variables not available in this context '{}'",
                                     var.name.clone()
                                 )
-                                    .as_str(),
+                                .as_str(),
                                 "Not Available",
                                 var.trace.range.clone(),
                                 var.trace.extra.clone(),
@@ -842,7 +838,7 @@ impl ToResolved<Point> for PointCtx {
                             trace.range.clone(),
                             trace.extra.clone(),
                         )
-                            .into());
+                        .into());
                     }
                     point = match env.point_or() {
                         Ok(point) => point.clone(),
@@ -853,7 +849,7 @@ impl ToResolved<Point> for PointCtx {
                                 trace.range.clone(),
                                 trace.extra.clone(),
                             )
-                                .into());
+                            .into());
                         }
                     };
                 }
@@ -877,12 +873,12 @@ impl ToResolved<Point> for PointCtx {
                                 "Too many point pops. working point was: '{}'",
                                 env.point_or().unwrap().to_string()
                             )
-                                .as_str(),
+                            .as_str(),
                             "too many point pops",
                             trace.range.clone(),
                             trace.extra.clone(),
                         )
-                            .into());
+                        .into());
                     }
                 }
                 PointSegCtx::FilesystemRootDir => {
@@ -939,8 +935,6 @@ pub struct PointDef<Route, Seg> {
     pub route: Route,
     pub segments: Vec<Seg>,
 }
-
-
 
 impl<Route, Seg> PointDef<Route, Seg>
 where
@@ -1159,7 +1153,7 @@ impl Point {
                             "'..' too many pop segments directives: out of parents: '{}'",
                             self.to_string()
                         )
-                            .into());
+                        .into());
                     }
                 }
             }
@@ -1497,10 +1491,6 @@ where
 
  */
 
-
-
-
-
 impl Point {
     pub fn root() -> Self {
         Self {
@@ -1579,4 +1569,3 @@ pub type PointCtx = PointDef<RouteSeg, PointSegCtx>;
 /// let point: Point = point_var.to_resolve(&env)?;
 /// ```
 pub type PointVar = PointDef<RouteSegVar, PointSegVar>;
-

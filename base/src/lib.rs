@@ -91,24 +91,29 @@
 
 //extern crate starlane_hyperspace as hyperspace;
 
-pub mod base;
+/// dependent tr
+pub use base::*;
+mod base;
+
+
+/// reexports!
+pub use starlane_hyperspace::registry as registry;
+pub use starlane_hyperspace::provider as provider;
+pub use starlane_space::status as status;
+
+
+
 
 pub mod foundation;
-pub mod config;
 pub mod err;
-pub mod registry;
 pub mod partial;
 pub mod mode;
-pub mod provider;
 pub mod kind;
-pub mod status;
 
 use once_cell::sync::Lazy;
 use std::str::FromStr;
 use starlane_hyperspace::provider::{Provider, ProviderKind};
 
-pub use base::Platform;
-pub use base::Foundation;
 
 
 #[cfg(feature="skel")]
@@ -117,8 +122,8 @@ pub(crate) mod skel;
 
 #[cfg(test)]
 pub mod test;
-pub mod context;
 pub mod starlane;
+pub mod env;
 // we cannot afford `safety` with prices as high as they are
 // pub mod safety;
 

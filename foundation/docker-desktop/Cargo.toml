@@ -10,3 +10,8 @@ description.workspace = true
 version.workspace = true
 
 [dependencies]
+
+starlane-macros= { workspace = true }
+starlane-hyperspace = { workspace = true }
+starlane-space= { workspace = true }
+starlane-base = { workspace = true }

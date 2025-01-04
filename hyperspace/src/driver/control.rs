@@ -7,8 +7,13 @@ use crate::hyperlane::{
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
     InterchangeGate, TransportTransform,
 };
-use crate::platform::Platform;
+use crate::base::Platform;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
+use anyhow::anyhow;
+use async_trait::async_trait;
+use dashmap::DashMap;
+use starlane_macros::logger;
+use starlane_macros::DirectedHandler;
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{
@@ -33,11 +38,6 @@ use starlane_space::wave::exchange::asynch::{
 };
 use starlane_space::wave::exchange::SetStrategy;
 use starlane_space::wave::{Agent, DirectedProto, PongCore, ToRecipients, Wave, WaveVariantDef};
-use anyhow::anyhow;
-use async_trait::async_trait;
-use dashmap::DashMap;
-use starlane_macros::DirectedHandler;
-use starlane_macros::logger;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -151,7 +151,7 @@ impl Driver for ControlDriver {
             PointSegTemplate::Exact("controls".to_string()),
             Kind::Base.to_template(),
         )
-            .await?;
+        .await?;
 
         let remote_point_factory = Arc::new(ControlCreator::new(
             self.skel.clone(),

@@ -1,6 +1,4 @@
-
 /// this should maybe be replaced with the [tokio-graceful-shutdown](https://crates.io/crates/tokio-graceful-shutdown)
-
 use once_cell::sync::Lazy;
 use std::future::Future;
 use std::pin::Pin;
@@ -23,8 +21,8 @@ static SHUTDOWN_HOOK_TX: Lazy<tokio::sync::mpsc::Sender<ShutdownCall>> = Lazy::n
                     tokio::time::timeout(Duration::from_secs(15u64), async move {
                         while let Some(res) = set.join_next().await {}
                     })
-                        .await
-                        .unwrap_or_default();
+                    .await
+                    .unwrap_or_default();
                     process::exit(code);
                 }
             }
@@ -33,7 +31,7 @@ static SHUTDOWN_HOOK_TX: Lazy<tokio::sync::mpsc::Sender<ShutdownCall>> = Lazy::n
     tx
 });
 
-pub fn add_shutdown_hook(f: Pin<Box<dyn Future<Output=()> + Sync + Send + 'static>>) {
+pub fn add_shutdown_hook(f: Pin<Box<dyn Future<Output = ()> + Sync + Send + 'static>>) {
     SHUTDOWN_HOOK_TX
         .try_send(ShutdownCall::AddHook(f))
         .unwrap_or_default();
@@ -56,6 +54,6 @@ where
 }
 
 pub enum ShutdownCall {
-    AddHook(Pin<Box<dyn Future<Output=()> + Sync + Send + 'static>>),
+    AddHook(Pin<Box<dyn Future<Output = ()> + Sync + Send + 'static>>),
     Shutdown(i32),
 }

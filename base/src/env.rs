@@ -1,6 +1,7 @@
 use starlane_hyperspace::err::HypErr;
 use starlane_hyperspace::shutdown::panic_shutdown;
 
+use serde_derive::{ Serialize,Deserialize};
 use anyhow::anyhow;
 use atty::Stream;
 use once_cell::sync::Lazy;
@@ -11,28 +12,28 @@ use std::str::FromStr;
 use std::string::ToString;
 use std::sync::Arc;
 use uuid::Uuid;
-use starlane_base::starlane::StarlaneConfig;
+use crate::starlane::StarlaneConfig;
 
-pub fn context() -> String {
-    fs::read_to_string(format!("{}/.context", STARLANE_HOME.as_str()).to_string())
+pub fn enviro() -> String {
+    fs::read_to_string(format!("{}/.enviro", STARLANE_HOME.as_str()).to_string())
         .unwrap_or("default".to_string())
 }
 
-pub fn set_context<S>(context: S) -> Result<(), anyhow::Error>
+pub fn set_enviro<S>(context: S) -> Result<(), anyhow::Error>
 where
     S: AsRef<str>,
 {
     fs::create_dir_all(STARLANE_HOME.as_str())?;
     fs::write(
-        format!("{}/.context", STARLANE_HOME.as_str()).to_string(),
+        format!("{}/.enviro", STARLANE_HOME.as_str()).to_string(),
         context.as_ref().to_string(),
     )?;
-    fs::create_dir_all(context_dir()).unwrap();
+    fs::create_dir_all(enviro_dir()).unwrap();
     Ok(())
 }
 
-pub fn context_dir() -> String {
-    format!("{}/{}", STARLANE_HOME.as_str(), context()).to_string()
+pub fn enviro_dir() -> String {
+    format!("{}/{}", STARLANE_HOME.as_str(), enviro()).to_string()
 }
 
 
@@ -127,7 +128,7 @@ static STARLANE_TOKEN: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_TOKEN").unwrap_or(Uuid::new_v4().to_string()));
 
 pub fn config_path() -> String {
-    config_path_context(context())
+    config_path_context(enviro())
 }
 
 pub fn config_path_context(context: String) -> String {
@@ -146,7 +147,7 @@ pub fn config() -> Result<Option<StarlaneConfig>, HypErr> {
             let config = std::fs::read_to_string(file.clone())?;
 
             let mut config: StarlaneConfig = serde_yaml::from_str(config.as_str()).map_err(|err| anyhow!("starlane config found: '{}' yet Starlane encountered an error when attempting to process the config: '{}'", config_path(), err))?;
-            config.context = context();
+            config.context = enviro();
 
             Ok(Some(config))
         }

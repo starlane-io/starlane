@@ -1,11 +1,8 @@
-
-use crate::env::{
-    config_save, context, Enviro, GlobalMode, StdEnviro,
-    STARLANE_GLOBAL_SETTINGS, STARLANE_HOME,
+use starlane_base::env::{
+    config_save, enviro, Enviro, GlobalMode, StdEnviro, STARLANE_GLOBAL_SETTINGS, STARLANE_HOME,
 };
 
-use starlane_hyperspace::shutdown::shutdown;
-use crate::{env, COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION};
+use crate::{COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION};
 use anyhow::anyhow;
 use cliclack::log::{error, remark};
 use cliclack::{
@@ -16,6 +13,9 @@ use colored::{Colorize, CustomColor};
 use console::style;
 use lerp::Lerp;
 use serde::Serialize;
+use starlane_base::env;
+use starlane_base::starlane::StarlaneConfig;
+use starlane_hyperspace::shutdown::shutdown;
 use starlane_space::particle::Status;
 use std::fmt::Display;
 use std::io::Write;
@@ -26,7 +26,6 @@ use std::time::Duration;
 use std::{io, thread};
 use text_to_ascii_art::to_art;
 use textwrap::Options;
-use starlane_base::starlane::StarlaneConfig;
 //use starlane::base::foundation::implementation::docker_daemon_foundation::DockerDaemonFoundation;
 
 #[tokio::main]
@@ -49,7 +48,7 @@ impl Installer {
     }
 
     pub async fn start(self) -> Result<(), anyhow::Error> {
-        let context = context();
+        let context = enviro();
         self.console.splash();
         println!("{}", self.console.center("* I N S T A L L E R *"));
 
@@ -65,7 +64,7 @@ context: {context}
 version: {version}
 "#
                 )
-                    .as_str(),
+                .as_str(),
             ),
         )?;
 

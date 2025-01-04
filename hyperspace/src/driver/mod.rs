@@ -15,13 +15,23 @@ use crate::driver::control::ControlErr;
 use crate::driver::star::StarDriverFactory;
 use crate::executor::dialect::filestore::FileStoreErr;
 use crate::machine::MachineErr;
-use crate::platform::Platform;
-use crate::registry::{Registration, Registry};
+use crate::base::Platform;
 use crate::registry::err::RegErr;
+use crate::registry::{Registration, Registry};
 use crate::service::{
     Service, ServiceErr, ServiceKind, ServiceRunnerConf, ServiceSelector, ServiceTemplate,
 };
 use crate::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
+use anyhow::__private::kind::TraitKind;
+use anyhow::{anyhow, Error};
+use async_trait::async_trait;
+use dashmap::DashMap;
+use futures::future::select_all;
+use futures::task::Spawn;
+use futures::{FutureExt, TryFutureExt};
+use once_cell::sync::Lazy;
+use starlane_macros::push_loc;
+use starlane_macros::{handler, route, DirectedHandler, ToSpaceErr};
 use starlane_space::artifact::asynch::{ArtErr, Artifacts};
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::StateSrc::Subst;
@@ -55,16 +65,6 @@ use starlane_space::wave::exchange::asynch::{
 use starlane_space::wave::exchange::SetStrategy;
 use starlane_space::wave::{Agent, DirectedWave, ReflectedWave, Wave};
 use starlane_space::HYPERUSER;
-use anyhow::__private::kind::TraitKind;
-use anyhow::{anyhow, Error};
-use async_trait::async_trait;
-use dashmap::DashMap;
-use futures::future::select_all;
-use futures::task::Spawn;
-use futures::{FutureExt, TryFutureExt};
-use once_cell::sync::Lazy;
-use starlane_macros::{handler, route, DirectedHandler, ToSpaceErr};
-use starlane_macros::push_loc;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -490,7 +490,7 @@ impl Drivers {
                 factory.clone(),
                 status_tx,
             )
-                .await;
+            .await;
 
             let (rtn, mut rtn_rx) = oneshot::channel();
             self.status_listen(Some(rtn)).await;

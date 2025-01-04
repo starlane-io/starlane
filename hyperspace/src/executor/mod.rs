@@ -42,7 +42,7 @@ impl ExeConf {
 
     pub fn create<D>(&self) -> Result<D, HostErr>
     where
-        D: TryFrom<CliOsExecutor, Error=HostErr>,
+        D: TryFrom<CliOsExecutor, Error = HostErr>,
     {
         match self {
             ExeConf::Host(host) => Ok(host.create::<D>()?.try_into()?),

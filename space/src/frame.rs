@@ -4,9 +4,9 @@ use nom::AsBytes;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
+use crate::err::SpaceErr;
 use crate::hyper::Knock;
 use crate::wave::{PingCore, PongCore, Wave};
-use crate::err::SpaceErr;
 
 pub struct PrimitiveFrame {
     pub data: Vec<u8>,

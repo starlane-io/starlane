@@ -52,6 +52,7 @@ typetag = { workspace = true }
 futures = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true }
+serde_derive = { workspace = true }
 rustls = { workspace = true, features = ["aws_lc_rs"] }
 
 clap = { workspace = true, features = ["derive"] }

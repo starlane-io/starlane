@@ -1,4 +1,5 @@
 use crate::registry::err::RegErr;
+use async_trait::async_trait;
 use starlane_space::command::common::{SetProperties, SetRegistry};
 use starlane_space::command::direct::create::Strategy;
 use starlane_space::command::direct::delete::Delete;
@@ -7,16 +8,17 @@ use starlane_space::command::direct::select::{Select, SubSelect};
 use starlane_space::hyper::{ParticleLocation, ParticleRecord};
 use starlane_space::kind::Kind;
 use starlane_space::particle::{Details, Properties, Status, Stub};
+use starlane_space::point::Point;
 use starlane_space::security::{Access, AccessGrant, IndexedAccessGrant};
 use starlane_space::selector::Selector;
 use starlane_space::substance::SubstanceList;
-use async_trait::async_trait;
 use std::sync::Arc;
-use starlane_space::point::Point;
 
 pub mod err;
 
 pub type Registry = Arc<dyn RegistryApi>;
+
+pub trait RegistryConfig: Send+Sync { }
 
 #[async_trait]
 pub trait RegistryApi: Send + Sync {
@@ -43,7 +45,7 @@ pub trait RegistryApi: Send + Sync {
     async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, RegErr>;
 
     async fn query<'a>(&'a self, point: &'a Point, query: &'a Query)
-                       -> Result<QueryResult, RegErr>;
+        -> Result<QueryResult, RegErr>;
 
     async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, RegErr>;
 

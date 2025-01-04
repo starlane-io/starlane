@@ -1,9 +1,12 @@
+mod kinds;
+
 use crate::driver::DriversBuilder;
-use crate::hyperlane::{
-    HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory,
-};
+use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
-use crate::registry::Registry;
+use crate::registry::{Registry, RegistryConfig};
+use anyhow::anyhow;
+use async_trait::async_trait;
+use starlane_macros::logger;
 use starlane_space::artifact::asynch::Artifacts;
 use starlane_space::command::direct::create::KindTemplate;
 use starlane_space::err::SpaceErr;
@@ -15,26 +18,25 @@ use starlane_space::loc::{MachineName, StarKey, ToBaseKind};
 use starlane_space::log::Logger;
 use starlane_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
 use starlane_space::settings::Timeouts;
-use anyhow::anyhow;
-use async_trait::async_trait;
-use starlane_macros::logger;
 use std::str::FromStr;
 use std::sync::Arc;
 
+pub trait Foundation: Send + Sync + Sized {
+    /// somehow must make sure [Foundation::ProviderKind] matches with [Platform::ProviderKind]
+    type ProviderKind: kinds::ProviderKind+?Sized;
+}
+
+
 #[async_trait]
 pub trait Platform: Send + Sync + Sized + Clone
-where
-    Self::Err: std::error::Error + Send + Sync + From<anyhow::Error>,
-    Self: 'static,
-    Self::StarAuth: HyperAuthenticator,
-    Self::RemoteStarConnectionFactory: HyperwayEndpointFactory,
-    Self::Config: PlatformConfig,
+where Self: 'static,
 {
-    type Err;
-    type StarAuth;
-    type RemoteStarConnectionFactory;
-    type Foundation;
-    type Config;
+    type Err: std::error::Error + Send + Sync + From<anyhow::Error>+?Sized;
+    type StarAuth: HyperAuthenticator+?Sized;
+    type RemoteStarConnectionFactory: HyperwayEndpointFactory+?Sized;
+    type Foundation: Foundation<ProviderKind:kinds::ProviderKind>+?Sized;
+    type ProviderKind: kinds::ProviderKind+?Sized;
+    type Config: PlatformConfig;
 
     fn config(&self) -> &Self::Config;
 
@@ -215,10 +217,9 @@ impl Default for Settings {
 }
 
 pub trait PlatformConfig: Clone + Send + Sync
-/*where
-Self::RegistryConfig: Clone + Sized + Send + Sync + 'static,*/
 {
-    type RegistryConfig;
+    /// a registry is requirede
+    type RegistryConfig: RegistryConfig;
 
     fn can_scorch(&self) -> bool;
     fn can_nuke(&self) -> bool;
@@ -227,5 +228,5 @@ Self::RegistryConfig: Clone + Sized + Send + Sync + 'static,*/
 
     fn home(&self) -> &String;
 
-    fn data_dir(&self) -> &String;
+    fn enviro(&self) -> &String;
 }
