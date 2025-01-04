@@ -14,6 +14,7 @@ use strum_macros::EnumDiscriminants;
 
 use crate::registry::Registry;
 use starlane_space::status::Status;
+use crate::base::kinds;
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
@@ -39,6 +40,7 @@ pub enum ProviderKindDef {
     /// [ProviderKindDef::_Ext] defines a new [ProviderKind] that is not builtin to Starlane
     _Ext(CamelCase),
 }
+
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
@@ -85,7 +87,7 @@ pub trait Provider: StatusProbe + EntityReadier + Send + Sync {
 
     // type Context: context::ProviderContext+ ?Sized;
 
-    fn kind(&self) -> ProviderKindDef;
+    fn kind(&self) -> & Self::Config::Kind;
 
     fn config(&self) -> Arc<Self::Config>;
 

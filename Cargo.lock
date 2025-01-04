@@ -3053,6 +3053,7 @@ dependencies = [
  "derive-name",
  "derive_builder",
  "enum-ordinalize",
+ "eyre",
  "futures",
  "indexmap 2.7.0",
  "itertools 0.13.0",

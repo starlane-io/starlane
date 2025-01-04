@@ -44,7 +44,7 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use starlane_hyperspace::registry::Registry;
 use crate::Foundation;
-use crate::provider::Provider;
+use starlane_hyperspace::base::provider::Provider;
 use crate::kind::{ProviderKind,ProviderKindDef,FoundationKind};
 
 

@@ -1,4 +1,4 @@
-use crate::provider::ProviderKind;
+use crate::base::provider::ProviderKind;
 use crate::registry::err::RegErr;
 use async_trait::async_trait;
 use indexmap::IndexMap;

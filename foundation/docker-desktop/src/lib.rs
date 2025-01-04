@@ -1,3 +1,7 @@
+
+
+pub use starlane_base as base;
+
 pub trait Foundation: base::Foundation {}
 
 mod concrete {}

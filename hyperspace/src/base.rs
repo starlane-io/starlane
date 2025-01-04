@@ -1,4 +1,7 @@
-mod kinds;
+pub mod kinds;
+pub mod config;
+pub mod err;
+pub mod provider;
 
 use crate::driver::DriversBuilder;
 use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
@@ -20,11 +23,9 @@ use starlane_space::particle::property::{PropertiesConfig, PropertiesConfigBuild
 use starlane_space::settings::Timeouts;
 use std::str::FromStr;
 use std::sync::Arc;
-
-pub trait Foundation: Send + Sync + Sized {
-    /// somehow must make sure [Foundation::ProviderKind] matches with [Platform::ProviderKind]
-    type ProviderKind: kinds::ProviderKind+?Sized;
-}
+use starlane_space::progress::Progress;
+use starlane_space::status;
+use starlane_space::status::{Status, StatusReporter, StatusWatcher};
 
 
 #[async_trait]
@@ -33,7 +34,7 @@ where Self: 'static,
 {
     type Err: std::error::Error + Send + Sync + From<anyhow::Error>+?Sized;
     type StarAuth: HyperAuthenticator+?Sized;
-    type RemoteStarConnectionFactory: HyperwayEndpointFactory+?Sized;
+    type RemoteStarConnectionFactory: HyperwayEndpointFactory+Sized;
     type Foundation: Foundation<ProviderKind:kinds::ProviderKind>+?Sized;
     type ProviderKind: kinds::ProviderKind+?Sized;
     type Config: PlatformConfig;
@@ -229,4 +230,44 @@ pub trait PlatformConfig: Clone + Send + Sync
     fn home(&self) -> &String;
 
     fn enviro(&self) -> &String;
+}
+
+
+
+#[async_trait]
+pub trait Foundation: Sync + Send {
+
+
+    /// [crate::Foundation::Config] should be a `concrete` implementation of [config::FoundationConfig]
+    type Config: config::FoundationConfig + ?Sized;
+
+
+
+    /// [crate::Foundation::Provider] Should be [Provider] or a custom `trait` that implements [Provider]
+    type Provider: Provider+ ?Sized;
+
+    type ProviderKind: kinds::ProviderKind+?Sized;
+    /// a
+    fn kind(&self) -> FoundationKind;
+
+    fn config(&self) -> Arc<Self::Config>;
+
+    fn status(&self) -> status::Status;
+
+    async fn status_detail(&self) -> Result<status::StatusDetail, err::BaseErr>;
+
+    fn status_watcher(&self) -> StatusWatcher;
+
+    /// [crate::Foundation::probe] synchronize [crate::Foundation]'s model from that of the external services
+    /// and return a [Status].  [crate::Foundation::probe] should also rebuild the [Provider][StatusDetail]
+    /// model and update [StatusReporter]
+    async fn probe(&self) -> Status;
+
+    /// Take action to bring this [crate::Foundation] to [Status::Ready] if not already. A [crate::Foundation]
+    /// is considered ready when all [Provider] dependencies are [Status::Ready].
+    async fn ready(&self, progress: Progress) -> Result<(), BaseErr>;
+
+    /// Returns a [Provider] implementation which
+    fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<Self::Provider>>, BaseErr>;
+
 }

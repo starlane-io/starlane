@@ -98,7 +98,7 @@ mod base;
 
 /// reexports!
 pub use starlane_hyperspace::registry as registry;
-pub use starlane_hyperspace::provider as provider;
+pub use starlane_hyperspace::base::provider as provider;
 pub use starlane_space::status as status;
 
 
@@ -112,7 +112,7 @@ pub mod kind;
 
 use once_cell::sync::Lazy;
 use std::str::FromStr;
-use starlane_hyperspace::provider::{Provider, ProviderKind};
+use starlane_hyperspace::base::provider::{Provider, ProviderKind};
 
 
 

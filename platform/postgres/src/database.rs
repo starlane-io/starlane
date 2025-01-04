@@ -43,11 +43,11 @@ mod concrete {
     use crate::service::config::PostgresUtilizationConfig;
     use crate::service::{PgConnection, PostgresServiceHandle};
     use async_trait::async_trait;
-    use provider::{Provider, ProviderKindDef};
+    use starlane_hyperspace::base::provider::{Provider, ProviderKindDef};
     use sqlx::postgres::PgConnectOptions;
     use sqlx::{Connection, PgPool};
     use starlane_base::foundation::config::ProviderConfig;
-    use starlane_base::provider;
+    use starlane_hyperspace::base::provider;
     use starlane_base::status::{Entity, EntityReadier, EntityResult, StatusResult};
     use starlane_base::status::{Status, StatusProbe};
     use std::ops::Deref;
@@ -78,7 +78,7 @@ mod concrete {
         }
     }
 
-    impl base::config::ProviderConfig for Config {
+    impl starlane_hyperspace::base::config::ProviderConfig for Config {
         fn kind(&self) -> &ProviderKindDef {
             todo!()
         }

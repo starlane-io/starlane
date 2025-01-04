@@ -40,7 +40,7 @@ use sqlx::postgres::PgConnectOptions;
 use sqlx::Error;
 use starlane_base as base;
 use starlane_base::kind::ProviderKindDef;
-use starlane_base::provider;
+use starlane_hyperspace::base::provider;
 use starlane_base::Foundation;
 use starlane_base::Platform;
 use starlane_space::parse::{Domain, VarCase};
@@ -110,7 +110,7 @@ pub mod config {
     use starlane_base as base;
     use std::str::FromStr;
 
-    pub trait ProviderConfig: base::config::ProviderConfig {}
+    pub trait ProviderConfig: starlane_hyperspace::base::config::ProviderConfig {}
 
     #[derive(Clone, Eq, PartialEq)]
     pub struct PostgresUtilizationConfig {
@@ -190,7 +190,7 @@ mod concrete {
     use async_trait::async_trait;
     use sqlx;
     use sqlx::{Acquire, ConnectOptions, Connection, Postgres};
-    use starlane_base::provider::{Manager, Provider, ProviderKindDef};
+    use starlane_hyperspace::base::provider::{Manager, Provider, ProviderKindDef};
     use starlane_base::Foundation;
     use starlane_base::Platform;
     use starlane_space::status;
@@ -204,7 +204,7 @@ mod concrete {
 
     use crate::service::concrete::my::{Error, PostgresConnectionProvider};
     use config::PostgresUtilizationConfig;
-    use starlane_base::config::ProviderConfig;
+    use starlane_hyperspace::base::config::ProviderConfig;
 
     pub mod my {
         pub use super::super::*;
@@ -346,7 +346,7 @@ mod concrete {
     }
 
     #[async_trait]
-    impl base::config::ProviderConfig for PostgresProviderConfig {
+    impl starlane_hyperspace::base::config::ProviderConfig for PostgresProviderConfig {
         fn kind(&self) -> &ProviderKindDef {
             todo!()
         }

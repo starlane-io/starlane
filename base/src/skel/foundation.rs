@@ -1,5 +1,5 @@
 use crate::foundation;
-use crate::provider;
+use starlane_hyperspace::base::provider;
 use crate::kind;
 
 /// [foundation::skel] provides a starter custom implementation of a [foundation]
@@ -86,11 +86,11 @@ pub mod partial {
 pub mod concrete {
     use std::sync::Arc;
     use async_trait::async_trait;
-    use crate::provider::Provider;
+    use starlane_hyperspace::base::provider::Provider;
     use crate::foundation;
     use serde::{Deserialize, Serialize};
     use tokio::sync::watch::Receiver;
-    use starlane_hyperspace::provider::ProviderKind;
+    use starlane_hyperspace::base::provider::ProviderKind;
     use starlane_space::progress::Progress;
     use crate::err::BaseErr;
     use crate::kind::FoundationKind;
@@ -162,11 +162,11 @@ pub mod concrete {
         use std::sync::Arc;
         use async_trait::async_trait;
         use starlane::config;
-        use starlane_hyperspace::provider::err::ProviderErr;
-        use starlane_hyperspace::provider::ProviderKindDef;
+        use starlane_hyperspace::base::provider::err::ProviderErr;
+        use starlane_hyperspace::base::provider::ProviderKindDef;
         use starlane_space::status::{StatusProbe, StatusWatcher};
         use crate::foundation;
-        use crate::config;
+        use starlane_hyperspace::base::config;
         use crate::kind;
         use crate::status::Status;
         use crate::status::StatusDetail;

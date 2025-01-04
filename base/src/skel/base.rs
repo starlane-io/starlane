@@ -22,10 +22,10 @@
 /// [Foundation](crate::Foundation)s. See foundation starter template: [`skel`](crate::base::foundation::skel)
 
 use crate::platform;
-use crate::provider;
+use starlane_hyperspace::base::provider;
 use crate::foundation;
 use crate::kind::ProviderKind;
-use crate::config;
+use starlane_hyperspace::base::config;
 use crate::common;
 
 pub trait Provider: provider::Provider<Config: ProviderConfig> {}
@@ -47,7 +47,7 @@ pub trait ProviderConfig: foundation::config::ProviderConfig {}
 /// pub mod postgres {
 ///
 ///   use starlane::config;
-/// use starlane_base::config;
+/// use starlane_hyperspace::base::config;
 ///
 ///   /// this example implementation is not configured for `modes`.
 ///   /// a mode implementation example is documented here: [starlane::base::mode]
@@ -99,7 +99,7 @@ pub mod concrete {
         pub mod mode {
             use super::my;
             pub mod create {
-                use crate::config::ProviderMode;
+                use starlane_hyperspace::base::config::ProviderMode;
                 use super::my;
                 use super::utilize;
                 use crate::Provider;

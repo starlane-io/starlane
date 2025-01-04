@@ -2,7 +2,7 @@ use std::hash::Hash;
 use strum_macros::EnumDiscriminants;
 use starlane_space::parse::CamelCase;
 
-pub use crate::provider::{ProviderKind,ProviderKindDef};
+pub use starlane_hyperspace::base::provider::{ProviderKind, ProviderKindDef};
 
 
 /// used by the [

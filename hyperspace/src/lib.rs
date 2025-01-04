@@ -17,7 +17,6 @@ pub mod shutdown;
 pub mod tests;
 
 mod config;
-pub mod provider;
 /// disabled for now... this mod's functionality may be superseded by the current
 /// refactor in which case it will be deleted for good
 /// -- Scot

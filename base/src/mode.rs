@@ -92,7 +92,7 @@
 ///   IF [Mode::Create] succeeds... the [crate::Foundation] will then reverse its mode traversal
 
 
-use starlane_hyperspace::provider::Provider;
+use starlane_hyperspace::base::provider::Provider;
 
 pub enum Mode {
     Connect,
