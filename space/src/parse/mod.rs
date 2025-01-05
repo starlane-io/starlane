@@ -75,7 +75,7 @@ use nom::character::complete::{alpha1, digit1};
 use nom::character::complete::{
     alphanumeric0, alphanumeric1, anychar, char, multispace0, multispace1, satisfy, space1,
 };
-use nom::combinator::{all_consuming, opt};
+use nom::combinator::{all_consuming, into, opt};
 use nom::combinator::{cut, eof, fail, not, peek, value, verify};
 use nom::error::{ErrorKind, ParseError};
 use nom::multi::{many0, many1, separated_list0};
@@ -400,8 +400,8 @@ pub fn domain_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
 }
 
 pub fn tag_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
-    delimited(tag("["), skewer_chars, tag("]"))(input)
-        .map(|(next, tag)| (next, RouteSeg::Tag(tag.to_string())))
+    delimited(tag("#["), into(skewer_case), tag("]"))(input)
+        .map(|(next, tag)| (next, RouteSeg::Tag(tag)))
 }
 
 pub fn sys_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {

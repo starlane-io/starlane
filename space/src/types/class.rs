@@ -1,23 +1,23 @@
-use crate::types::{private, DataPoint, Type, TypeKind};
-use crate::types::TypeCategory;
+use crate::types::{private, DataPoint, Exact, Abstract, ExactGen};
+use crate::types::AbstractDiscriminant;
 use core::str::FromStr;
 use std::borrow::Borrow;
 use derive_builder::Builder;
+use derive_name::Name;
 use nom::Parser;
+use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
 use starlane_space::parse::from_camel;
-use starlane_space::types::SchemaKind;
-use crate::kind::Specific;
 use crate::parse::{camel_case, camel_chars, CamelCase, NomErr, Res};
 use crate::parse::util::Span;
 use crate::point::Point;
-use crate::types::private::{Exact, Kind};
-use crate::types::schema::SchemaType;
+use crate::types::schema::SchemaDiscriminant;
+use crate::types::specific::Specific;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name)]
 #[strum_discriminants(vis(pub))]
-#[strum_discriminants(name(ClassType))]
+#[strum_discriminants(name(ClassDiscriminant))]
 #[strum_discriminants(derive(
     Hash,
     strum_macros::EnumString,
@@ -25,8 +25,7 @@ use crate::types::schema::SchemaType;
     strum_macros::IntoStaticStr
 ))]
 #[non_exhaustive]
-pub enum ClassKind {
-
+pub enum Class {
     Root,
     Platform,
     Foundation,
@@ -36,7 +35,7 @@ pub enum ClassKind {
     ///
     /// A Dependency can be `downloaded`, `installed`, `initialized` and `started` (what those
     /// phases actually mean to the Dependency itself is custom behavior)  The job of the Dependency
-    /// create the prerequisite conditions for it child [ClassType::Provider]s
+    /// create the prerequisite conditions for it child [ClassDiscriminant::Provider]s
     Dependency,
     /// Provider `provides` something to Starlane.  Providers enable Starlane to extend itself by
     /// Providing new functionality that the core Starlane binary did not ship with.
@@ -74,31 +73,26 @@ pub enum ClassKind {
     _Ext(CamelCase),
 }
 
-impl Into<TypeKind> for ClassKind {
-    fn into(self) -> TypeKind {
-        todo!()
-    }
-}
 
-impl TryFrom<ClassType> for ClassKind {
+impl TryFrom<ClassDiscriminant> for Class {
     type Error = ();
 
-    fn try_from(source: ClassType) -> Result<Self, Self::Error> {
+    fn try_from(source: ClassDiscriminant) -> Result<Self, Self::Error> {
         match source {
-            ClassType::_Ext=> Err(()),
+            ClassDiscriminant::_Ext=> Err(()),
             /// true we are doing a naughty [Result::unwrap] of a [CamelCase::from_str] but
-            /// a non [CamelCase] from [SchemaType::to_string] should be impossible unless some
+            /// a non [CamelCase] from [SchemaDiscriminant::to_string] should be impossible unless some
             /// developer messed up
             source=> Ok(Self::_Ext(CamelCase::from_str(source.to_string().as_str()).unwrap()))
         }
     }
 }
 
-impl private::Kind for ClassKind  {
-    type Type = Class;
+impl private::Generic for Class {
+    type Abstract = Class;
 
-    fn category(&self) -> TypeCategory {
-        TypeCategory::Class
+    fn discriminant(&self) -> AbstractDiscriminant {
+        AbstractDiscriminant::Class
     }
 
 
@@ -108,40 +102,32 @@ impl private::Kind for ClassKind  {
     {
         from_camel(input)
     }
+}
 
-    /*
-    fn parser<I>(input:I ) -> Res<I, Self>
-    where
-        I: Span
-    {
-        let (next,kind) = camel_chars(input)?;
-        let kind = Self::from_str(kind.to_string().as_str())?;
-        Ok((next,kind))
-    }
-
-     */
-
-
-    fn type_kind(&self) -> TypeKind {
-        todo!()
+/*
+impl Into<Abstract> for Class {
+    fn into(self) -> Abstract {
+        Abstract::Class(self)
     }
 }
 
-impl From<CamelCase> for ClassKind {
+ */
+
+impl From<CamelCase> for Class {
     fn from(camel: CamelCase) -> Self {
         ///
-        match ClassType::from_str(camel.as_str()) {
+        match ClassDiscriminant::from_str(camel.as_str()) {
             /// this Ok match is actually an Error
-            Ok(ClassType::_Ext) => panic!("ClassType: not CamelCase '{}'",camel),
+            Ok(ClassDiscriminant::_Ext) => panic!("ClassDiscriminant: not CamelCase '{}'",camel),
             Ok(discriminant) => Self::try_from(discriminant).unwrap(),
-            /// if no match then it is an extension: [ClassKind::_Ext]
-            Err(_) => ClassKind::_Ext(camel),
+            /// if no match then it is an extension: [Class::_Ext]
+            Err(_) => Class::_Ext(camel),
         }
     }
 }
 
 
-impl FromStr for ClassKind {
+impl FromStr for Class {
     type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -153,7 +139,7 @@ impl FromStr for ClassKind {
 
 
 
-impl From<CamelCase> for ClassType {
+impl From<CamelCase> for ClassDiscriminant {
     fn from(src: CamelCase) -> Self {
         /// it should not be possible for this to fail
         Self::from_str(src.as_str()).unwrap()
@@ -161,23 +147,21 @@ impl From<CamelCase> for ClassType {
 }
 
 
-impl Into<CamelCase> for ClassType {
+impl Into<CamelCase> for ClassDiscriminant {
     fn into(self) -> CamelCase {
         CamelCase::from_str(self.to_string().as_str()).unwrap()
     }
 }
 
 
-impl Into<TypeCategory> for ClassType {
-    fn into(self) -> TypeCategory {
-        TypeCategory::Class
-    }
-}
+
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ClassDef;
 
 
 
 
-pub type Class = private::Exact<ClassKind>;
 
 
 

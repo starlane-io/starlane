@@ -6,10 +6,7 @@ use crate::loc::{
 };
 use crate::parse::util::result;
 use crate::parse::util::{new_span, Trace};
-use crate::parse::{
-    consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, Env,
-    ResolverErr,
-};
+use crate::parse::{consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, skewer_case, Env, ResolverErr, SkewerCase};
 use crate::selector::{PointHierarchyOpt, PointKindSegOpt, Selector};
 use crate::util::ToResolved;
 use crate::wave::{Agent, Recipients, ToRecipients};
@@ -19,7 +16,50 @@ use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::path::PathBuf;
+use strum_macros::EnumDiscriminants;
 use thiserror::__private::AsDisplay;
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(RouteTagDiscriminant))]
+#[strum_discriminants(derive(
+    Hash,
+    strum_macros::EnumString,
+    strum_macros::ToString,
+    strum_macros::IntoStaticStr
+))]
+#[strum(serialize_all = "lowercase")]
+#[non_exhaustive]
+pub enum RouteTag {
+    Hub,
+    _Ext(SkewerCase)
+}
+
+impl FromStr for RouteTag {
+    type Err = ParseErrs;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let input = new_span(s);
+        let skewer = result(all_consuming(skewer_case)(input))?;
+        let discriminant = RouteTagDiscriminant::from_str(skewer.as_str())?;
+        match discriminant {
+            /// right now there is only one builtin [RouteTag::Hub]
+            RouteTagDiscriminant::Hub => Ok(Self::Hub),
+            /// if it isn't a builtin then it's an extended type
+            _ => Ok(Self::_Ext(skewer))
+        }
+    }
+}
+
+impl From<SkewerCase> for RouteTag {
+
+    fn from(skewer: SkewerCase) -> Self {
+        /// [RouteTag::from_str] will not fail because [SkewerCase::as_str] is already known
+        /// to be of the `skewer case` convention
+        Self::from_str(skewer.as_str()).unwrap()
+    }
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum RouteSeg {
@@ -28,7 +68,7 @@ pub enum RouteSeg {
     Remote,
     Global,
     Domain(String),
-    Tag(String),
+    Tag(RouteTag),
     Star(String),
 }
 
@@ -55,7 +95,7 @@ pub enum RouteSegVar {
     Remote,
     Global,
     Domain(String),
-    Tag(String),
+    Tag(RouteTag),
     Star(String),
     Var(Variable),
 }
