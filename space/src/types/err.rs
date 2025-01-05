@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-use dyn_clone::clone;
 use thiserror::Error;
 use crate::kind::Specific;
 use crate::types::TypeKind;
@@ -25,17 +23,14 @@ impl TypeErr {
         Self::EmptyMeta(k)
     }
 
-    pub fn meta_layer_index_out_of_bounds(kind: &TypeKind, tried: &usize, len: impl ToOwned<Owned=usize>) -> Self {
+    pub fn meta_layer_index_out_of_bounds(kind: &TypeKind, tried: &usize, len: usize) -> Self {
 
         let kind = kind.clone();
         let tried = tried.clone();
-        let len = len.to_owned();
         Self::MetaLayerIndexOutOfBounds {kind, tried, len}
     }
 
-    pub fn specific_not_found(specific: impl ToOwned<Owned=Specific>, search_location: impl ToOwned<Owned=String>) -> Self {
-        let specific = specific.to_owned();
-        let search_location = search_location.to_owned();
+    pub fn specific_not_found(specific: Specific, search_location: String) -> Self {
         Self::SpecificNotFound {search_location, specific}
     }
 }

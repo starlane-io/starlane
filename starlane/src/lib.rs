@@ -19,6 +19,8 @@ use once_cell::sync::Lazy;
 use shadow_rs::shadow;
 use std::str::FromStr;
 
+pub mod starlane;
+
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
 

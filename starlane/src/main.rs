@@ -48,7 +48,7 @@ use starlane_base::env;
 use starlane_base::env::{
     enviro_dir, ensure_global_settings, save_global_settings, set_enviro, STARLANE_HOME,
 };
-use starlane_base::starlane::Starlane;
+use starlane::starlane::Starlane;
 pub use starlane_hyperspace::base::Platform;
 use starlane_hyperspace::shutdown::shutdown;
 use starlane_macros::{create_mark, ToBase};

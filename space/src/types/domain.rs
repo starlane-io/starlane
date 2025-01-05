@@ -1,13 +1,21 @@
 use core::str::FromStr;
+use std::ops::ControlFlow;
+use futures::stream::{TryFilter, TryFold};
+use futures::TryFutureExt;
+use nom::combinator::all_consuming;
+use serde_derive::{Deserialize, Serialize};
+use strum::ParseError;
 use strum_macros::{EnumDiscriminants, EnumString};
+use validator::ValidateRequired;
+use starlane_space::parse::VarCase;
+use crate::err::{ParseErrs, SpaceErr};
 use crate::loc::Version;
 use crate::parse::{space_point_segment, CamelCase, SkewerCase};
-
-
+use crate::parse::util::{new_span, result};
 
 /// Some Domain Prefixes are reserved builtins like `root` & `starlane`
 #[non_exhaustive]
-#[derive(Clone, Debug, Eq, PartialEq, Hash, strum_macros::Display,EnumString)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, strum_macros::Display,EnumString,Serialize,Deserialize)]
 #[strum(serialize_all = "lowercase")]
 pub enum Prefix {
     /// Represents a `Type` that `Starlane` uses internally
@@ -25,11 +33,9 @@ pub enum Prefix {
 /// multiple definitions of the same base type and/or to group like definitions
 /// together.
 ///
+/// Example for a [super::class::ClassKind::File]
 ///
-/// Example for a [super::class::Class::File]
-///
-///
-#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display,Serialize,Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(SegmentKind))]
 #[strum_discriminants(derive(
@@ -40,16 +46,58 @@ pub enum Prefix {
 #[strum(serialize_all = "lowercase")]
 pub enum Segment {
     #[strum(to_string = "{0}")]
-    Ver(Version),
+    Version(Version),
     #[strum(to_string = "{0}")]
-    Seg(SkewerCase),
+    Segment(SkewerCase),
 }
 
 
+impl FromStr for Segment {
+    type Err = ParseErrs;
 
-#[derive(Clone,Eq,PartialEq,Hash,Debug)]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let input = new_span(s);
+        result(all_consuming(parse::postfix_segment)(input))
+    }
+}
+
+#[derive(Clone,Eq,PartialEq,Hash,Debug,Serialize,Deserialize)]
 pub struct DomainScope(Option<Prefix>,Vec<Segment>);
 
+impl DomainScope {
+    pub fn new( prefix: Option<Prefix>, segments: Vec<Segment> ) -> Self  {
+        Self(prefix,segments)
+    }
+}
+
+impl FromStr for DomainScope {
+    type Err = ParseErrs;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        result(all_consuming(parse::domain)(new_span(s)))
+    }
+}
+
+
+impl ToString for DomainScope {
+    fn to_string(&self) -> String {
+
+        let mut segs = self.post_segments().iter().map(|segment| segment.to_string().as_str()).collect::<Vec<_>>();
+
+        match self.prefix() {
+            None => {}
+            Some(prefix) => {
+                /// so we can use [Vec::push] ...
+                segs.reverse();
+                segs.push(prefix.to_string().as_str());
+                /// because [Prefix] should be first...
+                segs.reverse();
+            }
+        }
+        segs.join("::").to_string()
+
+    }
+}
 
 impl Default for DomainScope {
     fn default() -> Self {
@@ -73,6 +121,7 @@ impl DomainScope {
     }
 
 }
+
 
 
 
@@ -106,9 +155,10 @@ pub mod test {
         assert_eq!(domain.reserved(), true);
         assert_eq!(domain.prefix().is_some(), true);
 
-        let domain = DomainScope(Some(Prefix::Starlane),vec!["one","two","truee"].into());
-        println!("domain: '{}'", domain.to_string());
-        assert!(false)
+
+       // let domain = DomainScope(Some(Prefix::Starlane),vec!["one","two","truee"].into());
+       // println!("domain: '{}'", domain.to_string());
+        //assert!(false)
     }
 }
 
@@ -124,12 +174,13 @@ pub mod parse {
     use starlane_space::parse::SpaceContextError;
     use crate::command::common::PropertyMod;
     use crate::err;
-    use crate::parse::{skewer, skewer_case, skewer_chars, version, Res, SkewerCase};
+    use crate::parse::{skewer, skewer_case, skewer_chars, version, NomErr, Res, SkewerCase};
     use crate::parse::util::{new_span, result, Span};
     use crate::types::domain::{DomainScope, Prefix, Segment};
     use nom::{Err, Parser};
     use nom::branch::alt;
     use nom_supreme::ParserExt;
+    use nom_supreme::tag::TagError;
 
     pub(crate) fn parse(s: impl AsRef<str> ) -> Result<DomainScope,err::ParseErrs> {
         let span = new_span(s.as_ref());
@@ -143,18 +194,22 @@ pub mod parse {
     }
 
     fn prefix <I: Span>(input: I) -> Res<I, Prefix> {
-        terminated(skewer_chars.parse_from_str(),tag("::"))(input)
+        let (next, skewer) = terminated(skewer_case,tag("::"))(input.clone())?;
+        match Prefix::from_str(skewer.as_str()) {
+            Ok(prefix) => Ok((next,prefix)),
+            Err(_) => Err(nom::Err::Error(NomErr::from_tag(input,"prefix")))
+        }
     }
 
-    fn postfix_segment<I: Span>(input: I) -> Res<I, Segment> {
+    pub(super) fn postfix_segment<I: Span>(input: I) -> Res<I, Segment> {
         fn semver<I: Span>(input: I) -> Res<I, Segment> {
-            version(input).map(|(input,version)|(input, Segment::Ver(version)))
+            version(input).map(|(input,version)|(input, Segment::Version(version)))
         }
 
         fn segment<I: Span>(input: I) -> Res<I, Segment> {
-            skewer(input).map(|(input,skewer)|(input, Segment::Seg(skewer)))
+            skewer_case(input).map(|(input,skewer)|(input, Segment::Segment(skewer)))
         }
-        alt((segment,semver))
+        alt((segment,semver))(input)
     }
 
 

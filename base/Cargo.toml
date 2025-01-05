@@ -27,7 +27,7 @@ test=[]
 [dependencies]
 
 starlane-macros = { workspace = true, version = "0.3.21" }
-starlane-space = { workspace = true, version = "0.3.21" }
+starlane-space = { workspace = true, version = "0.3.21", features = ["types2"] }
 starlane-hyperspace = { package="starlane-hyperspace", workspace = true, version = "0.3.21" }
 
 thiserror = { workspace = true }

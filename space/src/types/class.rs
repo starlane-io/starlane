@@ -3,13 +3,17 @@ use crate::types::TypeCategory;
 use core::str::FromStr;
 use std::borrow::Borrow;
 use derive_builder::Builder;
+use nom::Parser;
 use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
+use starlane_space::parse::from_camel;
 use starlane_space::types::SchemaKind;
 use crate::kind::Specific;
-use crate::parse::CamelCase;
+use crate::parse::{camel_case, camel_chars, CamelCase, NomErr, Res};
+use crate::parse::util::Span;
 use crate::point::Point;
-use crate::types::private::Exact;
+use crate::types::private::{Exact, Kind};
+use crate::types::schema::SchemaType;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
@@ -76,6 +80,20 @@ impl Into<TypeKind> for ClassKind {
     }
 }
 
+impl TryFrom<ClassType> for ClassKind {
+    type Error = ();
+
+    fn try_from(source: ClassType) -> Result<Self, Self::Error> {
+        match source {
+            ClassType::_Ext=> Err(()),
+            /// true we are doing a naughty [Result::unwrap] of a [CamelCase::from_str] but
+            /// a non [CamelCase] from [SchemaType::to_string] should be impossible unless some
+            /// developer messed up
+            source=> Ok(Self::_Ext(CamelCase::from_str(source.to_string().as_str()).unwrap()))
+        }
+    }
+}
+
 impl private::Kind for ClassKind  {
     type Type = Class;
 
@@ -84,8 +102,41 @@ impl private::Kind for ClassKind  {
     }
 
 
+    fn parse<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        from_camel(input)
+    }
+
+    /*
+    fn parser<I>(input:I ) -> Res<I, Self>
+    where
+        I: Span
+    {
+        let (next,kind) = camel_chars(input)?;
+        let kind = Self::from_str(kind.to_string().as_str())?;
+        Ok((next,kind))
+    }
+
+     */
+
+
     fn type_kind(&self) -> TypeKind {
         todo!()
+    }
+}
+
+impl From<CamelCase> for ClassKind {
+    fn from(camel: CamelCase) -> Self {
+        ///
+        match ClassType::from_str(camel.as_str()) {
+            /// this Ok match is actually an Error
+            Ok(ClassType::_Ext) => panic!("ClassType: not CamelCase '{}'",camel),
+            Ok(discriminant) => Self::try_from(discriminant).unwrap(),
+            /// if no match then it is an extension: [ClassKind::_Ext]
+            Err(_) => ClassKind::_Ext(camel),
+        }
     }
 }
 
@@ -94,16 +145,7 @@ impl FromStr for ClassKind {
     type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        fn ext( s: &str ) -> Result<ClassKind,ParseErrs> {
-            Ok(ClassKind::_Ext(CamelCase::from_str(s)?.into()))
-        }
-
-        match ClassType::from_str(s) {
-            /// this Ok match is actually an Error!
-            Ok(ClassType::_Ext) => ext(s),
-            Ok(variant) => ext(variant.into()),
-            Err(_) => ext(s)
-        }
+        Ok(Self::from(CamelCase::from_str(s)?))
     }
 }
 

@@ -3,12 +3,12 @@ use base::status::{Entity, Handle, StatusProbe};
 use starlane_base as base;
 use std::future::Future;
 use std::ops::Deref;
-
+use sqlx::postgres::PgConnectOptions;
 use crate::database::partial::pool::PostgresDatabaseConnectionPoolProvider;
 /// these reexports must come from [crate::service] since they are mocks when `#[cfg(test)]`
 use crate::service;
-use crate::service::PostgresServiceHandle;
 use service::{PgConnection, Pool, PoolConnection};
+use crate::service::config;
 
 pub type PostgresDatabaseHandle = Handle<dyn PostgresDatabase<DerefTarget = Pool>>;
 
@@ -27,9 +27,12 @@ pub type PostgresDatabaseHandle = Handle<dyn PostgresDatabase<DerefTarget = Pool
 /// }
 /// ```
 #[async_trait]
-pub trait PostgresDatabase:
-    Entity + PostgresDatabaseConnectionPoolProvider + StatusProbe + Send + Sync
-{
+pub trait PostgresDatabase: Entity + PostgresDatabaseConnectionPoolProvider + StatusProbe + Send + Sync { }
+
+
+/// final [starlane::config::ProviderConfig] trait definitions for [concrete::PostgresProviderConfig]
+#[async_trait]
+pub trait ProviderConfig: service::ProviderConfig {
 }
 
 mod concrete {
@@ -213,24 +216,8 @@ pub mod partial {
     /// connection pool support
     pub mod pool {
         use super::my;
-        use sqlx::Acquire;
-        use std::future::Future;
-        use std::sync::Arc;
-        use tokio::sync::Mutex;
-
         pub trait PostgresDatabaseConnectionPoolProvider {
             fn pool(&self) -> &my::Pool;
-            /*
-            async fn acquire(&self) -> impl Future<Output=Result<my::PgConnection, sqlx::Error>> + 'static
-            {
-                let con = self.pool();
-                async move  {
-                    let guard = con.lock().await.acquire().await.unwrap();
-                    guard.acquire().await
-                }
-            }
-
-             */
         }
     }
 }
@@ -244,13 +231,6 @@ pub mod tests {
 
     #[tokio::test]
     pub async fn test_handle_deref() {
-        /*
-        let service_provider = ::mock();
-        let service = service_provider.ready().await.to_res().unwrap();
-        let database = PostgresDatabase::mock();
-        let handle = Handle::mock(database);
-        let deref = handle.deref();
 
-         */
     }
 }

@@ -3,6 +3,7 @@ pub mod context;
 mod detail;
 pub mod err;
 
+use std::hash::{Hash, Hasher};
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::parse::CamelCase;
@@ -14,7 +15,9 @@ use strum_macros::EnumDiscriminants;
 
 use crate::registry::Registry;
 use starlane_space::status::Status;
-use crate::base::kinds;
+use crate::base::{kinds, BaseSub};
+use crate::base::config::BaseConfig;
+use crate::base::kinds::Kind;
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
@@ -40,6 +43,25 @@ pub enum ProviderKindDef {
     /// [ProviderKindDef::_Ext] defines a new [ProviderKind] that is not builtin to Starlane
     _Ext(CamelCase),
 }
+
+/*
+impl kinds::ProviderKind for ProviderKind{ }
+
+impl Eq for ProviderKindDef {}
+
+impl PartialEq<Self> for ProviderKindDef {
+    fn eq(&self, other: &Self) -> bool {
+        todo!()
+    }
+}
+
+impl Hash for ProviderKindDef {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        todo!()
+    }
+}
+
+ */
 
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
@@ -82,14 +104,8 @@ pub enum Manager {
 /// is a Database server like Postgres... the Dependency will download, install, initialize and
 /// start the service whereas a Provider in this example would represent an individual Database
 #[async_trait]
-pub trait Provider: StatusProbe + EntityReadier + Send + Sync {
-    type Config: config::ProviderConfig + ?Sized;
+pub trait Provider: BaseSub<Config:config::ProviderConfig>+ StatusProbe + EntityReadier + Send + Sync {
 
-    // type Context: context::ProviderContext+ ?Sized;
-
-    fn kind(&self) -> & Self::Config::Kind;
-
-    fn config(&self) -> Arc<Self::Config>;
 
     /*
     /// Returns an interface clone for [Provider::Entity] when it reaches [Status::Ready].

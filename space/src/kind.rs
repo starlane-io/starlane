@@ -20,6 +20,7 @@ use core::str::FromStr;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use indexmap::Equivalent;
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {
@@ -763,6 +764,7 @@ impl StarStub {
     }
 }
 
+
 /// A Specific is used to associate [Type](s) with an`Exact` definition(s)
 ///
 /// The Specific segment schema is designed to avoid naming collisions and follows
@@ -817,6 +819,18 @@ pub struct Specific {
     pub product: SkewerCase,
     pub variant: SkewerCase,
     pub version: Version,
+}
+
+impl Equivalent<Specific> for &Specific {
+    fn equivalent(&self, other: &Specific) -> bool {
+        *self == other
+    }
+}
+
+impl Into<Specific> for &Specific {
+    fn into(self) -> Specific {
+       self.clone()
+    }
 }
 
 impl Specific {

@@ -22,8 +22,104 @@ use starlane_hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
 use starlane_hyperspace::shutdown::panic_shutdown;
 use starlane_macros::push_loc;
 use starlane_space::point::Point;
-use crate::env::STARLANE_CONTROL_PORT;
-use crate::registry;
+use base::env::STARLANE_CONTROL_PORT;
+use hyperspace::registry;
+
+
+pub mod prelude {
+   use starlane_hyperspace::base;
+   /// abstract
+   pub use base::kinds::Kind;
+   pub use base::config::BaseConfig;
+   pub use base::config::BaseSubConfig;
+
+   /// [Platform]
+   pub use base::Platform;
+   pub use base::config::PlatformConfig;
+   pub use base::kinds::PlatformKind;
+
+   /// [foundation]
+   pub use base::Foundation;
+   pub use base::config::FoundationConfig;
+   pub use base::kinds::FoundationKind;
+
+   /// [provider]
+   pub use base::provider::Provider;
+   pub use base::config::ProviderConfig;
+   pub use base::kinds::ProviderKind;
+
+
+    pub mod platform {
+        pub mod postgres {
+            pub mod service {
+                use starlane_platform_for_postgres::service::{Provider,ProviderConfig,PostgresService,PostgresServiceHandle};
+            }
+            pub mod database {
+                use starlane_platform_for_postgres::database::{Provider,ProviderConfig,PostgresService,PostgresDatabaseHandle};
+            }
+
+
+
+        }
+    }
+
+}
+
+
+mod concrete {
+    use crate::starlane::prelude;
+
+
+    pub struct Platform{
+        config: PlatformConfig
+    }
+
+    #[derive(Clone,Debug,)]
+    pub struct PlatformConfig{
+        kind: PlatformKind,
+    }
+
+    impl prelude::PlatformConfig for PlatformConfig {
+        type RegistryConfig = RegistryConfig;
+
+        fn can_scorch(&self) -> bool {
+            todo!()
+        }
+
+        fn can_nuke(&self) -> bool {
+            todo!()
+        }
+
+        fn registry(&self) -> &Self::RegistryConfig {
+            todo!()
+        }
+
+        fn home(&self) -> &String {
+            todo!()
+        }
+
+        fn enviro(&self) -> &String {
+            todo!()
+        }
+    }
+
+
+    #[derive(Clone,Debug,Eq,PartialEq,Hash)]
+    pub enum PlatformKind{
+       Standalone
+    }
+
+    impl prelude::Kind for PlatformKind{ }
+
+    impl prelude::ProviderKind for PlatformKind{ }
+
+
+
+
+
+
+
+}
 
 pub mod config {
     use starlane_hyperspace::base::PlatformConfig;
@@ -31,17 +127,15 @@ pub mod config {
     pub trait RegistryConfig:  registry::RegistryConfig { }
 }
 
-
 #[derive(Clone)]
-pub struct Starlane<P> where P: Platform {
-    platform: P,
+pub struct Starlane {
     artifacts: Artifacts,
     registry: Arc<dyn config::RegistryConfig>
 }
 
-impl Starlane {
+impl  Starlane  {
     pub async fn new(
-        config: StarlaneConfig,
+        config: P::Config,
         foundation: DockerDesktopFoundation,
     ) -> Result<Starlane, HypErr> {
         todo!();
@@ -235,7 +329,7 @@ where
 mod partial {
     mod my { pub use super::super::*; }
 
-    pub(super) mod config {
+    pub mod config {
         use serde_derive::{Deserialize, Serialize};
         use starlane_hyperspace::registry;
         use super::my;
@@ -287,4 +381,15 @@ mod partial {
 }
 
 
+}
+
+
+mod platform {
+
+
+    pub struct Platform {
+
+    }
+
+    impl Platform
 }

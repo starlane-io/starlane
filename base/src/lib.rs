@@ -112,7 +112,7 @@ pub mod kind;
 
 use once_cell::sync::Lazy;
 use std::str::FromStr;
-use starlane_hyperspace::base::provider::{Provider, ProviderKind};
+use starlane_hyperspace::base::provider::Provider;
 
 
 
@@ -122,8 +122,8 @@ pub(crate) mod skel;
 
 #[cfg(test)]
 pub mod test;
-pub mod starlane;
 pub mod env;
+pub mod backend;
 // we cannot afford `safety` with prices as high as they are
 // pub mod safety;
 

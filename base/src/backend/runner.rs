@@ -1,137 +1,14 @@
 use crate::base;
-use crate::base::config::ProviderConfig;
-use crate::base::config::{Config, DependencyConfig, FoundationConfig};
-use crate::base::err::BaseErr;
-use crate::base::foundation::kind::FoundationKind;
-use crate::base::foundation::status::{Phase, PhaseDetail, Status};
-use crate::base::foundation::util::SerMap;
-use crate::base::kind::{DependencyKind, Kind, ProviderKind};
-use crate::base::{foundation, registry};
 use starlane_space::parse::CamelCase;
 use starlane_space::point::Point;
 use starlane_space::progress::Progress;
-use md5::digest::FixedOutput;
 use starlane_macros::logger;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
-use wasmer_wasix::virtual_fs::Upcastable;
+use crate::backend::relay::FoundationTx;
 
-enum Call<F>
-where
-    F: foundation::Foundation,
-{
-    Synchronize {
-        progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<Status, BaseErr>>,
-    },
-    Dependency {
-        kind: DependencyKind,
-        rtn: tokio::sync::oneshot::Sender<Result<Option<F::Dependency>, BaseErr>>,
-    },
-
-    Install {
-        progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
-    },
-    Registry(tokio::sync::oneshot::Sender<Result<registry::Registry, BaseErr>>),
-    DepCall(DepWrapper<F>),
-    _Phantom(PhantomData<F>),
-}
-
-struct FoundationTx<F>
-where
-    F: foundation::Foundation,
-{
-    phantom: PhantomData<F>,
-    config: base::config::default::FoundationConfig,
-    call_tx: tokio::sync::mpsc::Sender<Call<F>>,
-    status: Arc<tokio::sync::watch::Receiver<Status>>,
-}
-
-impl<F> FoundationTx<F>
-where
-    F: foundation::Foundation,
-{
-    fn new(
-        config: base::config::default::FoundationConfig,
-        call_tx: tokio::sync::mpsc::Sender<Call<F>>,
-        status: Arc<tokio::sync::watch::Receiver<Status>>,
-    ) -> Self {
-        Self {
-            config,
-            call_tx,
-            status,
-            phantom: PhantomData::default(),
-        }
-    }
-}
-
-#[async_trait]
-impl<F> foundation::Foundation for FoundationTx<F>
-where
-    F: foundation::Foundation,
-{
-    type Config = F::Config;
-    type Dependency = ();
-    type Provider = ();
-
-    fn kind(&self) -> FoundationKind {
-        self.config.kind().clone()
-    }
-
-    fn config(&self) -> Self::Config {
-        self.config.clone()
-    }
-
-    fn status(&self) -> Status {
-        self.status.borrow().clone()
-    }
-
-    fn status_watcher(&self) -> Arc<Receiver<Status>> {
-        self.status.clone()
-    }
-
-    async fn synchronize(&self, progress: Progress) -> Result<Status, BaseErr> {
-        let (rtn, rx) = tokio::sync::oneshot::channel();
-        self.call_tx
-            .try_send(Call::Synchronize { progress, rtn })
-            .map_err(BaseErr::msg)?;
-        rx.await.map_err(BaseErr::msg)?
-    }
-
-    async fn install(&self, progress: Progress) -> Result<(), BaseErr> {
-        let (rtn, rx) = tokio::sync::oneshot::channel();
-        self.call_tx
-            .try_send(Call::Install { progress, rtn })
-            .map_err(BaseErr::msg)?;
-        rx.await.map_err(BaseErr::msg)?
-    }
-
-    fn dependency(
-        &self,
-        kind: &DependencyKind,
-    ) -> Result<Option<Self::Dependency>, BaseErr> {
-        let kind = kind.clone();
-        let (rtn, rx) = tokio::sync::oneshot::channel();
-        self.call_tx
-            .try_send(Call::Dependency { kind, rtn })
-            .map_err(BaseErr::msg)?;
-        Ok(rx.blocking_recv().map_err(BaseErr::msg)??)
-    }
-
-    fn registry(&self) -> Result<registry::Registry, BaseErr> {
-        let (rtn, rx) = tokio::sync::oneshot::channel();
-        self.call_tx
-            .try_send(Call::Registry(rtn))
-            .map_err(BaseErr::msg)?;
-        rx.blocking_recv().map_err(BaseErr::msg)?
-    }
-}
-
-type DepWrapper<D> = Wrapper<DependencyKind, DepCall<D>>;
-type ProvWrapper<P> = Wrapper<ProviderKind, ProviderCall<P>>;
 
 struct Wrapper<K, C> {
     kind: K,
@@ -141,34 +18,6 @@ impl<K, C> Wrapper<K, C> {
     fn new(kind: K, call: C) -> Self {
         Self { kind, call }
     }
-}
-
-enum DepCall<D>
-where
-    D: foundation::Dependency,
-{
-    Download {
-        progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
-    },
-    Install {
-        progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
-    },
-    Initialize {
-        progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
-    },
-    Start {
-        progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<foundation::LiveService<DependencyKind>, BaseErr>>,
-    },
-    Provider {
-        kind: ProviderKind,
-        rtn: tokio::sync::oneshot::Sender<Result<D::Provider, BaseErr>>,
-    },
-    ProviderCall(ProvWrapper<D::Provider>),
-    _Phantom(PhantomData<D>),
 }
 
 struct DependencyTx<F>
@@ -261,27 +110,12 @@ where
     }
 }
 
-enum ProviderCall<P>
-where
-    P: Provider,
-{
-    Initialize {
-        progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<(), BaseErr>>,
-    },
-    Start {
-        progress: Progress,
-        rtn: tokio::sync::oneshot::Sender<Result<LiveService<CamelCase>, BaseErr>>,
-    },
-    _Phantom(PhantomData<P>),
-}
-
 struct ProviderTx<P>
 where
     P: Provider,
 {
     config: P::Config,
-    call_tx: tokio::sync::mpsc::Sender<ProviderCall<P>>,
+    call_tx: tokio::sync::mpsc::Sender<Call<P>>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
@@ -291,7 +125,7 @@ where
 {
     fn new(
         config: Arc<dyn ProviderConfig>,
-        call_tx: tokio::sync::mpsc::Sender<ProviderCall<P>>,
+        call_tx: tokio::sync::mpsc::Sender<Call<P>>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
     ) -> Self {
         Self {
@@ -327,14 +161,14 @@ where
 
     async fn initialize(&self, progress: Progress) -> Result<(), BaseErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-        let call = ProviderCall::Initialize { progress, rtn };
+        let call = Call::Initialize { progress, rtn };
         self.call_tx.send(call).await.unwrap();
         rtn_rx.await?
     }
 
     async fn start(&self, progress: Progress) -> Result<LiveService<CamelCase>, BaseErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-        let call = ProviderCall::Start { progress, rtn };
+        let call = Call::Start { progress, rtn };
         self.call_tx.send(call).await.unwrap();
         rtn_rx.await?
     }
@@ -344,8 +178,8 @@ struct Runner<F>
 where
     F: Foundation,
 {
-    call_rx: tokio::sync::mpsc::Receiver<Call<F>>,
-    call_tx: tokio::sync::mpsc::Sender<Call<F>>,
+    call_rx: tokio::sync::mpsc::Receiver<Method<F>>,
+    call_tx: tokio::sync::mpsc::Sender<Method<F>>,
     foundation: F,
     runners: HashMap<DependencyKind, DependencyRunner<Self>>,
 }
@@ -408,26 +242,26 @@ where
         let logger = logger!(Point::global_foundation());
         while let Some(call) = self.call_rx.recv().await {
             match call {
-                Call::Synchronize { progress, rtn } => {
+                Method::Probe { progress, rtn } => {
                     rtn.send(self.foundation.synchronize(progress).await)
                         .unwrap_or_default();
                 }
-                Call::Dependency { kind, rtn } => {
+                Method::MakeReady { kind, rtn } => {
                     rtn.send(self.proxy(kind)).unwrap_or_default();
                 }
-                Call::Install { progress, rtn } => {
+                Method::Install { progress, rtn } => {
                     rtn.send(self.foundation.install(progress).await)
                         .unwrap_or_default();
                 }
-                Call::Registry(rtn) => {
+                Method::Registry(rtn) => {
                     rtn.send(self.foundation.registry()).unwrap_or_default();
                 }
-                Call::DepCall(wrap) => match self.runners.get_mut(&wrap.kind) {
+                Method::DepCall(wrap) => match self.runners.get_mut(&wrap.kind) {
                     None => {}
                     Some(runner) => runner.handle(wrap.call).await,
                 },
                 /// should never be called...
-                Call::_Phantom(_) => {}
+                Method::_Phantom(_) => {}
             }
         }
         Ok(())
@@ -440,14 +274,14 @@ where
 {
     dependency: F::Dependency,
     runners: HashMap<ProviderKind, ProviderRunner<F>>,
-    call_tx: tokio::sync::mpsc::Sender<Call<F::Dependency>>,
+    call_tx: tokio::sync::mpsc::Sender<Method<F::Dependency>>,
 }
 
 impl<F> DependencyRunner<F>
 where
     F: Foundation,
 {
-    fn new(dependency: F::Dependency, call_tx: tokio::sync::mpsc::Sender<Call<F>>) -> Self {
+    fn new(dependency: F::Dependency, call_tx: tokio::sync::mpsc::Sender<Method<F>>) -> Self {
         Self {
             dependency,
             runners: Default::default(),
@@ -462,7 +296,7 @@ where
         tokio::spawn(async move {
             while let Some(dep_call) = dep_call_rx.recv().await {
                 let prov_wrapper = DepWrapper::new(kind.clone(), dep_call);
-                let call = Call::DepCall(prov_wrapper);
+                let call = Method::DepCall(prov_wrapper);
                 foundation_call_tx.send(call).await.unwrap_or_default();
             }
         });
@@ -543,7 +377,7 @@ where
     F: Foundation,
 {
     provider: F::Provider,
-    foundation_call_tx: tokio::sync::mpsc::Sender<Call<F>>,
+    foundation_call_tx: tokio::sync::mpsc::Sender<Method<F>>,
 }
 
 impl<F> ProviderRunner<F>
@@ -552,7 +386,7 @@ where
 {
     fn new(
         provider: F::Provider,
-        foundation_call_tx: tokio::sync::mpsc::Sender<Call<F>>,
+        foundation_call_tx: tokio::sync::mpsc::Sender<Method<F>>,
     ) -> Self {
         Self {
             provider,
@@ -569,7 +403,7 @@ where
                 let prov_wrapper = ProvWrapper::new(kind.clone(), prov_call);
                 let dep_call = DepCall::ProviderCall(prov_wrapper);
                 let dep_wrapper = DepWrapper::new(kind.dep.clone(), dep_call);
-                let call = Call::DepCall(dep_wrapper);
+                let call = Method::DepCall(dep_wrapper);
                 foundation_call_tx.send(call).await.unwrap_or_default();
             }
         });
@@ -584,17 +418,17 @@ where
         self.provider.kind()
     }
 
-    async fn handle(&mut self, call: ProviderCall<F>) {
+    async fn handle(&mut self, call: Call<F>) {
         match call {
-            ProviderCall::Initialize { progress, rtn } => {
+            Call::Initialize { progress, rtn } => {
                 rtn.send(self.provider.initialize(progress).await)
                     .unwrap_or_default();
             }
-            ProviderCall::Start { progress, rtn } => {
+            Call::Start { progress, rtn } => {
                 rtn.send(self.provider.start(progress).await)
                     .unwrap_or_default();
             }
-            ProviderCall::_Phantom(_) => {}
+            Call::_Phantom(_) => {}
         }
     }
 }

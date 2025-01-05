@@ -103,22 +103,22 @@ use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
 
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
-pub type StarParser<I: Span, O> = dyn nom_supreme::parser_ext::ParserExt<I, O, SpaceTree<I>>;
+pub type StarParser<I: Span, O> = dyn nom_supreme::parser_ext::ParserExt<I, O, NomErr<I>>;
 
 pub type Xpan<'a> = Wrap<LocatedSpan<&'a str, Arc<String>>>;
 
-impl<I> From<SpaceTree<I>> for ParseErrs
+impl<I> From<NomErr<I>> for ParseErrs
 where
     I: Span,
 {
-    fn from(err: SpaceTree<I>) -> Self {
+    fn from(err: NomErr<I>) -> Self {
         match err {
-            SpaceTree::Base { location, kind } => ParseErrs::from_loc_span(
+            NomErr::Base { location, kind } => ParseErrs::from_loc_span(
                 "undefined parse error (error is not associated with an ErrorContext",
                 "undefined",
                 location.clone(),
             ),
-            SpaceTree::Stack { base, contexts } => {
+            NomErr::Stack { base, contexts } => {
                 let mut contexts = contexts.clone();
                 contexts.reverse();
                 let mut message = String::new();
@@ -144,7 +144,7 @@ where
 
                 ParseErrs::default()
             }
-            SpaceTree::Alt(_) => {
+            NomErr::Alt(_) => {
                 //println!("ALT!");
                 ParseErrs::default()
             }
@@ -152,11 +152,11 @@ where
     }
 }
 
-impl<I> From<nom::Err<SpaceTree<I>>> for ParseErrs
+impl<I> From<nom::Err<NomErr<I>>> for ParseErrs
 where
     I: Span,
 {
-    fn from(err: nom::Err<SpaceTree<I>>) -> Self {
+    fn from(err: nom::Err<NomErr<I>>) -> Self {
         match err {
             Err::Incomplete(i) => ParseErrs::default(),
             Err::Error(err) => err.into(),
@@ -166,7 +166,7 @@ where
 }
 pub fn context<I, F, O>(context: &'static str, mut f: F) -> impl FnMut(I) -> Res<I, O>
 where
-    F: Parser<I, O, SpaceTree<I>>,
+    F: Parser<I, O, NomErr<I>>,
     I: Span,
 {
     /*
@@ -300,9 +300,10 @@ pub enum BraceKindErrCtx {
 
 impl BraceKindErrCtx {}
 
-pub type SpaceTree<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErrs>;
+pub type NomErr<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErrs>;
 
-pub type Res<I: Span, O> = IResult<I, O, SpaceTree<I>>;
+
+pub type Res<I: Span, O> = IResult<I, O, NomErr<I>>;
 
 /*impl <I> From<SpaceTree<I>> for ParseErrs where I: Span {
     fn from(value: SpaceTree<I>) -> Self {
@@ -1304,7 +1305,7 @@ pub fn parse_uuid<I: Span>(i: I) -> Res<I, Uuid> {
     Ok((
         next,
         Uuid::from(uuid)
-            .map_err(|e| nom::Err::Error(SpaceTree::from_error_kind(i, ErrorKind::Tag)))?,
+            .map_err(|e| nom::Err::Error(NomErr::from_error_kind(i, ErrorKind::Tag)))?,
     ))
 }
 
@@ -1408,7 +1409,7 @@ pub fn path_regex<I: Span>(input: I) -> Res<I, I> {
         Ok(regex) => Ok((next, regex_span)),
         Err(err) => {
             println!("regex error {}", err.to_string());
-            return Err(nom::Err::Error(SpaceTree::from_error_kind(
+            return Err(nom::Err::Error(NomErr::from_error_kind(
                 input,
                 ErrorKind::Tag,
             )));
@@ -1750,6 +1751,22 @@ impl Deref for SkewerCase {
     fn deref(&self) -> &Self::Target {
         &self.string
     }
+}
+
+
+pub fn from<I,Fn,In,Out>(mut f: Fn) -> impl FnMut(I) -> Res<I, Out> where Fn: FnMut(I) -> Res<I,In>+Copy, Out: From<In>, I: Span {
+    move |input| {
+        f(input).map(|(next,t)|(next,Out::from(t)))
+    }
+}
+
+
+pub fn from_camel<I,O>(input:I) -> Res<I,O> where I: Span, O: From<CamelCase>{
+    from(camel_case)(input)
+}
+
+pub fn from_skewer<I,O>(input:I) -> Res<I,O> where I: Span, O: From<SkewerCase>{
+    from(skewer_case)(input)
 }
 
 pub fn camel_case<I: Span>(input: I) -> Res<I, CamelCase> {
@@ -2770,7 +2787,7 @@ where
         + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     I: ToString,
-    F: nom::Parser<I, O, SpaceTree<I>>,
+    F: nom::Parser<I, O, NomErr<I>>,
     O: Clone,
 {
     move |input: I| {
@@ -2791,9 +2808,9 @@ pub trait SubstParser<T: Sized> {
 
 pub fn root_ctx_seg<I: Span, F>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegCtx> + Copy
 where
-    F: Parser<I, PointSeg, SpaceTree<I>> + Copy,
+    F: Parser<I, PointSeg, NomErr<I>> + Copy,
 {
-    move |input: I| match pair(tag::<&str, I, SpaceTree<I>>(".."), eos)(input.clone()) {
+    move |input: I| match pair(tag::<&str, I, NomErr<I>>(".."), eos)(input.clone()) {
         Ok((next, v)) => Ok((
             next.clone(),
             PointSegCtx::Pop(Trace {
@@ -2801,7 +2818,7 @@ where
                 extra: next.extra(),
             }),
         )),
-        Err(err) => match pair(tag::<&str, I, SpaceTree<I>>("."), eos)(input.clone()) {
+        Err(err) => match pair(tag::<&str, I, NomErr<I>>("."), eos)(input.clone()) {
             Ok((next, _)) => Ok((
                 next.clone(),
                 PointSegCtx::Working(Trace {
@@ -2819,9 +2836,9 @@ where
 
 pub fn working<I: Span, F>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegCtx>
 where
-    F: nom::Parser<I, PointSeg, SpaceTree<I>>,
+    F: nom::Parser<I, PointSeg, NomErr<I>>,
 {
-    move |input: I| match pair(tag::<&str, I, SpaceTree<I>>("."), eos)(input.clone()) {
+    move |input: I| match pair(tag::<&str, I, NomErr<I>>("."), eos)(input.clone()) {
         Ok((next, v)) => Ok((
             next.clone(),
             PointSegCtx::Working(Trace {
@@ -2838,9 +2855,9 @@ where
 
 pub fn pop<I: Span, F>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegCtx> + Copy
 where
-    F: nom::Parser<I, PointSeg, SpaceTree<I>> + Copy,
+    F: nom::Parser<I, PointSeg, NomErr<I>> + Copy,
 {
-    move |input: I| match pair(tag::<&str, I, SpaceTree<I>>(".."), eos)(input.clone()) {
+    move |input: I| match pair(tag::<&str, I, NomErr<I>>(".."), eos)(input.clone()) {
         Ok((next, v)) => Ok((
             next.clone(),
             PointSegCtx::Working(Trace {
@@ -2858,7 +2875,7 @@ where
 pub fn base_seg<I, F, S>(mut f: F) -> impl FnMut(I) -> Res<I, S>
 where
     I: Span,
-    F: nom::Parser<I, S, SpaceTree<I>> + Copy,
+    F: nom::Parser<I, S, NomErr<I>> + Copy,
     S: PointSegment,
 {
     move |input: I| preceded(tag(":"), f)(input)
@@ -2866,7 +2883,7 @@ where
 
 pub fn mesh_seg<I: Span, F, S1, S2>(mut f: F) -> impl FnMut(I) -> Res<I, S2>
 where
-    F: nom::Parser<I, S1, SpaceTree<I>> + Copy,
+    F: nom::Parser<I, S1, NomErr<I>> + Copy,
     S1: PointSegment + Into<S2>,
     S2: PointSegment,
 {
@@ -2975,7 +2992,7 @@ where
         + Clone
         + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
-    F: nom::Parser<I, O, SpaceTree<I>>,
+    F: nom::Parser<I, O, NomErr<I>>,
     O: Clone + FromStr<Err = ParseErrs>,
 {
     move |input: I| {
@@ -2986,7 +3003,7 @@ where
 
 pub fn sub<I: Span, O, F>(mut f: F) -> impl FnMut(I) -> Res<I, Spanned<I, O>>
 where
-    F: nom::Parser<I, O, SpaceTree<I>>,
+    F: nom::Parser<I, O, NomErr<I>>,
     O: Clone,
 {
     move |input: I| {
@@ -3133,7 +3150,7 @@ where
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
     I: nom::Slice<std::ops::RangeFrom<usize>>,
     <I as InputIter>::Item: AsChar,
-    F: nom::Parser<I, O, SpaceTree<I>> + Clone,
+    F: nom::Parser<I, O, NomErr<I>> + Clone,
 {
     move |input: I| {
         f.clone()
@@ -3174,7 +3191,7 @@ where
             }
         }
 
-        Err(nom::Err::Failure(SpaceTree::from_error_kind(
+        Err(nom::Err::Failure(NomErr::from_error_kind(
             input.clone(),
             ErrorKind::Alt,
         )))
@@ -3200,7 +3217,7 @@ where
         BlockKind::Nested(kind) => lex_nested_block(kind).parse(input),
         BlockKind::Terminated(kind) => lex_terminated_block(kind).parse(input),
         BlockKind::Delimited(kind) => lex_delimited_block(kind).parse(input),
-        BlockKind::Partial => Err(nom::Err::Failure(SpaceTree::from_error_kind(
+        BlockKind::Partial => Err(nom::Err::Failure(NomErr::from_error_kind(
             input,
             ErrorKind::IsNot,
         ))),
@@ -5304,7 +5321,7 @@ pub fn layer<I: Span>(input: I) -> Res<I, Layer> {
     let (next, layer) = recognize(camel_case)(input.clone())?;
     match Layer::from_str(layer.to_string().as_str()) {
         Ok(layer) => Ok((next, layer)),
-        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(NomErr::from_error_kind(
             input,
             ErrorKind::Alpha,
         ))),
@@ -5368,9 +5385,9 @@ pub fn port<I: Span>(input: I) -> Res<I, Surface> {
     match point.w.collapse() {
         Ok(point) => Ok((next, Surface::new(point, layer, topic))),
         Err(err) => {
-            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Alpha);
+            let err = NomErr::from_error_kind(input.clone(), ErrorKind::Alpha);
             let loc = input.slice(point.trace.range);
-            Err(nom::Err::Error(SpaceTree::add_context(
+            Err(nom::Err::Error(NomErr::add_context(
                 loc,
                 ErrCtx::ResolverNotAvailable,
                 err,
@@ -5684,7 +5701,7 @@ pub fn parse_version_chars_str<I: Span, O: FromStr>(input: I) -> Res<I, O> {
     let (next, rtn) = recognize(version_chars)(input)?;
     match O::from_str(rtn.to_string().as_str()) {
         Ok(rtn) => Ok((next, rtn)),
-        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(NomErr::from_error_kind(
             next,
             ErrorKind::Fail,
         ))),
@@ -5754,7 +5771,7 @@ pub fn parse_star_key<I: Span>(input: I) -> Res<I, StarKey> {
     let index = match index.to_string().parse::<u16>() {
         Ok(index) => index,
         Err(err) => {
-            return Err(nom::Err::Failure(SpaceTree::from_error_kind(
+            return Err(nom::Err::Failure(NomErr::from_error_kind(
                 input,
                 ErrorKind::Digit,
             )))
@@ -5773,7 +5790,7 @@ pub fn parse_star_key<I: Span>(input: I) -> Res<I, StarKey> {
 
 pub fn pattern<I: Span, O, V>(mut value: V) -> impl FnMut(I) -> Res<I, Pattern<O>>
 where
-    V: Parser<I, O, SpaceTree<I>>,
+    V: Parser<I, O, NomErr<I>>,
 {
     move |input: I| {
         let x: Res<I, I> = tag("*")(input.clone());
@@ -5791,9 +5808,9 @@ where
 pub fn value_pattern<I: Span, O, F>(mut f: F) -> impl FnMut(I) -> Res<I, ValuePattern<O>>
 where
     I: InputLength + InputTake + Compare<&'static str>,
-    F: Parser<I, O, SpaceTree<I>>,
+    F: Parser<I, O, NomErr<I>>,
 {
-    move |input: I| match tag::<&'static str, I, SpaceTree<I>>("*")(input.clone()) {
+    move |input: I| match tag::<&'static str, I, NomErr<I>>("*")(input.clone()) {
         Ok((next, _)) => Ok((next, ValuePattern::Always)),
         Err(err) => f
             .parse(input.clone())
@@ -5810,7 +5827,7 @@ pub fn version_req<I: Span>(input: I) -> Res<I, VersionReq> {
     match rtn {
         Ok(version) => Ok((next, VersionReq { version })),
         Err(err) => {
-            let tree = Err::Error(SpaceTree::from_error_kind(input, ErrorKind::Fail));
+            let tree = Err::Error(NomErr::from_error_kind(input, ErrorKind::Fail));
             Err(tree)
         }
     }
@@ -5983,8 +6000,8 @@ pub fn base_kind<I: Span>(input: I) -> Res<I, BaseKind> {
     match BaseKind::try_from(kind.clone()) {
         Ok(kind) => Ok((next, kind)),
         Err(err) => {
-            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-            Err(nom::Err::Error(SpaceTree::add_context(
+            let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+            Err(nom::Err::Error(NomErr::add_context(
                 input,
                 ErrCtx::InvalidBaseKind(kind.to_string()),
                 err,
@@ -6001,8 +6018,8 @@ pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
         let base = match BaseKind::try_from(lex.base.clone()) {
             Ok(base) => base,
             Err(err) => {
-                let err = SpaceTree::from_error_kind(input2.clone(), ErrorKind::Fail);
-                Err(nom::Err::Error(SpaceTree::add_context(
+                let err = NomErr::from_error_kind(input2.clone(), ErrorKind::Fail);
+                Err(nom::Err::Error(NomErr::add_context(
                     input2,
                     ErrCtx::InvalidBaseKind(lex.base.to_string()),
                     err,
@@ -6029,8 +6046,8 @@ pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Guest => Ok((input, Kind::Guest)),
             _ => {
                 if lex.sub.is_none() {
-                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(SpaceTree::add_context(
+                    let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(NomErr::add_context(
                         input.clone(),
                         ErrCtx::InvalidSubKind(BaseKind::Database, "none".to_string()),
                         err,
@@ -6046,8 +6063,8 @@ pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
                             )),
                             None => {
                                 let err =
-                                    SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                                Err(nom::Err::Error(SpaceTree::add_context(
+                                    NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                                Err(nom::Err::Error(NomErr::add_context(
                                     input,
                                     ErrCtx::InvalidSubKind(BaseKind::Database, sub.to_string()),
                                     err,
@@ -6055,8 +6072,8 @@ pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
                             }
                         },
                         _ => {
-                            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                            Err(nom::Err::Error(SpaceTree::add_context(
+                            let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                            Err(nom::Err::Error(NomErr::add_context(
                                 input,
                                 ErrCtx::InvalidSubKind(BaseKind::Database, sub.to_string()),
                                 err,
@@ -6073,8 +6090,8 @@ pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
                             }
                             None => {
                                 let err =
-                                    SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                                Err(nom::Err::Error(SpaceTree::add_context(
+                                    NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                                Err(nom::Err::Error(NomErr::add_context(
                                     input,
                                     ErrCtx::InvalidSubKind(BaseKind::UserBase, sub.to_string()),
                                     err,
@@ -6082,8 +6099,8 @@ pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
                             }
                         },
                         _ => {
-                            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                            Err(nom::Err::Error(SpaceTree::add_context(
+                            let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                            Err(nom::Err::Error(NomErr::add_context(
                                 input,
                                 ErrCtx::InvalidSubKind(BaseKind::UserBase, sub.to_string()),
                                 err,
@@ -6094,8 +6111,8 @@ pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
                     BaseKind::Artifact => match ArtifactSubKind::from_str(sub.as_str()) {
                         Ok(sub) => Ok((input, Kind::Artifact(sub))),
                         Err(err) => {
-                            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                            Err(nom::Err::Error(SpaceTree::add_context(
+                            let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                            Err(nom::Err::Error(NomErr::add_context(
                                 input,
                                 ErrCtx::InvalidSubKind(BaseKind::Artifact, sub.to_string()),
                                 err,
@@ -6105,8 +6122,8 @@ pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
                     BaseKind::Star => match StarSub::from_str(sub.as_str()) {
                         Ok(sub) => Ok((input, Kind::Star(sub))),
                         Err(err) => {
-                            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                            Err(nom::Err::Error(SpaceTree::add_context(
+                            let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                            Err(nom::Err::Error(NomErr::add_context(
                                 input,
                                 ErrCtx::InvalidSubKind(BaseKind::Star, sub.to_string()),
                                 err,
@@ -6116,8 +6133,8 @@ pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
                     BaseKind::File => match FileSubKind::from_str(sub.as_str()) {
                         Ok(sub) => Ok((input, Kind::File(sub))),
                         Err(err) => {
-                            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                            Err(nom::Err::Error(SpaceTree::add_context(
+                            let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                            Err(nom::Err::Error(NomErr::add_context(
                                 input,
                                 ErrCtx::InvalidSubKind(BaseKind::File, sub.to_string()),
                                 err,
@@ -6126,8 +6143,8 @@ pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
                     },
 
                     _ => {
-                        let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                        Err(nom::Err::Error(SpaceTree::add_context(
+                        let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                        Err(nom::Err::Error(NomErr::add_context(
                             input,
                             ErrCtx::InvalidSubKind(BaseKind::File, sub.to_string()),
                             err,
@@ -6150,8 +6167,8 @@ pub fn resolve_sub<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Sub> {
                     Ok((next, Sub::Database(DatabaseSubKind::Relational(specific))))
                 }
                 _ => {
-                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(SpaceTree::add_context(
+                    let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(NomErr::add_context(
                         input,
                         ErrCtx::InvalidSubKind(BaseKind::Database, sub.to_string()),
                         err,
@@ -6165,8 +6182,8 @@ pub fn resolve_sub<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Sub> {
                     Ok((next, Sub::UserBase(UserBaseSubKind::OAuth(specific))))
                 }
                 _ => {
-                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(SpaceTree::add_context(
+                    let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(NomErr::add_context(
                         input,
                         ErrCtx::InvalidSubKind(BaseKind::UserBase, sub.to_string()),
                         err,
@@ -6177,8 +6194,8 @@ pub fn resolve_sub<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Sub> {
             BaseKind::Artifact => match ArtifactSubKind::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Sub::Artifact(sub))),
                 Err(err) => {
-                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(SpaceTree::add_context(
+                    let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(NomErr::add_context(
                         input,
                         ErrCtx::InvalidSubKind(BaseKind::Artifact, sub.to_string()),
                         err,
@@ -6188,8 +6205,8 @@ pub fn resolve_sub<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Sub> {
             BaseKind::Star => match StarSub::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Sub::Star(sub))),
                 Err(err) => {
-                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(SpaceTree::add_context(
+                    let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(NomErr::add_context(
                         input,
                         ErrCtx::InvalidSubKind(BaseKind::Star, sub.to_string()),
                         err,
@@ -6199,8 +6216,8 @@ pub fn resolve_sub<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Sub> {
             BaseKind::File => match FileSubKind::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Sub::File(sub))),
                 Err(err) => {
-                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(SpaceTree::add_context(
+                    let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(NomErr::add_context(
                         input,
                         ErrCtx::InvalidSubKind(BaseKind::File, sub.to_string()),
                         err,
@@ -6209,8 +6226,8 @@ pub fn resolve_sub<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Sub> {
             },
             k => {
                 let kind = k.to_string();
-                let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                Err(nom::Err::Error(SpaceTree::add_context(
+                let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                Err(nom::Err::Error(NomErr::add_context(
                     input,
                     ErrCtx::InvalidSubKind(
                         k.clone(),
@@ -6462,13 +6479,13 @@ pub fn version<I: Span>(input: I) -> Res<I, Version> {
     match rtn {
         Ok(version) => Ok((next, Version { version })),
         Err(err) => {
-            let tree = Err::Error(SpaceTree::from_error_kind(input, ErrorKind::Fail));
+            let tree = Err::Error(NomErr::from_error_kind(input, ErrorKind::Fail));
             Err(tree)
         }
     }
 }
 
-pub fn specific<I: Span>(input: I) -> Res<I, Specific> {
+pub fn specific<I>(input: I) -> Res<I, Specific> where I: Span {
     tuple((
         domain,
         tag(":"),
@@ -6619,7 +6636,7 @@ pub fn parse_alpha1_str<I: Span, O: FromStr>(input: I) -> Res<I, O> {
     let (next, rtn) = recognize(alpha1)(input)?;
     match O::from_str(rtn.to_string().as_str()) {
         Ok(rtn) => Ok((next, rtn)),
-        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(NomErr::from_error_kind(
             next,
             ErrorKind::Fail,
         ))),
@@ -6815,7 +6832,7 @@ pub fn format<I: Span>(input: I) -> Res<I, SubstanceFormat> {
     let (next, format) = recognize(alpha1)(input)?;
     match SubstanceFormat::from_str(format.to_string().as_str()) {
         Ok(format) => Ok((next, format)),
-        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(NomErr::from_error_kind(
             next,
             ErrorKind::Fail,
         ))),
@@ -6861,7 +6878,7 @@ pub fn parse_camel_case_str<I: Span, O: FromStr>(input: I) -> Res<I, O> {
     let (next, rtn) = recognize(camel_case_chars)(input)?;
     match O::from_str(rtn.to_string().as_str()) {
         Ok(rtn) => Ok((next, rtn)),
-        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(NomErr::from_error_kind(
             next,
             ErrorKind::Fail,
         ))),
@@ -6879,9 +6896,9 @@ pub fn http_method_pattern<I: Span>(input: I) -> Res<I, HttpMethodPattern> {
 pub fn method_pattern<I: Clone, F>(mut f: F) -> impl FnMut(I) -> Res<I, HttpMethodPattern>
 where
     I: InputLength + InputTake + Compare<&'static str>,
-    F: Parser<I, HttpMethod, SpaceTree<I>>,
+    F: Parser<I, HttpMethod, NomErr<I>>,
 {
-    move |input: I| match tag::<&'static str, I, SpaceTree<I>>("*")(input.clone()) {
+    move |input: I| match tag::<&'static str, I, NomErr<I>>("*")(input.clone()) {
         Ok((next, _)) => Ok((next, HttpMethodPattern::Always)),
         Err(err) => f
             .parse(input.clone())
@@ -6894,7 +6911,7 @@ pub fn ext_method<I: Span>(input: I) -> Res<I, ExtMethod> {
 
     match ExtMethod::new(ext_method.to_string()) {
         Ok(method) => Ok((next, method)),
-        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(NomErr::from_error_kind(
             input,
             ErrorKind::Fail,
         ))),
@@ -6906,7 +6923,7 @@ pub fn sys_method<I: Span>(input: I) -> Res<I, HypMethod> {
 
     match HypMethod::from_str(sys_method.to_string().as_str()) {
         Ok(method) => Ok((next, method)),
-        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(NomErr::from_error_kind(
             input,
             ErrorKind::Fail,
         ))),
@@ -6918,7 +6935,7 @@ pub fn cmd_method<I: Span>(input: I) -> Res<I, CmdMethod> {
 
     match CmdMethod::from_str(method.to_string().as_str()) {
         Ok(method) => Ok((next, method)),
-        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(NomErr::from_error_kind(
             input,
             ErrorKind::Fail,
         ))),
@@ -6930,7 +6947,7 @@ pub fn wrapped_ext_method<I: Span>(input: I) -> Res<I, Method> {
 
     match ExtMethod::new(ext_method.to_string()) {
         Ok(method) => Ok((next, Method::Ext(method))),
-        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(NomErr::from_error_kind(
             input,
             ErrorKind::Fail,
         ))),
@@ -7756,6 +7773,6 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
     ))
 }
 
-fn find_parse_err<I: Span>(_: &Err<SpaceTree<I>>) -> ParseErrs {
+fn find_parse_err<I: Span>(_: &Err<NomErr<I>>) -> ParseErrs {
     todo!()
 }

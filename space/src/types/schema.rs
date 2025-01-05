@@ -1,11 +1,17 @@
 use crate::types::{private, TypeCategory, SrcDef, TypeKind, Type};
 use core::str::FromStr;
+use rustls::client::verify_server_cert_signed_by_trust_anchor;
 use serde_derive::{Deserialize, Serialize};
+use strum::ParseError;
 use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
 use starlane_space::kind::Specific;
+use starlane_space::parse::{camel_chars, from_camel};
 use starlane_space::types::PointKindDefSrc;
-use crate::parse::CamelCase;
+use crate::parse::{camel_case, CamelCase, Res};
+use crate::parse::util::Span;
+use crate::types::class::{ClassKind, ClassType};
+use crate::types::parse::delim::schema;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display, Serialize,Deserialize)]
 #[strum_discriminants(vis(pub))]
@@ -26,30 +32,46 @@ pub enum SchemaKind {
     _Ext(CamelCase),
 }
 
+
+
+impl From<CamelCase> for SchemaKind {
+    fn from(camel: CamelCase) -> Self {
+        ///
+        match SchemaType::from_str(camel.as_str()) {
+            /// this Ok match is actually an Error
+            Ok(SchemaType::_Ext) => panic!("ClassType: not CamelCase '{}'",camel),
+            Ok(discriminant) => Self::try_from(discriminant).unwrap(),
+            /// if no match then it is an extension: [ClassKind::_Ext]
+            Err(_) => SchemaKind::_Ext(camel),
+        }
+    }
+}
+
+impl TryFrom<SchemaType> for SchemaKind {
+    type Error = ();
+
+    fn try_from(source: SchemaType) -> Result<Self, Self::Error> {
+        match source {
+            SchemaType::_Ext=> Err(()),
+            /// true we are doing a naughty [Result::unwrap] of a [CamelCase::from_str] but
+            /// a non [CamelCase] from [SchemaType::to_string] should be impossible unless some
+            /// developer messed up
+            source=> Ok(Self::_Ext(CamelCase::from_str(source.to_string().as_str()).unwrap()))
+        }
+    }
+}
+
 impl FromStr for SchemaKind {
     type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        fn ext(s: &str) -> Result<SchemaKind,ParseErrs> {
-            Ok(SchemaKind::_Ext(CamelCase::from_str(s)?.into()))
-        }
-
-        match SchemaType::from_str(s) {
-            /// this Ok match is actually an Error!
-            Ok(SchemaType::_Ext) => ext(s),
-            Ok(variant) => ext(variant.into()),
-            Err(_) => ext(s),
-        }
+        let camel =  CamelCase::from_str(s)?;
+        Ok(Self::from(camel))
     }
 }
 
 
-impl From<CamelCase> for SchemaKind {
-    fn from(src: CamelCase) -> Self {
-        /// it should not be possible for this to fail
-        Self::from_str(src.as_str()).unwrap()
-    }
-}
+
 
 impl Into<TypeKind> for SchemaKind {
     fn into(self) -> TypeKind {
@@ -64,11 +86,19 @@ impl private::Kind for SchemaKind {
         TypeCategory::Schema
     }
 
+    fn parse<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        from_camel(input)
+    }
+
 
     fn type_kind(&self) -> TypeKind {
         TypeKind::Schema(self.clone())
     }
 }
+
 
 impl Into<CamelCase> for SchemaKind {
     fn into(self) -> CamelCase {

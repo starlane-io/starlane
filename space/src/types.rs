@@ -1,5 +1,4 @@
-
-
+use std::str::FromStr;
 use strum_macros::EnumDiscriminants;
 
 mod class;
@@ -21,24 +20,21 @@ pub enum DefSrc {
 }
 
 pub(crate) mod private {
-    use std::borrow::Borrow;
     use std::collections::HashMap;
     use std::fmt::{Display, Formatter};
-    use std::marker::PhantomData;
     use std::ops::{Deref, DerefMut, Index};
     use std::str::FromStr;
+    use std::thread::scope;
     use indexmap::IndexMap;
     use itertools::Itertools;
     use nom::Parser;
-    use nom_supreme::ParserExt;
-    use rustls::pki_types::Der;
     use serde_derive::{Deserialize, Serialize};
-    use tracing::Instrument;
     use crate::err::ParseErrs;
     use crate::kind::Specific;
     use crate::parse::{camel_case, camel_case_chars, some, CamelCase, Res};
     use crate::parse::util::Span;
     use crate::point::Point;
+    use crate::types;
     use crate::types::class::ClassKind;
     use crate::types::domain::DomainScope;
     use crate::types::parse::scoped;
@@ -50,15 +46,15 @@ pub(crate) mod private {
 
         fn category(&self) -> super::TypeCategory;
 
-        fn plus(self, scope: impl ToOwned<Owned=DomainScope>, specific: impl ToOwned<Owned=Specific>) -> Exact<Self> {
+        fn plus(self, scope: DomainScope, specific: Specific) -> Exact<Self> {
             Exact::scoped(scope,self,specific)
         }
 
-        fn parser<I>() -> impl Fn(I) -> Res<I,Self>+Copy where I:Span
-        {
-            move |input| camel_case_chars.parse_from_str().parse(input)
+        fn plus_specific(self, specific: Specific) -> Exact<Self> {
+            Exact::new(self, specific)
         }
 
+        fn parse<I>(input: I) -> Res<I, Self> where I: Span;
 
         fn type_kind(&self) -> TypeKind;
     }
@@ -71,12 +67,12 @@ pub(crate) mod private {
     }
 
     impl <K> Scoped<K> where K: Kind {
-       pub fn plus_specific(self, specific: Specific ) -> Exact<K> {
+       pub fn plus_specific(self, specific: Specific) -> Exact<K> {
            K::plus(self.item,self.scope,specific )
        }
     }
 
-    impl <I> Scoped<I> {
+    impl <I> Scoped<I> where I: Clone {
         pub fn new(scope: domain::DomainScope, item:I ) -> Self {
             Self{
                 scope,
@@ -89,7 +85,7 @@ pub(crate) mod private {
         }
     }
 
-    impl <I> Deref for Scoped<I> {
+    impl <I> Deref for Scoped<I> where I: Span {
         type Target = I;
 
         fn deref(&self) -> &Self::Target {
@@ -97,11 +93,14 @@ pub(crate) mod private {
         }
     }
 
+    /*
     impl <K> Into<K> for Scoped<K> where K: Kind {
         fn into(self) -> K {
             self.item
         }
     }
+
+     */
 
     impl Into<Specific> for Scoped<Specific> {
         fn into(self) -> Specific {
@@ -119,8 +118,6 @@ pub(crate) mod private {
         /// multiple type definition layers that are composited.
         /// Layers define inheritance in regular order.  The last
         /// layer is the [Type] of this [Meta] composite.
-        ///
-        ///
         defs: IndexMap<Specific,Layer>
     }
 
@@ -137,15 +134,15 @@ pub(crate) mod private {
         }
 
         pub fn typical(&self) -> impl Typical {
-            self.kind.clone().plus_specific(self.specific())
+            self.kind.clone().plus_specific(self.specific().clone())
         }
 
         pub fn to_type(&self) -> TypeKind {
             self.typical().into()
         }
 
-        pub fn describe(&self) -> &str{
-            format!("Meta definitions for type '{}'", self.typical()).as_str()
+        pub fn describe(&self) -> String {
+            format!("Meta definitions for type '{}'", self.typical())
         }
 
         pub fn kind(&self) -> & K{
@@ -157,19 +154,19 @@ pub(crate) mod private {
             self.defs.first().map(|(_,layer)| layer).unwrap()
         }
 
-        fn layer_by_index(&self, index: impl ToOwned<Owned=usize> ) -> Result<&Layer,err::TypeErr> {
-            self.defs.index(index.to_owned()).ok_or(err::TypeErr::meta_layer_index_out_of_bounds(self.kind.clone(), index, self.defs.len() ))
+        fn layer_by_index(&self, index: usize ) -> Result<&Layer,err::TypeErr> {
+             self.defs.get_index(index).ok_or(err::TypeErr::meta_layer_index_out_of_bounds(&self.kind.type_kind(), &index, self.defs.len() )).map(|(_,layer)|layer)
         }
 
-        fn layer_by_specific(&self, specific: impl ToOwned<Owned=Specific> ) -> Result<&Layer,err::TypeErr> {
-            self.defs.get(specific.borrow()).ok_or(err::TypeErr::specific_not_found(specific,self.describe()))
+        fn layer_by_specific(&self, specific: &Specific ) -> Result<&Layer,err::TypeErr> {
+            self.defs.get(&specific).ok_or(err::TypeErr::specific_not_found(specific.clone(),self.describe()))
         }
 
         pub fn specific(&self) -> & Specific  {
             &self.first().specific
         }
 
-        pub fn by_index<'x>(&self, index: &usize) -> Result<MetaLayerAccess<'x,K>,err::TypeErr> {
+        pub fn by_index<'x>(&self, index: usize) -> Result<MetaLayerAccess<'x,K>,err::TypeErr> {
             Ok(MetaLayerAccess::new(self, self.layer_by_index(index)?))
         }
 
@@ -184,7 +181,7 @@ pub(crate) mod private {
         defs: IndexMap<Specific,Layer>
     }
 
-    impl <T> MetaBuilder<T> where T: Typical{
+    impl <T> MetaBuilder<T> where T: Typical+types::private::Kind {
         pub fn new(typical: T) -> MetaBuilder<T>{
             Self {
                 typical,
@@ -223,8 +220,8 @@ pub(crate) mod private {
             }
         }
 
-        pub fn get_type(&'y self) -> Exact<K> {
-            self.meta.as_type()
+        pub fn get_type(&'y self) -> TypeKind {
+            self.meta.to_type()
         }
 
 
@@ -282,6 +279,7 @@ pub(crate) mod private {
         fn into(self) -> TypeKind {
             match self {
                 Exact { scope, kind, specific } => {
+                    let kind = kind.into();
                     TypeKind::from(kind)
                 }
             }
@@ -305,14 +303,14 @@ pub(crate) mod private {
 
     impl <K> Exact<K> where K: Kind
     {
-        pub fn new(kind: impl ToOwned<Owned=K>, specific: impl ToOwned<Owned=Specific>) -> Self {
-            Self::scoped(kind,specific,Default::default())
+        pub fn new(kind: K, specific: Specific) -> Self {
+            Self::scoped(Default::default(),kind,specific)
          }
 
-        pub fn scoped(scope: impl ToOwned<Owned=domain::DomainScope>,kind: impl ToOwned<Owned=K>, specific: impl ToOwned<Owned=Specific> ) -> Self {
-            let kind = kind.to_owned();
-            let specific = specific.to_owned();
-            let scope = scope.to_owned();
+        pub fn scoped(scope: DomainScope,kind: K, specific: Specific ) -> Self {
+            let kind = kind.into();
+            let specific = specific.into();
+            let scope = scope.into();
             Self {
                 kind,
                 specific,
@@ -320,10 +318,13 @@ pub(crate) mod private {
             }
         }
 
-        pub fn plus_scope(self, scope: impl ToOwned<Owned=domain::DomainScope>) -> Self {
-            Self::scoped(self.kind,self.specific,scope)
+        pub fn plus_scope(self, scope: DomainScope) -> Self {
+            Self::scoped(scope,self.kind,self.specific)
         }
 
+        pub fn plus_specific(self, specific: Specific ) -> Self {
+            Self::new(self.kind,specific)
+        }
 
         pub fn kind(&self) -> &K{
             &self.kind
@@ -352,8 +353,34 @@ pub enum TypeKind {
     Class(ClassKind),
 }
 
+impl TypeKind {
+    pub fn convention(&self) -> TypeConvention {
+        /// it so happens everything is CamelCase, but that may change...
+        TypeConvention::CamelCase
+    }
+}
 
+pub enum TypeConvention {
+    CamelCase,
+    SkewerCase
+}
 
+impl TypeConvention {
+    pub fn validate(&self, text: &str) -> Result<(),ParseErrs> {
+
+        /// transform from [Result<Whatever,ParseErrs>] -> [Result<(),ParseErrs?]
+        fn strip_ok<Ok,Err>( result: Result<Ok,Err>) -> Result<(), Err> {
+            result.map(|_|())
+        }
+
+        match self {
+            TypeConvention::CamelCase =>  strip_ok(CamelCase::from_str(text)),
+
+            TypeConvention::SkewerCase => strip_ok(SkewerCase::from_str(text))
+        }
+    }
+
+}
 
 impl Type {
     pub fn specific(&self) -> &Specific {
@@ -386,27 +413,29 @@ pub type DataPoint = PointTypeDef<Point, SchemaKind>;
 
 pub use schema::SchemaKind;
 use starlane_space::kind::Specific;
+use crate::err::ParseErrs;
+use crate::parse::{CamelCase, SkewerCase};
 use crate::point::Point;
 use crate::types::class::{Class, ClassKind};
 use crate::types::private::Kind;
 use crate::types::schema::Schema;
 
-
 pub mod parse {
     use std::str::FromStr;
     use ascii::AsciiChar::i;
+    use futures::FutureExt;
     use nom::branch::alt;
     use nom::combinator::opt;
     use nom::multi::{separated_list0, separated_list1};
-    use nom::Parser;
+    use nom::{IResult, Parser};
     use nom::sequence::{delimited, pair, terminated, tuple};
     use nom_supreme::parser_ext::FromStrParser;
     use nom_supreme::ParserExt;
     use nom_supreme::tag::complete::tag;
-    use crate::{err, types};
+    use crate::{err, parse, types};
     use crate::err::report::Report;
     use crate::kind::Specific;
-    use crate::parse::{camel_case, camel_case_chars, delim_kind, specific, Res, SpaceTree};
+    use crate::parse::{camel_case, camel_case_chars, delim_kind, specific, Res, NomErr, Domain};
     use crate::parse::util::{new_span, result, Span};
     use crate::types::private::{Exact, Kind, Scoped};
     use crate::types::{domain::parse::domain, SchemaKind, Type, TypeKind};
@@ -426,9 +455,13 @@ pub mod parse {
     }
 
      */
-    pub fn scoped<I,F,T>( f: F) -> impl Fn(I) -> Res<I,Scoped<T>> where I: Span, F: Fn(I) -> Res<I,T>+Copy {
+    pub fn scoped<I,F,R>( f: F) -> impl Fn(I) -> Res<I,Scoped<R>> where I: Span, F: Fn(I) -> Res<I,R>+Copy, R: Clone{
+
         move | input | {
-            pair(opt_def(terminated(domain, tag("::"))), f)(input).map(|(input,(scope,item))|(input, Scoped::new(scope, item)))
+            let parser =  |dom| terminated(domain, tag("::"))(dom);
+
+
+            pair(opt_def(parser), f)(input).map(|(input,(scope,item))|(input, Scoped::new(scope, item)))
         }
     }
 
@@ -438,15 +471,19 @@ pub mod parse {
         scoped(specific)(input)
     }
 
+    /*
     /// sprinkle in a `Specific` and let's get an `Exact`
-    pub fn exact<I,K>( specific: impl ToOwned<Owned=Specific>) -> impl Fn(I) -> Res<I,Exact<K>> where I: Span, K: Kind {
-        let specific = specific.to_owned();
-        scoped(K::parser).map(|(input,scoped):(I,Scoped<K>)|(input,scoped.plus_specific(specific)))
-    }
-    /// scan `opt(f) -> Option<D>`  then [Option::unwrap_or_default]  to generate a [D::default] value
-    pub fn opt_def<I,F,D>(f: F ) -> impl Fn(I) -> Res<I,D> where I: Span, F: Fn(I) -> Res<I,D>+Copy, D: Default {
+    pub fn exact<I,K,F>( specific: F ) -> impl Fn(I) -> Res<I,Exact<K>> where I: Span, K: Kind, F: Fn() -> Specific+Copy {
         move | input |  {
-            opt(f)(input).map(|(input,opt)|opt.unwrap_or_default())
+            scoped(K::parse)(input).map(|(next,scoped)|(next,scoped.plus_specific(specific())))
+        }
+    }
+
+     */
+    /// scan `opt(f) -> Option<D>`  then [Option::unwrap_or_default]  to generate a [D::default] value
+    pub fn opt_def<I,F,D>(f: F ) -> impl Fn(I) -> Res<I,D> where I: Span, F: FnMut(I) -> Res<I,D>+Copy, D: Default {
+        move | input |  {
+            opt(f)(input).map(|(next,opt)|(next,opt.unwrap_or_default()))
         }
     }
 
@@ -454,7 +491,7 @@ pub mod parse {
         camel_case_chars.parse_from_str().parse(input)
     }
 
-    pub fn type_kind<I>( input: I)  -> Res<I,TypeKind> where I: Span {
+    pub fn type_kind<I>( input: I) -> Res<I,TypeKind> where I: Span {
         alt((class_kind, schema_kind))(input).map(into)
     }
 

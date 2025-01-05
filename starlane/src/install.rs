@@ -14,7 +14,7 @@ use console::style;
 use lerp::Lerp;
 use serde::Serialize;
 use starlane_base::env;
-use starlane_base::starlane::StarlaneConfig;
+use starlane::starlane::StarlaneConfig;
 use starlane_hyperspace::shutdown::shutdown;
 use starlane_space::particle::Status;
 use std::fmt::Display;

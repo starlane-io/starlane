@@ -1,6 +1,6 @@
 use crate::err::{ParseErrs, PrintErr};
 use crate::loc::Variable;
-use crate::parse::{ErrCtx, SpaceTree, VarCase};
+use crate::parse::{ErrCtx, NomErr, VarCase};
 use core::fmt::Display;
 use nom::character::complete::multispace0;
 use nom::error::{ErrorKind, ParseError};
@@ -915,7 +915,7 @@ where
     move |input: I| delimited(multispace0, f, multispace0)(input)
 }
 
-pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<SpaceTree<I>>>) -> Result<R, ParseErrs> {
+pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<NomErr<I>>>) -> Result<R, ParseErrs> {
     match result {
         Ok((_, e)) => Ok(e),
         Err(nom::Err::Error(err)) => Result::Err(err.into()),
@@ -973,15 +973,15 @@ where
     result
 }
 
-pub fn print<I>(err: &SpaceTree<I>)
+pub fn print<I>(err: &NomErr<I>)
 where
     I: Span,
 {
     match err {
-        SpaceTree::Base { .. } => {
+        NomErr::Base { .. } => {
             println!("BASE!");
         }
-        SpaceTree::Stack { base, contexts } => {
+        NomErr::Stack { base, contexts } => {
             println!("STACK!");
             let mut contexts = contexts.clone();
             contexts.reverse();
@@ -1007,7 +1007,7 @@ where
                 }
             }
         }
-        SpaceTree::Alt(_) => {
+        NomErr::Alt(_) => {
             println!("ALT!");
         }
     }
@@ -1026,3 +1026,5 @@ where
         second.parse(input)
     }
 }
+
+

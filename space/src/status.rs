@@ -685,6 +685,9 @@ pub mod test {
         }
         impl Entity for Mock {
             type DerefTarget = String;
+            fn deref_target(&self) -> &Self::DerefTarget {
+                &self.value
+             }
         }
 
         impl Default for Mock {
@@ -703,14 +706,10 @@ pub mod test {
             }
         }
 
-        impl Entity for Mock {
-            type DerefTarget = ();
-        }
-
         let mock = Mock::default();
 
         let handle = Handle::mock(mock);
 
-        assert_eq!(handle.as_str(), value);
+        assert_eq!(handle.deref(), value);
     }
 }

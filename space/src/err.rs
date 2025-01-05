@@ -29,7 +29,7 @@ use crate::substance::{Substance, SubstanceErr, SubstanceKind};
 use crate::wave::core::http2::StatusCode;
 use crate::wave::core::{Method, ReflectedCore};
 use serde::{Deserialize, Serialize};
-use starlane_space::parse::SpaceTree;
+use starlane_space::parse::NomErr;
 use starlane_space::status;
 use strum::{IntoEnumIterator, ParseError};
 use thiserror::Error;

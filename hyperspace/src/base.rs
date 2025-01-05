@@ -25,19 +25,30 @@ use std::str::FromStr;
 use std::sync::Arc;
 use starlane_space::progress::Progress;
 use starlane_space::status;
-use starlane_space::status::{Status, StatusReporter, StatusWatcher};
+use starlane_space::status::{Entity, EntityReadier, Status, StatusProbe, StatusReporter, StatusResult, StatusWatcher};
+use err::BaseErr;
+use crate::base::config::{BaseSubConfig, FoundationConfig, ProviderConfig};
+use crate::base::provider::context::FoundationContext;
 
+pub trait BaseSub: Send + Sync {
+   type Config: config::BaseSubConfig<Kind:kinds::Kind>+?Sized;
+
+   fn kind(&self) -> &<Self::Config as BaseSubConfig>::Kind {
+       self.config().kind()
+   }
+
+   fn config(&self) -> & Self::Config;
+}
 
 #[async_trait]
-pub trait Platform: Send + Sync + Sized + Clone
+pub trait Platform: BaseSub<Config:PlatformConfig> + Sized + Clone
 where Self: 'static,
 {
     type Err: std::error::Error + Send + Sync + From<anyhow::Error>+?Sized;
     type StarAuth: HyperAuthenticator+?Sized;
     type RemoteStarConnectionFactory: HyperwayEndpointFactory+Sized;
-    type Foundation: Foundation<ProviderKind:kinds::ProviderKind>+?Sized;
+    type Foundation: Foundation<>;
     type ProviderKind: kinds::ProviderKind+?Sized;
-    type Config: PlatformConfig;
 
     fn config(&self) -> &Self::Config;
 
@@ -217,10 +228,9 @@ impl Default for Settings {
     }
 }
 
-pub trait PlatformConfig: Clone + Send + Sync
+pub trait PlatformConfig: BaseSubConfig<Kind:kinds::PlatformKind>
 {
-    /// a registry is requirede
-    type RegistryConfig: RegistryConfig;
+    type RegistryConfig: RegistryConfig+?Sized;
 
     fn can_scorch(&self) -> bool;
     fn can_nuke(&self) -> bool;
@@ -234,40 +244,28 @@ pub trait PlatformConfig: Clone + Send + Sync
 
 
 
-#[async_trait]
-pub trait Foundation: Sync + Send {
+#[async_trait ]
+pub trait Foundation: BaseSub<Config:FoundationConfig> {
+    fn status(&self) -> StatusResult {
+        self.status_watcher().borrow().clone()
+    }
+    async fn status_detail(&self) -> status::StatusDetail;
 
-
-    /// [crate::Foundation::Config] should be a `concrete` implementation of [config::FoundationConfig]
-    type Config: config::FoundationConfig + ?Sized;
-
-
-
-    /// [crate::Foundation::Provider] Should be [Provider] or a custom `trait` that implements [Provider]
-    type Provider: Provider+ ?Sized;
-
-    type ProviderKind: kinds::ProviderKind+?Sized;
-    /// a
-    fn kind(&self) -> FoundationKind;
-
-    fn config(&self) -> Arc<Self::Config>;
-
-    fn status(&self) -> status::Status;
-
-    async fn status_detail(&self) -> Result<status::StatusDetail, err::BaseErr>;
-
-    fn status_watcher(&self) -> StatusWatcher;
+    fn status_watcher(&self) -> &StatusWatcher;
 
     /// [crate::Foundation::probe] synchronize [crate::Foundation]'s model from that of the external services
     /// and return a [Status].  [crate::Foundation::probe] should also rebuild the [Provider][StatusDetail]
     /// model and update [StatusReporter]
-    async fn probe(&self) -> Status;
+    async fn probe(&self) -> StatusResult;
 
     /// Take action to bring this [crate::Foundation] to [Status::Ready] if not already. A [crate::Foundation]
     /// is considered ready when all [Provider] dependencies are [Status::Ready].
-    async fn ready(&self, progress: Progress) -> Result<(), BaseErr>;
+    async fn ready(&self, progress: Progress) -> StatusResult;
 
-    /// Returns a [Provider] implementation which
-    fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<Self::Provider>>, BaseErr>;
-
+    /// Returns a [Provider] by this [Foundation]
+    fn provider(&self, kind: &<Self::Config as BaseSubConfig>::Kind) -> Result<Option<Box<<Self::Config as FoundationConfig>::Provider>>, BaseErr>;
 }
+
+
+
+
