@@ -1,5 +1,7 @@
 use std::fmt::Display;
 use std::str::FromStr;
+use derive_name::Name;
+use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 
 pub mod class;
@@ -146,12 +148,24 @@ pub enum TagWrap<S,T> {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 use crate::err::ParseErrs;
 use crate::parse::{CamelCase, Res, SkewerCase};
 use crate::point::Point;
-use crate::types::private::Generic;
+use crate::types::private::{Generic, Super};
 pub use schema::Schema;
 use specific::Specific;
+use starlane_space::types::private::Variant;
 use crate::parse::util::Span;
 use crate::types::class::Class;
 use crate::types::scope::Scope;
@@ -300,11 +314,15 @@ pub(crate) mod private {
     use std::hash::Hash;
     use std::ops::{Deref, DerefMut};
     use std::str::FromStr;
+    use std::sync::Arc;
     use derive_name::Name;
+    use strum_macros::EnumDiscriminants;
 
     pub(crate) trait Generic: Name+Clone+Eq+PartialEq+Hash+Into<Abstract>+Clone+FromStr<Err=ParseErrs>{
 
         type Abstract;
+
+        type Discriminant;
 
         fn discriminant(&self) -> super::AbstractDiscriminant;
 
@@ -312,20 +330,65 @@ pub(crate) mod private {
             GenericExact::scoped(scope, self, specific)
         }
 
-
         fn plus_specific(self, specific: Specific) -> GenericExact<Self>{
             GenericExact::new(self, specific)
         }
 
-        /*
-        fn scoped(self, scope: &Scope) -> Scoped<Self> {
-            Scoped::new(self, scope)
-        }
-
-         */
-
         fn parse<I>(input: I) -> Res<I, Self> where I: Span;
     }
+
+    /// [Variant] implies inheritance from a
+    pub(crate) trait Variant {
+        /// the base [Abstract] variant [Class] or [Schema]
+        type Root: Generic+?Sized;
+
+        /// return the parent which may be another [Variant] or
+        /// the base level [Abstract]
+        fn parent(&self) -> Super<Self::Root>;
+
+        fn root(&self) -> Self::Root {
+            match self.parent() {
+                Super::Root(root) => root,
+                Super::Super(s) => s.root()
+            }
+        }
+    }
+
+
+    /// [Member] of a [Group] for scoping purposes
+    pub(crate) trait Member {
+        fn group(&self) -> Group;
+
+        fn root(&self) -> Abstract {
+            match self.group() {
+                Group::Root(root) => root,
+                Group::Parent(s) => s.root(),
+            }
+        }
+    }
+
+    #[derive(EnumDiscriminants,strum_macros::Display)]
+    #[strum_discriminants(vis(pub))]
+    #[strum_discriminants(name(SuperDiscriminant))]
+    #[strum_discriminants(derive( Hash, strum_macros::EnumString, strum_macros::ToString, strum_macros::IntoStaticStr ))]
+    pub enum Super<A> where A: Generic+?Sized {
+        /// the `root` [Abstract] variant [Generic] that a [Variant] derives from.
+        Root(A),
+        /// the `super` [Variant] of this [Variant] (which is not a `root`)
+        Super(Box<dyn Variant<Root=A>>),
+    }
+
+    #[derive(EnumDiscriminants,strum_macros::Display)]
+    #[strum_discriminants(vis(pub))]
+    #[strum_discriminants(name(GroupDiscriminant))]
+    #[strum_discriminants(derive( Hash, strum_macros::EnumString, strum_macros::ToString, strum_macros::IntoStaticStr ))]
+    pub enum Group {
+        /// the `root` group must be an [Abstract]
+        Root(Abstract),
+        /// parent
+        Parent(Box<dyn Member>),
+    }
+
 
 
     /*

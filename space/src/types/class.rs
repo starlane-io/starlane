@@ -12,6 +12,7 @@ use starlane_space::parse::from_camel;
 use crate::parse::{camel_case, camel_chars, CamelCase, NomErr, Res};
 use crate::parse::util::Span;
 use crate::point::Point;
+use crate::types::class::service::Service;
 use crate::types::schema::SchemaDiscriminant;
 use crate::types::specific::Specific;
 
@@ -27,6 +28,7 @@ use crate::types::specific::Specific;
 #[non_exhaustive]
 pub enum Class {
     Root,
+    Service(Service),
     Platform,
     Foundation,
     /// Dependencies are external bits that can be downloaded and added to a Starlane instance.
@@ -51,7 +53,6 @@ pub enum Class {
     /// for any number of other Classes that it provides
     Guest,
     Plugin,
-    Service,
     Global,
     Registry,
     Star,
@@ -69,8 +70,68 @@ pub enum Class {
     FileStore,
     Directory,
     File,
+    /// Ext variants are not supported ....
     #[strum(to_string = "{0}")]
     _Ext(CamelCase),
+}
+
+pub mod service {
+    use derive_name::Name;
+    use serde_derive::{Deserialize, Serialize};
+    use strum_macros::EnumDiscriminants;
+    use starlane_space::types::private::Variant;
+    use crate::parse::CamelCase;
+    use crate::types::Abstract;
+    use crate::types::class::{Class, ClassDiscriminant};
+    use crate::types::private::Super;
+
+    /// variants for [super::Class::Service]
+    #[derive(
+        Clone,
+        Debug,
+        Eq,
+        PartialEq,
+        Hash,
+        EnumDiscriminants,
+        strum_macros::Display,
+        Serialize,
+        Deserialize,
+        Name
+    )]
+    #[strum_discriminants(vis(pub))]
+    #[strum_discriminants(name(Discriminant))]
+    #[strum_discriminants(derive(
+        Hash,
+        strum_macros::EnumString,
+        strum_macros::ToString,
+        strum_macros::IntoStaticStr
+    ))]
+    #[non_exhaustive]
+    pub enum Service {
+        /// an external facing web service such as `Nginx`
+        Web,
+        /// a ref to a `Database Cluster` that serves [super::Class::Database] instances... NOT the same as
+        Database,
+        /// example: a `KeyCloak` instance which provides [super::Class::UserBase] which
+        /// are instances of `KeyCloak Realms`
+        UserBase,
+    }
+
+    impl Into<Class> for Service {
+        fn into(self) -> Class{
+            Class::Service(self)
+        }
+    }
+
+
+    impl Variant for Service {
+        type Root = Class;
+
+        fn parent(&self) -> Super<Self::Root> {
+            Super::Root(self.clone().into())
+        }
+    }
+
 }
 
 
@@ -90,6 +151,7 @@ impl TryFrom<ClassDiscriminant> for Class {
 
 impl private::Generic for Class {
     type Abstract = Class;
+    type Discriminant =ClassDiscriminant;
 
     fn discriminant(&self) -> AbstractDiscriminant {
         AbstractDiscriminant::Class

@@ -1,10 +1,18 @@
 use crate::parse::SkewerCase;
 use crate::point;
+use crate::types::specific::Specific;
 
 #[non_exhaustive]
 pub enum VersionTag{
+    /// magically derive the version in this order:
+    /// 1. [VersionTag::Using] (if set)
+    /// 2. [VersionTag::Latest] use the latest
+    Default,
+    /// the global version number for [Specific]
+    Using,
     /// reference the latest version...
     Latest,
+
     /// custom [VersionTag] defined in the registry
     _Ext(SkewerCase)
 }
@@ -15,6 +23,7 @@ pub enum RouteTag{
     Hub,
 }
 
+#[non_exhaustive]
 pub enum PointTag {
     _Ext(point::PointSeg),
 }

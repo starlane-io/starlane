@@ -45,9 +45,10 @@ impl Into<TypeKind> for SchemaKind {
 
 impl Generic for Schema {
     type Abstract = Schema;
+    type Discriminant = SchemaDiscriminant;
 
-    fn discriminant(&self) -> AbstractDiscriminant {
-        AbstractDiscriminant::Schema
+    fn discriminant(&self) -> super::AbstractDiscriminant {
+        self.clone().into()
     }
 
     fn parse<I>(input: I) -> Res<I, Self>
