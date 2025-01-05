@@ -12,7 +12,7 @@ use starlane_space::types::PointKindDefSrc;
 use crate::parse::{camel_case, CamelCase, Res};
 use crate::parse::util::Span;
 use crate::types::class::{Class, ClassDiscriminant};
-use crate::types::private::Generic;
+use crate::types::private::{Delimited, Generic};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display, Serialize,Deserialize,Name)]
 #[strum_discriminants(vis(pub))]
@@ -41,6 +41,11 @@ impl Into<TypeKind> for SchemaKind {
 }
 
  */
+impl Delimited for Schema {
+    fn type_delimiters() -> (&'static str, &'static str) {
+        ("[","]")
+    }
+}
 
 
 impl Generic for Schema {

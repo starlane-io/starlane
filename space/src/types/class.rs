@@ -13,10 +13,11 @@ use crate::parse::{camel_case, camel_chars, CamelCase, NomErr, Res};
 use crate::parse::util::Span;
 use crate::point::Point;
 use crate::types::class::service::Service;
+use crate::types::private::Delimited;
 use crate::types::schema::SchemaDiscriminant;
 use crate::types::specific::Specific;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name)]
+#[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ClassDiscriminant))]
 #[strum_discriminants(derive(
@@ -146,6 +147,13 @@ impl TryFrom<ClassDiscriminant> for Class {
             /// developer messed up
             source=> Ok(Self::_Ext(CamelCase::from_str(source.to_string().as_str()).unwrap()))
         }
+    }
+}
+
+
+impl Delimited for Class {
+    fn type_delimiters() -> (&'static str, &'static str) {
+        ("<",">")
     }
 }
 
