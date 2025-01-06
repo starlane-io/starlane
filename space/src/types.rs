@@ -19,6 +19,8 @@ pub mod tag;
 pub mod parse;
 #[cfg(test)]
 pub mod test;
+pub mod exact;
+
 //pub(crate) trait Typical: Display+Into<TypeKind>+Into<Type> { }
 
 
@@ -46,6 +48,8 @@ impl <A> From<GenericExact<A>> for Exact where A: Generic {
         Exact::scoped(from.scope,from.r#abstract.into(),from.specific)
     }
 }
+
+
 pub type Exact = ExactGen<Scope,Abstract,Specific>;
 
 pub type ExactClass = GenericExact<Class>;
