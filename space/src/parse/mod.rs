@@ -5013,6 +5013,11 @@ pub mod model {
     }
 
     impl NestedBlockKind {
+
+        pub fn wrap(&self, string: String  ) -> String {
+            format!("{}{}{}", self.open(), string, self.close()).to_string()
+        }
+
         pub fn is_block_terminator(c: char) -> bool {
             match c {
                 '}' => true,

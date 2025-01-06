@@ -55,6 +55,10 @@ impl Generic for Schema {
     fn parser() -> impl Parsers<Output=Self, Variant=Self::Segment> {
         SchemaParsers::new()
     }
+
+    fn block_kind() -> NestedBlockKind {
+        NestedBlockKind::Square
+    }
 }
 
 struct SchemaParsers;
@@ -76,6 +80,10 @@ impl Parsers for SchemaParsers {
     {
         let (next,segment) = Self::segment(input)?;
         Ok((next,Self::Discriminant::from_str(segment.as_str()).unwrap_or_else(|_| Self::Discriminant::_Ext)))
+    }
+
+    fn block_kind() -> NestedBlockKind {
+        NestedBlockKind::Square
     }
     /*
     fn discriminant<I>(&self) -> impl FnMut(I) -> Res<I, Self::Discriminant>

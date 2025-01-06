@@ -101,6 +101,9 @@ impl Generic for Class {
         ClassParsers::new()
     }
 
+    fn block_kind() -> NestedBlockKind {
+        NestedBlockKind::Angle
+    }
 }
 
 
@@ -156,6 +159,9 @@ impl Parsers for ClassParsers {
         }
     }
 
+    fn block_kind() -> NestedBlockKind {
+        NestedBlockKind::Angle
+    }
 }
 
 

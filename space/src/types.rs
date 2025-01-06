@@ -205,8 +205,9 @@ pub(crate) mod private {
     use nom::sequence::{delimited, pair};
     use nom_supreme::ParserExt;
     use strum_macros::EnumDiscriminants;
+    use crate::parse::model::{BlockKind, NestedBlockKind};
 
-    pub(crate) trait Generic: Name+Clone+Into<Abstract>+Clone+FromStr{
+    pub(crate) trait Generic: Name+Clone+Into<Abstract>+Clone+FromStr+Display{
 
         type Abstract;
 
@@ -242,6 +243,20 @@ pub(crate) mod private {
             Self::parser().parse(input)
         }
 
+
+        fn block_kind() -> NestedBlockKind;
+
+
+
+        /// wrap the string value in it's `type` wrapper.
+        ///
+        /// for example:  [Class::to_string] for [Class::Database] would `Database`, or a variant like
+        /// [Class::Service(Service::Database)] to_string would return `Service<Database>` and
+        /// [Class::wrapped_string] would return `<Database>` and `<Service<Database>` respectively
+        fn wrapped_string(&self) -> String {
+            Self::block_kind().wrap(self.to_string())
+        }
+
     }
 
 
@@ -256,6 +271,9 @@ pub(crate) mod private {
         fn discriminant<I>(input:I) -> Res<I, Self::Discriminant>
         where
             I: Span;
+
+
+        fn block_kind() -> NestedBlockKind;
 
         fn block<I,F,O>(f: F) -> impl FnMut(I) -> Res<I, O> where F: FnMut(I) -> Res<I,O>+Copy, I: Span;
 
