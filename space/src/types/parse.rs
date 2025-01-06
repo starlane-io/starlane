@@ -39,34 +39,7 @@ where
 
 
 
-/*
-fn into<I,O>((input,kind):(I,impl Into<O>)) -> (I,O) {
-    (input.into(),kind.into())
-}
 
- */
-
-
-/*
-pub fn r#abstract<I, P>(input: I) -> Res<I, P::Output>
-where
-    P: Parsers,
-    I: Span,
-{
-
-    let (next, (disc, variant)) = pair(P::discriminant, opt(P::segment))(input.clone())?;
-    let output = match variant {
-        None => P::Output::try_from(disc).map_err(|err|NomErr::from_external_error(input,ErrorKind::Fail,err))?,
-        Some(variant) => {
-            P::variant(disc,variant).map_err(|err|NomErr::from_external_error(input,ErrorKind::Fail,err))?
-        }
-    };
-
-
-    Ok((next, output))
-}
-
- */
 
 
 

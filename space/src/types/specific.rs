@@ -5,13 +5,14 @@ use indexmap::Equivalent;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::loc::Version;
 use starlane_space::selector::Pattern;
-use crate::parse::{Domain, SkewerCase};
+use crate::parse::{Domain, Res, SkewerCase};
+use crate::parse::util::Span;
 use crate::selector::VersionReq;
 use crate::types::class::{Class, ClassDef};
+use crate::types::Schema;
 use crate::types::scope::Scope;
-use crate::types::{Schema, TagWrap};
 use crate::types::schema::SchemaDef;
-use crate::types::tag::VersionTag;
+use crate::types::tag::{TagWrap, VersionTag};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct MetaDefs;
@@ -42,9 +43,13 @@ pub type Defs<A,D>  = HashMap<A,D>;
 pub type ClassDefs = Defs<Class,ClassDef>;
 pub type SchemaDefs = Defs<Schema,SchemaDef>;
 
-
 pub type Specific = SpecificGen<Contributor,Package,Version>;
 
+impl Specific {
+    pub fn parse<I>(input: I) -> Res<I,Self> where I: Span {
+        parse::specific(input)
+    }
+}
 
 impl Equivalent<Specific> for &Specific {
     fn equivalent(&self, specific: &Specific) -> bool {
@@ -54,6 +59,10 @@ impl Equivalent<Specific> for &Specific {
 
 
 pub type SpecificCtx = SpecificGen<Contributor,Package,TagWrap<Version,VersionTag>>;
+
+impl SpecificCtx {
+}
+
 pub type Contributor = Domain;
 pub type Package = SkewerCase;
 
@@ -79,6 +88,12 @@ impl <Contributor,Package,Version> SpecificGen<Contributor,Package,Version> {
 }
 
 pub type SpecificSelector = SpecificGen<ContributorSelector,PackageSelector,VersionPattern>;
+
+impl SpecificSelector {
+    pub fn parse<I>(input: I) -> Res<I,Self> where I: Span {
+        parse::specific_selector(input)
+    }
+}
 
 pub type ContributorSelector = Pattern<Contributor>;
 pub type PackageSelector = Pattern<Package>;
@@ -112,7 +127,28 @@ pub(crate) mod parse {
         specific_gen(contributor, package, version, input)
     }
 
+
+    pub fn specific_ctx<I>(input: I) -> Res<I, Specific> where I: Span {
+        specific_gen(contributor, package, version, input)
+    }
+
+
     pub fn specific_selector<I: Span>(input: I) -> Res<I, SpecificSelector> {
         specific_gen(pattern(contributor), pattern(package), pattern(version_req), input)
     }
+
+
+
+
+
+    #[cfg(test)]
+    pub mod test {
+
+        #[test]
+        pub fn test_specific_gen() {
+
+        }
+
+    }
+
 }

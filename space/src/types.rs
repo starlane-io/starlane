@@ -148,17 +148,7 @@ pub enum DefSrc {
 }
 
 
-/// tag identifier [Tag::id] and `type`
-pub struct Tag<T> {
-    id: SkewerCase,
-    r#type: T
-}
 
-/// wraps a generic `segment` with a potential [Tag<T>]
-pub enum TagWrap<S,T> {
-   Tag(Tag<T>),
-   Segment(S)
-}
 
 
 
