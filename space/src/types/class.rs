@@ -1,4 +1,4 @@
-use crate::types::{private, DataPoint, Exact, Abstract, ExactGen};
+use crate::types::{private, DataPoint, Exact, Abstract, ExactGen, Case};
 use crate::types::AbstractDiscriminant;
 use core::str::FromStr;
 use std::borrow::Borrow;
@@ -13,9 +13,6 @@ use crate::parse::{camel_case, camel_chars, CamelCase, NomErr, Res};
 use crate::parse::util::Span;
 use crate::point::Point;
 use crate::types::class::service::Service;
-use crate::types::private::Delimited;
-use crate::types::schema::SchemaDiscriminant;
-use crate::types::specific::Specific;
 
 #[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
 #[strum_discriminants(vis(pub))]
@@ -155,11 +152,7 @@ pub mod service {
 
 
 
-impl Delimited for Class {
-    fn type_delimiters() -> (&'static str, &'static str) {
-        ("<",">")
-    }
-}
+
 
 impl private::Generic for Class {
     type Abstract = Class;
@@ -175,6 +168,14 @@ impl private::Generic for Class {
         I: Span
     {
         from_camel(input)
+    }
+
+    fn delimiters() -> (&'static str, &'static str) {
+        ("<",">")
+    }
+
+    fn convention() -> Case {
+        Case::CamelCase
     }
 }
 

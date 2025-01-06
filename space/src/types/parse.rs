@@ -11,7 +11,6 @@ use nom_supreme::ParserExt;
 use starlane_space::parse::from_camel;
 use std::str::FromStr;
 use nom::sequence::pair;
-use starlane_space::types::private::Delimited;
 use crate::types::parse::delim::{angles, delim};
 
 pub mod case {
@@ -52,6 +51,19 @@ fn into<I,O>((input,kind):(I,impl Into<O>)) -> (I,O) {
 
  */
 
+pub fn abstract_gen<I,A,C>(input: I) -> Res<I, Class> where A: Generic, I: Span, C: Into<A> {
+    let (next,(base,variant)) = pair(camel_case,opt(angles(camel_case)))(input.clone())?;
+
+    let class = match variant {
+        None => From::from(base),
+        Some(variant) => {
+            Class::from_variant(base,variant).map_err(|e|nom::Err::Failure(e.to_nom(input)))?
+        }
+    };
+
+    Ok((next, class))
+}
+
 pub fn class<I: Span>(input: I) -> Res<I, Class> {
     let (next,(base,variant)) = pair(camel_case,opt(angles(camel_case)))(input.clone())?;
         let class = match variant {
@@ -80,7 +92,6 @@ pub mod delim {
     use crate::types::private::Generic;
     use nom::sequence::delimited;
     use nom_supreme::tag::complete::tag;
-    use starlane_space::types::private::Delimited;
     use crate::types::class::{Class, ClassDiscriminant};
     use crate::types::class::service::Service;
     use crate::types::parse::{class, schema};
@@ -100,7 +111,7 @@ pub mod delim {
     where
         I: Span,
         F: FnMut(I) -> Res<I, O> + Copy,
-        O: Delimited
+        O: Generic,
     {
         fn tags<I>(
             (open, close): (&'static str, &'static str),
@@ -108,7 +119,7 @@ pub mod delim {
             (tag(open), tag(close))
         }
 
-        let (open, close) = tags(O::type_delimiters());
+        let (open, close) = tags(O::delimiters());
         delimited(open, f, close)
     }
 

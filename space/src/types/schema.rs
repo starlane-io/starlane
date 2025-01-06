@@ -1,4 +1,4 @@
-use crate::types::{private, AbstractDiscriminant, SrcDef, Abstract, Exact, ExactGen};
+use crate::types::{private, AbstractDiscriminant, SrcDef, Abstract, Exact, ExactGen, Case};
 use core::str::FromStr;
 use derive_name::Name;
 use rustls::client::verify_server_cert_signed_by_trust_anchor;
@@ -12,7 +12,7 @@ use starlane_space::types::PointKindDefSrc;
 use crate::parse::{camel_case, CamelCase, Res};
 use crate::parse::util::Span;
 use crate::types::class::{Class, ClassDiscriminant};
-use crate::types::private::{Delimited, Generic};
+use crate::types::private::Generic;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::EnumString, strum_macros::Display, Serialize,Deserialize,Name)]
 #[strum_discriminants(vis(pub))]
@@ -42,11 +42,6 @@ impl Into<TypeKind> for SchemaKind {
 }
 
  */
-impl Delimited for Schema {
-    fn type_delimiters() -> (&'static str, &'static str) {
-        ("[","]")
-    }
-}
 
 
 impl Generic for Schema {
@@ -64,6 +59,13 @@ impl Generic for Schema {
         schema(input)
     }
 
+    fn delimiters() -> (&'static str, &'static str) {
+        ("[","]")
+    }
+
+    fn convention() -> Case {
+        Case::CamelCase
+    }
 }
 
 /*

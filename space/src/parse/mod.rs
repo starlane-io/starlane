@@ -1535,6 +1535,11 @@ impl CamelCase {
     pub fn as_str(&self) -> &str {
         self.string.as_str()
     }
+
+    pub fn parser<I,O>(input:I) -> Res<I,O> where I: Span, O: From<CamelCase>{
+        into(camel_case)(input)
+    }
+
 }
 
 impl FromStr for CamelCase {
@@ -1645,6 +1650,12 @@ impl Deref for Domain {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct SkewerCase {
     string: String,
+}
+
+impl SkewerCase {
+    pub fn parser<I,O>(input:I) -> Res<I,O> where I: Span, O: From<SkewerCase>{
+        into(skewer_case)(input)
+    }
 }
 
 pub struct SnakeCase {

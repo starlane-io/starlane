@@ -81,18 +81,18 @@ impl From<Schema> for Abstract {
 }
 
 impl Abstract {
-    pub fn convention(&self) -> Convention {
+    pub fn convention(&self) -> Case {
         /// it so happens everything is CamelCase, but that may change...
-        Convention::CamelCase
+        Case::CamelCase
     }
 }
 
-pub enum Convention {
+pub enum Case {
     CamelCase,
     SkewerCase
 }
 
-impl Convention {
+impl Case {
     pub fn validate(&self, text: &str) -> Result<(),ParseErrs> {
 
         /// transform from [Result<Whatever,ParseErrs>] -> [Result<(),ParseErrs?]
@@ -101,11 +101,22 @@ impl Convention {
         }
 
         match self {
-            Convention::CamelCase =>  strip_ok(CamelCase::from_str(text)),
+            Case::CamelCase =>  strip_ok(CamelCase::from_str(text)),
 
-            Convention::SkewerCase => strip_ok(SkewerCase::from_str(text))
+            Case::SkewerCase => strip_ok(SkewerCase::from_str(text))
         }
     }
+
+    /*
+    pub fn parser<I,O>(&self) -> impl Fn(I) -> Res<I,O> where I: Span {
+        match self {
+            Case::CamelCase => CamelCase::parser,
+            Case::SkewerCase => SkewerCase::parser,
+        }
+    }
+
+     */
+
 }
 
 
@@ -175,7 +186,7 @@ use crate::types::scope::Scope;
 
 
 pub(crate) mod private {
-    use super::{err, Abstract, GenericExact, Exact, ExactGen, Schema};
+    use super::{err, Abstract, GenericExact, Exact, ExactGen, Schema, Case};
     use crate::err::ParseErrs;
     use super::specific::Specific;
     use crate::parse::util::Span;
@@ -196,7 +207,7 @@ pub(crate) mod private {
     use derive_name::Name;
     use strum_macros::EnumDiscriminants;
 
-    pub(crate) trait Generic: Name+Clone+Into<Abstract>+Clone+FromStr+Delimited{
+    pub(crate) trait Generic: Name+Clone+Into<Abstract>+Clone+FromStr{
 
         type Abstract;
 
@@ -214,11 +225,12 @@ pub(crate) mod private {
         }
 
         fn parse<I>(input: I) -> Res<I, Self> where I: Span;
+
+        fn delimiters() -> (&'static str, &'static str);
+
+        fn convention() -> Case;
     }
 
-    pub trait Delimited {
-       fn type_delimiters() -> (&'static str, &'static str);
-    }
 
     /// [Variant] implies inheritance from a
     pub(crate) trait Variant {
