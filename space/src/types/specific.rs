@@ -61,6 +61,9 @@ impl Equivalent<Specific> for &Specific {
 pub type SpecificCtx = SpecificGen<Contributor,Package,TagWrap<Version,VersionTag>>;
 
 impl SpecificCtx {
+    pub fn parse<I>(input: I) -> Res<I,Self> where I: Span {
+        parse::specific_ctx(input)
+    }
 }
 
 pub type Contributor = Domain;
@@ -97,17 +100,19 @@ impl SpecificSelector {
 
 pub type ContributorSelector = Pattern<Contributor>;
 pub type PackageSelector = Pattern<Package>;
-pub type VersionPattern = Pattern<VersionReq>;
+pub type VersionPattern = TagWrap<Pattern<VersionReq>,VersionTag>;
 
 pub(crate) mod parse {
     use nom::sequence::tuple;
     use nom_supreme::tag::complete::tag;
-    use super::{Specific, SpecificGen};
+    use starlane_space::types::tag::VersionTag;
+    use super::{Specific, SpecificCtx, SpecificGen};
     use crate::parse::{pattern, version_req, Res};
     use crate::parse::util::Span;
     use crate::parse::domain as contributor;
     use crate::parse::skewer_case as package;
     use crate::parse::version as version;
+    use crate::types::tag::AbstractTag;
     use super::SpecificSelector;
 
     /// parse the general structure of a [Specific] including: [SpecificSelector]...
@@ -128,24 +133,30 @@ pub(crate) mod parse {
     }
 
 
-    pub fn specific_ctx<I>(input: I) -> Res<I, Specific> where I: Span {
-        specific_gen(contributor, package, version, input)
+    pub fn specific_ctx<I>(input: I) -> Res<I, SpecificCtx> where I: Span {
+        specific_gen(contributor, package, VersionTag::wrap(version), input)
     }
 
 
     pub fn specific_selector<I: Span>(input: I) -> Res<I, SpecificSelector> {
-        specific_gen(pattern(contributor), pattern(package), pattern(version_req), input)
+        specific_gen(pattern(contributor), pattern(package), VersionTag::wrap(pattern(version_req)), input)
     }
-
-
 
 
 
     #[cfg(test)]
     pub mod test {
+        use crate::parse::util::{new_span, result};
+        use crate::types::specific::{Specific, SpecificCtx};
 
         #[test]
-        pub fn test_specific_gen() {
+        pub fn test_specific() {
+
+            let specific = result(Specific::parse(new_span("uberscott.com:my-package:1.3.7"))).unwrap();
+            println!("{}", specific);
+
+            let specific = result(SpecificCtx::parse(new_span("uberscott.com:my-package:#[latest]"))).unwrap();
+            println!("{}", specific);
 
         }
 

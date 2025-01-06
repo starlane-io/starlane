@@ -32,9 +32,15 @@ pub trait AbstractTag: Display+Eq+PartialEq+Hash+Into<Tag>+From<SkewerCase> {
         parse::any_tag(input)
     }
 
-    fn wrap<I,F,O>(f: F) -> impl FnMut(I) -> Res<I,TagWrap<O,Self>> where F: FnMut(I) -> Res<I,O>+Copy, I: Span {
+    fn wrap<I,F,O>(f: F) -> impl FnMut(I) -> Res<I,TagWrap<O,Self>> where F: FnMut(I) -> Res<I,O>+Copy, I: Span, O: Display  {
         wrap_tag(f)
     }
+
+
+    fn to_wrapped_string(&self) -> String {
+        format!("#[{}]", self).to_string()
+    }
+
 }
 
 impl From<VersionTag> for Tag {
@@ -55,12 +61,22 @@ impl From<PointTag> for Tag {
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum TagWrap<S,T> where T: Into<Tag>+Display {
+pub enum TagWrap<S,T> where T: AbstractTag+Display, S: Display {
     Segment(S),
     Tag(T)
 }
 
-impl <S,T> TagWrap<S,T> where T: Into<Tag>+Display {
+
+impl <S,T> Display for TagWrap<S,T> where T: AbstractTag+Display, S: Display {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            TagWrap::Segment(segment) => segment.to_string(),
+            TagWrap::Tag(tag) => tag.to_wrapped_string()
+        };
+        write!(f, "{}", str)
+    }
+}
+impl <S,T> TagWrap<S,T> where T: AbstractTag+Display, S: Display {
     pub fn segment(segment:S) -> Self {
         Self::Segment(segment)
     }
@@ -189,21 +205,22 @@ pub mod parse {
     pub use wrap::wrapper as wrap_tag;
 
     mod wrap{
+        use std::fmt::Display;
         use nom::branch::alt;
         use nom::{InputLength, Parser};
         use crate::parse::{Res, SkewerCase};
         use crate::parse::util::Span;
         use crate::types::tag::{AbstractTag, TagWrap};
         use super::tag_block;
-        pub fn wrapper<I,F,T,S>(f: F) -> impl FnMut(I) -> Res<I,TagWrap<S,T>> where F: FnMut(I) -> Res<I, S>+Copy, I:Span, T: AbstractTag{
+        pub fn wrapper<I,F,T,S>(f: F) -> impl FnMut(I) -> Res<I,TagWrap<S,T>> where F: FnMut(I) -> Res<I, S>+Copy, I:Span, T: AbstractTag, S: Display{
             alt((with_tag,with_seg(f)))
         }
 
-        fn with_tag<I,S,T>( input: I) -> Res<I,TagWrap<S,T>>  where I: Span, T: AbstractTag {
+        fn with_tag<I,S,T>( input: I) -> Res<I,TagWrap<S,T>>  where I: Span, T: AbstractTag, S: Display {
             tag_block(input).map(|(next,tag)|(next,TagWrap::Tag(tag)))
         }
 
-        fn with_seg<I,F,T,S>(mut f: F) -> impl FnMut(I) -> Res<I,TagWrap<S,T>> where F: FnMut(I) -> Res<I, S>+Copy, I:Span, T: AbstractTag {
+        fn with_seg<I,F,T,S>(mut f: F) -> impl FnMut(I) -> Res<I,TagWrap<S,T>> where F: FnMut(I) -> Res<I, S>+Copy, I:Span, T: AbstractTag, S: Display {
             move |input| f(input).map(|(next,segment)|(next,TagWrap::Segment(segment)))
         }
     }

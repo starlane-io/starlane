@@ -1,5 +1,6 @@
 use core::fmt::{Debug, Formatter};
 use core::str::FromStr;
+use std::fmt::Display;
 use std::ops::Deref;
 
 use nom::combinator::all_consuming;
@@ -547,9 +548,9 @@ impl<'de> Visitor<'de> for VersionReqVisitor {
     }
 }
 
-impl ToString for VersionReq {
-    fn to_string(&self) -> String {
-        self.version.to_string()
+impl Display for VersionReq {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.version.to_string())
     }
 }
 
@@ -983,15 +984,16 @@ where
     }
 }
 
-impl<P> ToString for Pattern<P>
+impl<P> Display for Pattern<P>
 where
     P: ToString,
 {
-    fn to_string(&self) -> String {
-        match self {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
             Pattern::Always => "*".to_string(),
             Pattern::Exact(exact) => exact.to_string(),
-        }
+        };
+        write!(f, "{}", str)
     }
 }
 

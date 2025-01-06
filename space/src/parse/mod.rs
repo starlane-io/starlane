@@ -5822,9 +5822,9 @@ pub fn parse_star_key<I: Span>(input: I) -> Res<I, StarKey> {
     ))
 }
 
-pub fn pattern<I: Span, O, V>(mut value: V) -> impl FnMut(I) -> Res<I, Pattern<O>>
+pub fn pattern<I: Span, O, V>(mut value: V) -> impl FnMut(I) -> Res<I, Pattern<O>>+Copy
 where
-    V: Parser<I, O, NomErr<I>>,
+    V: Parser<I, O, NomErr<I>>+Copy,
 {
     move |input: I| {
         let x: Res<I, I> = tag("*")(input.clone());
