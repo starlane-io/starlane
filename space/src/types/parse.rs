@@ -1,5 +1,5 @@
 use crate::parse::util::Span;
-use crate::parse::{CamelCase, Res};
+use crate::parse::{camel_case, CamelCase, NomErr, Res};
 use crate::types::class::Class;
 use crate::types::private::Generic;
 use crate::types::{scope::parse::domain, Abstract, Exact, Schema};
@@ -10,8 +10,9 @@ use nom::Parser;
 use nom_supreme::ParserExt;
 use starlane_space::parse::from_camel;
 use std::str::FromStr;
-
-
+use nom::sequence::pair;
+use starlane_space::types::private::Delimited;
+use crate::types::parse::delim::{angles, delim};
 
 pub mod case {
 
@@ -52,8 +53,18 @@ fn into<I,O>((input,kind):(I,impl Into<O>)) -> (I,O) {
  */
 
 pub fn class<I: Span>(input: I) -> Res<I, Class> {
-    from_camel(input)
+    let (next,(base,variant)) = pair(camel_case,opt(angles(camel_case)))(input.clone())?;
+        let class = match variant {
+            None => From::from(base),
+            Some(variant) => {
+                Class::from_variant(base,variant).map_err(|e|nom::Err::Failure(e.to_nom(input)))?
+            }
+        };
+
+    Ok((next, class))
 }
+
+
 
 pub fn schema<I: Span>(input: I) -> Res<I, Schema> {
     from_camel(input)
@@ -63,6 +74,7 @@ pub fn schema<I: Span>(input: I) -> Res<I, Schema> {
 
 pub mod delim {
     use std::str::FromStr;
+    use nom::combinator::into;
     use crate::parse::util::{new_span, result, Span};
     use crate::parse::{from_camel, CamelCase, Res};
     use crate::types::private::Generic;
@@ -70,8 +82,19 @@ pub mod delim {
     use nom_supreme::tag::complete::tag;
     use starlane_space::types::private::Delimited;
     use crate::types::class::{Class, ClassDiscriminant};
+    use crate::types::class::service::Service;
     use crate::types::parse::{class, schema};
+    use crate::types::parse::test::delimit;
     use crate::types::Schema;
+
+    pub fn angles<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
+    where
+        I: Span,
+        F: FnMut(I) -> Res<I, O> + Copy,
+    {
+        delimited(tag("<"), f, tag(">"))
+    }
+
 
     pub fn delim<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
     where
@@ -130,7 +153,6 @@ pub mod delim {
 
         assert_eq!(class, Class::Database);
 
-
     }
 
     #[test]
@@ -144,9 +166,12 @@ pub mod delim {
 
 
     #[test]
-    pub fn test_from_variant() {
-        let camel = CamelCase::from_str("Database").unwrap();
-        let class = Class::from(camel);
+    pub fn test_class_variant() {
+        let s = "<Service<Database>>";
+        let i = new_span(s);
+
+        let c = result(delim(class)(i)).unwrap();
+        assert_eq!(Class::Service(Service::Database), c)
     }
 
     /*

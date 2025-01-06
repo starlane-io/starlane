@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use bincode::ErrorKind;
-use nom::error::{FromExternalError, VerboseError};
+use nom::error::{FromExternalError, ParseError, VerboseError};
 use nom_supreme::error::BaseErrorKind;
 use serde::de::Error;
 use std::convert::Infallible;
@@ -31,7 +31,7 @@ use crate::wave::core::{Method, ReflectedCore};
 use serde::{Deserialize, Serialize};
 use starlane_space::parse::NomErr;
 use starlane_space::status;
-use strum::{IntoEnumIterator, ParseError};
+use strum::{IntoEnumIterator};
 use thiserror::Error;
 /*
 #[macro_export]
@@ -646,6 +646,12 @@ impl ParseErrs {
             src: "".to_string(),
         }
     }
+
+
+    pub fn to_nom<I>(self, input: I) -> NomErr<I> where I: Span {
+        NomErr::from_error_kind(input, nom::error::ErrorKind::Tag)
+    }
+
 }
 
 impl From<Box<bincode::ErrorKind>> for ParseErrs {
@@ -655,7 +661,7 @@ impl From<Box<bincode::ErrorKind>> for ParseErrs {
 }
 
 impl From<strum::ParseError> for ParseErrs {
-    fn from(err: ParseError) -> Self {
+    fn from(err: strum::ParseError) -> Self {
         ParseErrs::new(err.to_string())
     }
 }

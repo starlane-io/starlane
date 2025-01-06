@@ -79,6 +79,18 @@ pub enum Class {
     _Ext(CamelCase),
 }
 
+
+impl Class {
+    pub fn from_variant( variant: CamelCase, sub: CamelCase ) -> Result<Class,ParseErrs> {
+        match variant.as_str() {
+            "Service" => {
+                Ok(Class::Service(Service::from_str(sub.as_str())?))
+            }
+            oops => Err(ParseErrs::new(format!("Class variant not found: '{}'", oops)))
+        }
+    }
+}
+
 pub mod service {
     use derive_name::Name;
     use serde_derive::{Deserialize, Serialize};
