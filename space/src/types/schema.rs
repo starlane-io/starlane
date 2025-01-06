@@ -1,6 +1,7 @@
 use crate::types::{private, AbstractDiscriminant, SrcDef, Abstract, Exact, ExactGen, Case};
 use core::str::FromStr;
 use derive_name::Name;
+use nom::combinator::fail;
 use rustls::client::verify_server_cert_signed_by_trust_anchor;
 use serde_derive::{Deserialize, Serialize};
 use strum::ParseError;
@@ -11,7 +12,10 @@ use starlane_space::types::parse::schema;
 use starlane_space::types::PointKindDefSrc;
 use crate::parse::{camel_case, CamelCase, Res};
 use crate::parse::util::Span;
-use crate::types::private::Generic;
+use crate::types::class::ClassDiscriminant;
+use crate::types::class::service::Service;
+use crate::types::parse::{angle_block, square_block};
+use crate::types::private::{Generic, Parsers, Variant};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::EnumString, strum_macros::Display, Serialize,Deserialize,Name)]
 #[strum_discriminants(vis(pub))]
@@ -39,12 +43,7 @@ impl Generic for Schema {
     type Discriminant = SchemaDiscriminant;
     type Segment = CamelCase;
 
-    fn parse_segment<I>(input: I) -> Res<I, Self::Segment>
-    where
-        I: Span
-    {
-        camel_case(input)
-    }
+
     fn abstract_discriminant(&self) -> AbstractDiscriminant {
         AbstractDiscriminant::Schema
     }
@@ -53,9 +52,72 @@ impl Generic for Schema {
     fn convention() -> Case {
         Case::CamelCase
     }
+
+    fn parser() -> impl Parsers<Output=Self, Segment=Self::Segment> {
+        SchemaParsers::new()
+    }
 }
 
+struct SchemaParsers;
 
+impl SchemaParsers {
+    fn new() -> Self {
+        Self
+    }
+}
+
+impl Parsers for SchemaParsers {
+    type Output = Schema;
+    type Discriminant = SchemaDiscriminant;
+    type Segment = CamelCase;
+
+    fn discriminant<I>(input: I) -> Res<I, Self::Discriminant>
+    where
+        I: Span
+    {
+        let (next,segment) = Self::segment(input)?;
+        Ok((next,Self::Discriminant::from_str(segment.as_str()).unwrap_or_else(|_| Self::Discriminant::_Ext)))
+    }
+    /*
+    fn discriminant<I>(&self) -> impl FnMut(I) -> Res<I, Self::Discriminant>
+    where
+        I: Span
+    {
+        let mut segment = Self::segment();
+
+        move |input| {
+            let (next,segment) = segment(input)?;
+            Ok((next,Self::Discriminant::from_str(segment.as_str()).unwrap_or_else(|_| Self::Discriminant::_Ext)))
+        }
+    }
+
+     */
+
+    fn block<I,F,O>(f: F) -> impl FnMut(I) -> Res<I, O> where F: FnMut(I) -> Res<I,O>+Copy, I: Span {
+        square_block(f)
+    }
+
+    fn segment<I>(input: I) -> Res<I, Self::Segment>
+    where
+        I: Span
+    {
+        camel_case(input)
+    }
+
+
+}
+
+impl TryFrom<SchemaDiscriminant> for Schema {
+    type Error = strum::ParseError;
+
+    fn try_from(disc: SchemaDiscriminant) -> Result<Self, Self::Error> {
+        match disc {
+            SchemaDiscriminant::_Ext =>  Err(strum::ParseError::VariantNotFound),
+            _ => Schema::from_str(disc.to_string().as_str())
+        }
+
+    }
+}
 
 
 pub struct SchemaSegmentParser;
@@ -77,8 +139,13 @@ impl From<CamelCase> for Schema {
 }
 
 
+impl TryFrom<CamelCase> for SchemaDiscriminant{
+    type Error = strum::ParseError;
 
-
+    fn try_from(camel: CamelCase) -> Result<Self, Self::Error> {
+        SchemaDiscriminant::from_str(&camel.as_str())
+    }
+}
 
 
 

@@ -204,10 +204,14 @@ pub(crate) mod private {
     use std::ops::{Deref, DerefMut};
     use std::str::FromStr;
     use std::sync::Arc;
+    use ascii::AsciiChar::i;
+    use chrono::ParseResult;
+    use cliclack::input;
     use derive_name::Name;
     use nom::bytes::complete::tag;
-    use nom::combinator::{into, opt};
-    use nom::error::{ErrorKind, ParseError};
+    use nom::combinator::{cond, fail, into, opt, peek, value};
+    use nom::error::{ErrorKind, FromExternalError, ParseError};
+    use nom::error::VerboseErrorKind::Nom;
     use nom::sequence::{delimited, pair};
     use nom_supreme::ParserExt;
     use strum_macros::EnumDiscriminants;
@@ -217,11 +221,10 @@ pub(crate) mod private {
 
         type Abstract;
 
-        type Discriminant: TryFrom<Self::Segment>;
+        type Discriminant;
 
-        type Segment: Into<Self>;
+        type Segment;
 
-        fn parse_segment<I>(input: I) -> Res<I,Self::Segment> where I: Span;
 
         fn abstract_discriminant(&self) -> super::AbstractDiscriminant;
 
@@ -240,12 +243,69 @@ pub(crate) mod private {
 
         fn convention() -> Case;
 
+        fn parser() -> impl Parsers<Output=Self,Segment=Self::Segment>;
+
+        fn parse_outer<I>(input: I) -> Res<I,Self> where I: Span {
+            Self::parser().outer(input)
+        }
+
+        fn parse<I>(input: I) -> Res<I,Self> where I: Span {
+            Self::parser().parse(input)
+        }
+
     }
 
 
 
+    pub trait Parsers {
+        type Output: TryFrom<Self::Discriminant,Error=strum::ParseError> + FromStr;
 
+        type Discriminant: TryFrom<Self::Segment>;
 
+        type Segment;
+
+        fn discriminant<I>(input:I) -> Res<I, Self::Discriminant>
+        where
+            I: Span;
+
+        fn block<I,F,O>(f: F) -> impl FnMut(I) -> Res<I, O> where F: FnMut(I) -> Res<I,O>+Copy, I: Span;
+
+        fn segment<I>(input: I) -> Res<I, Self::Segment> where I:Span;
+
+        fn variant(_: Self::Discriminant, _: Self::Segment) -> Result<Self::Output, strum::ParseError> {
+            Err(strum::ParseError::VariantNotFound)
+        }
+
+        fn peek_variant<I>(input: I) -> Res<I, bool> where I: Span
+        {
+             value(true, peek(Self::block(Self::segment)))(input)
+        }
+
+        fn outer<I>(&self, input: I) -> Res<I, Self::Output>
+        where
+            I: Span
+        {
+            let parse = move |input| self.parse(input);
+            Self::block(parse)(input)
+        }
+
+        fn parse<I>(&self, input: I) -> Res<I, Self::Output>
+        where
+            I: Span
+        {
+            let (next, disc) = Self::discriminant(input.clone())?;
+            let result= if !Self::peek_variant(next.clone()).map(|(_,flag)|flag)? {
+                Self::Output::try_from(disc)
+            } else {
+                let (next, variant) = Self::block(Self::segment)(next.clone())?;
+                Self::variant(disc,variant)
+            };
+
+            let output = result.map_err(|err| nom::Err::Failure(NomErr::from_external_error(input,ErrorKind::Fail,err)))?;
+
+            Ok((next, output))
+        }
+    }
 
 
     /// [Variant] implies inheritance from a
@@ -253,14 +313,10 @@ pub(crate) mod private {
         /// the base [Abstract] variant [Class] or [Schema]
         type Root: Generic+?Sized;
 
-        fn root(&self) -> Self::Root {
-            match self.parent() {
-                Super::Root(root) => root,
-                Super::Super(s) => s.root()
-            }
-        }
+        type Discriminant;
 
-        fn parse<I>(input: I) -> Res<I, Self> where I: Span;
+
+
     }
 
 

@@ -1,12 +1,14 @@
-use crate::types::{private, DataPoint, Exact, Abstract, ExactGen, Case};
+use crate::types::{private, DataPoint, Exact, Abstract, ExactGen, Case, Schema};
 use crate::types::AbstractDiscriminant;
 use core::str::FromStr;
 use std::borrow::Borrow;
 use derive_builder::Builder;
 use derive_name::Name;
+use nom::combinator::{cut, fail, into};
 use nom::Parser;
 use nom::sequence::delimited;
 use serde_derive::{Deserialize, Serialize};
+use strum::ParseError;
 use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
 use starlane_space::parse::{delim_kind_lex, from_camel};
@@ -16,7 +18,8 @@ use crate::parse::util::Span;
 use crate::point::Point;
 use crate::types::class::service::Service;
 use crate::types::parse::{angle_block,};
-use crate::types::private::Variant;
+use crate::types::private::{Parsers, Variant};
+use crate::types::schema::SchemaDiscriminant;
 
 #[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
 #[strum_discriminants(vis(pub))]
@@ -86,19 +89,65 @@ impl Generic for Class {
     type Discriminant = ClassDiscriminant;
     type Segment = CamelCase;
 
-    fn parse_segment<I>(input: I) -> Res<I, Self::Segment>
-    where
-        I: Span
-    {
-        camel_case(input)
-    }
-
     fn abstract_discriminant(&self) -> AbstractDiscriminant {
         AbstractDiscriminant::Class
     }
 
     fn convention() -> Case {
         Case::CamelCase
+    }
+
+    fn parser() -> impl Parsers<Output=Self, Segment=Self::Segment> {
+        ClassParsers::new()
+    }
+
+}
+
+
+
+impl TryFrom<ClassDiscriminant> for Class{
+    type Error = strum::ParseError;
+
+    fn try_from(disc: ClassDiscriminant) -> Result<Self, Self::Error> {
+        match disc {
+            ClassDiscriminant::_Ext =>  Err(strum::ParseError::VariantNotFound),
+            _ => Class::from_str(disc.to_string().as_str())
+        }
+
+    }
+}
+
+pub struct ClassParsers;
+
+impl ClassParsers {
+    fn new() -> Self {
+        Self
+    }
+}
+
+impl Parsers for ClassParsers {
+    type Output = Class;
+    type Discriminant = ClassDiscriminant;
+    type Segment = CamelCase;
+
+
+    fn block<I,F,O>(f: F) -> impl FnMut(I) -> Res<I, O> where F: FnMut(I) -> Res<I,O>+Copy, I: Span {
+        angle_block(f)
+    }
+
+    fn segment<I>(input: I) -> Res<I, Self::Segment>
+    where
+        I: Span
+    {
+        camel_case(input)
+    }
+
+    fn discriminant<I>(input: I) -> Res<I, Self::Discriminant>
+    where
+        I: Span
+    {
+      let (next,segment) = Self::segment(input)?;
+      Ok((next,ClassDiscriminant::from_str(segment.as_str()).unwrap_or_else(|_| ClassDiscriminant::_Ext)))
     }
 }
 
@@ -120,6 +169,7 @@ pub mod service {
     use nom::combinator::into;
     use nom::Parser;
     use serde_derive::{Deserialize, Serialize};
+    use strum::ParseError;
     use strum_macros::{EnumDiscriminants, EnumString};
     use starlane_space::types::private::Variant;
     use crate::err::ParseErrs;
@@ -173,13 +223,10 @@ pub mod service {
 
     impl Variant for Service {
         type Root = Class;
+        type Discriminant = Discriminant;
 
-        fn parse<I>(input: I) -> Res<I, Self>
-        where
-            I: Span
-        {
-            camel_case(input).map(|(next,camel)|(next,camel.into()))
-        }
+
+
     }
 
     impl From<CamelCase> for Service{
@@ -188,7 +235,10 @@ pub mod service {
             match Discriminant::from_str(camel.as_str()) {
                 /// this Ok match is actually an Error
                 Ok(Discriminant::_Ext) => panic!("Service: not CamelCase '{}'",camel),
-                Ok(discriminant) => Self::try_from(discriminant.to_string().as_str()).unwrap(),
+                Ok(discriminant) => match Self::try_from(discriminant.to_string().as_str()) {
+                    Ok(service) => service,
+                    Err(err) => panic!("Service: invalid service: {}", err)
+                }
                 /// if no match then it is an extension: [Service::_Ext]
                 Err(_) => Service::_Ext(camel),
             }

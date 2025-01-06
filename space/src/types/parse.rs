@@ -1,8 +1,8 @@
 use crate::parse::util::Span;
 use crate::parse::{camel_case, CamelCase, NomErr, Res};
 use crate::types::class::Class;
-use crate::types::private::Generic;
-use crate::types::{scope::parse::domain, Abstract, Exact, Schema};
+use crate::types::private::{Generic, Parsers};
+use crate::types::{Abstract, Schema};
 use futures::FutureExt;
 use nom::branch::alt;
 use nom::combinator::{into, opt};
@@ -12,6 +12,7 @@ use nom_supreme::tag::complete::tag;
 use nom_supreme::ParserExt;
 use starlane_space::parse::from_camel;
 use std::str::FromStr;
+use nom::error::FromExternalError;
 
 pub fn block_delimiters<I>(
     (open, close): (&'static str, &'static str),
@@ -38,7 +39,7 @@ where
 
 pub fn angle_block<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
 where
-    F: FnMut(I) -> Res<I, O>,
+    F: FnMut(I) -> Res<I, O>+Copy,
     I: Span,
 {
     let (outer, inner) = angle_block_delimiters();
@@ -47,7 +48,7 @@ where
 
 pub fn square_block<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
 where
-    F: FnMut(I) -> Res<I, O>,
+    F: FnMut(I) -> Res<I, O>+Copy,
     I: Span,
 {
     let (outer, inner) = square_block_delimiters();
@@ -98,23 +99,26 @@ fn into<I,O>((input,kind):(I,impl Into<O>)) -> (I,O) {
  */
 
 
-pub fn r#abstract<I, G>(input: I) -> Res<I, G>
+/*
+pub fn r#abstract<I, P>(input: I) -> Res<I, P::Output>
 where
-    G: Generic,
+    P: Parsers,
     I: Span,
 {
-    let segment = G::parse_segment;
 
-    let (next, (base, variant)) = pair(segment, opt(segment))(input.clone())?;
-    let class = match variant {
-        None => G::from(base.into()),
+    let (next, (disc, variant)) = pair(P::discriminant, opt(P::segment))(input.clone())?;
+    let output = match variant {
+        None => P::Output::try_from(disc).map_err(|err|NomErr::from_external_error(input,ErrorKind::Fail,err))?,
         Some(variant) => {
-            G::variant(base.into(), variant).map_err(|e| nom::Err::Failure(e.to_nom(input)))?
+            P::variant(disc,variant).map_err(|err|NomErr::from_external_error(input,ErrorKind::Fail,err))?
         }
     };
 
-    Ok((next, class))
+
+    Ok((next, output))
 }
+
+ */
 
 pub fn class<I: Span>(input: I) -> Res<I, Class> {
     let (next, (base, variant)) = pair(camel_case, opt(angle_block(camel_case)))(input.clone())?;
@@ -133,18 +137,11 @@ pub fn schema<I: Span>(input: I) -> Res<I, Schema> {
 }
 
 pub mod delim {
-    use crate::parse::util::{new_span, result, Span};
-    use crate::parse::{from_camel, CamelCase, Res};
-    use crate::types::class::service::Service;
-    use crate::types::class::{Class, ClassDiscriminant};
+    use crate::parse::util::Span;
+    use crate::parse::Res;
     use crate::types::private::Generic;
-    use crate::types::Schema;
-    use nom::combinator::into;
     use nom::sequence::delimited;
     use nom_supreme::tag::complete::tag;
-    use std::str::FromStr;
-    use crate::types::parse::{angle_block, r#abstract, square_block};
-
     pub fn angles<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
     where
         I: Span,
@@ -153,64 +150,6 @@ pub mod delim {
         delimited(tag("<"), f, tag(">"))
     }
 
-
-
-
-    #[test]
-    pub fn test_from_camel() {
-        #[derive(Eq, PartialEq, Debug)]
-        struct Blah(CamelCase);
-
-        impl From<CamelCase> for Blah {
-            fn from(camel: CamelCase) -> Self {
-                Blah(camel)
-            }
-        }
-
-        let s = "MyCamelCase";
-        let i = new_span(s);
-        let blah: Blah = result(from_camel(i)).unwrap();
-        assert_eq!(blah.0.as_str(), s);
-    }
-
-
-    #[test]
-    pub fn test_class() {
-        let s = "<Database>";
-        let i = new_span(s);
-        let class: Class = result(angle_block(r#abstract)(i)).unwrap();
-    }
-
-    #[test]
-    pub fn test_class_variant() {
-        let s = "<Service<Database>>";
-        let i = new_span(s);
-        let class: Class= result(Class::block(r#abstract)(i)).unwrap();
-    }
-
-    #[test]
-    pub fn test_schema() {
-        let s = "[Text]";
-        let i = new_span(s);
-        let schema: Schema  = result(square_block(r#abstract)(i)).unwrap();
-    }
-
-    #[test]
-    pub fn class_from_camel() {
-        let camel = CamelCase::from_str("Database").unwrap();
-        let class = Class::from(camel);
-
-        assert_eq!(class, Class::Database);
-    }
-
-    #[test]
-    pub fn test_class_ext() {
-        /// test [Class:_Ext]
-        let camel = CamelCase::from_str("Zophis").unwrap();
-        let class = Class::from(camel.clone());
-
-        assert_eq!(class, Class::_Ext(camel));
-    }
 
 
 
@@ -233,9 +172,4 @@ pub mod delim {
         }
 
          */
-}
-#[cfg(test)]
-pub mod test {
-    #[test]
-    pub fn delimit() {}
 }
