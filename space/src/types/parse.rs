@@ -14,10 +14,7 @@ use std::str::FromStr;
 
 
 pub mod case {
-    /// the structure of a variant.. i.e. : `<Service<Database>>`
-   pub struct Variant<Case> {
 
-   }
 }
 
 
@@ -65,17 +62,21 @@ pub fn schema<I: Span>(input: I) -> Res<I, Schema> {
 
 
 pub mod delim {
-    use crate::parse::util::Span;
-    use crate::parse::Res;
+    use std::str::FromStr;
+    use crate::parse::util::{new_span, result, Span};
+    use crate::parse::{from_camel, CamelCase, Res};
     use crate::types::private::Generic;
     use nom::sequence::delimited;
     use nom_supreme::tag::complete::tag;
     use starlane_space::types::private::Delimited;
-    pub fn delim<I, F, O, D>(f: F) -> impl FnMut(I) -> Res<I, O>
+    use crate::types::class::{Class, ClassDiscriminant};
+    use crate::types::parse::class;
+
+    pub fn delim<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
     where
         I: Span,
         F: FnMut(I) -> Res<I, O> + Copy,
-        D: Delimited,
+        O: Delimited
     {
         fn tags<I>(
             (open, close): (&'static str, &'static str),
@@ -83,25 +84,83 @@ pub mod delim {
             (tag(open), tag(close))
         }
 
-        let (open, close) = tags(D::type_delimiters());
+        let (open, close) = tags(O::type_delimiters());
         delimited(open, f, close)
     }
-    #[cfg(test)]
-    pub mod test {
-        use nom::bytes::complete::tag;
+
+
+    #[test]
+    pub fn test_from_camel() {
+        #[derive(Eq, PartialEq, Debug)]
+        struct Blah(CamelCase);
+
+        impl From<CamelCase> for Blah {
+            fn from(camel: CamelCase) -> Self {
+                Blah(camel)
+            }
+        }
+
+        let s = "MyCamelCase";
+        let i = new_span(s);
+        let blah: Blah  = result(from_camel(i)).unwrap();
+        assert_eq!(blah.0.as_str(), s);
+    }
+
+    #[test]
+    pub fn test_class() {
+        let s = "<Database>";
+        let i = new_span(s);
+        let database= result(delim(class)(i)).unwrap();
+        assert_eq!(database, Class::Database);
+    }
+
+
+    #[test]
+    pub fn class_from_camel() {
+        let camel = CamelCase::from_str("Database").unwrap();
+        let class = Class::from(camel);
+
+        assert_eq!(class, Class::Database);
+
+
+    }
+
+    #[test]
+    pub fn test_class_ext() {
+        /// test [Class:_Ext]
+        let camel = CamelCase::from_str("Zophis").unwrap();
+        let class = Class::from(camel.clone());
+
+        assert_eq!(class, Class::_Ext(camel));
+    }
+
+
+    #[test]
+    pub fn test_from_variant() {
+        let camel = CamelCase::from_str("Database").unwrap();
+        let class = Class::from(camel);
+    }
+
+    /*
+    #[test]
+    pub fn test_delim() {
         use nom::combinator::all_consuming;
         use crate::parse::util::{new_span, result};
         use crate::types::class::Class;
         use crate::types::parse::class;
         use crate::types::parse::delim::delim;
 
-        #[test]
-        pub fn test_delim() {
-            let i = new_span("<Database>");
-            let c = result(all_consuming(delim(class))(i)).unwrap();
-            assert_eq!(Class::Database,c)
-        }
+
+        //let i = new_span("<Database>");
+        let i = new_span("Database");
+        let c = result(class(i)).unwrap();
+        assert_eq!(Class::Database,c)
+        //let c = result(delim(class)(i)).unwrap();
+//        assert_eq!(Class::Database,c)
     }
+
+     */
+
 }
 #[cfg(test)]
 pub mod test {

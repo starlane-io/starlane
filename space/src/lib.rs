@@ -160,6 +160,7 @@ pub mod prelude;
 pub mod progress;
 
 pub mod status;
+
 /// `types` mod is a work in progress for the proposed new type system
 /// its having some compile problems and isn't as-of-yet used by
 /// anything so makes sense to disable it for a while, so I can focus

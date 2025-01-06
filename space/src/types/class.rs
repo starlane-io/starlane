@@ -17,7 +17,7 @@ use crate::types::private::Delimited;
 use crate::types::schema::SchemaDiscriminant;
 use crate::types::specific::Specific;
 
-#[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name)]
+#[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ClassDiscriminant))]
 #[strum_discriminants(derive(
@@ -29,6 +29,8 @@ use crate::types::specific::Specific;
 #[non_exhaustive]
 pub enum Class {
     Root,
+    #[strum(disabled)]
+    #[strum(to_string = "Service<{0}>")]
     Service(Service),
     Platform,
     Foundation,
@@ -72,7 +74,7 @@ pub enum Class {
     FileStore,
     Directory,
     File,
-    /// Ext variants are not supported ....
+    #[strum(disabled)]
     #[strum(to_string = "{0}")]
     _Ext(CamelCase),
 }
@@ -80,7 +82,7 @@ pub enum Class {
 pub mod service {
     use derive_name::Name;
     use serde_derive::{Deserialize, Serialize};
-    use strum_macros::EnumDiscriminants;
+    use strum_macros::{EnumDiscriminants, EnumString};
     use starlane_space::types::private::Variant;
     use crate::parse::CamelCase;
     use crate::types::Abstract;
@@ -95,6 +97,7 @@ pub mod service {
         PartialEq,
         Hash,
         EnumDiscriminants,
+        EnumString,
         strum_macros::Display,
         Serialize,
         Deserialize,
@@ -106,7 +109,6 @@ pub mod service {
         Hash,
         strum_macros::EnumString,
         strum_macros::ToString,
-        strum_macros::IntoStaticStr
     ))]
     #[non_exhaustive]
     pub enum Service {
@@ -117,6 +119,9 @@ pub mod service {
         /// example: a `KeyCloak` instance which provides [super::Class::UserBase] which
         /// are instances of `KeyCloak Realms`
         UserBase,
+        #[strum(disabled)]
+        #[strum(to_string = "{0}")]
+        _Ext(CamelCase)
     }
 
     impl Into<Class> for Service {
@@ -172,11 +177,11 @@ impl Into<Abstract> for Class {
 
 impl From<CamelCase> for Class {
     fn from(camel: CamelCase) -> Self {
-        ///
+
         match ClassDiscriminant::from_str(camel.as_str()) {
             /// this Ok match is actually an Error
             Ok(ClassDiscriminant::_Ext) => panic!("ClassDiscriminant: not CamelCase '{}'",camel),
-            Ok(discriminant) => Self::try_from(discriminant).unwrap(),
+            Ok(discriminant) => Self::try_from(discriminant.to_string().as_str()).unwrap(),
             /// if no match then it is an extension: [Class::_Ext]
             Err(_) => Class::_Ext(camel),
         }
@@ -184,13 +189,26 @@ impl From<CamelCase> for Class {
 }
 
 
-impl FromStr for Class {
-    type Err = ParseErrs;
+/*
+impl TryFrom<ClassDiscriminant> for Class{
+    type Error = ParseErrs;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::from(CamelCase::from_str(s)?))
+    fn try_from(d: ClassDiscriminant) -> Result<Self, Self::Error> {
+        match &d {
+            ClassDiscriminant::_Ext => Err(ParseErrs::new("cannot convert from 'Discriminant' to 'Class'")),
+            ClassDiscriminant::Service => Err(ParseErrs::new("cannot convert from 'Discriminant::Service' to 'Class' which has variants...")),
+            /// parse and hope for the best
+            _ => {
+                Class::from_str(d.to_string().as_str())
+            }
+        }
+
     }
 }
+
+ */
+
+
 
 
 

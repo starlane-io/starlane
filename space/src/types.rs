@@ -17,6 +17,8 @@ pub mod def;
 pub mod id;
 pub mod tag;
 pub mod parse;
+#[cfg(test)]
+pub mod test;
 //pub(crate) trait Typical: Display+Into<TypeKind>+Into<Type> { }
 
 
@@ -194,7 +196,7 @@ pub(crate) mod private {
     use derive_name::Name;
     use strum_macros::EnumDiscriminants;
 
-    pub(crate) trait Generic: Name+Clone+Into<Abstract>+Clone+FromStr<Err=ParseErrs>+Delimited{
+    pub(crate) trait Generic: Name+Clone+Into<Abstract>+Clone+FromStr+Delimited{
 
         type Abstract;
 
@@ -469,5 +471,6 @@ pub(crate) mod private {
 
 
 }
+
 
 

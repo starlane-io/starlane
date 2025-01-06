@@ -1754,19 +1754,22 @@ impl Deref for SkewerCase {
 }
 
 
+/*
 pub fn from<I,Fn,In,Out>(mut f: Fn) -> impl FnMut(I) -> Res<I, Out> where Fn: FnMut(I) -> Res<I,In>+Copy, Out: From<In>, I: Span {
     move |input| {
         f(input).map(|(next,t)|(next,Out::from(t)))
     }
 }
 
+ */
+
 
 pub fn from_camel<I,O>(input:I) -> Res<I,O> where I: Span, O: From<CamelCase>{
-    from(camel_case)(input)
+    into(camel_case)(input)
 }
 
 pub fn from_skewer<I,O>(input:I) -> Res<I,O> where I: Span, O: From<SkewerCase>{
-    from(skewer_case)(input)
+    into(skewer_case)(input)
 }
 
 pub fn camel_case<I: Span>(input: I) -> Res<I, CamelCase> {
