@@ -13,11 +13,11 @@ use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
 use starlane_space::parse::{delim_kind_lex, from_camel};
 use starlane_space::types::private::Generic;
-use crate::parse::{camel_case, camel_chars, CamelCase, NomErr, Res};
+use crate::parse::{camel_case, camel_chars, lex_block, unwrap_block, CamelCase, NomErr, Res};
+use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::point::Point;
 use crate::types::class::service::Service;
-use crate::types::parse::{angle_block,};
 use crate::types::private::{Parsers, Variant};
 use crate::types::schema::SchemaDiscriminant;
 
@@ -132,7 +132,7 @@ impl Parsers for ClassParsers {
 
 
     fn block<I,F,O>(f: F) -> impl FnMut(I) -> Res<I, O> where F: FnMut(I) -> Res<I,O>+Copy, I: Span {
-        angle_block(f)
+        unwrap_block(BlockKind::Nested(NestedBlockKind::Angle),f)
     }
 
     fn segment<I>(input: I) -> Res<I, Self::Segment>

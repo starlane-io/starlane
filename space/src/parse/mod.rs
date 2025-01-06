@@ -100,7 +100,6 @@ use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
-use starlane_space::types::parse::ParsePrimitive;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
 
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
@@ -1541,8 +1540,17 @@ impl CamelCase {
 }
 
 
+/*
+impl <E> TryInto<E> for CamelCase where E: TryInto<String> {
+    type Error = ();
+
+    fn try_into(self) -> Result<E, Self::Error> {
+        self.string.try_into().map_err(|_| ())
+    }
+}
 
 
+ */
 
 
 impl FromStr for CamelCase {

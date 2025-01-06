@@ -197,7 +197,7 @@ pub(crate) mod private {
     use crate::types::scope::Scope;
     use indexmap::IndexMap;
     use itertools::Itertools;
-    use nom::Parser;
+    use nom::{IResult, Parser};
     use std::collections::HashMap;
     use std::fmt::{Display, Formatter};
     use std::hash::Hash;
@@ -215,7 +215,6 @@ pub(crate) mod private {
     use nom::sequence::{delimited, pair};
     use nom_supreme::ParserExt;
     use strum_macros::EnumDiscriminants;
-    use starlane_space::types::parse::angle_block;
 
     pub(crate) trait Generic: Name+Clone+Into<Abstract>+Clone+FromStr{
 
@@ -276,9 +275,12 @@ pub(crate) mod private {
             Err(strum::ParseError::VariantNotFound)
         }
 
-        fn peek_variant<I>(input: I) -> Res<I, bool> where I: Span
+        fn peek_variant<I>(input: I) -> bool where I: Span
         {
-             value(true, peek(Self::block(Self::segment)))(input)
+             match value(true, peek(Self::block(Self::segment)))(input) {
+                 Ok((_,value)) => value,
+                 Err(_) => false
+             }
         }
 
         fn outer<I>(&self, input: I) -> Res<I, Self::Output>
@@ -294,7 +296,7 @@ pub(crate) mod private {
             I: Span
         {
             let (next, disc) = Self::discriminant(input.clone())?;
-            let result= if !Self::peek_variant(next.clone()).map(|(_,flag)|flag)? {
+            let result= if !Self::peek_variant(next.clone()) {
                 Self::Output::try_from(disc)
             } else {
                 let (next, variant) = Self::block(Self::segment)(next.clone())?;

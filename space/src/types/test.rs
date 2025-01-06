@@ -4,10 +4,12 @@
 
 pub mod parse {
     use std::str::FromStr;
+    use starlane_space::parse::unwrap_block;
     use crate::err::{ParseErrs, PrintErr};
-    use crate::parse::{from_camel, CamelCase};
+    use crate::parse::{camel_case, from_camel, CamelCase};
+    use crate::parse::model::{BlockKind, NestedBlockKind};
     use crate::parse::util::{new_span, result};
-    use crate::types::class::Class;
+    use crate::types::class::{Class, ClassDiscriminant, ClassParsers};
     use crate::types::private::{Generic, Parsers};
     use crate::types::Schema;
     #[test]
@@ -29,11 +31,32 @@ pub mod parse {
 
     #[test]
     pub fn test_class() {
-        let s = "<Database>";
-        let i = new_span(s);
-        //let class: Class = result(angle_block(r#abstract)(i)).unwrap();
-        Class::parse_outer(i).unwrap();
+        let inner = "Database";
+        let s = format!("<{}>", inner).to_string();
+        let i = new_span(s.as_str());
+
+        let res = result(unwrap_block(BlockKind::Nested(NestedBlockKind::Angle), camel_case)(i.clone())).unwrap();
+        assert_eq!(res.as_str(), inner);
+
+        let (next, disc) = ClassParsers::discriminant(new_span(inner)).unwrap();
+
+        assert_eq!(ClassDiscriminant::Database, disc);
+
+        assert!(!ClassParsers::peek_variant(next));
+
+        let class = result(Class::parse(new_span(inner))).unwrap();
+
+        assert_eq!(Class::Database, class);
+
+        let class = result(Class::parse_outer(i)).unwrap();
+
+
+        assert_eq!(Class::Database, class);
+
+
     }
+
+
 
     #[test]
     pub fn test_class_discriminant() {
