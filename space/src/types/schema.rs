@@ -14,7 +14,7 @@ use crate::parse::util::Span;
 use crate::types::class::{Class, ClassDiscriminant};
 use crate::types::private::{Delimited, Generic};
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display, Serialize,Deserialize,Name)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::EnumString, strum_macros::Display, Serialize,Deserialize,Name)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(SchemaDiscriminant))]
 #[strum_discriminants(derive(
@@ -29,6 +29,7 @@ pub enum Schema {
     Text,
     /// a [Schema::BindConfig] definition for a [Class]
     BindConfig,
+    #[strum(disabled)]
     #[strum(to_string = "{0}")]
     _Ext(CamelCase),
 }
@@ -80,36 +81,16 @@ impl From<CamelCase> for Schema {
         ///
         match SchemaDiscriminant::from_str(camel.as_str()) {
             /// this Ok match is actually an Error
-            Ok(SchemaDiscriminant::_Ext) => panic!("ClassDiscriminant: not CamelCase '{}'",camel),
-            Ok(discriminant) => Self::try_from(discriminant).unwrap(),
+            Ok(SchemaDiscriminant::_Ext) => panic!("SchemaDiscriminant: not CamelCase '{}'",camel),
+            Ok(discriminant) => Self::try_from(discriminant.to_string().as_str()).unwrap(),
             /// if no match then it is an extension: [Class::_Ext]
             Err(_) => Schema::_Ext(camel),
         }
     }
 }
 
-impl TryFrom<SchemaDiscriminant> for Schema {
-    type Error = ();
 
-    fn try_from(source: SchemaDiscriminant) -> Result<Self, Self::Error> {
-        match source {
-            SchemaDiscriminant::_Ext=> Err(()),
-            /// true we are doing a naughty [Result::unwrap] of a [CamelCase::from_str] but
-            /// a non [CamelCase] from [SchemaDiscriminant::to_string] should be impossible unless some
-            /// developer messed up
-            source=> Ok(Self::_Ext(CamelCase::from_str(source.to_string().as_str()).unwrap()))
-        }
-    }
-}
 
-impl FromStr for Schema {
-    type Err = ParseErrs;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let camel =  CamelCase::from_str(s)?;
-        Ok(Self::from(camel))
-    }
-}
 
 
 

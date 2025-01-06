@@ -70,7 +70,8 @@ pub mod delim {
     use nom_supreme::tag::complete::tag;
     use starlane_space::types::private::Delimited;
     use crate::types::class::{Class, ClassDiscriminant};
-    use crate::types::parse::class;
+    use crate::types::parse::{class, schema};
+    use crate::types::Schema;
 
     pub fn delim<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
     where
@@ -114,6 +115,13 @@ pub mod delim {
         assert_eq!(database, Class::Database);
     }
 
+    #[test]
+    pub fn test_schema() {
+        let s = "[Text]";
+        let i = new_span(s);
+        let text = result(delim(schema)(i)).unwrap();
+        assert_eq!(text, Schema::Text);
+    }
 
     #[test]
     pub fn class_from_camel() {
