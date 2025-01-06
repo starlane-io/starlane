@@ -5,10 +5,7 @@ use core::fmt::Display;
 use nom::character::complete::multispace0;
 use nom::error::{ErrorKind, ParseError};
 use nom::sequence::delimited;
-use nom::{
-    AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength,
-    InputTake, InputTakeAtPosition, Needed, Offset, Slice,
-};
+use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Needed, Offset, Parser, Slice};
 use nom_locate::LocatedSpan;
 use nom_supreme::error::{GenericErrorTree, StackContext};
 use nom_supreme::final_parser::ExtractContext;
@@ -504,6 +501,10 @@ impl FindSubstring<&str> for SliceStr {
         self.as_str().find_substring(substr)
     }
 }
+
+
+
+
 
 #[cfg(test)]
 pub mod test {

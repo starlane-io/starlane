@@ -186,11 +186,11 @@ use crate::types::scope::Scope;
 
 
 pub(crate) mod private {
-    use super::{err, Abstract, GenericExact, Exact, ExactGen, Schema, Case};
-    use crate::err::ParseErrs;
+    use super::{err, Abstract, GenericExact, Exact, ExactGen, Schema, Case, parse};
+    use crate::err::{ParseErrs, SpaceErr};
     use super::specific::Specific;
     use crate::parse::util::Span;
-    use crate::parse::Res;
+    use crate::parse::{CamelCase, NomErr, Res};
     use crate::point::Point;
     use crate::types;
     use crate::types::class::Class;
@@ -205,16 +205,25 @@ pub(crate) mod private {
     use std::str::FromStr;
     use std::sync::Arc;
     use derive_name::Name;
+    use nom::bytes::complete::tag;
+    use nom::combinator::{into, opt};
+    use nom::error::{ErrorKind, ParseError};
+    use nom::sequence::{delimited, pair};
+    use nom_supreme::ParserExt;
     use strum_macros::EnumDiscriminants;
+    use starlane_space::types::parse::angle_block;
 
     pub(crate) trait Generic: Name+Clone+Into<Abstract>+Clone+FromStr{
 
         type Abstract;
 
-        type Discriminant;
+        type Discriminant: TryFrom<Self::Segment>;
 
+        type Segment: Into<Self>;
 
-        fn discriminant(&self) -> super::AbstractDiscriminant;
+        fn parse_segment<I>(input: I) -> Res<I,Self::Segment> where I: Span;
+
+        fn abstract_discriminant(&self) -> super::AbstractDiscriminant;
 
         fn plus(self, scope: Scope, specific: Specific) -> GenericExact<Self> {
             GenericExact::scoped(scope, self, specific)
@@ -224,22 +233,25 @@ pub(crate) mod private {
             GenericExact::new(self, specific)
         }
 
-        fn parse<I>(input: I) -> Res<I, Self> where I: Span;
-
-        fn delimiters() -> (&'static str, &'static str);
+        /// parse the sub variant
+        fn variant<V>(_: Self::Discriminant, _: Self::Segment) -> Result<V,ParseErrs> where V: Variant<Root=Self>{
+            Err(ParseErrs::new("Discriminant does not support Variants"))
+        }
 
         fn convention() -> Case;
+
     }
 
 
+
+
+
+
+
     /// [Variant] implies inheritance from a
-    pub(crate) trait Variant {
+    pub(crate) trait Variant where Self: Into<Self::Root> {
         /// the base [Abstract] variant [Class] or [Schema]
         type Root: Generic+?Sized;
-
-        /// return the parent which may be another [Variant] or
-        /// the base level [Abstract]
-        fn parent(&self) -> Super<Self::Root>;
 
         fn root(&self) -> Self::Root {
             match self.parent() {
@@ -247,6 +259,8 @@ pub(crate) mod private {
                 Super::Super(s) => s.root()
             }
         }
+
+        fn parse<I>(input: I) -> Res<I, Self> where I: Span;
     }
 
 
@@ -266,11 +280,11 @@ pub(crate) mod private {
     #[strum_discriminants(vis(pub))]
     #[strum_discriminants(name(SuperDiscriminant))]
     #[strum_discriminants(derive( Hash, strum_macros::EnumString, strum_macros::ToString, strum_macros::IntoStaticStr ))]
-    pub enum Super<A> where A: Generic+?Sized {
+    pub enum Super<A,V> where A: Generic+?Sized, V: Variant<Root=A>+?Sized {
         /// the `root` [Abstract] variant [Generic] that a [Variant] derives from.
         Root(A),
         /// the `super` [Variant] of this [Variant] (which is not a `root`)
-        Super(Box<dyn Variant<Root=A>>),
+        Super(V),
     }
 
     #[derive(EnumDiscriminants,strum_macros::Display)]

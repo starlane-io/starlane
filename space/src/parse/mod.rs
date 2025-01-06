@@ -100,6 +100,7 @@ use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
+use starlane_space::types::parse::ParsePrimitive;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
 
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
@@ -304,6 +305,8 @@ pub type NomErr<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErrs>;
 
 
 pub type Res<I: Span, O> = IResult<I, O, NomErr<I>>;
+
+pub trait MyParser<I:Span,O> :Parser<I,O,NomErr<I>> {}
 
 /*impl <I> From<SpaceTree<I>> for ParseErrs where I: Span {
     fn from(value: SpaceTree<I>) -> Self {
@@ -1535,12 +1538,12 @@ impl CamelCase {
     pub fn as_str(&self) -> &str {
         self.string.as_str()
     }
-
-    pub fn parser<I,O>(input:I) -> Res<I,O> where I: Span, O: From<CamelCase>{
-        into(camel_case)(input)
-    }
-
 }
+
+
+
+
+
 
 impl FromStr for CamelCase {
     type Err = ParseErrs;
@@ -1657,6 +1660,10 @@ impl SkewerCase {
         into(skewer_case)(input)
     }
 }
+
+
+
+
 
 pub struct SnakeCase {
     string: String,

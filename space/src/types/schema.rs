@@ -11,7 +11,6 @@ use starlane_space::types::parse::schema;
 use starlane_space::types::PointKindDefSrc;
 use crate::parse::{camel_case, CamelCase, Res};
 use crate::parse::util::Span;
-use crate::types::class::{Class, ClassDiscriminant};
 use crate::types::private::Generic;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::EnumString, strum_macros::Display, Serialize,Deserialize,Name)]
@@ -34,48 +33,34 @@ pub enum Schema {
     _Ext(CamelCase),
 }
 
-/*
-impl Into<TypeKind> for SchemaKind {
-    fn into(self) -> TypeKind {
-        TypeKind::Schema(self)
-    }
-}
-
- */
-
 
 impl Generic for Schema {
     type Abstract = Schema;
     type Discriminant = SchemaDiscriminant;
+    type Segment = CamelCase;
 
-    fn discriminant(&self) -> super::AbstractDiscriminant {
-        self.clone().into()
-    }
-
-    fn parse<I>(input: I) -> Res<I, Self>
+    fn parse_segment<I>(input: I) -> Res<I, Self::Segment>
     where
         I: Span
     {
-        schema(input)
+        camel_case(input)
+    }
+    fn abstract_discriminant(&self) -> AbstractDiscriminant {
+        AbstractDiscriminant::Schema
     }
 
-    fn delimiters() -> (&'static str, &'static str) {
-        ("[","]")
-    }
 
     fn convention() -> Case {
         Case::CamelCase
     }
 }
 
-/*
-impl Into<TypeKind>  for SchemaKind {
-    fn into(self) -> TypeKind {
-        TypeKind::Schema(self)
-    }
-}
 
- */
+
+
+pub struct SchemaSegmentParser;
+
+
 
 
 impl From<CamelCase> for Schema {

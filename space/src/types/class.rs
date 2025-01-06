@@ -5,14 +5,18 @@ use std::borrow::Borrow;
 use derive_builder::Builder;
 use derive_name::Name;
 use nom::Parser;
+use nom::sequence::delimited;
 use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
-use starlane_space::parse::from_camel;
+use starlane_space::parse::{delim_kind_lex, from_camel};
+use starlane_space::types::private::Generic;
 use crate::parse::{camel_case, camel_chars, CamelCase, NomErr, Res};
 use crate::parse::util::Span;
 use crate::point::Point;
 use crate::types::class::service::Service;
+use crate::types::parse::{angle_block,};
+use crate::types::private::Variant;
 
 #[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
 #[strum_discriminants(vis(pub))]
@@ -77,6 +81,28 @@ pub enum Class {
 }
 
 
+impl Generic for Class {
+    type Abstract = Class;
+    type Discriminant = ClassDiscriminant;
+    type Segment = CamelCase;
+
+    fn parse_segment<I>(input: I) -> Res<I, Self::Segment>
+    where
+        I: Span
+    {
+        camel_case(input)
+    }
+
+    fn abstract_discriminant(&self) -> AbstractDiscriminant {
+        AbstractDiscriminant::Class
+    }
+
+    fn convention() -> Case {
+        Case::CamelCase
+    }
+}
+
+
 impl Class {
     pub fn from_variant( variant: CamelCase, sub: CamelCase ) -> Result<Class,ParseErrs> {
         match variant.as_str() {
@@ -89,11 +115,16 @@ impl Class {
 }
 
 pub mod service {
+    use std::str::FromStr;
     use derive_name::Name;
+    use nom::combinator::into;
+    use nom::Parser;
     use serde_derive::{Deserialize, Serialize};
     use strum_macros::{EnumDiscriminants, EnumString};
     use starlane_space::types::private::Variant;
-    use crate::parse::CamelCase;
+    use crate::err::ParseErrs;
+    use crate::parse::{camel_case, from_camel, CamelCase, NomErr, Res};
+    use crate::parse::util::Span;
     use crate::types::Abstract;
     use crate::types::class::{Class, ClassDiscriminant};
     use crate::types::private::Super;
@@ -143,8 +174,24 @@ pub mod service {
     impl Variant for Service {
         type Root = Class;
 
-        fn parent(&self) -> Super<Self::Root> {
-            Super::Root(self.clone().into())
+        fn parse<I>(input: I) -> Res<I, Self>
+        where
+            I: Span
+        {
+            camel_case(input).map(|(next,camel)|(next,camel.into()))
+        }
+    }
+
+    impl From<CamelCase> for Service{
+        fn from(camel: CamelCase) -> Self {
+
+            match Discriminant::from_str(camel.as_str()) {
+                /// this Ok match is actually an Error
+                Ok(Discriminant::_Ext) => panic!("Service: not CamelCase '{}'",camel),
+                Ok(discriminant) => Self::try_from(discriminant.to_string().as_str()).unwrap(),
+                /// if no match then it is an extension: [Service::_Ext]
+                Err(_) => Service::_Ext(camel),
+            }
         }
     }
 
@@ -154,39 +201,7 @@ pub mod service {
 
 
 
-impl private::Generic for Class {
-    type Abstract = Class;
-    type Discriminant =ClassDiscriminant;
 
-    fn discriminant(&self) -> AbstractDiscriminant {
-        AbstractDiscriminant::Class
-    }
-
-
-    fn parse<I>(input: I) -> Res<I, Self>
-    where
-        I: Span
-    {
-        from_camel(input)
-    }
-
-    fn delimiters() -> (&'static str, &'static str) {
-        ("<",">")
-    }
-
-    fn convention() -> Case {
-        Case::CamelCase
-    }
-}
-
-/*
-impl Into<Abstract> for Class {
-    fn into(self) -> Abstract {
-        Abstract::Class(self)
-    }
-}
-
- */
 
 impl From<CamelCase> for Class {
     fn from(camel: CamelCase) -> Self {
