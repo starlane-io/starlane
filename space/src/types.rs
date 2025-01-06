@@ -176,7 +176,7 @@ pub enum TagWrap<S,T> {
 use crate::err::ParseErrs;
 use crate::parse::{CamelCase, Res, SkewerCase};
 use crate::point::Point;
-use crate::types::private::{Generic, Super};
+use crate::types::private::{Generic};
 pub use schema::Schema;
 use specific::Specific;
 use starlane_space::types::private::Variant;
@@ -190,7 +190,7 @@ pub(crate) mod private {
     use crate::err::{ParseErrs, SpaceErr};
     use super::specific::Specific;
     use crate::parse::util::Span;
-    use crate::parse::{CamelCase, NomErr, Res};
+    use crate::parse::{camel_case, CamelCase, NomErr, Res};
     use crate::point::Point;
     use crate::types;
     use crate::types::class::Class;
@@ -198,10 +198,10 @@ pub(crate) mod private {
     use indexmap::IndexMap;
     use itertools::Itertools;
     use nom::{IResult, Parser};
-    use std::collections::HashMap;
-    use std::fmt::{Display, Formatter};
+    use std::collections::{HashMap, HashSet};
+    use std::fmt::{Debug, Display, Formatter};
     use std::hash::Hash;
-    use std::ops::{Deref, DerefMut};
+    use std::ops::{Deref, DerefMut, Index};
     use std::str::FromStr;
     use std::sync::Arc;
     use ascii::AsciiChar::i;
@@ -242,7 +242,7 @@ pub(crate) mod private {
 
         fn convention() -> Case;
 
-        fn parser() -> impl Parsers<Output=Self,Segment=Self::Segment>;
+        fn parser() -> impl Parsers<Output=Self, Variant=Self::Segment>;
 
         fn parse_outer<I>(input: I) -> Res<I,Self> where I: Span {
             Self::parser().outer(input)
@@ -259,9 +259,9 @@ pub(crate) mod private {
     pub trait Parsers {
         type Output: TryFrom<Self::Discriminant,Error=strum::ParseError> + FromStr;
 
-        type Discriminant: TryFrom<Self::Segment>;
+        type Discriminant: TryFrom<Self::Variant>;
 
-        type Segment;
+        type Variant;
 
         fn discriminant<I>(input:I) -> Res<I, Self::Discriminant>
         where
@@ -269,9 +269,9 @@ pub(crate) mod private {
 
         fn block<I,F,O>(f: F) -> impl FnMut(I) -> Res<I, O> where F: FnMut(I) -> Res<I,O>+Copy, I: Span;
 
-        fn segment<I>(input: I) -> Res<I, Self::Segment> where I:Span;
+        fn segment<I>(input: I) -> Res<I, Self::Variant> where I:Span;
 
-        fn variant(_: Self::Discriminant, _: Self::Segment) -> Result<Self::Output, strum::ParseError> {
+        fn create(_: Self::Discriminant, _: Self::Variant) -> Result<Self::Output, strum::ParseError> {
             Err(strum::ParseError::VariantNotFound)
         }
 
@@ -300,7 +300,7 @@ pub(crate) mod private {
                 Self::Output::try_from(disc)
             } else {
                 let (next, variant) = Self::block(Self::segment)(next.clone())?;
-                Self::variant(disc,variant)
+                Self::create(disc, variant)
             };
 
             let output = result.map_err(|err| nom::Err::Failure(NomErr::from_external_error(input,ErrorKind::Fail,err)))?;
@@ -316,10 +316,63 @@ pub(crate) mod private {
         type Root: Generic+?Sized;
 
         type Discriminant;
+    }
 
 
+
+    #[cfg(feature="groups")]
+    pub mod group {
+        #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+        pub struct AbstractSegment(CamelCase);
+        impl Segment for AbstractSegment {
+            fn delimiter() -> &'static str {
+                ":"
+            }
+
+            fn parse<I>(input: I) -> Res<I, Self>
+            where
+                I: Span
+            {
+                camel_case(input).map(|(next, camel)| (next, Self(camel)))
+            }
+        }
+
+        impl Display for AbstractSegment {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.0.to_string())
+            }
+        }
+
+
+        pub trait Segment: Clone + Debug + Eq + PartialEq + Hash + Serialize + Deserialize + Display {
+            fn delimiter() -> &'static str;
+
+            fn parse<I>(input: I) -> Res<I, Self>
+            where
+                I: Span;
+        }
+
+        #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+        pub struct Segments<S>
+        where
+            S: Segment + ?Sized
+        {
+            segments: Vec<S>
+        }
+
+        impl<S> Display for Segments<S>
+        where
+            S: Segment
+        {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.segments.iter().join(S::delimiter()))
+            }
+        }
 
     }
+
+
+    /*
 
 
     /// [Member] of a [Group] for scoping purposes
@@ -358,6 +411,8 @@ pub(crate) mod private {
 
 
 
+     */
+
     /*
     impl <K> Into<K> for Scoped<K> where K: Kind {
         fn into(self) -> K {
@@ -367,6 +422,11 @@ pub(crate) mod private {
 
      */
 
+
+    pub struct Group {
+        members: HashSet<Abstract>,
+        subs: HashMap<Abstract, Box<HashSet<Abstract>>>
+    }
 
     pub(crate) struct Meta<G> where G: Generic
     {

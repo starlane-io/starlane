@@ -52,7 +52,7 @@ impl Generic for Schema {
         Case::CamelCase
     }
 
-    fn parser() -> impl Parsers<Output=Self, Segment=Self::Segment> {
+    fn parser() -> impl Parsers<Output=Self, Variant=Self::Segment> {
         SchemaParsers::new()
     }
 }
@@ -68,7 +68,7 @@ impl SchemaParsers {
 impl Parsers for SchemaParsers {
     type Output = Schema;
     type Discriminant = SchemaDiscriminant;
-    type Segment = CamelCase;
+    type Variant = CamelCase;
 
     fn discriminant<I>(input: I) -> Res<I, Self::Discriminant>
     where
@@ -96,7 +96,7 @@ impl Parsers for SchemaParsers {
         unwrap_block(BlockKind::Nested(NestedBlockKind::Square),f)
     }
 
-    fn segment<I>(input: I) -> Res<I, Self::Segment>
+    fn segment<I>(input: I) -> Res<I, Self::Variant>
     where
         I: Span
     {

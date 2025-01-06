@@ -97,7 +97,7 @@ impl Generic for Class {
         Case::CamelCase
     }
 
-    fn parser() -> impl Parsers<Output=Self, Segment=Self::Segment> {
+    fn parser() -> impl Parsers<Output=Self, Variant=Self::Segment> {
         ClassParsers::new()
     }
 
@@ -113,7 +113,6 @@ impl TryFrom<ClassDiscriminant> for Class{
             ClassDiscriminant::_Ext =>  Err(strum::ParseError::VariantNotFound),
             _ => Class::from_str(disc.to_string().as_str())
         }
-
     }
 }
 
@@ -128,14 +127,14 @@ impl ClassParsers {
 impl Parsers for ClassParsers {
     type Output = Class;
     type Discriminant = ClassDiscriminant;
-    type Segment = CamelCase;
+    type Variant = CamelCase;
 
 
     fn block<I,F,O>(f: F) -> impl FnMut(I) -> Res<I, O> where F: FnMut(I) -> Res<I,O>+Copy, I: Span {
         unwrap_block(BlockKind::Nested(NestedBlockKind::Angle),f)
     }
 
-    fn segment<I>(input: I) -> Res<I, Self::Segment>
+    fn segment<I>(input: I) -> Res<I, Self::Variant>
     where
         I: Span
     {
@@ -150,7 +149,7 @@ impl Parsers for ClassParsers {
       Ok((next,ClassDiscriminant::from_str(segment.as_str()).unwrap_or_else(|_| ClassDiscriminant::_Ext)))
     }
 
-    fn variant(disc: Self::Discriminant, variant: Self::Segment) -> Result<Self::Output, strum::ParseError> {
+    fn create(disc: Self::Discriminant, variant: Self::Variant) -> Result<Self::Output, strum::ParseError> {
         match disc {
             Self::Discriminant::Service => Ok(Service::from(variant).into()),
             _ => Err(strum::ParseError::VariantNotFound)
@@ -185,7 +184,6 @@ pub mod service {
     use crate::parse::util::Span;
     use crate::types::Abstract;
     use crate::types::class::{Class, ClassDiscriminant};
-    use crate::types::private::Super;
 
     /// variants for [super::Class::Service]
     #[derive(

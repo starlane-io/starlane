@@ -84,7 +84,7 @@ pub mod parse {
         let variant = result(ClassParsers::block(ClassParsers::segment)(next)).unwrap();
         assert_eq!(variant.to_string().as_str(), "Database");
 
-        let class = ClassParsers::variant(discriminant,variant).unwrap();
+        let class = ClassParsers::create(discriminant, variant).unwrap();
 
         assert_eq!(class,Class::Service(Service::Database));
 
