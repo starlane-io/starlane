@@ -11,6 +11,16 @@ use nom_supreme::ParserExt;
 use starlane_space::parse::from_camel;
 use std::str::FromStr;
 
+
+
+pub mod case {
+    /// the structure of a variant.. i.e. : `<Service<Database>>`
+   pub struct Variant<Case> {
+
+   }
+}
+
+
 /// scan `opt(f) -> Option<D>`  then [Option::unwrap_or_default]  to generate a [D::default] value
 ///
 pub fn opt_def<I, F, D>(f: F) -> impl Fn(I) -> Res<I, D>
@@ -33,7 +43,7 @@ pub fn type_kind<I>(input: I) -> Res<I, Abstract>
 where
     I: Span,
 {
-    alt((into(schema_kind), into(class_kind)))(input)
+    alt((into(schema), into(class)))(input)
     //alt((map(schema_kind,TypeKind::from),map(class_kind,TypeKind::from) ))
 }
 
@@ -44,13 +54,15 @@ fn into<I,O>((input,kind):(I,impl Into<O>)) -> (I,O) {
 
  */
 
-pub fn class_kind<I: Span>(input: I) -> Res<I, Class> {
+pub fn class<I: Span>(input: I) -> Res<I, Class> {
     from_camel(input)
 }
 
-pub fn schema_kind<I: Span>(input: I) -> Res<I, Schema> {
+pub fn schema<I: Span>(input: I) -> Res<I, Schema> {
     from_camel(input)
 }
+
+
 
 pub mod delim {
     use crate::parse::util::Span;
@@ -74,13 +86,25 @@ pub mod delim {
         let (open, close) = tags(D::type_delimiters());
         delimited(open, f, close)
     }
+    #[cfg(test)]
+    pub mod test {
+        use nom::bytes::complete::tag;
+        use nom::combinator::all_consuming;
+        use crate::parse::util::{new_span, result};
+        use crate::types::class::Class;
+        use crate::types::parse::class;
+        use crate::types::parse::delim::delim;
+
+        #[test]
+        pub fn test_delim() {
+            let i = new_span("<Database>");
+            let c = result(all_consuming(delim(class))(i)).unwrap();
+            assert_eq!(Class::Database,c)
+        }
+    }
 }
 #[cfg(test)]
 pub mod test {
-    use crate::parse::kind;
-    use crate::parse::util::result;
-    use crate::util::log;
-
-    #[test]
-    pub fn test() {}
+   #[test]
+    pub fn delimit() {}
 }

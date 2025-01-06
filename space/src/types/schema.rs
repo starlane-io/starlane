@@ -7,7 +7,7 @@ use strum::ParseError;
 use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
 use starlane_space::parse::{camel_chars, from_camel};
-use starlane_space::types::parse::schema_kind;
+use starlane_space::types::parse::schema;
 use starlane_space::types::PointKindDefSrc;
 use crate::parse::{camel_case, CamelCase, Res};
 use crate::parse::util::Span;
@@ -60,7 +60,7 @@ impl Generic for Schema {
     where
         I: Span
     {
-        schema_kind(input)
+        schema(input)
     }
 
 }

@@ -53,6 +53,7 @@ pub enum Class {
     /// The [Guest] which executes inside a [Host].  A single Guest instance may provide the execution
     /// for any number of other Classes that it provides
     Guest,
+    Database,
     Plugin,
     Global,
     Registry,
@@ -135,20 +136,6 @@ pub mod service {
 
 }
 
-
-impl TryFrom<ClassDiscriminant> for Class {
-    type Error = ();
-
-    fn try_from(source: ClassDiscriminant) -> Result<Self, Self::Error> {
-        match source {
-            ClassDiscriminant::_Ext=> Err(()),
-            /// true we are doing a naughty [Result::unwrap] of a [CamelCase::from_str] but
-            /// a non [CamelCase] from [SchemaDiscriminant::to_string] should be impossible unless some
-            /// developer messed up
-            source=> Ok(Self::_Ext(CamelCase::from_str(source.to_string().as_str()).unwrap()))
-        }
-    }
-}
 
 
 impl Delimited for Class {
