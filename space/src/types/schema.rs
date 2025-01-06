@@ -93,7 +93,7 @@ impl Parsers for SchemaParsers {
      */
 
     fn block<I,F,O>(f: F) -> impl FnMut(I) -> Res<I, O> where F: FnMut(I) -> Res<I,O>+Copy, I: Span {
-        unwrap_block(BlockKind::Nested(NestedBlockKind::Angle),f)
+        unwrap_block(BlockKind::Nested(NestedBlockKind::Square),f)
     }
 
     fn segment<I>(input: I) -> Res<I, Self::Segment>
