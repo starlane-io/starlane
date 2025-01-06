@@ -10,6 +10,7 @@ pub mod parse {
     use crate::parse::model::{BlockKind, NestedBlockKind};
     use crate::parse::util::{new_span, result};
     use crate::types::class::{Class, ClassDiscriminant, ClassParsers};
+    use crate::types::class::service::Service;
     use crate::types::private::{Generic, Parsers};
     use crate::types::Schema;
     #[test]
@@ -69,18 +70,28 @@ pub mod parse {
 
     #[test]
     pub fn test_class_variant() {
-        let s = "<Service<Database>>";
+        let inner = "Service<Database>";
+        let outer  = format!("<{}>",inner).to_string();
 
+        let segment = result(ClassParsers::segment(new_span(inner))).unwrap();
+        assert_eq!(segment.as_str(), "Service");
 
+        let (next,discriminant) = ClassParsers::discriminant(new_span(inner)).unwrap();
+        assert_eq!(ClassDiscriminant::Service, discriminant);
+        assert_eq!(next.to_string().as_str(), "<Database>");
+        assert!(ClassParsers::peek_variant(next.clone()));
 
-        let i = new_span(s);
-        match result(Class::parse_outer(i))  {
-            Ok(_) => {}
-            Err(err) => {
-                err.print();
-                panic!("test_class_variant failed: {}", err)
-            }
-        }
+        let variant = result(ClassParsers::block(ClassParsers::segment)(next)).unwrap();
+        assert_eq!(variant.to_string().as_str(), "Database");
+
+        let class = ClassParsers::variant(discriminant,variant).unwrap();
+
+        assert_eq!(class,Class::Service(Service::Database));
+
+        let class = result(Class::parse_outer(new_span(outer.as_str()))).unwrap();
+
+        assert_eq!(Class::Service(Service::Database),class)
+
     }
 
     #[test]

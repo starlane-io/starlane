@@ -149,6 +149,14 @@ impl Parsers for ClassParsers {
       let (next,segment) = Self::segment(input)?;
       Ok((next,ClassDiscriminant::from_str(segment.as_str()).unwrap_or_else(|_| ClassDiscriminant::_Ext)))
     }
+
+    fn variant(disc: Self::Discriminant, variant: Self::Segment) -> Result<Self::Output, strum::ParseError> {
+        match disc {
+            Self::Discriminant::Service => Ok(Service::from(variant).into()),
+            _ => Err(strum::ParseError::VariantNotFound)
+        }
+    }
+
 }
 
 
