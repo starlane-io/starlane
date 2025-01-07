@@ -3,6 +3,8 @@ use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::marker::PhantomData;
 use indexmap::Equivalent;
+use nom::sequence::tuple;
+use nom_supreme::tag::complete::tag;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::loc::Version;
 use starlane_space::selector::Pattern;
@@ -42,7 +44,9 @@ impl <V> TypeParser for SpecificExt<V> where V: SpecificVariant {
     where
         I: Span
     {
-        todo!()
+        tuple((V::Contributor::inner,tag(":"),V::Package::inner,tag(":"),V::Version::inner))(input).map( |(next,((contributor,_,package,_,version)))| {
+            (next,SpecificExt::new(contributor,package,version))
+        })
     }
 }
 
@@ -62,9 +66,7 @@ pub mod variants {
 
     pub type Contributor = Domain;
 
-
     pub type Package = SkewerCase;
-
 
     pub type ContributorSelector = Pattern<Contributor>;
     pub type PackageSelector = Pattern<Package>;
@@ -135,12 +137,7 @@ pub type SchemaDefs = Defs<Schema,SchemaDef>;
 
 
 
-impl Specific {
-    pub fn parse<I>(input: I) -> Res<I,Self> where I: Span {
-        todo!()
-        //parse::specific(input)
-    }
-}
+
 
 impl Equivalent<Specific> for &Specific {
     fn equivalent(&self, specific: &Specific) -> bool {
@@ -151,102 +148,26 @@ impl Equivalent<Specific> for &Specific {
 
 
 
-
-
-
-
-
-
-
 impl <V> SpecificExt<V> where V: SpecificVariant {
     pub fn new(contributor: V::Contributor, package: V::Package, version: V::Version) -> Self  {
         Self { contributor, package, version, phantom: PhantomData::default() }
     }
 }
 
-
-
-
-
-
-
-/*
-impl SpecificSelector {
-    pub fn parse<I>(input: I) -> Res<I,Self> where I: Span {
-        parse::specific_selector(input)
-    }
-}
-
-
-pub(crate) mod parse {
-    use nom::sequence::tuple;
-    use nom_supreme::tag::complete::tag;
-    use starlane_space::types::parse::TypeParser;
-    use starlane_space::types::tag::VersionTag;
-    use super::{Specific, SpecificCtx, SpecificExt};
-    use crate::parse::{pattern, version_req, Res};
-    use crate::parse::util::Span;
-    use crate::parse::domain as contributor;
-    use crate::parse::skewer_case as package;
-    use crate::parse::version as version;
-    use crate::types::tag::AbstractTag;
-    use super::SpecificSelector;
-
-
-
-    /*
-    /// parse the general structure of a [Specific] including: [SpecificSelector]...
-    pub fn specific_gen<I,C,P,V>(contributor: impl FnMut(I) -> Res<I,C>,package: impl FnMut(I) -> Res<I,P>,version: impl FnMut(I) -> Res<I,V>, input: I ) -> Res<I, SpecificExt<C,P,V>> where I: Span {
-        tuple((
-            contributor,
-            tag(":"),
-            package,
-            tag(":"),
-            version,
-        ))(input).map(|(next,(contributor,_,package,_,version))|{
-            (next, SpecificExt::new(contributor, package, version))
-        })
-    }
-
-    pub fn specific<I>(input: I) -> Res<I, Specific> where I: Span {
-        specific_gen(contributor, package, version, input)
-    }
-
-
-    pub fn specific_ctx<I>(input: I) -> Res<I, SpecificCtx> where I: Span {
-        specific_gen(contributor, package, VersionTag::wrap(version), input)
-    }
-
-
-    pub fn specific_selector<I: Span>(input: I) -> Res<I, SpecificSelector> {
-        specific_gen(pattern(contributor), pattern(package), VersionTag::wrap(pattern(version_req)), input)
-    }
-
-
-     */
-
-    /*
+pub mod parse {
 
     #[cfg(test)]
     pub mod test {
         use crate::parse::util::{new_span, result};
-        use crate::types::specific::{Specific, SpecificCtx};
+        use crate::types::parse::TypeParser;
+        use crate::types::specific::Specific;
 
         #[test]
-        pub fn test_specific() {
+        pub fn parse_specific() {
+            let input = "uberscott:wonky:1.3.5";
+            let specific = result(Specific::inner(new_span(input))).unwrap();
 
-            let specific = result(Specific::parse(new_span("uberscott.com:my-package:1.3.7"))).unwrap();
-            println!("{}", specific);
-
-            let specific = result(SpecificCtx::parse(new_span("uberscott.com:my-package:#[latest]"))).unwrap();
-            println!("{}", specific);
-
+            assert_eq!(specific.to_string().as_str(),input)
         }
-
     }
-
-     */
-
 }
-
- */
