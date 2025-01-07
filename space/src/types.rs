@@ -1,7 +1,6 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 use std::marker::PhantomData;
 use std::str::FromStr;
-use ascii::AsciiChar::P;
 use derive_name::Name;
 use nom::branch::alt;
 use nom::combinator::{into, opt};
@@ -9,7 +8,6 @@ use nom::error::{ErrorKind, FromExternalError};
 use nom::sequence::{terminated, tuple};
 use nom_supreme::tag::complete::tag;
 use once_cell::sync::Lazy;
-use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 
 pub mod class;
@@ -36,34 +34,12 @@ pub mod exact;
 /// which references a definition in [Specific]
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants,strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
-#[strum_discriminants(name(AbstractDiscriminant))]
+#[strum_discriminants(name(TypeDiscriminant))]
 #[strum_discriminants(derive( Hash, strum_macros::EnumString, strum_macros::ToString, strum_macros::IntoStaticStr ))]
 pub enum Type {
     Schema(Schema),
     Class(Class),
 }
-
-impl TzoParser for Type {
-    fn inner<I>(input: I) -> Res<I, Self>
-    where
-        I: Span
-    {
-        todo!()
-    }
-}
-
-impl BlockParser for Type {
-    fn block() -> NestedBlockKind {
-        todo!()
-    }
-}
-
-impl Type {
-    pub fn parse<I>(input: I) -> Res<I,Self> where I: Span{
-        alt((into(Class::outer), into(Schema::outer)))(input)
-    }
-}
-
 
 pub type AsType = dyn Into<ExtType>;
 pub type AsTypeKind = dyn Into<Type>;
@@ -85,11 +61,7 @@ pub(crate) struct Ext<V> where V: ExtVariant
     specific: V::Specific,
 }
 
-impl <V> BlockParser for Ext<V> where V: ExtVariant {
-    fn block() -> NestedBlockKind {
-        V::Type::block()
-    }
-}
+
 
 impl<V> Display for Ext<V> where V: ExtVariant
 
@@ -109,20 +81,11 @@ impl<V> Display for Ext<V> where V: ExtVariant
 
 /// binds the various elements to support `Identifier`, `Selector` and `Context` variants
 pub trait ExtVariant {
-   type Scope: TzoParser +Default;
-   type Type: TzoParser+BlockParser;
-   type Specific: TzoParser;
+   type Scope: PrimitiveArchetype<Parser:PrimitiveParser<Output=Self::Scope>>;
+   type Type: Archetype;
+   type Specific: SpecificVariant;
 
-    /*
-  fn parse<I,Scope,Abstract,Specific>(input: I) -> Res<I,ExactGen> where I: Span {
-        let (next,block) = lex_block_alt(BLOCKS.as_ref())(input.clone())?;
-        match block.kind {
-            BlockKind::Nested(NestedBlockKind::Angle) ->
-            _ =>  Err(nom::Err::Error(NomErr::from_external_error(input,ErrorKind::Fail,"unrecognized block kind")
-        }
-   }
-
-     */
+   type Parser: ExtParser<Self>;
 }
 
 
@@ -149,7 +112,7 @@ impl ExtVariant for SchemaIdentifier {
     type Specific = Specific;
 }
 
-impl <G> ExtVariant for GenericIdentifier<G> where G: Generic+BlockParser{
+impl <G> ExtVariant for GenericIdentifier<G> where G: Generic{
     type Scope = Scope;
     type Type = G;
     type Specific = Specific;
@@ -161,31 +124,22 @@ pub trait TypeFactory {
 
 }
 
-impl <V> TzoParser for Ext<V>  where V: ExtVariant
+impl <V> PrimitiveParser for Ext<V>  where V: ExtVariant
 {
-
-    fn outer<I>(input: I) -> Res<I,Self> where I: Span {
-        let (next,block) = lex_block_alt(BLOCKS.clone())(input.clone())?;
-        match block.kind {
-            _ =>  Err(nom::Err::Error(NomErr::from_external_error(input,ErrorKind::Fail,"unrecognized block kind")))
-        }
-    }
+    type Output = Ext<V>;
 
 
-    fn inner<I>(input: I) -> Res<I, Self>
+    fn parse<I>(input: I) -> Res<I, Self::Output>
     where
         I: Span
     {
 
-        tuple((opt(terminated(V::Scope::inner, tag("::"))), V::Type::inner, tag("@"), V::Specific::inner))(input).map(|(next,(scope,r#abstract,_,specific))|
+        tuple((opt(terminated(V::Scope::parse, tag("::"))), V::Type::parse, tag("@"), V::Specific::parse))(input).map(|(next,(scope,r#abstract,_,specific))|
             (next, Ext::new(scope.unwrap_or_default(), r#abstract, specific))
         )
     }
 }
 
-pub trait BlockParser {
-    fn block() -> NestedBlockKind;
-}
 
 
 
@@ -317,15 +271,16 @@ pub enum DefSrc {
 use crate::err::ParseErrs;
 use crate::parse::{lex_block_alt, CamelCase, NomErr, Res, SkewerCase};
 use crate::point::Point;
-use crate::types::private::{Generic};
+use crate::types::private::Generic;
 pub use schema::Schema;
 use specific::Specific;
+use starlane_space::types::parse::GenericParser;
 use starlane_space::types::private::Variant;
+use starlane_space::types::specific::SpecificVariant;
 use crate::parse::model::{BlockKind, NestedBlockKind};
-use crate::parse::test::test_lex_block;
 use crate::parse::util::Span;
 use crate::types::class::Class;
-use crate::types::parse::{TzoParser, NESTED_BLOCKS_DEFAULT};
+use crate::types::parse::{Archetype, ExtParser, PrimitiveArchetype, PrimitiveParser, SpecificParser, TypeParsers};
 use crate::types::scope::Scope;
 
 
@@ -338,7 +293,7 @@ pub(crate) mod private {
     use crate::point::Point;
     use crate::types;
     use crate::types::class::Class;
-    use crate::types::scope::Scope;
+    use crate::types::scope::{Scope, Segment};
     use indexmap::IndexMap;
     use itertools::Itertools;
     use nom::{IResult, Parser};
@@ -360,46 +315,29 @@ pub(crate) mod private {
     use nom::sequence::{delimited, pair};
     use nom_supreme::ParserExt;
     use strum_macros::EnumDiscriminants;
+    use starlane_space::types::parse::TypeParsers;
     use crate::parse::model::{BlockKind, NestedBlockKind};
-    use crate::types::parse::TzoParser;
+    use crate::types::parse::{PrimitiveArchetype, PrimitiveParser};
 
-    pub(crate) trait Generic: BlockParser+TzoParser +Name+Clone+Into<Type>+Clone+FromStr+Display{
+    pub(crate) trait Generic: PrimitiveArchetype<Parser: TypeParsers<Discriminant=Self::Discriminant>> +Name+Clone+Into<Type>+Clone+FromStr+Display{
 
         type Discriminant;
 
-        type Segment;
+        type Segment:  PrimitiveArchetype<Parser:PrimitiveParser>;
 
-
-        fn abstract_discriminant(&self) -> super::AbstractDiscriminant;
+        fn of_type() -> &'static super::TypeDiscriminant;
 
         fn plus(self, scope: Scope, specific: Specific) -> GenExt<Self> {
             GenExt::new(scope,self,specific)
         }
 
         /// parse the sub variant
-        fn variant<V>(_: Self::Discriminant, _: Self::Segment) -> Result<V,ParseErrs> where V: Variant<Root=Self>{
+        fn create_variant<V>(_: Self::Discriminant, _: Self::Segment) -> Result<V,ParseErrs> where V: Variant<Type=Self>{
             Err(ParseErrs::new("Discriminant does not support Variants"))
         }
 
-        fn convention() -> Case;
 
-        /*
-        fn parser() -> impl Parsers<Output=Self, Variant=Self::Segment>;
-
-        fn parse_outer<I>(input: I) -> Res<I,Self> where I: Span {
-            Self::parser().outer(input)
-        }
-
-        fn parse<I>(input: I) -> Res<I,Self> where I: Span {
-            Self::parser().parse(input)
-        }
-
-
-         */
-
-        fn block_kind() -> NestedBlockKind;
-
-
+        fn block() -> &'static NestedBlockKind;
 
         /// wrap the string value in it's `type` wrapper.
         ///
@@ -407,74 +345,15 @@ pub(crate) mod private {
         /// [Class::Service(Service::Database)] to_string would return `Service<Database>` and
         /// [Class::wrapped_string] would return `<Database>` and `<Service<Database>` respectively
         fn wrapped_string(&self) -> String {
-            Self::block_kind().wrap(self.to_string())
-        }
-
-    }
-
-
-
-    pub trait Parsers {
-        type Output: TryFrom<Self::Discriminant,Error=strum::ParseError> + FromStr;
-
-        type Discriminant: TryFrom<Self::Variant>;
-
-        type Variant;
-
-        fn discriminant<I>(input:I) -> Res<I, Self::Discriminant>
-        where
-            I: Span;
-
-
-        fn block_kind() -> NestedBlockKind;
-
-        fn block<I,F,O>(f: F) -> impl FnMut(I) -> Res<I, O> where F: FnMut(I) -> Res<I,O>+Copy, I: Span;
-
-        fn segment<I>(input: I) -> Res<I, Self::Variant> where I:Span;
-
-        fn create(_: Self::Discriminant, _: Self::Variant) -> Result<Self::Output, strum::ParseError> {
-            Err(strum::ParseError::VariantNotFound)
-        }
-
-        fn peek_variant<I>(input: I) -> bool where I: Span
-        {
-             match value(true, peek(Self::block(Self::segment)))(input) {
-                 Ok((_,value)) => value,
-                 Err(_) => false
-             }
-        }
-
-        fn outer<I>(&self, input: I) -> Res<I, Self::Output>
-        where
-            I: Span
-        {
-            let parse = move |input| self.parse(input);
-            Self::block(parse)(input)
-        }
-
-        fn parse<I>(&self, input: I) -> Res<I, Self::Output>
-        where
-            I: Span
-        {
-            let (next, disc) = Self::discriminant(input.clone())?;
-            let result= if !Self::peek_variant(next.clone()) {
-                Self::Output::try_from(disc)
-            } else {
-                let (next, variant) = Self::block(Self::segment)(next.clone())?;
-                Self::create(disc, variant)
-            };
-
-            let output = result.map_err(|err| nom::Err::Failure(NomErr::from_external_error(input,ErrorKind::Fail,err)))?;
-
-            Ok((next, output))
+            Self::block().wrap(self.to_string())
         }
     }
 
 
     /// [Variant] implies inheritance from a
-    pub(crate) trait Variant where Self: Into<Self::Root> {
+    pub(crate) trait Variant where Self: Into<Self::Type> {
         /// the base [Type] variant [Class] or [Schema]
-        type Root: Generic+?Sized;
+        type Type: Generic+?Sized;
 
         type Discriminant;
     }

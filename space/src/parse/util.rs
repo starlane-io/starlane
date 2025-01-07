@@ -179,6 +179,9 @@ mod span_serde {
     }
 }
 
+
+pub type Input<'s> = Wrap<LocatedSpan<&'s str, Arc<String>>>;
+
 pub fn new_span<'a>(s: &'a str) -> Wrap<LocatedSpan<&'a str, Arc<String>>> {
     let extra = Arc::new(s.to_string());
     let span = LocatedSpan::new_extra(s, extra);

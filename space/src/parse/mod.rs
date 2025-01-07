@@ -100,7 +100,7 @@ use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
-use starlane_space::types::parse::TzoParser;
+use starlane_space::types::parse::PrimitiveParser;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
 
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
@@ -1613,8 +1613,8 @@ pub struct Domain {
     string: String,
 }
 
-impl TzoParser for Domain {
-    fn inner<I>(input: I) -> Res<I, Self>
+impl PrimitiveParser for Domain {
+    fn parse<I>(input: I) -> Res<I, Self>
     where
         I: Span
     {
@@ -1673,8 +1673,8 @@ pub struct SkewerCase {
     string: String,
 }
 
-impl TzoParser for SkewerCase {
-    fn inner<I>(input: I) -> Res<I, Self>
+impl PrimitiveParser for SkewerCase {
+    fn parse<I>(input: I) -> Res<I, Self>
     where
         I: Span
     {
@@ -5028,9 +5028,16 @@ pub mod model {
 
     impl NestedBlockKind {
 
-        pub fn unwrap<I: Span, F, O>(&self, mut f: F) -> impl FnMut(I) -> Res<I, O>
+
+        pub fn unwrap_func<I,O,F>(&self) ->  impl FnMut(I) -> Res<I, O> where I: Span, F: FnMut(I) -> Res<I, O>{
+            let clone= self.clone();
+            move |func| clone.unwrap(func)
+        }
+
+
+        pub fn unwrap<I, F, O>(&self, mut f: F) -> impl FnMut(I) -> Res<I, O>
         where
-            F: FnMut(I) -> Res<I, O>,
+            F: FnMut(I) -> Res<I, O>, I: Span
         {
             unwrap_block(BlockKind::Nested(self.clone()), f )
         }

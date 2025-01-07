@@ -5,15 +5,13 @@
 pub mod parse {
     use std::str::FromStr;
     use starlane_space::parse::unwrap_block;
-    use starlane_space::types::BlockParser;
-    use crate::err::{ParseErrs, PrintErr};
     use crate::parse::{camel_case, from_camel, CamelCase};
     use crate::parse::model::{BlockKind, NestedBlockKind};
     use crate::parse::util::{new_span, result};
-    use crate::types::class::{Class, ClassDiscriminant, ClassParsers};
+    use crate::types::class::{Class, ClassDiscriminant};
     use crate::types::class::service::Service;
-    use crate::types::parse::TzoParser;
-    use crate::types::private::{Generic, Parsers};
+    use crate::types::parse::{TypeParsers, PrimitiveParser};
+    use crate::types::private::{Generic};
     use crate::types::{ClassExt, Schema};
 
 
@@ -22,7 +20,7 @@ pub mod parse {
         let inner = "Database@uberscott.io:postgres:1.3.5";
         let outer = NestedBlockKind::Angle.wrap(&inner);
         let input = new_span(outer.as_str());
-        let ext = result(<ClassExt as BlockParser>::block().unwrap(ClassExt::inner)(input)).unwrap();
+        let ext = result(<ClassExt as BlockParser>::block().unwrap(ClassExt::parse)(input)).unwrap();
         println!("from -> {}", outer );
         println!("ext -> {}", ext );
     }
@@ -54,13 +52,14 @@ pub mod parse {
         let res = result(unwrap_block(BlockKind::Nested(NestedBlockKind::Angle), camel_case)(i.clone())).unwrap();
         assert_eq!(res.as_str(), inner);
 
+
         let (next, disc) = ClassParsers::discriminant(new_span(inner)).unwrap();
 
         assert_eq!(ClassDiscriminant::Database, disc);
 
         assert!(!ClassParsers::peek_variant(next));
 
-        let class = result(Class::inner(new_span(inner))).unwrap();
+        let class = result(Class::parse(new_span(inner))).unwrap();
 
         assert_eq!(Class::Database, class);
 
@@ -79,7 +78,7 @@ pub mod parse {
         let s = "<Service<Database>>";
         let i = new_span(s);
 
-        let parser = Class::inner(i).unwrap();
+        let parser = Class::parse(i).unwrap();
     }
 
 

@@ -15,8 +15,9 @@ use crate::parse::util::{new_span, result, Span};
 
 use once_cell::sync::Lazy;
 use strum::ParseError;
-use starlane_space::types::parse::TzoParser;
+use starlane_space::types::parse::PrimitiveParser;
 use starlane_space::types::private::Generic;
+use crate::types::parse::PrimitiveArchetype;
 use crate::types::specific::Specific;
 
 pub static ROOT_SCOPE: Lazy<Scope> = Lazy::new(|| Scope(Some(Keyword::Root), vec![]));
@@ -38,17 +39,40 @@ pub enum Keyword {
     Root
 }
 
+impl PrimitiveArchetype for Keyword {
+    type Parser = dyn KeywordParser;
+}
 
+pub trait KeywordParser {}
 
-impl TzoParser for Keyword {
-    fn inner<I>(input:I) -> Res<I,Self> where I: Span{
+impl PrimitiveParser for dyn KeywordParser {
+    type Output = Keyword;
+
+    fn parse<I>(input:I) -> Res<I,Self::Output> where I: Span{
         let (next,var) = var_case(input.clone())?;
-        match Self::from_str(var.as_str()) {
+        match Self::Output::from_str(var.as_str()) {
             Ok(keyword) => Ok((next,keyword)),
             Err(err) => Err(nom::Err::Error(NomErr::from_external_error(input,ErrorKind::Fail,err)))
         }
     }
 }
+
+/*
+struct KeywordParser;
+
+impl PrimitiveParser for KeywordParser {
+    type Output = Keyword;
+
+    fn parse<I>(input:I) -> Res<I,Self::Output> where I: Span{
+        let (next,var) = var_case(input.clone())?;
+        match Self::Output::from_str(var.as_str()) {
+            Ok(keyword) => Ok((next,keyword)),
+            Err(err) => Err(nom::Err::Error(NomErr::from_external_error(input,ErrorKind::Fail,err)))
+        }
+    }
+}
+
+ */
 
 /// a segment providing `scope` [Specific] [Meta] in the case where
 /// multiple definitions of the same base type and/or to group like definitions
@@ -85,8 +109,12 @@ impl From<VarCase> for Segment {
     }
 }
 
-impl TzoParser for Segment  {
-    fn inner<I>(input:I) -> Res<I,Self> where I: Span{
+struct SegmentParser;
+
+impl PrimitiveParser for SegmentParser  {
+    type Output = Segment;
+
+    fn parse<I>(input:I) -> Res<I,Self::Output> where I: Span{
         alt((into(version),into(var_case)))(input)
     }
 }
@@ -121,8 +149,8 @@ impl Scope {
 
 }
 
-impl TzoParser for Scope {
-    fn inner<I>(input: I) -> Res<I, Self>
+impl PrimitiveParser for Scope {
+    fn parse<I>(input: I) -> Res<I, Self>
     where
         I: Span
     {
@@ -206,7 +234,7 @@ pub mod parse {
     use nom::branch::alt;
     use nom_supreme::ParserExt;
     use nom_supreme::tag::TagError;
-    use crate::types::parse::TzoParser;
+    use crate::types::parse::PrimitiveParser;
 
     pub(crate) fn parse(s: impl AsRef<str> ) -> Result<Scope,err::ParseErrs> {
         let span = new_span(s.as_ref());
@@ -214,7 +242,7 @@ pub mod parse {
     }
     /// will return an empty [Scope]  -> `DomainScope(None,Vec:default())` if nothing is found
     pub fn scope<I: Span>(input: I) -> Res<I, Scope> {
-        let keyword = <Keyword as TzoParser> ::inner;
+        let keyword = <Keyword as PrimitiveParser> ::parse;
         pair(opt(pair(keyword,opt(tag("::")))),segments)(input).map(|(next,(preamble,segments))|{
             let keyword = preamble.map_or_else(||None,|(keyword,_) | Some(keyword));
 
@@ -253,13 +281,13 @@ pub mod test {
     use crate::loc::Version;
     use crate::parse::util::{new_span, result};
     use crate::parse::VarCase;
-    use crate::types::parse::TzoParser;
+    use crate::types::parse::PrimitiveParser;
     use crate::types::scope::parse::parse;
     use crate::types::scope::{Scope, Segment, SegmentDiscriminant};
 
     #[test]
     fn test_keywords() {
-        let keyword = result(Keyword::inner(new_span("root"))).unwrap();
+        let keyword = result(Keyword::parse(new_span("root"))).unwrap();
         assert_eq!(keyword, Keyword::Root);
         let scope = Scope(Some(Keyword::Root), vec![]);
         assert!(scope.is_reserved_prefix())
@@ -269,10 +297,10 @@ pub mod test {
     fn test_segment() {
         let var = "some_var_case";
         let version = "1.3.5";
-        let segment = result(Segment::inner( new_span(var))).unwrap();
+        let segment = result(Segment::parse( new_span(var))).unwrap();
         assert_eq!(Segment::Segment(VarCase::from_str(var).unwrap()), segment);
 
-        let segment = result(Segment::inner( new_span(version))).unwrap();
+        let segment = result(Segment::parse( new_span(version))).unwrap();
         assert_eq!(Segment::Version(Version::from_str(version).unwrap()), segment);
     }
 
@@ -296,7 +324,7 @@ pub mod test {
     fn test_scope( )  {
         {
             let input = "starlane";
-            let scope = result(Scope::inner(new_span(input))).unwrap();
+            let scope = result(Scope::parse(new_span(input))).unwrap();
             assert!(scope.is_reserved_prefix());
             assert_eq!(scope, Scope(Some(Keyword::Starlane), vec![]));
         }
@@ -304,7 +332,7 @@ pub mod test {
         {
             let input = "my";
             let var = VarCase::from_str(input).unwrap();;
-            let scope = result(Scope::inner(new_span(input))).unwrap();
+            let scope = result(Scope::parse(new_span(input))).unwrap();
             assert!(!scope.is_reserved_prefix());
             assert_eq!(scope, Scope(None, vec![Segment::Segment(var)]));
         }
@@ -316,7 +344,7 @@ pub mod test {
 
             assert_eq!( "root::database::postgres", input.as_str() );
 
-            let scope = result(Scope::inner(new_span(input.as_str()))).unwrap();
+            let scope = result(Scope::parse(new_span(input.as_str()))).unwrap();
             assert!(scope.is_reserved_prefix());
             segments.remove(0);
             assert_eq!(segments.len(),2);

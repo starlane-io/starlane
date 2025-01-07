@@ -8,19 +8,22 @@ use nom_supreme::tag::complete::tag;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::loc::Version;
 use starlane_space::selector::Pattern;
-use starlane_space::types::parse::TzoParser;
+use starlane_space::types::parse::{PrimitiveArchetype, PrimitiveParser};
 use crate::parse::{Domain, Res, SkewerCase};
 use crate::parse::util::Span;
 use crate::types::class::{Class, ClassDef};
 use crate::types::id::Id;
+use crate::types::parse::SpecificParser;
 use crate::types::Schema;
 use crate::types::scope::Scope;
 use crate::types::schema::SchemaDef;
 
-trait SpecificVariant {
-    type Contributor: TzoParser +Clone;
-    type Package: TzoParser +Clone;
-    type Version: TzoParser +Clone;
+pub trait SpecificVariant {
+    type Contributor: PrimitiveArchetype<Parser:PrimitiveParser>+Clone;
+    type Package: PrimitiveArchetype<Parser:PrimitiveParser>+Clone;
+    type Version: PrimitiveArchetype<Parser:PrimitiveParser>+Clone;
+
+    fn parser<P>() -> P where P: SpecificParser<Output=Self>;
 }
 
 #[derive(Debug, Clone, Hash,Eq, PartialEq)]
@@ -39,12 +42,12 @@ impl <V> Display for SpecificExt<V> where V: SpecificVariant {
 
 
 
-impl <V> TzoParser for SpecificExt<V> where V: SpecificVariant {
-    fn inner<I>(input: I) -> Res<I, Self>
+impl <V> PrimitiveParser for SpecificExt<V> where V: SpecificVariant {
+    fn parse<I>(input: I) -> Res<I, Self>
     where
         I: Span
     {
-        tuple((V::Contributor::inner,tag(":"),V::Package::inner,tag(":"),V::Version::inner))(input).map( |(next,((contributor,_,package,_,version)))| {
+        tuple((V::Contributor::parse, tag(":"), V::Package::parse, tag(":"), V::Version::parse))(input).map( |(next,((contributor,_,package,_,version)))| {
             (next,SpecificExt::new(contributor,package,version))
         })
     }
@@ -60,7 +63,7 @@ pub mod variants {
     use crate::parse::{domain, Domain, Res, SkewerCase};
     use crate::parse::util::Span;
     use crate::selector::{Pattern, VersionReq};
-    use crate::types::parse::TzoParser;
+    use crate::types::parse::PrimitiveParser;
     use crate::types::specific::{SpecificVariant};
     use crate::types::tag::{TagWrap, VersionTag};
 
@@ -159,13 +162,13 @@ pub mod parse {
     #[cfg(test)]
     pub mod test {
         use crate::parse::util::{new_span, result};
-        use crate::types::parse::TzoParser;
+        use crate::types::parse::PrimitiveParser;
         use crate::types::specific::Specific;
 
         #[test]
         pub fn parse_specific() {
             let input = "uberscott:wonky:1.3.5";
-            let specific = result(Specific::inner(new_span(input))).unwrap();
+            let specific = result(Specific::parse(new_span(input))).unwrap();
 
             assert_eq!(specific.to_string().as_str(),input)
         }

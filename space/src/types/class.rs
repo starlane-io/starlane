@@ -1,5 +1,5 @@
 use crate::types::{private, DataPoint, ExtType, Type, Ext, Case, Schema};
-use crate::types::AbstractDiscriminant;
+use crate::types::TypeDiscriminant;
 use core::str::FromStr;
 use std::borrow::Borrow;
 use derive_builder::Builder;
@@ -12,15 +12,15 @@ use strum::ParseError;
 use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
 use starlane_space::parse::{delim_kind_lex, from_camel};
-use starlane_space::types::BlockParser;
 use starlane_space::types::private::Generic;
 use crate::parse::{camel_case, camel_chars, lex_block, unwrap_block, CamelCase, NomErr, Res};
 use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::point::Point;
+use crate::types::class::parse::ClassParser;
 use crate::types::class::service::Service;
-use crate::types::parse::TzoParser;
-use crate::types::private::{Parsers, Variant};
+use crate::types::parse::{TypeParsers, PrimitiveParser, VariantSegmentParser, PrimitiveArchetype, SeparatedSegmentParser};
+use crate::types::private::{Variant};
 use crate::types::schema::SchemaDiscriminant;
 
 #[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
@@ -85,37 +85,22 @@ pub enum Class {
     _Ext(CamelCase),
 }
 
-impl TzoParser for Class {
-    fn inner<I>(input: I) -> Res<I, Self>
-    where
-        I: Span
-    {
-        ClassParsers::new().parse(input)
-    }
-}
 
-impl BlockParser for Class {
-    fn block() -> NestedBlockKind {
-        NestedBlockKind::Angle
-    }
-}
 
 impl Generic for Class {
     type Discriminant = ClassDiscriminant;
     type Segment = CamelCase;
 
-    fn abstract_discriminant(&self) -> AbstractDiscriminant {
-        AbstractDiscriminant::Class
+    fn of_type() -> &'static TypeDiscriminant {
+        & TypeDiscriminant::Class
     }
 
-    fn convention() -> Case {
-        Case::CamelCase
-    }
+    fn block() -> &'static NestedBlockKind {
 
-    fn block_kind() -> NestedBlockKind {
-        NestedBlockKind::Angle
+        &NestedBlockKind::Angle
     }
 }
+
 
 
 
@@ -130,25 +115,21 @@ impl TryFrom<ClassDiscriminant> for Class{
     }
 }
 
-pub struct ClassParsers;
 
-impl ClassParsers {
-    fn new() -> Self {
-        Self
-    }
-}
 
-impl Parsers for ClassParsers {
+
+/*
+impl TypeParsers for ClassParsers {
     type Output = Class;
     type Discriminant = ClassDiscriminant;
-    type Variant = CamelCase;
+    type GroupSegment = CamelCase;
 
 
     fn block<I,F,O>(f: F) -> impl FnMut(I) -> Res<I, O> where F: FnMut(I) -> Res<I,O>+Copy, I: Span {
         unwrap_block(BlockKind::Nested(NestedBlockKind::Angle),f)
     }
 
-    fn segment<I>(input: I) -> Res<I, Self::Variant>
+    fn segment<I>(input: I) -> Res<I, Self::GroupSegment>
     where
         I: Span
     {
@@ -163,7 +144,7 @@ impl Parsers for ClassParsers {
       Ok((next,ClassDiscriminant::from_str(segment.as_str()).unwrap_or_else(|_| ClassDiscriminant::_Ext)))
     }
 
-    fn create(disc: Self::Discriminant, variant: Self::Variant) -> Result<Self::Output, strum::ParseError> {
+    fn create(disc: Self::Discriminant, variant: Self::GroupSegment) -> Result<Self::Output, strum::ParseError> {
         match disc {
             Self::Discriminant::Service => Ok(Service::from(variant).into()),
             _ => Err(strum::ParseError::VariantNotFound)
@@ -173,7 +154,11 @@ impl Parsers for ClassParsers {
     fn block_kind() -> NestedBlockKind {
         NestedBlockKind::Angle
     }
+
+    type VariantSegment = ();
 }
+
+ */
 
 
 impl Class {
@@ -245,7 +230,7 @@ pub mod service {
 
 
     impl Variant for Service {
-        type Root = Class;
+        type Type = Class;
         type Discriminant = Discriminant;
 
 

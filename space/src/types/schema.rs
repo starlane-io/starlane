@@ -1,4 +1,4 @@
-use crate::types::{private, AbstractDiscriminant, SrcDef, Type, ExtType, Ext, Case};
+use crate::types::{private, TypeDiscriminant, SrcDef, Type, ExtType, Ext, Case};
 use core::str::FromStr;
 use derive_name::Name;
 use nom::combinator::fail;
@@ -8,14 +8,14 @@ use strum::ParseError;
 use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
 use starlane_space::parse::{camel_chars, from_camel};
-use starlane_space::types::{BlockParser, PointKindDefSrc};
+use starlane_space::types::{PointKindDefSrc};
 use crate::parse::{camel_case, unwrap_block, CamelCase, Res};
 use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::types::class::ClassDiscriminant;
 use crate::types::class::service::Service;
-use crate::types::parse::TzoParser;
-use crate::types::private::{Generic, Parsers, Variant};
+use crate::types::parse::{TypeParsers, PrimitiveParser};
+use crate::types::private::{Generic, Variant};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::EnumString, strum_macros::Display, Serialize,Deserialize,Name)]
 #[strum_discriminants(vis(pub))]
@@ -37,94 +37,25 @@ pub enum Schema {
     _Ext(CamelCase),
 }
 
-impl TzoParser for Schema {
-    fn inner<I>(input: I) -> Res<I, Self>
-    where
-        I: Span
-    {
-
-        SchemaParsers::new().parse(input)
-    }
-}
-
-impl BlockParser for Schema {
-    fn block() -> NestedBlockKind {
-        NestedBlockKind::Square
-    }
-}
-
 impl Generic for Schema {
     type Discriminant = SchemaDiscriminant;
     type Segment = CamelCase;
 
-
-    fn abstract_discriminant(&self) -> AbstractDiscriminant {
-        AbstractDiscriminant::Schema
+    fn of_type() -> &'static TypeDiscriminant {
+        & TypeDiscriminant::Schema
     }
 
-
-    fn convention() -> Case {
-        Case::CamelCase
-    }
-
-
-    fn block_kind() -> NestedBlockKind {
-        NestedBlockKind::Square
+    fn block() -> &'static NestedBlockKind {
+        & NestedBlockKind::Square
     }
 }
 
-struct SchemaParsers;
-
-impl SchemaParsers {
-    fn new() -> Self {
-        Self
-    }
-}
-
-impl Parsers for SchemaParsers {
-    type Output = Schema;
-    type Discriminant = SchemaDiscriminant;
-    type Variant = CamelCase;
-
-    fn discriminant<I>(input: I) -> Res<I, Self::Discriminant>
-    where
-        I: Span
-    {
-        let (next,segment) = Self::segment(input)?;
-        Ok((next,Self::Discriminant::from_str(segment.as_str()).unwrap_or_else(|_| Self::Discriminant::_Ext)))
-    }
-
-    fn block_kind() -> NestedBlockKind {
-        NestedBlockKind::Square
-    }
-    /*
-    fn discriminant<I>(&self) -> impl FnMut(I) -> Res<I, Self::Discriminant>
-    where
-        I: Span
-    {
-        let mut segment = Self::segment();
-
-        move |input| {
-            let (next,segment) = segment(input)?;
-            Ok((next,Self::Discriminant::from_str(segment.as_str()).unwrap_or_else(|_| Self::Discriminant::_Ext)))
-        }
-    }
-
-     */
-
-    fn block<I,F,O>(f: F) -> impl FnMut(I) -> Res<I, O> where F: FnMut(I) -> Res<I,O>+Copy, I: Span {
-        unwrap_block(BlockKind::Nested(NestedBlockKind::Square),f)
-    }
-
-    fn segment<I>(input: I) -> Res<I, Self::Variant>
-    where
-        I: Span
-    {
-        camel_case(input)
-    }
+struct SchemaParser;
 
 
-}
+
+
+
 
 impl TryFrom<SchemaDiscriminant> for Schema {
     type Error = strum::ParseError;
@@ -185,9 +116,9 @@ impl Into<CamelCase> for Schema {
     }
 }
 
-impl Into<AbstractDiscriminant> for Schema {
-    fn into(self) -> AbstractDiscriminant {
-        AbstractDiscriminant::Schema
+impl Into<TypeDiscriminant> for Schema {
+    fn into(self) -> TypeDiscriminant {
+        TypeDiscriminant::Schema
     }
 }
 
