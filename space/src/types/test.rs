@@ -20,6 +20,7 @@ pub mod parse {
         let inner = "Database@uberscott.io:postgres:1.3.5";
         let outer = NestedBlockKind::Angle.wrap(&inner);
         let input = new_span(outer.as_str());
+        ClassExt::parse()
         let ext = result(<ClassExt as BlockParser>::block().unwrap(ClassExt::parse)(input)).unwrap();
         println!("from -> {}", outer );
         println!("ext -> {}", ext );

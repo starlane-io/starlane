@@ -648,9 +648,12 @@ impl ParseErrs {
     }
 
 
-    pub fn to_nom<I>(self, input: I) -> NomErr<I> where I: Span {
-        NomErr::from_error_kind(input, nom::error::ErrorKind::Tag)
+    pub fn to_nom<I>(self, input: &I) -> NomErr<I> where I: Span {
+        NomErr::from_error_kind(input.clone(), nom::error::ErrorKind::Tag)
     }
+
+
+
 
 }
 

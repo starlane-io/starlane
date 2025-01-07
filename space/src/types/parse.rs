@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::marker::PhantomData;
 use crate::parse::util::{preceded, Span};
 use crate::parse::{camel_case, lex_block, lex_block_alt, CamelCase, NomErr, Res};
 use crate::types::class::Class;
@@ -7,19 +8,20 @@ use crate::types::{Type, Schema, Ext, TypeDiscriminant};
 use futures::FutureExt;
 use nom::branch::alt;
 use nom::combinator::{into, map, opt, peek, value};
-use nom::sequence::{delimited, pair, tuple};
+use nom::sequence::{delimited, pair, terminated, tuple};
 use nom::Parser;
 use nom_supreme::tag::complete::tag;
 use nom_supreme::ParserExt;
 use starlane_space::parse::from_camel;
 use std::str::FromStr;
 use nom::error::{ErrorKind, FromExternalError};
-use nom::multi::separated_list0;
+use nom::multi::{many0, separated_list0};
 use once_cell::sync::Lazy;
 use starlane_space::types::ExtVariant;
 use starlane_space::types::specific::SpecificVariant;
+use crate::err::ParseErrs;
 use crate::parse::model::{BlockKind, NestedBlockKind};
-use crate::types::parse::util::Alt;
+use crate::types::parse::util::{Alt, VariantStack};
 use crate::types::specific::SpecificExt;
 
 pub static NESTED_BLOCKS_DEFAULT: Lazy<Option<NestedBlockKind>> =
@@ -32,7 +34,7 @@ pub trait PrimitiveArchetype: Display {
 
 pub trait Archetype: Display {
    type Segment: PrimitiveArchetype<Parser:PrimitiveParser>;
-   type Parsers: TypeParsers;
+   type Parser: TypeParsers;
 }
 
 
@@ -64,7 +66,67 @@ pub trait SpecificParser {
 
 
 
-mod util {
+pub mod util {
+    use std::ops::Deref;
+    use crate::err::ParseErrs;
+    use crate::types::private::Generic;
+
+    pub struct VariantStack<G> where G: Generic{
+        segments: Vec<G::Segment>
+    }
+
+    impl <G> VariantStack<G> where G: Generic{
+        fn two(&self) -> Result<(&G::Segment,Option<&G::Segment>),ParseErrs>  {
+            match self.segments.len() {
+                1 =>  Ok((self.first().unwrap(),None)),
+                2 =>  Ok((self.first().unwrap(),self.get(1))),
+                len => {
+                    Err(ParseErrs::expected(format!("{}",G::of_type()), "segment count between: 1..2", len.to_string() ))
+                }
+            }
+        }
+    }
+
+
+    impl <G> From<Vec<G::Segment>> for VariantStack<G> where G:Generic{
+        fn from(segments: Vec<G::Segment>) -> Self {
+            Self { segments }
+        }
+    }
+
+    impl <G> VariantStack<G> where G: Generic{
+
+        pub fn new() -> Self {
+            Default::default()
+        }
+
+        pub fn push(& mut self, segment:G::Segment ) {
+            self.segments.push(segment);
+        }
+
+
+        pub fn as_string(&self, index: &usize) -> String {
+            self.segments.get(index).map(ToString::to_string).unwrap_or_default()
+        }
+
+    }
+
+    impl <G> Default for VariantStack<G> where G: Generic{
+        fn default() -> Self {
+            Self {
+                segments: Default::default()
+            }
+        }
+    }
+
+    impl <G> Deref for VariantStack<G> where G: Generic {
+        type Target = Vec<G::Segment>;
+
+        fn deref(&self) -> &Self::Target {
+            &self.segments
+        }
+    }
+
     pub enum Alt<V,S> {
         Variant((V,Option<S>)),
         Specific(S),
@@ -87,52 +149,60 @@ mod util {
 
 pub trait ExtParser<V> where V: ExtVariant {
 
+    fn new() -> impl  ExtParser<V> {
+        ExtParserImpl::default()
+    }
+
     fn block<'x>() -> &'static NestedBlockKind {
-        <<V::Type as PrimitiveArchetype>::Parser as TypeParsers>::unwrap()
+        <<V::Type as PrimitiveArchetype>::Parser as TypeParsers>::block()
     }
 
-    fn parse_outer<I>(input: I) -> Res<I,Ext<V>> where I: Span {
-        Self::block().unwrap(input)
+
+    fn specific_prelude<I>(input: I) -> impl FnMut(I) -> Res<I,V::Specific>+Clone where I: Span {
+        preceded(tag("@"),Self::specific)(input)
     }
 
-    fn specific_prelude<I>() -> impl FnMut(I) -> Res<I,V::Specific>+Clone where I: Span {
-        preceded(tag("@"),Self::specific)
+    fn specific<I>(input:I) -> impl FnMut(I) -> Res<I,V::Specific>+Clone where I: Span {
+        <<V::Specific as PrimitiveArchetype>::Parser as PrimitiveParser>::parse(input)
     }
 
-    fn specific<I>() -> impl FnMut(I) -> Res<I,V::Specific>+Clone where I: Span {
-        <<V::Specific as PrimitiveArchetype>::Parser as PrimitiveParser>::parse
-    }
-
-    fn variant_prelude<I>() -> impl FnMut(I) -> Res<I,V::Specific>+Clone where I: Span {
-        preceded(peek(tag("@")),Self::specific)
-    }
     fn segment<I>() -> impl FnMut(I) -> Res<I,V::Type>+Clone where I: Span {
        <<V::Type as Archetype>::Parser as TypeParsers>::segment
     }
 
     /// return [Alt] enumeration of either [Alt::Variant] or [Atl::Specific]
     fn alt<I>() -> impl FnMut(I) -> Res<I,Alt<V::Type::Segment,V::Specific>>+Clone where I: Span  {
-        let segment = Self::segment;
-        let specific = Self::specific;
-        alt(())
+        let specific = Self::specific_prelude.map(Alt::from);
+        let variant = tuple((V::Type::Parser::segment_prelude, opt(Self::specific_prelude))).map(Alt::from);
+        alt((specific,variant))
+    }
+
+    fn scope<I>() -> impl FnMut(I) -> Res<I,V::Scope> where I: Span {
+        <<V::Scope as PrimitiveArchetype>::Parser as PrimitiveParser>::parse
     }
 
     fn outer<I>(input:I) -> Res<I,Ext<V>> where I: Span {
-        V::Type::Parsers::enter(Self::parse)(input)
+        V::Type::Parser::enter(Self::parse)(input)
     }
 
     fn parse<I>(input: I) -> Res<I, Ext<V>>
     where
         I: Span
     {
-        
+        tuple((Self::scope,V::Type::Parser::stack,Self::specific_prelude))(input).map(|(next,(scope,generic,specific))|
+            (next,Ext::new(scope,))
+
+        )
     }
 }
 
-pub type ScopeParser<O> = impl PrimitiveParser<Output=O>;
+struct ExtParserImpl<V>(PhantomData<V>) where V: ExtVariant;
 
-
-
+impl<V> Default for ExtParserImpl<V> where V: ExtVariant {
+    fn default() -> Self {
+        Self(PhantomData::default())
+    }
+}
 
 
 pub trait ParserWrapper<I> where I: Span {
@@ -250,10 +320,13 @@ pub trait TypeParsers {
         Self::Segment::Parser::parse(input)
     }
 
+
+
     /// opening character for a NestedBlock
     fn open<I>() -> impl FnMut(I) -> Res<I,()> where I: Span {
         tag(Self::block().open())
     }
+
 
     /// enter the block and start parsing like mad
     fn enter<I, F, O>(mut f: F) -> impl FnMut(I) -> Res<I, O>
@@ -263,9 +336,21 @@ pub trait TypeParsers {
         Self::block().unwrap(f)
     }
 
-   fn variant(_: Self::Discriminant, _: Self::Segment) -> Result<Self::Type,strum::ParseError>  {
-        Err(strum::ParseError::VariantNotFound)
+    fn stack<I>(input: I) -> Res<I,VariantStack<Self::Type>> where I: Span{
+        let segment = Self::segment;
+        let variant = Self::enter(Self::segment);
+
+        pair(segment,many0(variant))(input).map(|(next,(segment,mut variants))|  {
+            variants.insert(0,segment);
+            let stack = variants.into();
+            (next,stack)
+        })
     }
+
+    fn variant<I>(input: I) -> Res<I,Self::Type> where I: Span{
+        into(Self::stack)(input)
+    }
+
 }
 
 

@@ -12,9 +12,10 @@ use starlane_space::types::{PointKindDefSrc};
 use crate::parse::{camel_case, unwrap_block, CamelCase, Res};
 use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
-use crate::types::class::ClassDiscriminant;
+use crate::types::class::{Class, ClassDiscriminant};
 use crate::types::class::service::Service;
 use crate::types::parse::{TypeParsers, PrimitiveParser};
+use crate::types::parse::util::VariantStack;
 use crate::types::private::{Generic, Variant};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::EnumString, strum_macros::Display, Serialize,Deserialize,Name)]
@@ -47,6 +48,29 @@ impl Generic for Schema {
 
     fn block() -> &'static NestedBlockKind {
         & NestedBlockKind::Square
+    }
+}
+
+
+impl TryFrom<VariantStack<Schema>>  for Schema {
+    type Error = ParseErrs;
+
+    fn try_from(stack: VariantStack<Schema>) -> Result<Self, Self::Error> {
+
+        match stack.two()? {
+            (disc, None) => Ok(Schema::from(disc)),
+            (disc, Some(variant)) => {
+
+                Err(ParseErrs::new("Schema type generic does not yet support variants"))
+                /*
+                let disc = SchemaDiscriminant::try_from(disc)?;
+                match disc {
+                    disc => Err(ParseErrs::expected("Class::Discriminant", "a valid variant", format!("Class::Discriminant::{}",disc.to_string())))?
+                }
+
+                 */
+            }
+        }
     }
 }
 

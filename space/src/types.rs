@@ -85,7 +85,9 @@ pub trait ExtVariant {
    type Type: Archetype;
    type Specific: SpecificVariant;
 
-   type Parser: ExtParser<Self>;
+   fn parser() -> impl ExtParser<Self> {
+       ExtParser::new()
+   }
 }
 
 
@@ -124,21 +126,6 @@ pub trait TypeFactory {
 
 }
 
-impl <V> PrimitiveParser for Ext<V>  where V: ExtVariant
-{
-    type Output = Ext<V>;
-
-
-    fn parse<I>(input: I) -> Res<I, Self::Output>
-    where
-        I: Span
-    {
-
-        tuple((opt(terminated(V::Scope::parse, tag("::"))), V::Type::parse, tag("@"), V::Specific::parse))(input).map(|(next,(scope,r#abstract,_,specific))|
-            (next, Ext::new(scope.unwrap_or_default(), r#abstract, specific))
-        )
-    }
-}
 
 
 
@@ -274,7 +261,6 @@ use crate::point::Point;
 use crate::types::private::Generic;
 pub use schema::Schema;
 use specific::Specific;
-use starlane_space::types::parse::GenericParser;
 use starlane_space::types::private::Variant;
 use starlane_space::types::specific::SpecificVariant;
 use crate::parse::model::{BlockKind, NestedBlockKind};
@@ -285,8 +271,7 @@ use crate::types::scope::Scope;
 
 
 pub(crate) mod private {
-    use super::{err, Type, ExtType, Ext, Schema, Case, parse, GenExt, ExtVariant, BlockParser};
-    use crate::err::{ParseErrs, SpaceErr};
+    use super::{err, Type, ExtType, Ext, Schema, Case, parse, GenExt, ExtVariant};
     use super::specific::Specific;
     use crate::parse::util::Span;
     use crate::parse::{camel_case, CamelCase, NomErr, Res};
@@ -318,12 +303,18 @@ pub(crate) mod private {
     use starlane_space::types::parse::TypeParsers;
     use crate::parse::model::{BlockKind, NestedBlockKind};
     use crate::types::parse::{PrimitiveArchetype, PrimitiveParser};
+    use crate::types::parse::util::VariantStack;
 
-    pub(crate) trait Generic: PrimitiveArchetype<Parser: TypeParsers<Discriminant=Self::Discriminant>> +Name+Clone+Into<Type>+Clone+FromStr+Display{
+    pub(crate) trait Generic: PrimitiveArchetype<Parser: TypeParsers<Discriminant=Self::Discriminant>> +TryFrom<VariantStack<Self>>+Name+Clone+Into<Type>+Clone+FromStr+Display{
 
         type Discriminant;
 
         type Segment:  PrimitiveArchetype<Parser:PrimitiveParser>;
+
+
+        fn max_stack_size() -> usize {
+            2usize
+        }
 
         fn of_type() -> &'static super::TypeDiscriminant;
 
@@ -331,10 +322,8 @@ pub(crate) mod private {
             GenExt::new(scope,self,specific)
         }
 
-        /// parse the sub variant
-        fn create_variant<V>(_: Self::Discriminant, _: Self::Segment) -> Result<V,ParseErrs> where V: Variant<Type=Self>{
-            Err(ParseErrs::new("Discriminant does not support Variants"))
-        }
+
+
 
 
         fn block() -> &'static NestedBlockKind;

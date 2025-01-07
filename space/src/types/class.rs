@@ -17,9 +17,9 @@ use crate::parse::{camel_case, camel_chars, lex_block, unwrap_block, CamelCase, 
 use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::point::Point;
-use crate::types::class::parse::ClassParser;
 use crate::types::class::service::Service;
-use crate::types::parse::{TypeParsers, PrimitiveParser, VariantSegmentParser, PrimitiveArchetype, SeparatedSegmentParser};
+use crate::types::parse::PrimitiveArchetype;
+use crate::types::parse::util::VariantStack;
 use crate::types::private::{Variant};
 use crate::types::schema::SchemaDiscriminant;
 
@@ -87,6 +87,7 @@ pub enum Class {
 
 
 
+
 impl Generic for Class {
     type Discriminant = ClassDiscriminant;
     type Segment = CamelCase;
@@ -99,10 +100,26 @@ impl Generic for Class {
 
         &NestedBlockKind::Angle
     }
+
 }
 
+impl TryFrom<VariantStack<Class>>  for Class {
+    type Error = ParseErrs;
 
+    fn try_from(stack: VariantStack<Class>) -> Result<Self, Self::Error> {
 
+        match stack.two()? {
+            (disc, None) => Ok(Class::from(disc)),
+            (disc, Some(variant)) => {
+                let disc = ClassDiscriminant::try_from(disc)?;
+                match disc {
+                    ClassDiscriminant::Service => Ok(Service::from(variant).into()),
+                    disc => Err(ParseErrs::expected("Class::Discriminant", "a valid variant", format!("Class::Discriminant::{}",disc.to_string())))?
+                }
+            }
+        }
+    }
+}
 
 impl TryFrom<ClassDiscriminant> for Class{
     type Error = strum::ParseError;
@@ -161,6 +178,7 @@ impl TypeParsers for ClassParsers {
  */
 
 
+/*
 impl Class {
     pub fn from_variant( variant: CamelCase, sub: CamelCase ) -> Result<Class,ParseErrs> {
         match variant.as_str() {
@@ -171,6 +189,8 @@ impl Class {
         }
     }
 }
+
+ */
 
 pub mod service {
     use std::str::FromStr;
