@@ -21,7 +21,7 @@ use crate::substance::{
 };
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
-use starlane_space::types::parse::TypeParser;
+use starlane_space::types::parse::TzoParser;
 
 pub type PointSegKindHop = HopDef<PointSegSelector, KindSelector>;
 pub type PointSegKindHopCtx = HopDef<PointSegSelectorCtx, KindSelector>;
@@ -932,7 +932,8 @@ pub enum Pattern<P> {
     Exact(P),
 }
 
-impl <P> TypeParser for Pattern<P> where P: TypeParser {
+impl <P> TzoParser for Pattern<P> where P: TzoParser
+{
     fn inner<I>(input: I) -> Res<I, Self>
     where
         I: Span

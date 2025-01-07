@@ -12,13 +12,14 @@ use strum::ParseError;
 use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
 use starlane_space::parse::{delim_kind_lex, from_camel};
+use starlane_space::types::BlockParser;
 use starlane_space::types::private::Generic;
 use crate::parse::{camel_case, camel_chars, lex_block, unwrap_block, CamelCase, NomErr, Res};
 use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::point::Point;
 use crate::types::class::service::Service;
-use crate::types::parse::TypeParser;
+use crate::types::parse::TzoParser;
 use crate::types::private::{Parsers, Variant};
 use crate::types::schema::SchemaDiscriminant;
 
@@ -84,12 +85,18 @@ pub enum Class {
     _Ext(CamelCase),
 }
 
-impl TypeParser for Class {
+impl TzoParser for Class {
     fn inner<I>(input: I) -> Res<I, Self>
     where
         I: Span
     {
         ClassParsers::new().parse(input)
+    }
+}
+
+impl BlockParser for Class {
+    fn block() -> NestedBlockKind {
+        NestedBlockKind::Angle
     }
 }
 

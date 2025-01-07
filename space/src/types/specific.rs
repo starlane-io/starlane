@@ -8,7 +8,7 @@ use nom_supreme::tag::complete::tag;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::loc::Version;
 use starlane_space::selector::Pattern;
-use starlane_space::types::parse::TypeParser;
+use starlane_space::types::parse::TzoParser;
 use crate::parse::{Domain, Res, SkewerCase};
 use crate::parse::util::Span;
 use crate::types::class::{Class, ClassDef};
@@ -18,9 +18,9 @@ use crate::types::scope::Scope;
 use crate::types::schema::SchemaDef;
 
 trait SpecificVariant {
-    type Contributor: TypeParser+Clone;
-    type Package: TypeParser+Clone;
-    type Version: TypeParser+Clone;
+    type Contributor: TzoParser +Clone;
+    type Package: TzoParser +Clone;
+    type Version: TzoParser +Clone;
 }
 
 #[derive(Debug, Clone, Hash,Eq, PartialEq)]
@@ -39,7 +39,7 @@ impl <V> Display for SpecificExt<V> where V: SpecificVariant {
 
 
 
-impl <V> TypeParser for SpecificExt<V> where V: SpecificVariant {
+impl <V> TzoParser for SpecificExt<V> where V: SpecificVariant {
     fn inner<I>(input: I) -> Res<I, Self>
     where
         I: Span
@@ -60,7 +60,7 @@ pub mod variants {
     use crate::parse::{domain, Domain, Res, SkewerCase};
     use crate::parse::util::Span;
     use crate::selector::{Pattern, VersionReq};
-    use crate::types::parse::TypeParser;
+    use crate::types::parse::TzoParser;
     use crate::types::specific::{SpecificVariant};
     use crate::types::tag::{TagWrap, VersionTag};
 
@@ -159,7 +159,7 @@ pub mod parse {
     #[cfg(test)]
     pub mod test {
         use crate::parse::util::{new_span, result};
-        use crate::types::parse::TypeParser;
+        use crate::types::parse::TzoParser;
         use crate::types::specific::Specific;
 
         #[test]

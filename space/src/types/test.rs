@@ -5,15 +5,29 @@
 pub mod parse {
     use std::str::FromStr;
     use starlane_space::parse::unwrap_block;
+    use starlane_space::types::BlockParser;
     use crate::err::{ParseErrs, PrintErr};
     use crate::parse::{camel_case, from_camel, CamelCase};
     use crate::parse::model::{BlockKind, NestedBlockKind};
     use crate::parse::util::{new_span, result};
     use crate::types::class::{Class, ClassDiscriminant, ClassParsers};
     use crate::types::class::service::Service;
-    use crate::types::parse::TypeParser;
+    use crate::types::parse::TzoParser;
     use crate::types::private::{Generic, Parsers};
-    use crate::types::Schema;
+    use crate::types::{ClassExt, Schema};
+
+
+    #[test]
+    pub fn test_parse_exact() {
+        let inner = "Database@uberscott.io:postgres:1.3.5";
+        let outer = NestedBlockKind::Angle.wrap(&inner);
+        let input = new_span(outer.as_str());
+        let ext = result(<ClassExt as BlockParser>::block().unwrap(ClassExt::inner)(input)).unwrap();
+        println!("from -> {}", outer );
+        println!("ext -> {}", ext );
+    }
+
+
     #[test]
     pub fn test_from_camel() {
         #[derive(Eq, PartialEq, Debug)]

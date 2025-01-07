@@ -43,11 +43,17 @@ pub enum Type {
     Class(Class),
 }
 
-impl TypeParser for Type {
+impl TzoParser for Type {
     fn inner<I>(input: I) -> Res<I, Self>
     where
         I: Span
     {
+        todo!()
+    }
+}
+
+impl BlockParser for Type {
+    fn block() -> NestedBlockKind {
         todo!()
     }
 }
@@ -79,7 +85,11 @@ pub(crate) struct Ext<V> where V: ExtVariant
     specific: V::Specific,
 }
 
-
+impl <V> BlockParser for Ext<V> where V: ExtVariant {
+    fn block() -> NestedBlockKind {
+        V::Type::block()
+    }
+}
 
 impl<V> Display for Ext<V> where V: ExtVariant
 
@@ -99,9 +109,9 @@ impl<V> Display for Ext<V> where V: ExtVariant
 
 /// binds the various elements to support `Identifier`, `Selector` and `Context` variants
 pub trait ExtVariant {
-   type Scope: TypeParser+Default;
-   type Type: TypeParser;
-   type Specific: TypeParser;
+   type Scope: TzoParser +Default;
+   type Type: TzoParser+BlockParser;
+   type Specific: TzoParser;
 
     /*
   fn parse<I,Scope,Abstract,Specific>(input: I) -> Res<I,ExactGen> where I: Span {
@@ -139,7 +149,7 @@ impl ExtVariant for SchemaIdentifier {
     type Specific = Specific;
 }
 
-impl <G> ExtVariant for GenericIdentifier<G> where G: Generic{
+impl <G> ExtVariant for GenericIdentifier<G> where G: Generic+BlockParser{
     type Scope = Scope;
     type Type = G;
     type Specific = Specific;
@@ -151,7 +161,7 @@ pub trait TypeFactory {
 
 }
 
-impl <V> TypeParser for Ext<V>  where V: ExtVariant
+impl <V> TzoParser for Ext<V>  where V: ExtVariant
 {
 
     fn outer<I>(input: I) -> Res<I,Self> where I: Span {
@@ -160,6 +170,7 @@ impl <V> TypeParser for Ext<V>  where V: ExtVariant
             _ =>  Err(nom::Err::Error(NomErr::from_external_error(input,ErrorKind::Fail,"unrecognized block kind")))
         }
     }
+
 
     fn inner<I>(input: I) -> Res<I, Self>
     where
@@ -171,6 +182,12 @@ impl <V> TypeParser for Ext<V>  where V: ExtVariant
         )
     }
 }
+
+pub trait BlockParser {
+    fn block() -> NestedBlockKind;
+}
+
+
 
 pub static CLASS_NESTED_BLOCK_KIND: Lazy<Option<NestedBlockKind>> =
     Lazy::new(|| Option::Some(NestedBlockKind::Angle));
@@ -308,12 +325,12 @@ use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::test::test_lex_block;
 use crate::parse::util::Span;
 use crate::types::class::Class;
-use crate::types::parse::TypeParser;
+use crate::types::parse::{TzoParser, NESTED_BLOCKS_DEFAULT};
 use crate::types::scope::Scope;
 
 
 pub(crate) mod private {
-    use super::{err, Type, ExtType, Ext, Schema, Case, parse, GenExt, ExtVariant};
+    use super::{err, Type, ExtType, Ext, Schema, Case, parse, GenExt, ExtVariant, BlockParser};
     use crate::err::{ParseErrs, SpaceErr};
     use super::specific::Specific;
     use crate::parse::util::Span;
@@ -344,9 +361,9 @@ pub(crate) mod private {
     use nom_supreme::ParserExt;
     use strum_macros::EnumDiscriminants;
     use crate::parse::model::{BlockKind, NestedBlockKind};
-    use crate::types::parse::TypeParser;
+    use crate::types::parse::TzoParser;
 
-    pub(crate) trait Generic: TypeParser+Name+Clone+Into<Type>+Clone+FromStr+Display{
+    pub(crate) trait Generic: BlockParser+TzoParser +Name+Clone+Into<Type>+Clone+FromStr+Display{
 
         type Discriminant;
 

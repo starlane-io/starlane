@@ -8,13 +8,13 @@ use strum::ParseError;
 use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
 use starlane_space::parse::{camel_chars, from_camel};
-use starlane_space::types::PointKindDefSrc;
+use starlane_space::types::{BlockParser, PointKindDefSrc};
 use crate::parse::{camel_case, unwrap_block, CamelCase, Res};
 use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::types::class::ClassDiscriminant;
 use crate::types::class::service::Service;
-use crate::types::parse::TypeParser;
+use crate::types::parse::TzoParser;
 use crate::types::private::{Generic, Parsers, Variant};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::EnumString, strum_macros::Display, Serialize,Deserialize,Name)]
@@ -37,13 +37,19 @@ pub enum Schema {
     _Ext(CamelCase),
 }
 
-impl TypeParser for Schema {
+impl TzoParser for Schema {
     fn inner<I>(input: I) -> Res<I, Self>
     where
         I: Span
     {
 
         SchemaParsers::new().parse(input)
+    }
+}
+
+impl BlockParser for Schema {
+    fn block() -> NestedBlockKind {
+        NestedBlockKind::Square
     }
 }
 

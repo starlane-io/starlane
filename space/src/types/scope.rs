@@ -15,7 +15,7 @@ use crate::parse::util::{new_span, result, Span};
 
 use once_cell::sync::Lazy;
 use strum::ParseError;
-use starlane_space::types::parse::TypeParser;
+use starlane_space::types::parse::TzoParser;
 use starlane_space::types::private::Generic;
 use crate::types::specific::Specific;
 
@@ -40,7 +40,7 @@ pub enum Keyword {
 
 
 
-impl TypeParser for Keyword {
+impl TzoParser for Keyword {
     fn inner<I>(input:I) -> Res<I,Self> where I: Span{
         let (next,var) = var_case(input.clone())?;
         match Self::from_str(var.as_str()) {
@@ -85,7 +85,7 @@ impl From<VarCase> for Segment {
     }
 }
 
-impl TypeParser for Segment  {
+impl TzoParser for Segment  {
     fn inner<I>(input:I) -> Res<I,Self> where I: Span{
         alt((into(version),into(var_case)))(input)
     }
@@ -121,7 +121,7 @@ impl Scope {
 
 }
 
-impl TypeParser for Scope {
+impl TzoParser for Scope {
     fn inner<I>(input: I) -> Res<I, Self>
     where
         I: Span
@@ -206,7 +206,7 @@ pub mod parse {
     use nom::branch::alt;
     use nom_supreme::ParserExt;
     use nom_supreme::tag::TagError;
-    use crate::types::parse::TypeParser;
+    use crate::types::parse::TzoParser;
 
     pub(crate) fn parse(s: impl AsRef<str> ) -> Result<Scope,err::ParseErrs> {
         let span = new_span(s.as_ref());
@@ -214,7 +214,7 @@ pub mod parse {
     }
     /// will return an empty [Scope]  -> `DomainScope(None,Vec:default())` if nothing is found
     pub fn scope<I: Span>(input: I) -> Res<I, Scope> {
-        let keyword = <Keyword as TypeParser> ::inner;
+        let keyword = <Keyword as TzoParser> ::inner;
         pair(opt(pair(keyword,opt(tag("::")))),segments)(input).map(|(next,(preamble,segments))|{
             let keyword = preamble.map_or_else(||None,|(keyword,_) | Some(keyword));
 
@@ -253,7 +253,7 @@ pub mod test {
     use crate::loc::Version;
     use crate::parse::util::{new_span, result};
     use crate::parse::VarCase;
-    use crate::types::parse::TypeParser;
+    use crate::types::parse::TzoParser;
     use crate::types::scope::parse::parse;
     use crate::types::scope::{Scope, Segment, SegmentDiscriminant};
 

@@ -100,7 +100,7 @@ use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
-use starlane_space::types::parse::TypeParser;
+use starlane_space::types::parse::TzoParser;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
 
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
@@ -1613,7 +1613,7 @@ pub struct Domain {
     string: String,
 }
 
-impl TypeParser for Domain {
+impl TzoParser for Domain {
     fn inner<I>(input: I) -> Res<I, Self>
     where
         I: Span
@@ -1673,7 +1673,7 @@ pub struct SkewerCase {
     string: String,
 }
 
-impl TypeParser for SkewerCase {
+impl TzoParser for SkewerCase {
     fn inner<I>(input: I) -> Res<I, Self>
     where
         I: Span
@@ -3993,10 +3993,7 @@ pub mod model {
     use crate::err::ParseErrs;
     use crate::loc::Version;
     use crate::parse::util::{new_span, result, Span, Trace, Tw};
-    use crate::parse::{
-        lex_child_scopes, method_kind, pipeline, subst_path, value_pattern, wrapped_cmd_method,
-        wrapped_ext_method, wrapped_http_method, wrapped_sys_method, Assignment, Env,
-    };
+    use crate::parse::{lex_child_scopes, method_kind, pipeline, subst_path, unwrap_block, value_pattern, wrapped_cmd_method, wrapped_ext_method, wrapped_http_method, wrapped_sys_method, Assignment, Env, Res};
     use crate::point::{Point, PointCtx, PointVar};
     use crate::util::{ToResolved, ValueMatcher, ValuePattern};
     use crate::wave::core::{Method, MethodKind};
@@ -5031,8 +5028,15 @@ pub mod model {
 
     impl NestedBlockKind {
 
-        pub fn wrap(&self, string: String  ) -> String {
-            format!("{}{}{}", self.open(), string, self.close()).to_string()
+        pub fn unwrap<I: Span, F, O>(&self, mut f: F) -> impl FnMut(I) -> Res<I, O>
+        where
+            F: FnMut(I) -> Res<I, O>,
+        {
+            unwrap_block(BlockKind::Nested(self.clone()), f )
+        }
+
+        pub fn wrap(&self, string: impl AsRef<str>) -> String {
+            format!("{}{}{}", self.open(), string.as_ref(), self.close()).to_string()
         }
 
         pub fn is_block_terminator(c: char) -> bool {

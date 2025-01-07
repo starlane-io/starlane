@@ -21,7 +21,7 @@ use starlane_macros::ToBase;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
-use crate::types::parse::TypeParser;
+use crate::types::parse::TzoParser;
 
 pub static CENTRAL: Lazy<Point> = Lazy::new(|| StarKey::central().to_point());
 pub static GLOBAL_LOGGER: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::logger").unwrap());
@@ -134,7 +134,7 @@ pub struct Version {
 }
 
 
-impl TypeParser for Version {
+impl TzoParser for Version {
     fn inner<I>(input: I) -> Res<I, Self>
     where
         I: Span

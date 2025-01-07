@@ -20,19 +20,14 @@ use crate::parse::model::{BlockKind, NestedBlockKind};
 pub static NESTED_BLOCKS_DEFAULT: Lazy<Option<NestedBlockKind>> =
     Lazy::new(|| None);
 
-pub trait TypeParser: Display+Sized {
-    /// an outer parser will unwrap the root nested block and pass to [TypeParser::inner]
+pub trait TzoParser: Display+Sized {
+    /// an outer parser will unwrap the root nested block and pass to [TzoParser::inner]
     /// i.e.`<Database>` become `Database`  For implementation that don't have the
-    /// concept of an outer block [TypeParser::outer] simply proxies to [TypeParser::inner]
+    /// concept of an outer block [TzoParser::outer] simply proxies to [TzoParser::inner]
     fn outer<I>(input: I) -> Res<I,Self> where I: Span {
         Self::inner(input)
     }
     fn inner<I>(input: I) -> Res<I,Self> where I: Span;
-
-
-    fn block() -> &'static Option<NestedBlockKind> {
-        &*NESTED_BLOCKS_DEFAULT
-    }
 }
 
 
