@@ -25,6 +25,7 @@ pub enum Tag {
     Version(VersionTag),
     Route(RouteTag),
     Point(PointTag),
+    Specific(SpecificTag)
 }
 
 pub trait AbstractTag: Display+Eq+PartialEq+Hash+Into<Tag>+From<SkewerCase> {
@@ -167,6 +168,40 @@ impl From<SkewerCase> for RouteTag {
 
 #[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
 #[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(SpecificTagdiscriminants))]
+#[strum_discriminants(derive(
+    Hash,
+    strum_macros::EnumString,
+    strum_macros::ToString,
+    strum_macros::IntoStaticStr
+))]
+#[non_exhaustive]
+#[strum(serialize_all = "kebab-case")]
+pub enum SpecificTag{
+    #[strum(disabled)]
+    #[strum(to_string = "{0}")]
+    _Ext(SkewerCase),
+}
+
+
+impl Into<Tag> for SpecificTag {
+    fn into(self) -> Tag {
+        Tag::Specific(self)
+    }
+}
+
+impl AbstractTag for SpecificTag {}
+
+impl From<SkewerCase> for SpecificTag {
+    fn from(skewer: SkewerCase) -> Self {
+        match Self::from_str(skewer.as_str()) {
+            Ok(tag) => tag,
+            Err(_) => Self::_Ext(skewer)
+        }
+    }
+}
+#[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
+#[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(PointTagDiscriminants))]
 #[strum_discriminants(derive(
     Hash,
@@ -182,9 +217,9 @@ pub enum PointTag {
     _Ext(SkewerCase),
 }
 
-impl AbstractTag for PointTag {}
+impl AbstractTag for crate::types::tag::PointTag {}
 
-impl From<SkewerCase> for PointTag {
+impl From<SkewerCase> for crate::types::tag::PointTag {
     fn from(skewer: SkewerCase) -> Self {
         match Self::from_str(skewer.as_str()) {
             Ok(tag) => tag,
@@ -192,6 +227,7 @@ impl From<SkewerCase> for PointTag {
         }
     }
 }
+
 
 
 pub mod parse {

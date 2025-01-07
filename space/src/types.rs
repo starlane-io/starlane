@@ -1,6 +1,14 @@
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
+use std::marker::PhantomData;
 use std::str::FromStr;
+use ascii::AsciiChar::P;
 use derive_name::Name;
+use nom::branch::alt;
+use nom::combinator::{into, opt};
+use nom::error::{ErrorKind, FromExternalError};
+use nom::sequence::{terminated, tuple};
+use nom_supreme::tag::complete::tag;
+use once_cell::sync::Lazy;
 use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 
@@ -24,44 +32,166 @@ pub mod exact;
 //pub(crate) trait Typical: Display+Into<TypeKind>+Into<Type> { }
 
 
-/// [class::Class::Database] is an example of an [Abstract] because it is not an [ExactDef]
+/// [class::Class::Database] is an example of an [Type] because it is not an [ExactDef]
 /// which references a definition in [Specific]
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants,strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(AbstractDiscriminant))]
 #[strum_discriminants(derive( Hash, strum_macros::EnumString, strum_macros::ToString, strum_macros::IntoStaticStr ))]
-pub enum Abstract {
+pub enum Type {
     Schema(Schema),
     Class(Class),
 }
 
+impl TypeParser for Type {
+    fn inner<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        todo!()
+    }
+}
 
-
-
-pub type AsType = dyn Into<Exact>;
-pub type AsTypeKind = dyn Into<Abstract>;
-
-pub type GenericExact<Abstract:Generic> =  ExactGen<Scope,Abstract,Specific>;
-
-impl <A> From<GenericExact<A>> for Exact where A: Generic {
-    fn from(from: GenericExact<A>) -> Exact {
-        Exact::scoped(from.scope,from.r#abstract.into(),from.specific)
+impl Type {
+    pub fn parse<I>(input: I) -> Res<I,Self> where I: Span{
+        alt((into(Class::outer), into(Schema::outer)))(input)
     }
 }
 
 
-pub type Exact = ExactGen<Scope,Abstract,Specific>;
+pub type AsType = dyn Into<ExtType>;
+pub type AsTypeKind = dyn Into<Type>;
 
-pub type ExactClass = GenericExact<Class>;
-pub type ExactSchema = GenericExact<Schema>;
+pub type ExtType = Ext<TypeIdentifier>;
+
+pub type GenExt<G:Generic> = Ext<GenericIdentifier<G>>;
+pub type ClassExt = Ext<ClassIdentifier>;
+
+pub type SchemaExt = Ext<SchemaIdentifier>;
+
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub(crate) struct ExactGen<Scope,Abstract,Specific> where Scope: Default
+pub(crate) struct Ext<V> where V: ExtVariant
 {
-    scope: Scope,
-    r#abstract: Abstract,
-    specific: Specific,
+    phantom: PhantomData<V>,
+    scope: V::Scope,
+    r#type: V::Type,
+    specific: V::Specific,
 }
+
+
+
+impl<V> Display for Ext<V> where V: ExtVariant
+
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let scope = self.scope.to_string();
+        let str = if !scope.is_empty() {
+            format!("{}::{}@{}", self.scope, self.r#type, self.specific)
+        } else {
+            format!("{}@{}", self.r#type, self.specific)
+        };
+        write!(f, "{}", str)
+    }
+}
+
+
+
+/// binds the various elements to support `Identifier`, `Selector` and `Context` variants
+pub trait ExtVariant {
+   type Scope: TypeParser+Default;
+   type Type: TypeParser;
+   type Specific: TypeParser;
+
+    /*
+  fn parse<I,Scope,Abstract,Specific>(input: I) -> Res<I,ExactGen> where I: Span {
+        let (next,block) = lex_block_alt(BLOCKS.as_ref())(input.clone())?;
+        match block.kind {
+            BlockKind::Nested(NestedBlockKind::Angle) ->
+            _ =>  Err(nom::Err::Error(NomErr::from_external_error(input,ErrorKind::Fail,"unrecognized block kind")
+        }
+   }
+
+     */
+}
+
+
+
+pub struct TypeIdentifier;
+pub struct ClassIdentifier;
+pub struct SchemaIdentifier;
+pub struct GenericIdentifier<G>(PhantomData<G>) where G: Generic;
+
+impl ExtVariant for TypeIdentifier {
+    type Scope = Scope;
+    type Type = Type;
+    type Specific = Specific;
+}
+
+impl ExtVariant for ClassIdentifier {
+    type Scope = Scope;
+    type Type = Class;
+    type Specific = Specific;
+}
+impl ExtVariant for SchemaIdentifier {
+    type Scope = Scope;
+    type Type = Schema;
+    type Specific = Specific;
+}
+
+impl <G> ExtVariant for GenericIdentifier<G> where G: Generic{
+    type Scope = Scope;
+    type Type = G;
+    type Specific = Specific;
+}
+
+/// is able to ascertain the desired abstract
+pub trait TypeFactory {
+
+
+}
+
+impl <V> TypeParser for Ext<V>  where V: ExtVariant
+{
+
+    fn outer<I>(input: I) -> Res<I,Self> where I: Span {
+        let (next,block) = lex_block_alt(BLOCKS.clone())(input.clone())?;
+        match block.kind {
+            _ =>  Err(nom::Err::Error(NomErr::from_external_error(input,ErrorKind::Fail,"unrecognized block kind")))
+        }
+    }
+
+    fn inner<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+
+        tuple((opt(terminated(V::Scope::inner, tag("::"))), V::Type::inner, tag("@"), V::Specific::inner))(input).map(|(next,(scope,r#abstract,_,specific))|
+            (next, Ext::new(scope.unwrap_or_default(), r#abstract, specific))
+        )
+    }
+}
+
+pub static CLASS_NESTED_BLOCK_KIND: Lazy<Option<NestedBlockKind>> =
+    Lazy::new(|| Option::Some(NestedBlockKind::Angle));
+
+pub static SCHEMA_NESTED_BLOCK_KIND: Lazy<Option<NestedBlockKind>> =
+    Lazy::new(|| Option::Some(NestedBlockKind::Square));
+
+
+pub static BLOCKS: Lazy<Vec<BlockKind>> =
+    Lazy::new(|| vec![BlockKind::Nested(NestedBlockKind::Angle),BlockKind::Nested(NestedBlockKind::Square)]);
+
+impl ExtType {
+
+    fn parse_outer<I>(input: I) -> Res<I,Self> where I: Span{
+        todo!()
+
+    }
+
+}
+
+
 
 /*
 impl <Scope,Abstract,Specific> ExactGen<Scope,Abstract,Specific> {
@@ -72,19 +202,19 @@ impl <Scope,Abstract,Specific> ExactGen<Scope,Abstract,Specific> {
 
  */
 
-impl From<Class> for Abstract {
+impl From<Class> for Type {
     fn from(kind: Class) -> Self {
         Self::Class(kind)
     }
 }
 
-impl From<Schema> for Abstract {
+impl From<Schema> for Type {
     fn from(kind: Schema) -> Self {
         Self::Schema(kind)
     }
 }
 
-impl Abstract {
+impl Type {
     pub fn convention(&self) -> Case {
         /// it so happens everything is CamelCase, but that may change...
         Case::CamelCase
@@ -168,19 +298,22 @@ pub enum DefSrc {
 
 
 use crate::err::ParseErrs;
-use crate::parse::{CamelCase, Res, SkewerCase};
+use crate::parse::{lex_block_alt, CamelCase, NomErr, Res, SkewerCase};
 use crate::point::Point;
 use crate::types::private::{Generic};
 pub use schema::Schema;
 use specific::Specific;
 use starlane_space::types::private::Variant;
+use crate::parse::model::{BlockKind, NestedBlockKind};
+use crate::parse::test::test_lex_block;
 use crate::parse::util::Span;
 use crate::types::class::Class;
+use crate::types::parse::TypeParser;
 use crate::types::scope::Scope;
 
 
 pub(crate) mod private {
-    use super::{err, Abstract, GenericExact, Exact, ExactGen, Schema, Case, parse};
+    use super::{err, Type, ExtType, Ext, Schema, Case, parse, GenExt, ExtVariant};
     use crate::err::{ParseErrs, SpaceErr};
     use super::specific::Specific;
     use crate::parse::util::Span;
@@ -195,6 +328,7 @@ pub(crate) mod private {
     use std::collections::{HashMap, HashSet};
     use std::fmt::{Debug, Display, Formatter};
     use std::hash::Hash;
+    use std::marker::PhantomData;
     use std::ops::{Deref, DerefMut, Index};
     use std::str::FromStr;
     use std::sync::Arc;
@@ -210,10 +344,9 @@ pub(crate) mod private {
     use nom_supreme::ParserExt;
     use strum_macros::EnumDiscriminants;
     use crate::parse::model::{BlockKind, NestedBlockKind};
+    use crate::types::parse::TypeParser;
 
-    pub(crate) trait Generic: Name+Clone+Into<Abstract>+Clone+FromStr+Display{
-
-        type Abstract;
+    pub(crate) trait Generic: TypeParser+Name+Clone+Into<Type>+Clone+FromStr+Display{
 
         type Discriminant;
 
@@ -222,12 +355,8 @@ pub(crate) mod private {
 
         fn abstract_discriminant(&self) -> super::AbstractDiscriminant;
 
-        fn plus(self, scope: Scope, specific: Specific) -> GenericExact<Self> {
-            GenericExact::scoped(scope, self, specific)
-        }
-
-        fn plus_specific(self, specific: Specific) -> GenericExact<Self>{
-            GenericExact::new(self, specific)
+        fn plus(self, scope: Scope, specific: Specific) -> GenExt<Self> {
+            GenExt::new(scope,self,specific)
         }
 
         /// parse the sub variant
@@ -237,6 +366,7 @@ pub(crate) mod private {
 
         fn convention() -> Case;
 
+        /*
         fn parser() -> impl Parsers<Output=Self, Variant=Self::Segment>;
 
         fn parse_outer<I>(input: I) -> Res<I,Self> where I: Span {
@@ -247,6 +377,8 @@ pub(crate) mod private {
             Self::parser().parse(input)
         }
 
+
+         */
 
         fn block_kind() -> NestedBlockKind;
 
@@ -324,7 +456,7 @@ pub(crate) mod private {
 
     /// [Variant] implies inheritance from a
     pub(crate) trait Variant where Self: Into<Self::Root> {
-        /// the base [Abstract] variant [Class] or [Schema]
+        /// the base [Type] variant [Class] or [Schema]
         type Root: Generic+?Sized;
 
         type Discriminant;
@@ -436,8 +568,8 @@ pub(crate) mod private {
 
 
     pub struct Group {
-        members: HashSet<Abstract>,
-        subs: HashMap<Abstract, Box<HashSet<Abstract>>>
+        members: HashSet<Type>,
+        subs: HashMap<Type, Box<HashSet<Type>>>
     }
 
     pub(crate) struct Meta<G> where G: Generic
@@ -447,7 +579,7 @@ pub(crate) mod private {
         /// types support inheritance and their
         /// multiple type definition layers that are composited.
         /// Layers define inheritance in regular order.  The last
-        /// layer is the [ExactGen] of this [Meta] composite.
+        /// layer is the [Ext] of this [Meta] composite.
         defs: IndexMap<Specific,Layer>
     }
 
@@ -464,7 +596,7 @@ pub(crate) mod private {
             }
         }
 
-        pub fn to_abstract(&self) -> Abstract {
+        pub fn to_abstract(&self) -> Type {
             self.generic.clone().into()
         }
 
@@ -552,7 +684,7 @@ pub(crate) mod private {
             }
         }
 
-        pub fn get_type(&'y self) -> Abstract {
+        pub fn get_type(&'y self) -> Type {
             self.meta.to_abstract()
         }
 
@@ -580,7 +712,7 @@ pub(crate) mod private {
     pub type ClassPointRef = Ref<Point,Class>;
     pub type SchemaPointRef = Ref<Point,Schema>;
     pub type GenericPointRef<G:Generic> = Ref<Point,G>;
-    pub type ExactPointRef = Ref<Point,Exact>;
+    pub type ExactPointRef = Ref<Point, ExtType>;
 
     #[derive(Clone,Eq,PartialEq,Hash)]
     pub struct Ref<I,K> where I: Clone+Eq+PartialEq+Hash, K: Clone+Eq+PartialEq+Hash
@@ -594,32 +726,31 @@ pub(crate) mod private {
 
 
 
-    impl <Scope,Abstract,Specific> ExactGen<Scope,Abstract,Specific> where Scope: Default
+    impl <V> Ext<V> where  V: ExtVariant
     {
-        pub fn new(r#abstract: Abstract, specific: Specific) -> Self {
-            Self::scoped(Scope::default(), r#abstract, specific)
-        }
 
-        pub fn scoped(scope: Scope, r#abstract: Abstract, specific: Specific ) -> Self {
-            Self {
-                scope,
-                r#abstract,
-                specific,
+            pub fn new(scope: V::Scope, r#type: V::Type, specific: V::Specific) -> Self {
+                Self {
+                    phantom: PhantomData::default(),
+                    scope,
+                    r#type,
+                    specific
+                }
             }
+
+
+        pub fn plus_scope(self, scope: V::Scope) -> Self {
+            Self::new(scope, self.r#type, self.specific)
         }
 
-        pub fn plus_scope(self, scope: Scope) -> Self {
-            Self::scoped(scope, self.r#abstract, self.specific)
+        pub fn plus_specific(self, specific: V::Specific ) -> Self {
+            Self::new(self.scope, self.r#type, specific)
         }
 
-        pub fn plus_specific(self, specific: Specific ) -> Self {
-            Self::scoped(self.scope, self.r#abstract, specific)
+        pub fn get_type(&self) -> &V::Type {
+            &self.r#type
         }
-
-        pub fn r#abstract(&self) -> &Abstract {
-            &self.r#abstract
-        }
-        pub fn specific(&self) -> &Specific  {
+        pub fn specific(&self) -> &V::Specific {
             &self.specific
         }
     }

@@ -1,8 +1,8 @@
 use crate::point::Point;
-use crate::types::Exact;
+use crate::types::ExtType;
 
-/// a globally defined [Point] + [Exact]
-pub type Id = IdGen<Point,Exact>;
+/// a globally defined [Point] + [ExtType]
+pub type Id = IdGen<Point, ExtType>;
 
 
 /// a generic definition of a `complete` identifier providing

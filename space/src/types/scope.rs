@@ -15,8 +15,8 @@ use crate::parse::util::{new_span, result, Span};
 
 use once_cell::sync::Lazy;
 use strum::ParseError;
+use starlane_space::types::parse::TypeParser;
 use starlane_space::types::private::Generic;
-use crate::types::GenericExact;
 use crate::types::specific::Specific;
 
 pub static ROOT_SCOPE: Lazy<Scope> = Lazy::new(|| Scope(Some(Keyword::Root), vec![]));
@@ -38,8 +38,10 @@ pub enum Keyword {
     Root
 }
 
-impl Keyword {
-    pub fn parse<I>(input:I) -> Res<I,Self> where I: Span{
+
+
+impl TypeParser for Keyword {
+    fn inner<I>(input:I) -> Res<I,Self> where I: Span{
         let (next,var) = var_case(input.clone())?;
         match Self::from_str(var.as_str()) {
             Ok(keyword) => Ok((next,keyword)),
@@ -83,8 +85,8 @@ impl From<VarCase> for Segment {
     }
 }
 
-impl Segment  {
-    pub fn parse<I>(input:I) -> Res<I,Self> where I: Span{
+impl TypeParser for Segment  {
+    fn inner<I>(input:I) -> Res<I,Self> where I: Span{
         alt((into(version),into(var_case)))(input)
     }
 }
@@ -119,11 +121,16 @@ impl Scope {
 
 }
 
-impl Scope {
-        pub fn parse<I>(input:I) -> Res<I,Self> where I: Span{
-            parse::scope(input)
-        }
+impl TypeParser for Scope {
+    fn inner<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        parse::scope(input)
+    }
 }
+
+
 
 impl Default for Scope {
     fn default() -> Self {
@@ -199,6 +206,7 @@ pub mod parse {
     use nom::branch::alt;
     use nom_supreme::ParserExt;
     use nom_supreme::tag::TagError;
+    use crate::types::parse::TypeParser;
 
     pub(crate) fn parse(s: impl AsRef<str> ) -> Result<Scope,err::ParseErrs> {
         let span = new_span(s.as_ref());
@@ -206,7 +214,8 @@ pub mod parse {
     }
     /// will return an empty [Scope]  -> `DomainScope(None,Vec:default())` if nothing is found
     pub fn scope<I: Span>(input: I) -> Res<I, Scope> {
-        pair(opt(pair(Keyword::parse,opt(tag("::")))),segments)(input).map(|(next,(preamble,segments))|{
+        let keyword = <Keyword as TypeParser> ::inner;
+        pair(opt(pair(keyword,opt(tag("::")))),segments)(input).map(|(next,(preamble,segments))|{
             let keyword = preamble.map_or_else(||None,|(keyword,_) | Some(keyword));
 
             (next,Scope::new(keyword,segments))
@@ -244,12 +253,13 @@ pub mod test {
     use crate::loc::Version;
     use crate::parse::util::{new_span, result};
     use crate::parse::VarCase;
+    use crate::types::parse::TypeParser;
     use crate::types::scope::parse::parse;
     use crate::types::scope::{Scope, Segment, SegmentDiscriminant};
 
     #[test]
     fn test_keywords() {
-        let keyword = result(Keyword::parse(new_span("root"))).unwrap();
+        let keyword = result(Keyword::inner(new_span("root"))).unwrap();
         assert_eq!(keyword, Keyword::Root);
         let scope = Scope(Some(Keyword::Root), vec![]);
         assert!(scope.is_reserved_prefix())
@@ -259,10 +269,10 @@ pub mod test {
     fn test_segment() {
         let var = "some_var_case";
         let version = "1.3.5";
-        let segment = result(Segment::parse( new_span(var))).unwrap();
+        let segment = result(Segment::inner( new_span(var))).unwrap();
         assert_eq!(Segment::Segment(VarCase::from_str(var).unwrap()), segment);
 
-        let segment = result(Segment::parse( new_span(version))).unwrap();
+        let segment = result(Segment::inner( new_span(version))).unwrap();
         assert_eq!(Segment::Version(Version::from_str(version).unwrap()), segment);
     }
 
@@ -286,7 +296,7 @@ pub mod test {
     fn test_scope( )  {
         {
             let input = "starlane";
-            let scope = result(Scope::parse(new_span(input))).unwrap();
+            let scope = result(Scope::inner(new_span(input))).unwrap();
             assert!(scope.is_reserved_prefix());
             assert_eq!(scope, Scope(Some(Keyword::Starlane), vec![]));
         }
@@ -294,7 +304,7 @@ pub mod test {
         {
             let input = "my";
             let var = VarCase::from_str(input).unwrap();;
-            let scope = result(Scope::parse(new_span(input))).unwrap();
+            let scope = result(Scope::inner(new_span(input))).unwrap();
             assert!(!scope.is_reserved_prefix());
             assert_eq!(scope, Scope(None, vec![Segment::Segment(var)]));
         }
@@ -306,7 +316,7 @@ pub mod test {
 
             assert_eq!( "root::database::postgres", input.as_str() );
 
-            let scope = result(Scope::parse(new_span(input.as_str()))).unwrap();
+            let scope = result(Scope::inner(new_span(input.as_str()))).unwrap();
             assert!(scope.is_reserved_prefix());
             segments.remove(0);
             assert_eq!(segments.len(),2);

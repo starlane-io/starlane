@@ -1,25 +1,115 @@
 use std::collections::HashMap;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use std::hash::Hash;
+use std::marker::PhantomData;
 use indexmap::Equivalent;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::loc::Version;
 use starlane_space::selector::Pattern;
+use starlane_space::types::parse::TypeParser;
 use crate::parse::{Domain, Res, SkewerCase};
 use crate::parse::util::Span;
-use crate::selector::VersionReq;
 use crate::types::class::{Class, ClassDef};
+use crate::types::id::Id;
 use crate::types::Schema;
 use crate::types::scope::Scope;
 use crate::types::schema::SchemaDef;
-use crate::types::tag::{TagWrap, VersionTag};
+
+trait SpecificVariant {
+    type Contributor: TypeParser+Clone;
+    type Package: TypeParser+Clone;
+    type Version: TypeParser+Clone;
+}
+
+#[derive(Debug, Clone, Hash,Eq, PartialEq)]
+pub struct SpecificExt<V> where V: SpecificVariant {
+    phantom: PhantomData<V>,
+    pub contributor: V::Contributor,
+    pub package: V::Package,
+    pub version: V::Version,
+}
+
+impl <V> Display for SpecificExt<V> where V: SpecificVariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", format!("{}:{}:{}", self.contributor, self.package, self.version))
+    }
+}
+
+
+
+impl <V> TypeParser for SpecificExt<V> where V: SpecificVariant {
+    fn inner<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        todo!()
+    }
+}
+
+pub type Specific = SpecificExt<variants::Identifier>;
+pub type SpecificSelector = SpecificExt<variants::Selector>;
+pub type SpecificCtx = SpecificExt<variants::Ctx>;
+
+
+pub mod variants {
+    use crate::loc::Version;
+    use crate::parse::{domain, Domain, Res, SkewerCase};
+    use crate::parse::util::Span;
+    use crate::selector::{Pattern, VersionReq};
+    use crate::types::parse::TypeParser;
+    use crate::types::specific::{SpecificVariant};
+    use crate::types::tag::{TagWrap, VersionTag};
+
+    pub type Contributor = Domain;
+
+
+    pub type Package = SkewerCase;
+
+
+    pub type ContributorSelector = Pattern<Contributor>;
+    pub type PackageSelector = Pattern<Package>;
+    pub type VersionSelector = TagWrap<Pattern<VersionReq>,VersionTag>;
+
+    pub type ContributorCtx = Domain;
+    pub type PackageCtx = Domain;
+    pub type VersionCtx  = TagWrap<Version,VersionTag>;
+
+
+    #[derive(Clone,Eq,PartialEq,Hash,Debug)]
+    pub struct Identifier;
+    #[derive(Clone)]
+    pub(super) struct Selector;
+    #[derive(Clone)]
+    pub(super) struct Ctx;
+
+    impl SpecificVariant for Identifier {
+        type Contributor = Contributor;
+        type Package = Package;
+        type Version = Version;
+    }
+
+    /*
+    impl SpecificVariant for Selector {
+        type Contributor = ContributorSelector;
+        type Package = PackageSelector;
+        type Version = VersionSelector;
+    }
+    impl SpecificVariant for Ctx {
+        type Contributor = ContributorCtx;
+        type Package = PackageCtx;
+        type Version = VersionCtx;
+    }
+
+     */
+}
+
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct MetaDefs;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SpecificMeta {
-    pub specific: Specific,
+    //pub specific: Specific,
     pub defs: Definitions
 }
 
@@ -43,11 +133,12 @@ pub type Defs<A,D>  = HashMap<A,D>;
 pub type ClassDefs = Defs<Class,ClassDef>;
 pub type SchemaDefs = Defs<Schema,SchemaDef>;
 
-pub type Specific = SpecificGen<Contributor,Package,Version>;
+
 
 impl Specific {
     pub fn parse<I>(input: I) -> Res<I,Self> where I: Span {
-        parse::specific(input)
+        todo!()
+        //parse::specific(input)
     }
 }
 
@@ -58,55 +149,41 @@ impl Equivalent<Specific> for &Specific {
 }
 
 
-pub type SpecificCtx = SpecificGen<Contributor,Package,TagWrap<Version,VersionTag>>;
 
-impl SpecificCtx {
-    pub fn parse<I>(input: I) -> Res<I,Self> where I: Span {
-        parse::specific_ctx(input)
-    }
-}
 
-pub type Contributor = Domain;
-pub type Package = SkewerCase;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
-pub struct SpecificGen<Contributor,Package,Version> {
-    pub contributor: Contributor,
-    pub package: Package,
-    pub version: Version
-}
 
-impl <Contributor,Package,Version> Display for SpecificGen<Contributor,Package,Version> where Contributor:Display, Package:Display, Version: Display{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}:{}", self.contributor, self.package, self.version)
+
+
+
+
+
+impl <V> SpecificExt<V> where V: SpecificVariant {
+    pub fn new(contributor: V::Contributor, package: V::Package, version: V::Version) -> Self  {
+        Self { contributor, package, version, phantom: PhantomData::default() }
     }
 }
 
 
 
-impl <Contributor,Package,Version> SpecificGen<Contributor,Package,Version> {
-    pub fn new(contributor: Contributor, package: Package, version: Version) -> Self  {
-        Self { contributor, package, version }
-    }
-}
 
-pub type SpecificSelector = SpecificGen<ContributorSelector,PackageSelector,VersionPattern>;
 
+
+
+/*
 impl SpecificSelector {
     pub fn parse<I>(input: I) -> Res<I,Self> where I: Span {
         parse::specific_selector(input)
     }
 }
 
-pub type ContributorSelector = Pattern<Contributor>;
-pub type PackageSelector = Pattern<Package>;
-pub type VersionPattern = TagWrap<Pattern<VersionReq>,VersionTag>;
 
 pub(crate) mod parse {
     use nom::sequence::tuple;
     use nom_supreme::tag::complete::tag;
+    use starlane_space::types::parse::TypeParser;
     use starlane_space::types::tag::VersionTag;
-    use super::{Specific, SpecificCtx, SpecificGen};
+    use super::{Specific, SpecificCtx, SpecificExt};
     use crate::parse::{pattern, version_req, Res};
     use crate::parse::util::Span;
     use crate::parse::domain as contributor;
@@ -115,8 +192,11 @@ pub(crate) mod parse {
     use crate::types::tag::AbstractTag;
     use super::SpecificSelector;
 
+
+
+    /*
     /// parse the general structure of a [Specific] including: [SpecificSelector]...
-    pub fn specific_gen<I,C,P,V>(contributor: impl FnMut(I) -> Res<I,C>,package: impl FnMut(I) -> Res<I,P>,version: impl FnMut(I) -> Res<I,V>, input: I ) -> Res<I, SpecificGen<C,P,V>> where I: Span {
+    pub fn specific_gen<I,C,P,V>(contributor: impl FnMut(I) -> Res<I,C>,package: impl FnMut(I) -> Res<I,P>,version: impl FnMut(I) -> Res<I,V>, input: I ) -> Res<I, SpecificExt<C,P,V>> where I: Span {
         tuple((
             contributor,
             tag(":"),
@@ -124,7 +204,7 @@ pub(crate) mod parse {
             tag(":"),
             version,
         ))(input).map(|(next,(contributor,_,package,_,version))|{
-            (next,SpecificGen::new(contributor,package,version))
+            (next, SpecificExt::new(contributor, package, version))
         })
     }
 
@@ -143,6 +223,9 @@ pub(crate) mod parse {
     }
 
 
+     */
+
+    /*
 
     #[cfg(test)]
     pub mod test {
@@ -162,4 +245,8 @@ pub(crate) mod parse {
 
     }
 
+     */
+
 }
+
+ */

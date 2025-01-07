@@ -1,8 +1,9 @@
+use std::fmt::Display;
 use crate::parse::util::Span;
 use crate::parse::{camel_case, lex_block, CamelCase, NomErr, Res};
 use crate::types::class::Class;
 use crate::types::private::{Generic, Parsers};
-use crate::types::{Abstract, Schema};
+use crate::types::{Type, Schema};
 use futures::FutureExt;
 use nom::branch::alt;
 use nom::combinator::{into, opt};
@@ -13,8 +14,26 @@ use nom_supreme::ParserExt;
 use starlane_space::parse::from_camel;
 use std::str::FromStr;
 use nom::error::FromExternalError;
-use crate::parse::model::BlockKind;
+use once_cell::sync::Lazy;
+use crate::parse::model::{BlockKind, NestedBlockKind};
 
+pub static NESTED_BLOCKS_DEFAULT: Lazy<Option<NestedBlockKind>> =
+    Lazy::new(|| None);
+
+pub trait TypeParser: Display+Sized {
+    /// an outer parser will unwrap the root nested block and pass to [TypeParser::inner]
+    /// i.e.`<Database>` become `Database`  For implementation that don't have the
+    /// concept of an outer block [TypeParser::outer] simply proxies to [TypeParser::inner]
+    fn outer<I>(input: I) -> Res<I,Self> where I: Span {
+        Self::inner(input)
+    }
+    fn inner<I>(input: I) -> Res<I,Self> where I: Span;
+
+
+    fn block() -> &'static Option<NestedBlockKind> {
+        &*NESTED_BLOCKS_DEFAULT
+    }
+}
 
 
 pub mod case {}

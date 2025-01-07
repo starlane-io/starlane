@@ -100,6 +100,7 @@ use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
+use starlane_space::types::parse::TypeParser;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
 
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
@@ -1612,6 +1613,15 @@ pub struct Domain {
     string: String,
 }
 
+impl TypeParser for Domain {
+    fn inner<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        domain(input)
+    }
+}
+
 impl Serialize for Domain {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -1663,11 +1673,18 @@ pub struct SkewerCase {
     string: String,
 }
 
-impl SkewerCase {
-    pub fn parser<I,O>(input:I) -> Res<I,O> where I: Span, O: From<SkewerCase>{
-        into(skewer_case)(input)
+impl TypeParser for SkewerCase {
+    fn inner<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        skewer_case(input)
     }
 }
+
+
+
+
 
 
 
@@ -3398,7 +3415,7 @@ fn block_open<I: Span>(input: I) -> Res<I, NestedBlockKind> {
     ))(input)
 }
 
-fn any_soround_lex_block<I: Span>(input: I) -> Res<I, LexBlock<I>>
+fn any_surrounding_lex_block<I: Span>(input: I) -> Res<I, LexBlock<I>>
 where
     I: ToString
         + InputLength
@@ -3785,7 +3802,7 @@ where
             delimited(
                 tag(kind.open()),
                 recognize(many1(alt((
-                    recognize(any_soround_lex_block),
+                    recognize(any_surrounding_lex_block),
                     recognize(verify(anychar, move |c| {
                         f(*c) && *c != kind.close_as_char()
                     })),
@@ -3823,7 +3840,7 @@ where
 {
     move |input: I| {
         recognize(many0(alt((
-            recognize(any_soround_lex_block),
+            recognize(any_surrounding_lex_block),
             recognize(verify(anychar, move |c| *c != kind.close_as_char())),
         ))))(input)
     }
@@ -7147,7 +7164,7 @@ pub fn rough_pipeline_step<I: Span>(input: I) -> Res<I, I> {
     recognize(tuple((
         many0(preceded(
             alt((tag("-"), tag("="), tag("+"))),
-            any_soround_lex_block,
+            any_surrounding_lex_block,
         )),
         alt((tag("->"), tag("=>"))),
     )))(input)

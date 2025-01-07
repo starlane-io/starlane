@@ -11,12 +11,9 @@ use crate::err::ParseErrs;
 use crate::err::SpaceErr;
 use crate::kind::{BaseKind, Kind, KindParts, Specific, SubKind};
 use crate::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};
-use crate::parse::util::result;
+use crate::parse::util::{result, Span};
 use crate::parse::util::{new_span, Trace};
-use crate::parse::{
-    consume_hierarchy, kind_selector, point_segment_selector, point_selector, specific_selector,
-    CamelCase, Env,
-};
+use crate::parse::{consume_hierarchy, kind_selector, pattern, point_segment_selector, point_selector, specific_selector, CamelCase, Env, Res};
 use crate::point::{Point, PointCtx, PointDef, PointSeg, PointVar, RouteSeg};
 use crate::substance::{
     CallWithConfigDef, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
@@ -24,6 +21,7 @@ use crate::substance::{
 };
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
+use starlane_space::types::parse::TypeParser;
 
 pub type PointSegKindHop = HopDef<PointSegSelector, KindSelector>;
 pub type PointSegKindHopCtx = HopDef<PointSegSelectorCtx, KindSelector>;
@@ -932,6 +930,15 @@ impl ToString for PointSegKindHop {
 pub enum Pattern<P> {
     Always,
     Exact(P),
+}
+
+impl <P> TypeParser for Pattern<P> where P: TypeParser {
+    fn inner<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        todo!()
+    }
 }
 
 impl<I: ToString> Pattern<I> {

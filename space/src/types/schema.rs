@@ -1,4 +1,4 @@
-use crate::types::{private, AbstractDiscriminant, SrcDef, Abstract, Exact, ExactGen, Case};
+use crate::types::{private, AbstractDiscriminant, SrcDef, Type, ExtType, Ext, Case};
 use core::str::FromStr;
 use derive_name::Name;
 use nom::combinator::fail;
@@ -14,6 +14,7 @@ use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::types::class::ClassDiscriminant;
 use crate::types::class::service::Service;
+use crate::types::parse::TypeParser;
 use crate::types::private::{Generic, Parsers, Variant};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::EnumString, strum_macros::Display, Serialize,Deserialize,Name)]
@@ -36,9 +37,17 @@ pub enum Schema {
     _Ext(CamelCase),
 }
 
+impl TypeParser for Schema {
+    fn inner<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+
+        SchemaParsers::new().parse(input)
+    }
+}
 
 impl Generic for Schema {
-    type Abstract = Schema;
     type Discriminant = SchemaDiscriminant;
     type Segment = CamelCase;
 
@@ -52,9 +61,6 @@ impl Generic for Schema {
         Case::CamelCase
     }
 
-    fn parser() -> impl Parsers<Output=Self, Variant=Self::Segment> {
-        SchemaParsers::new()
-    }
 
     fn block_kind() -> NestedBlockKind {
         NestedBlockKind::Square

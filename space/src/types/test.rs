@@ -11,6 +11,7 @@ pub mod parse {
     use crate::parse::util::{new_span, result};
     use crate::types::class::{Class, ClassDiscriminant, ClassParsers};
     use crate::types::class::service::Service;
+    use crate::types::parse::TypeParser;
     use crate::types::private::{Generic, Parsers};
     use crate::types::Schema;
     #[test]
@@ -45,11 +46,11 @@ pub mod parse {
 
         assert!(!ClassParsers::peek_variant(next));
 
-        let class = result(Class::parse(new_span(inner))).unwrap();
+        let class = result(Class::inner(new_span(inner))).unwrap();
 
         assert_eq!(Class::Database, class);
 
-        let class = result(Class::parse_outer(i)).unwrap();
+        let class = result(Class::outer(i)).unwrap();
 
 
         assert_eq!(Class::Database, class);
@@ -64,7 +65,7 @@ pub mod parse {
         let s = "<Service<Database>>";
         let i = new_span(s);
 
-        let parser = Class::parser();
+        let parser = Class::inner(i).unwrap();
     }
 
 
@@ -88,7 +89,7 @@ pub mod parse {
 
         assert_eq!(class,Class::Service(Service::Database));
 
-        let class = result(Class::parse_outer(new_span(outer.as_str()))).unwrap();
+        let class = result(Class::outer(new_span(outer.as_str()))).unwrap();
 
         assert_eq!(Class::Service(Service::Database),class)
 
@@ -99,7 +100,7 @@ pub mod parse {
         let inner = "Text";
         let s = format!("[{}]", inner);
         let i = new_span(s.as_str());
-        let schema = result(Schema::parse_outer(i)).unwrap();
+        let schema = result(Schema::outer(i)).unwrap();
         assert_eq!(schema.to_string().as_str(), inner);
     }
 

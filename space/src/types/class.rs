@@ -1,4 +1,4 @@
-use crate::types::{private, DataPoint, Exact, Abstract, ExactGen, Case, Schema};
+use crate::types::{private, DataPoint, ExtType, Type, Ext, Case, Schema};
 use crate::types::AbstractDiscriminant;
 use core::str::FromStr;
 use std::borrow::Borrow;
@@ -18,6 +18,7 @@ use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::point::Point;
 use crate::types::class::service::Service;
+use crate::types::parse::TypeParser;
 use crate::types::private::{Parsers, Variant};
 use crate::types::schema::SchemaDiscriminant;
 
@@ -83,9 +84,16 @@ pub enum Class {
     _Ext(CamelCase),
 }
 
+impl TypeParser for Class {
+    fn inner<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        ClassParsers::new().parse(input)
+    }
+}
 
 impl Generic for Class {
-    type Abstract = Class;
     type Discriminant = ClassDiscriminant;
     type Segment = CamelCase;
 
@@ -95,10 +103,6 @@ impl Generic for Class {
 
     fn convention() -> Case {
         Case::CamelCase
-    }
-
-    fn parser() -> impl Parsers<Output=Self, Variant=Self::Segment> {
-        ClassParsers::new()
     }
 
     fn block_kind() -> NestedBlockKind {
@@ -188,7 +192,7 @@ pub mod service {
     use crate::err::ParseErrs;
     use crate::parse::{camel_case, from_camel, CamelCase, NomErr, Res};
     use crate::parse::util::Span;
-    use crate::types::Abstract;
+    use crate::types::Type;
     use crate::types::class::{Class, ClassDiscriminant};
 
     /// variants for [super::Class::Service]
