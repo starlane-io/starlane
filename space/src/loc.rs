@@ -21,7 +21,7 @@ use starlane_macros::ToBase;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
-use crate::types::parse::PrimitiveParser;
+use crate::types::parse::{PrimitiveArchetype, PrimitiveParser};
 
 pub static CENTRAL: Lazy<Point> = Lazy::new(|| StarKey::central().to_point());
 pub static GLOBAL_LOGGER: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::logger").unwrap());
@@ -133,9 +133,12 @@ pub struct Version {
     pub version: semver::Version,
 }
 
+impl PrimitiveArchetype for Version { type Parser = Self; }
+
 
 impl PrimitiveParser for Version {
-    fn parse<I>(input: I) -> Res<I, Self>
+    type Output = Self;
+    fn parse<I>(input: I) -> Res<I, Self::Output>
     where
         I: Span
     {

@@ -14,7 +14,7 @@ use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::types::class::{Class, ClassDiscriminant};
 use crate::types::class::service::Service;
-use crate::types::parse::{TypeParsers, PrimitiveParser};
+use crate::types::parse::{TypeParser, PrimitiveParser, ParserImpl};
 use crate::types::parse::util::VariantStack;
 use crate::types::private::{Generic, Variant};
 
@@ -42,6 +42,8 @@ impl Generic for Schema {
     type Discriminant = SchemaDiscriminant;
     type Segment = CamelCase;
 
+    type Parser = ParserImpl<Self>;
+
     fn of_type() -> &'static TypeDiscriminant {
         & TypeDiscriminant::Schema
     }
@@ -49,6 +51,8 @@ impl Generic for Schema {
     fn block() -> &'static NestedBlockKind {
         & NestedBlockKind::Square
     }
+
+
 }
 
 

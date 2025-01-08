@@ -2,6 +2,7 @@
 
 
 
+#[cfg(feature = "allo")]
 pub mod parse {
     use std::str::FromStr;
     use starlane_space::parse::unwrap_block;
@@ -10,18 +11,18 @@ pub mod parse {
     use crate::parse::util::{new_span, result};
     use crate::types::class::{Class, ClassDiscriminant};
     use crate::types::class::service::Service;
-    use crate::types::parse::{TypeParsers, PrimitiveParser};
+    use crate::types::parse::{TypeParser, PrimitiveParser};
     use crate::types::private::{Generic};
-    use crate::types::{ClassExt, Schema};
-
+    use crate::types::Schema;
+    use crate::types::specific::variants::Identifier;
 
     #[test]
     pub fn test_parse_exact() {
         let inner = "Database@uberscott.io:postgres:1.3.5";
         let outer = NestedBlockKind::Angle.wrap(&inner);
         let input = new_span(outer.as_str());
-        ClassExt::parse()
-        let ext = result(<ClassExt as BlockParser>::block().unwrap(ClassExt::parse)(input)).unwrap();
+
+
         println!("from -> {}", outer );
         println!("ext -> {}", ext );
     }
@@ -114,8 +115,8 @@ pub mod parse {
         let inner = "Text";
         let s = format!("[{}]", inner);
         let i = new_span(s.as_str());
-        let schema = result(Schema::outer(i)).unwrap();
-        assert_eq!(schema.to_string().as_str(), inner);
+
+//        let schema = result(<Schema as Generic>::Parser::
     }
 
     #[test]

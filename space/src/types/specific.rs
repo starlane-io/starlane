@@ -8,7 +8,7 @@ use nom_supreme::tag::complete::tag;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::loc::Version;
 use starlane_space::selector::Pattern;
-use starlane_space::types::parse::{PrimitiveArchetype, PrimitiveParser};
+use starlane_space::types::parse::{ParserImpl, PrimitiveArchetype, PrimitiveParser};
 use crate::parse::{Domain, Res, SkewerCase};
 use crate::parse::util::Span;
 use crate::types::class::{Class, ClassDef};
@@ -22,8 +22,6 @@ pub trait SpecificVariant {
     type Contributor: PrimitiveArchetype<Parser:PrimitiveParser>+Clone;
     type Package: PrimitiveArchetype<Parser:PrimitiveParser>+Clone;
     type Version: PrimitiveArchetype<Parser:PrimitiveParser>+Clone;
-
-    fn parser<P>() -> P where P: SpecificParser<Output=Self>;
 }
 
 #[derive(Debug, Clone, Hash,Eq, PartialEq)]
@@ -34,6 +32,12 @@ pub struct SpecificExt<V> where V: SpecificVariant {
     pub version: V::Version,
 }
 
+impl <V> SpecificExt<V> where V: SpecificVariant {
+    pub fn parser() -> ParserImpl<V> {
+        Default::default()
+    }
+}
+
 impl <V> Display for SpecificExt<V> where V: SpecificVariant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", format!("{}:{}:{}", self.contributor, self.package, self.version))
@@ -42,16 +46,10 @@ impl <V> Display for SpecificExt<V> where V: SpecificVariant {
 
 
 
-impl <V> PrimitiveParser for SpecificExt<V> where V: SpecificVariant {
-    fn parse<I>(input: I) -> Res<I, Self>
-    where
-        I: Span
-    {
-        tuple((V::Contributor::parse, tag(":"), V::Package::parse, tag(":"), V::Version::parse))(input).map( |(next,((contributor,_,package,_,version)))| {
-            (next,SpecificExt::new(contributor,package,version))
-        })
-    }
-}
+
+
+
+
 
 pub type Specific = SpecificExt<variants::Identifier>;
 pub type SpecificSelector = SpecificExt<variants::Selector>;
@@ -82,10 +80,21 @@ pub mod variants {
 
     #[derive(Clone,Eq,PartialEq,Hash,Debug)]
     pub struct Identifier;
-    #[derive(Clone)]
-    pub(super) struct Selector;
-    #[derive(Clone)]
-    pub(super) struct Ctx;
+
+
+
+    /// right now variants are stubbed
+    pub type Selector = Identifier;
+    pub type Ctx= Identifier;
+
+
+    /*
+    #[derive(Clone,Eq,PartialEq,Hash,Debug)]
+    pub(crate) struct Selector;
+    #[derive(Clone,Eq,PartialEq,Hash,Debug)]
+    pub(crate) struct Ctx;
+
+     */
 
     impl SpecificVariant for Identifier {
         type Contributor = Contributor;
@@ -104,6 +113,7 @@ pub mod variants {
         type Package = PackageCtx;
         type Version = VersionCtx;
     }
+
 
      */
 }
@@ -161,14 +171,17 @@ pub mod parse {
 
     #[cfg(test)]
     pub mod test {
+        use starlane_space::types::parse::SpecificParser;
         use crate::parse::util::{new_span, result};
         use crate::types::parse::PrimitiveParser;
-        use crate::types::specific::Specific;
+        use crate::types::specific;
+        use crate::types::specific::{Specific, SpecificExt};
 
         #[test]
         pub fn parse_specific() {
             let input = "uberscott:wonky:1.3.5";
-            let specific = result(Specific::parse(new_span(input))).unwrap();
+            struct Bla;
+            let specific:SpecificExt<specific::variants::Identifier> = result(SpecificParser::parse(new_span(input))).unwrap();
 
             assert_eq!(specific.to_string().as_str(),input)
         }

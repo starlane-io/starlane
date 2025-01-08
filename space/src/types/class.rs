@@ -18,7 +18,7 @@ use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::point::Point;
 use crate::types::class::service::Service;
-use crate::types::parse::PrimitiveArchetype;
+use crate::types::parse::{ParserImpl, PrimitiveArchetype};
 use crate::types::parse::util::VariantStack;
 use crate::types::private::{Variant};
 use crate::types::schema::SchemaDiscriminant;
@@ -89,6 +89,8 @@ pub enum Class {
 
 
 impl Generic for Class {
+
+    type Parser = ParserImpl<Self>;
     type Discriminant = ClassDiscriminant;
     type Segment = CamelCase;
 
@@ -100,6 +102,7 @@ impl Generic for Class {
 
         &NestedBlockKind::Angle
     }
+
 
 }
 

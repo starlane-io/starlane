@@ -1,3 +1,4 @@
+use std::any::TypeId;
 use std::fmt::Display;
 use std::marker::PhantomData;
 use std::str::FromStr;
@@ -41,6 +42,8 @@ pub enum Type {
     Class(Class),
 }
 
+
+
 pub type AsType = dyn Into<ExtType>;
 pub type AsTypeKind = dyn Into<Type>;
 
@@ -53,12 +56,12 @@ pub type SchemaExt = Ext<SchemaIdentifier>;
 
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub(crate) struct Ext<V> where V: ExtVariant
+pub(crate) struct Ext<V> where V: ExtVariant+?Sized
 {
     phantom: PhantomData<V>,
     scope: V::Scope,
     r#type: V::Type,
-    specific: V::Specific,
+    specific: SpecificExt<V::Specific>,
 }
 
 
@@ -82,12 +85,10 @@ impl<V> Display for Ext<V> where V: ExtVariant
 /// binds the various elements to support `Identifier`, `Selector` and `Context` variants
 pub trait ExtVariant {
    type Scope: PrimitiveArchetype<Parser:PrimitiveParser<Output=Self::Scope>>;
-   type Type: Archetype;
+   type Type: Generic;
    type Specific: SpecificVariant;
 
-   fn parser() -> impl ExtParser<Self> {
-       ExtParser::new()
-   }
+   type Parser: ExtParser<Self>;
 }
 
 
@@ -99,25 +100,34 @@ pub struct GenericIdentifier<G>(PhantomData<G>) where G: Generic;
 
 impl ExtVariant for TypeIdentifier {
     type Scope = Scope;
-    type Type = Type;
-    type Specific = Specific;
+    /// should be a [Type] which is problematic because [Type] doesn't implement [Generic] ...
+    /// hacked it to point to [Class] for now...
+    type Type = Class;
+    type Specific = specific::variants::Identifier;
+    type Parser = ParserImpl<Self>;
 }
+
 
 impl ExtVariant for ClassIdentifier {
     type Scope = Scope;
     type Type = Class;
-    type Specific = Specific;
+    type Specific = specific::variants::Identifier;
+
+    type Parser = ParserImpl<Self>;
 }
 impl ExtVariant for SchemaIdentifier {
     type Scope = Scope;
     type Type = Schema;
-    type Specific = Specific;
+    type Specific = specific::variants::Identifier;
+    type Parser = ParserImpl<Self>;
 }
 
 impl <G> ExtVariant for GenericIdentifier<G> where G: Generic{
     type Scope = Scope;
     type Type = G;
-    type Specific = Specific;
+    type Specific = specific::variants::Identifier;
+
+    type Parser = ParserImpl<Self>;
 }
 
 /// is able to ascertain the desired abstract
@@ -266,9 +276,9 @@ use starlane_space::types::specific::SpecificVariant;
 use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::types::class::Class;
-use crate::types::parse::{Archetype, ExtParser, PrimitiveArchetype, PrimitiveParser, SpecificParser, TypeParsers};
+use crate::types::parse::{Archetype, ExtParser, ParserImpl, PrimitiveArchetype, PrimitiveParser, SpecificParser, TypeParser};
 use crate::types::scope::Scope;
-
+use crate::types::specific::SpecificExt;
 
 pub(crate) mod private {
     use super::{err, Type, ExtType, Ext, Schema, Case, parse, GenExt, ExtVariant};
@@ -288,10 +298,7 @@ pub(crate) mod private {
     use std::marker::PhantomData;
     use std::ops::{Deref, DerefMut, Index};
     use std::str::FromStr;
-    use std::sync::Arc;
-    use ascii::AsciiChar::i;
-    use chrono::ParseResult;
-    use cliclack::input;
+
     use derive_name::Name;
     use nom::bytes::complete::tag;
     use nom::combinator::{cond, fail, into, opt, peek, value};
@@ -300,17 +307,82 @@ pub(crate) mod private {
     use nom::sequence::{delimited, pair};
     use nom_supreme::ParserExt;
     use strum_macros::EnumDiscriminants;
-    use starlane_space::types::parse::TypeParsers;
+    use starlane_space::types::parse::TypeParser;
     use crate::parse::model::{BlockKind, NestedBlockKind};
-    use crate::types::parse::{PrimitiveArchetype, PrimitiveParser};
+    use crate::types::parse::{Archetype, PrimitiveArchetype, PrimitiveParser};
     use crate::types::parse::util::VariantStack;
 
-    pub(crate) trait Generic: PrimitiveArchetype<Parser: TypeParsers<Discriminant=Self::Discriminant>> +TryFrom<VariantStack<Self>>+Name+Clone+Into<Type>+Clone+FromStr+Display{
+    pub(crate) trait TypeVariant {
+        type Type;
 
-        type Discriminant;
+        type Segment;
+
+        type Discriminant: FromStr<Err=strum::ParseError>;
+
+
+        fn of_type() -> &'static super::TypeDiscriminant;
+    }
+    pub mod variants {
+        pub mod class {
+            use crate::parse::CamelCase;
+            use crate::types::class::{Class, ClassDiscriminant};
+            use crate::types::private::TypeVariant;
+            use crate::types::TypeDiscriminant;
+
+            #[derive(Clone, Eq, PartialEq, Hash, Debug)]
+            pub struct Identifier;
+
+            /// right now variants are stubbed
+            pub type Selector = Identifier;
+            pub type Ctx = Identifier;
+
+
+            impl TypeVariant for Identifier {
+                type Type = Class;
+                type Segment = CamelCase;
+                type Discriminant = ClassDiscriminant;
+
+                fn of_type() -> &'static TypeDiscriminant {
+                    & TypeDiscriminant::Class
+                }
+            }
+        }
+
+        pub mod schema {
+            use crate::parse::CamelCase;
+            use crate::types::class::{Class, ClassDiscriminant};
+            use crate::types::private::TypeVariant;
+            use crate::types::{Schema, TypeDiscriminant};
+
+            #[derive(Clone, Eq, PartialEq, Hash, Debug)]
+            pub struct Identifier;
+
+            /// right now variants are stubbed
+            pub type Selector = Identifier;
+            pub type Ctx = Ctx;
+
+
+            impl TypeVariant for Identifier {
+                type Type = Schema;
+                type Segment = CamelCase;
+                type Discriminant = ClassDiscriminant;
+
+                fn of_type() -> &'static TypeDiscriminant {
+                    & TypeDiscriminant::Class
+                }
+            }
+
+
+
+        }
+    }
+
+    pub(crate) trait Generic: TryFrom<VariantStack<Self>>+Name+Clone+Into<Type>+Clone+FromStr+Display{
+
+        type Parser: TypeParser<Self>;
+        type Discriminant: FromStr<Err=strum::ParseError>;
 
         type Segment:  PrimitiveArchetype<Parser:PrimitiveParser>;
-
 
         fn max_stack_size() -> usize {
             2usize
@@ -336,6 +408,7 @@ pub(crate) mod private {
         fn wrapped_string(&self) -> String {
             Self::block().wrap(self.to_string())
         }
+
     }
 
 

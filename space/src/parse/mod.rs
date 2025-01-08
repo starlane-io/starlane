@@ -77,7 +77,7 @@ use nom::character::complete::{
 };
 use nom::combinator::{all_consuming, into, opt};
 use nom::combinator::{cut, eof, fail, not, peek, value, verify};
-use nom::error::{ErrorKind, ParseError};
+use nom::error::{ErrorKind, FromExternalError, ParseError};
 use nom::multi::{many0, many1, separated_list0};
 use nom::sequence::{delimited, pair, terminated, tuple};
 use nom::{
@@ -100,7 +100,7 @@ use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
-use starlane_space::types::parse::PrimitiveParser;
+use starlane_space::types::parse::{PrimitiveArchetype, PrimitiveParser};
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
 
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
@@ -1534,6 +1534,24 @@ pub struct CamelCase {
     string: String,
 }
 
+impl PrimitiveArchetype for CamelCase {
+    type Parser = Self;
+}
+
+impl PrimitiveParser for CamelCase {
+    type Output = Self;
+
+    fn parse<I>(input: I) -> Res<I, Self::Output>
+    where
+        I: Span
+    {
+        camel_case(input)
+    }
+}
+
+
+
+
 impl CamelCase {
     pub fn as_str(&self) -> &str {
         self.string.as_str()
@@ -1560,6 +1578,18 @@ impl FromStr for CamelCase {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(camel_case)(new_span(s)))
     }
+}
+
+pub fn parse_from_str<I,O,F,S,E>(f: F) -> impl FnMut(I) -> Res<I, O> where I: Span, O: FromStr<Err=E>, F: FnMut(I) -> Res<I,S>+Copy, ParseErrs: From<E>{
+    move |input| {
+        let (next,string):(I,String)=into_str(recognize(f))(input.clone())?;
+        let output = O::from_str(string.as_str()).map_err(|err|nom::Err::Error(NomErr::from_external_error(input,ErrorKind::Fail,err)))?;
+        Ok((next,output))
+    }
+}
+
+pub fn into_str<I,F,O>(mut f: F) -> impl FnMut(I) -> Res<I, String> where I: Span, O: ToString, F: FnMut(I) -> Res<I,O>{
+    move |input| f(input).map(|(next,output)|(next,output.to_string()))
 }
 
 /*
@@ -1613,8 +1643,14 @@ pub struct Domain {
     string: String,
 }
 
+impl PrimitiveArchetype for Domain {
+    type Parser = Domain;
+}
+
 impl PrimitiveParser for Domain {
-    fn parse<I>(input: I) -> Res<I, Self>
+    type Output = Domain;
+
+    fn parse<I>(input: I) -> Res<I, Self::Output>
     where
         I: Span
     {
@@ -1673,8 +1709,12 @@ pub struct SkewerCase {
     string: String,
 }
 
+impl PrimitiveArchetype for SkewerCase { type Parser = Self; }
+
 impl PrimitiveParser for SkewerCase {
-    fn parse<I>(input: I) -> Res<I, Self>
+    type Output = SkewerCase;
+
+    fn parse<I>(input: I) -> Res<I, Self::Output>
     where
         I: Span
     {
@@ -5029,13 +5069,9 @@ pub mod model {
     impl NestedBlockKind {
 
 
-        pub fn unwrap_func<I,O,F>(&self) ->  impl FnMut(I) -> Res<I, O> where I: Span, F: FnMut(I) -> Res<I, O>{
-            let clone= self.clone();
-            move |func| clone.unwrap(func)
-        }
 
 
-        pub fn unwrap<I, F, O>(&self, mut f: F) -> impl FnMut(I) -> Res<I, O>
+        pub fn unwrap<I, F, O>(&self, f: F) -> impl FnMut(I) -> Res<I, O>
         where
             F: FnMut(I) -> Res<I, O>, I: Span
         {

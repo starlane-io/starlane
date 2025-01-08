@@ -148,11 +148,13 @@ impl Scope {
      */
 
 }
+impl PrimitiveArchetype for Scope { type Parser = Self; }
 
 impl PrimitiveParser for Scope {
-    fn parse<I>(input: I) -> Res<I, Self>
-    where
-        I: Span
+    type Output = Self;
+
+    fn parse<I>(input: I) -> Res<I, Self::Output> where I: Span
+
     {
         parse::scope(input)
     }

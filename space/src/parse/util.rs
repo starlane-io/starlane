@@ -66,17 +66,19 @@ where
     }
 }
 
+
+
 impl<'a> Span for Wrap<LocatedSpan<&'a str, Arc<String>>> {
     fn location_offset(&self) -> usize {
         self.input.location_offset()
     }
 
-    fn get_column(&self) -> usize {
-        self.input.get_column()
-    }
-
     fn location_line(&self) -> u32 {
         self.input.location_line()
+    }
+
+    fn get_column(&self) -> usize {
+        self.input.get_column()
     }
 
     fn extra(&self) -> Arc<String> {
@@ -1038,5 +1040,6 @@ where
         second.parse(input)
     }
 }
+
 
 
