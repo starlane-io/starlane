@@ -322,58 +322,37 @@ pub(crate) mod private {
 
         fn of_type() -> &'static super::TypeDiscriminant;
     }
+
     pub mod variants {
-        pub mod class {
-            use crate::parse::CamelCase;
-            use crate::types::class::{Class, ClassDiscriminant};
-            use crate::types::private::TypeVariant;
-            use crate::types::TypeDiscriminant;
-
-            #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-            pub struct Identifier;
-
-            /// right now variants are stubbed
-            pub type Selector = Identifier;
-            pub type Ctx = Identifier;
+        use std::marker::PhantomData;
+        use crate::parse::CamelCase;
+        use crate::types::private::{Generic, TypeVariant};
+        use crate::types::TypeDiscriminant;
 
 
-            impl TypeVariant for Identifier {
-                type Type = Class;
-                type Segment = CamelCase;
-                type Discriminant = ClassDiscriminant;
+        #[derive(Clone, Eq, PartialEq, Hash, Debug)]
+        pub struct Identifier<T>(PhantomData<T>) where T: Generic;
 
-                fn of_type() -> &'static TypeDiscriminant {
-                    & TypeDiscriminant::Class
-                }
+        impl <T> TypeVariant for Identifier<T> where T: Generic{
+            type Type = T;
+            type Segment = CamelCase;
+            type Discriminant =  T::Discriminant;
+
+            fn of_type() -> &'static TypeDiscriminant {
+                T::of_type()
             }
         }
 
+        pub mod class {
+            use crate::types::class::Class;
+
+            pub type Identifier = super::Identifier<Class>;
+
+        }
+
         pub mod schema {
-            use crate::parse::CamelCase;
-            use crate::types::class::{Class, ClassDiscriminant};
-            use crate::types::private::TypeVariant;
-            use crate::types::{Schema, TypeDiscriminant};
-
-            #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-            pub struct Identifier;
-
-            /// right now variants are stubbed
-            pub type Selector = Identifier;
-            pub type Ctx = Ctx;
-
-
-            impl TypeVariant for Identifier {
-                type Type = Schema;
-                type Segment = CamelCase;
-                type Discriminant = ClassDiscriminant;
-
-                fn of_type() -> &'static TypeDiscriminant {
-                    & TypeDiscriminant::Class
-                }
-            }
-
-
-
+            use crate::types::Schema;
+            pub type Identifier = super::Identifier<Schema>;
         }
     }
 
@@ -383,6 +362,7 @@ pub(crate) mod private {
         type Discriminant: FromStr<Err=strum::ParseError>;
 
         type Segment:  PrimitiveArchetype<Parser:PrimitiveParser>;
+
 
         fn max_stack_size() -> usize {
             2usize

@@ -18,7 +18,7 @@ use nom::error::{ErrorKind, FromExternalError};
 use nom::multi::{many0, separated_list0};
 use once_cell::sync::Lazy;
 use starlane_space::types::ExtVariant;
-use starlane_space::types::private::TypeVariant;
+use starlane_space::types::private::{variants, TypeVariant};
 use starlane_space::types::specific::SpecificVariant;
 use crate::err::ParseErrs;
 use crate::parse::model::{BlockKind, NestedBlockKind};
@@ -316,14 +316,9 @@ pub trait VariantSegmentParser {
 /// a [Type] cannot be parsed on its own so [TypeParser] supplies the necessary
 /// sup parsers to [ExtParser]
 pub trait TypeParser<T> where T: TypeVariant{
-    //type Output: TryFrom<Self::Discriminant,Error=strum::ParseError> + FromStr;
 
-    //type Discriminant: TryFrom<Self::Segment>;
-
-    //type Segment: PrimitiveArchetype<Parser:PrimitiveParser>;
-
-    fn identifier() -> ParserImpl<T> {
-        ParserImpl::default()
+    fn identifier<G>() -> ParserImpl<variants::Identifier<G>> where G: Generic {
+        Default::default()
     }
 
     fn of_type<I>() -> &'static TypeDiscriminant {
