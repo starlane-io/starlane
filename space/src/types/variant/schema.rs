@@ -1,22 +1,16 @@
 use crate::types::{private, TypeDiscriminant, SrcDef, Type, ExtType, Ext, Case};
 use core::str::FromStr;
 use derive_name::Name;
-use nom::combinator::fail;
-use rustls::client::verify_server_cert_signed_by_trust_anchor;
 use serde_derive::{Deserialize, Serialize};
-use strum::ParseError;
 use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
-use starlane_space::parse::{camel_chars, from_camel};
 use starlane_space::types::{PointKindDefSrc};
 use crate::parse::{camel_case, unwrap_block, CamelCase, Res};
 use crate::parse::model::{BlockKind, NestedBlockKind};
-use crate::parse::util::Span;
-use crate::types::class::{Class, ClassDiscriminant};
-use crate::types::class::service::Service;
-use crate::types::parse::{TypeParser, PrimitiveParser, ParserImpl};
-use crate::types::parse::util::VariantStack;
-use crate::types::private::{Generic, Variant};
+use crate::types::variant::class::{Class, ClassDiscriminant};
+use crate::types::parse::{TypeParser, PrimitiveParser, TypeParserImpl};
+use crate::types::parse::util::TypeVariantStack;
+use crate::types::variant::TypeVariant;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::EnumString, strum_macros::Display, Serialize,Deserialize,Name)]
 #[strum_discriminants(vis(pub))]
@@ -38,11 +32,11 @@ pub enum Schema {
     _Ext(CamelCase),
 }
 
-impl Generic for Schema {
+impl TypeVariant for Schema {
+    type Parser = TypeParserImpl<Self>;
     type Discriminant = SchemaDiscriminant;
-    type Segment = CamelCase;
 
-    type Parser = ParserImpl<Self>;
+    type Segment = CamelCase;
 
     fn of_type() -> &'static TypeDiscriminant {
         & TypeDiscriminant::Schema
@@ -51,15 +45,21 @@ impl Generic for Schema {
     fn block() -> &'static NestedBlockKind {
         & NestedBlockKind::Square
     }
-
-
 }
 
+impl From<&CamelCase> for Schema{
+    fn from(segment: &CamelCase) -> Self {
+        match SchemaDiscriminant::from_str(segment.as_str()) {
+            Ok(disc) => Schema::try_from(disc).unwrap(),
+            Err(_) => Schema::_Ext(segment.clone()),
+        }
+    }
+}
 
-impl TryFrom<VariantStack<Schema>>  for Schema {
+impl TryFrom<TypeVariantStack<Schema>>  for Schema {
     type Error = ParseErrs;
 
-    fn try_from(stack: VariantStack<Schema>) -> Result<Self, Self::Error> {
+    fn try_from(stack: TypeVariantStack<Schema>) -> Result<Self, Self::Error> {
 
         match stack.two()? {
             (disc, None) => Ok(Schema::from(disc)),
@@ -77,31 +77,6 @@ impl TryFrom<VariantStack<Schema>>  for Schema {
         }
     }
 }
-
-struct SchemaParser;
-
-
-
-
-
-
-impl TryFrom<SchemaDiscriminant> for Schema {
-    type Error = strum::ParseError;
-
-    fn try_from(disc: SchemaDiscriminant) -> Result<Self, Self::Error> {
-        match disc {
-            SchemaDiscriminant::_Ext =>  Err(strum::ParseError::VariantNotFound),
-            _ => Schema::from_str(disc.to_string().as_str())
-        }
-
-    }
-}
-
-
-pub struct SchemaSegmentParser;
-
-
-
 
 impl From<CamelCase> for Schema {
     fn from(camel: CamelCase) -> Self {
@@ -126,18 +101,6 @@ impl TryFrom<CamelCase> for SchemaDiscriminant{
 }
 
 
-
-/*
-impl Into<TypeKind> for SchemaKind {
-    fn into(self) -> TypeKind {
-        TypeKind::Schema(self)
-    }
-}
-
- */
-
-
-
 impl Into<CamelCase> for Schema {
     fn into(self) -> CamelCase {
         CamelCase::from_str(self.to_string().as_str()).unwrap()
@@ -150,30 +113,28 @@ impl Into<TypeDiscriminant> for Schema {
     }
 }
 
-pub type BindConfigSrc = PointKindDefSrc<Schema>;
+
+struct SchemaParser;
 
 
-/*
+impl TryFrom<SchemaDiscriminant> for Schema {
+    type Error = strum::ParseError;
 
-mod parse {
-    use core::str::FromStr;
-    use crate::err::SpaceErr;
-    use crate::schema::case::CamelCase;
-    use crate::types::class::Class;
-
-    impl FromStr for Class {
-        type Err = SpaceErr;
-
-        fn from_str(src: &str) -> Result<Self, Self::Err> {
-            CamelCase::from_str(src)
-
-            Ok(Self(CamelCase::from_str(src)?))
+    fn try_from(disc: SchemaDiscriminant) -> Result<Self, Self::Error> {
+        match disc {
+            SchemaDiscriminant::_Ext =>  Err(strum::ParseError::VariantNotFound),
+            _ => Schema::from_str(disc.to_string().as_str())
         }
-    }
 
+    }
 }
 
 
- */
+
+
+pub type BindConfigSrc = PointKindDefSrc<Schema>;
+
+
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SchemaDef;

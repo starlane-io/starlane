@@ -1,18 +1,10 @@
-use std::any::TypeId;
 use std::fmt::Display;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use derive_name::Name;
-use nom::branch::alt;
-use nom::combinator::{into, opt};
-use nom::error::{ErrorKind, FromExternalError};
-use nom::sequence::{terminated, tuple};
-use nom_supreme::tag::complete::tag;
+use nom::error::FromExternalError;
 use once_cell::sync::Lazy;
 use strum_macros::EnumDiscriminants;
-
-pub mod class;
-pub mod schema;
 
 pub mod registry;
 pub mod specific;
@@ -27,7 +19,7 @@ pub mod parse;
 #[cfg(test)]
 pub mod test;
 pub mod exact;
-
+pub mod variant;
 //pub(crate) trait Typical: Display+Into<TypeKind>+Into<Type> { }
 
 
@@ -38,18 +30,16 @@ pub mod exact;
 #[strum_discriminants(name(TypeDiscriminant))]
 #[strum_discriminants(derive( Hash, strum_macros::EnumString, strum_macros::ToString, strum_macros::IntoStaticStr ))]
 pub enum Type {
-    Schema(Schema),
     Class(Class),
+    Schema(Schema)
 }
-
-
 
 pub type AsType = dyn Into<ExtType>;
 pub type AsTypeKind = dyn Into<Type>;
 
 pub type ExtType = Ext<TypeIdentifier>;
 
-pub type GenExt<G:Generic> = Ext<GenericIdentifier<G>>;
+pub type GenExt<G: TypeVariant> = Ext<GenericIdentifier<G>>;
 pub type ClassExt = Ext<ClassIdentifier>;
 
 pub type SchemaExt = Ext<SchemaIdentifier>;
@@ -85,7 +75,7 @@ impl<V> Display for Ext<V> where V: ExtVariant
 /// binds the various elements to support `Identifier`, `Selector` and `Context` variants
 pub trait ExtVariant {
    type Scope: PrimitiveArchetype<Parser:PrimitiveParser<Output=Self::Scope>>;
-   type Type: Generic;
+   type Type: TypeVariant;
    type Specific: SpecificVariant;
 
    type Parser: ExtParser<Self>;
@@ -96,15 +86,15 @@ pub trait ExtVariant {
 pub struct TypeIdentifier;
 pub struct ClassIdentifier;
 pub struct SchemaIdentifier;
-pub struct GenericIdentifier<G>(PhantomData<G>) where G: Generic;
+pub struct GenericIdentifier<G>(PhantomData<G>) where G: TypeVariant;
 
 impl ExtVariant for TypeIdentifier {
     type Scope = Scope;
-    /// should be a [Type] which is problematic because [Type] doesn't implement [Generic] ...
+    /// should be a [Type] which is problematic because [Type] doesn't implement [TypeVariant] ...
     /// hacked it to point to [Class] for now...
     type Type = Class;
     type Specific = specific::variants::Identifier;
-    type Parser = ParserImpl<Self>;
+    type Parser = ExtParserImpl<Self>;
 }
 
 
@@ -113,21 +103,22 @@ impl ExtVariant for ClassIdentifier {
     type Type = Class;
     type Specific = specific::variants::Identifier;
 
-    type Parser = ParserImpl<Self>;
+    type Parser = ExtParserImpl<Self>;
 }
 impl ExtVariant for SchemaIdentifier {
     type Scope = Scope;
     type Type = Schema;
     type Specific = specific::variants::Identifier;
-    type Parser = ParserImpl<Self>;
+    type Parser = ExtParserImpl<Self>;
 }
 
-impl <G> ExtVariant for GenericIdentifier<G> where G: Generic{
+impl <G> ExtVariant for GenericIdentifier<G> where G: TypeVariant
+{
     type Scope = Scope;
     type Type = G;
     type Specific = specific::variants::Identifier;
 
-    type Parser = ParserImpl<Self>;
+    type Parser = ExtParserImpl<Self>;
 }
 
 /// is able to ascertain the desired abstract
@@ -266,142 +257,34 @@ pub enum DefSrc {
 
 
 use crate::err::ParseErrs;
-use crate::parse::{lex_block_alt, CamelCase, NomErr, Res, SkewerCase};
+use crate::parse::{CamelCase, Res, SkewerCase};
 use crate::point::Point;
-use crate::types::private::Generic;
-pub use schema::Schema;
+pub use variant::schema::Schema;
 use specific::Specific;
-use starlane_space::types::private::Variant;
 use starlane_space::types::specific::SpecificVariant;
+use variant::{class, TypeVariant};
 use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
-use crate::types::class::Class;
-use crate::types::parse::{Archetype, ExtParser, ParserImpl, PrimitiveArchetype, PrimitiveParser, SpecificParser, TypeParser};
+use variant::class::Class;
+use crate::types::parse::{Archetype, ExtParser, ExtParserImpl, PrimitiveArchetype, PrimitiveParser, SpecificParser, TypeParser};
 use crate::types::scope::Scope;
 use crate::types::specific::SpecificExt;
 
 pub(crate) mod private {
-    use super::{err, Type, ExtType, Ext, Schema, Case, parse, GenExt, ExtVariant};
+    use super::{err, Ext, ExtType, ExtVariant, Schema, Type};
     use super::specific::Specific;
     use crate::parse::util::Span;
-    use crate::parse::{camel_case, CamelCase, NomErr, Res};
     use crate::point::Point;
-    use crate::types;
-    use crate::types::class::Class;
-    use crate::types::scope::{Scope, Segment};
+    use crate::types::variant::class::Class;
     use indexmap::IndexMap;
     use itertools::Itertools;
-    use nom::{IResult, Parser};
+    use nom::Parser;
     use std::collections::{HashMap, HashSet};
-    use std::fmt::{Debug, Display, Formatter};
+    use std::fmt::{Debug, Display};
     use std::hash::Hash;
     use std::marker::PhantomData;
-    use std::ops::{Deref, DerefMut, Index};
-    use std::str::FromStr;
-
-    use derive_name::Name;
-    use nom::bytes::complete::tag;
-    use nom::combinator::{cond, fail, into, opt, peek, value};
-    use nom::error::{ErrorKind, FromExternalError, ParseError};
-    use nom::error::VerboseErrorKind::Nom;
-    use nom::sequence::{delimited, pair};
-    use nom_supreme::ParserExt;
-    use strum_macros::EnumDiscriminants;
-    use starlane_space::types::parse::TypeParser;
-    use crate::parse::model::{BlockKind, NestedBlockKind};
+    use std::ops::{Deref, DerefMut};
     use crate::types::parse::{Archetype, PrimitiveArchetype, PrimitiveParser};
-    use crate::types::parse::util::VariantStack;
-
-    pub(crate) trait TypeVariant {
-        type Type;
-
-        type Segment;
-
-        type Discriminant: FromStr<Err=strum::ParseError>;
-
-
-        fn of_type() -> &'static super::TypeDiscriminant;
-    }
-
-    pub mod variants {
-        use std::marker::PhantomData;
-        use crate::parse::CamelCase;
-        use crate::types::private::{Generic, TypeVariant};
-        use crate::types::TypeDiscriminant;
-
-
-        #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-        pub struct Identifier<T>(PhantomData<T>) where T: Generic;
-
-        impl <T> TypeVariant for Identifier<T> where T: Generic{
-            type Type = T;
-            type Segment = CamelCase;
-            type Discriminant =  T::Discriminant;
-
-            fn of_type() -> &'static TypeDiscriminant {
-                T::of_type()
-            }
-        }
-
-        pub mod class {
-            use crate::types::class::Class;
-
-            pub type Identifier = super::Identifier<Class>;
-
-        }
-
-        pub mod schema {
-            use crate::types::Schema;
-            pub type Identifier = super::Identifier<Schema>;
-        }
-    }
-
-    pub(crate) trait Generic: TryFrom<VariantStack<Self>>+Name+Clone+Into<Type>+Clone+FromStr+Display{
-
-        type Parser: TypeParser<Self>;
-        type Discriminant: FromStr<Err=strum::ParseError>;
-
-        type Segment:  PrimitiveArchetype<Parser:PrimitiveParser>;
-
-
-        fn max_stack_size() -> usize {
-            2usize
-        }
-
-        fn of_type() -> &'static super::TypeDiscriminant;
-
-        fn plus(self, scope: Scope, specific: Specific) -> GenExt<Self> {
-            GenExt::new(scope,self,specific)
-        }
-
-
-
-
-
-        fn block() -> &'static NestedBlockKind;
-
-        /// wrap the string value in it's `type` wrapper.
-        ///
-        /// for example:  [Class::to_string] for [Class::Database] would `Database`, or a variant like
-        /// [Class::Service(Service::Database)] to_string would return `Service<Database>` and
-        /// [Class::wrapped_string] would return `<Database>` and `<Service<Database>` respectively
-        fn wrapped_string(&self) -> String {
-            Self::block().wrap(self.to_string())
-        }
-
-    }
-
-
-    /// [Variant] implies inheritance from a
-    pub(crate) trait Variant where Self: Into<Self::Type> {
-        /// the base [Type] variant [Class] or [Schema]
-        type Type: Generic+?Sized;
-
-        type Discriminant;
-    }
-
-
-
     #[cfg(feature="groups")]
     pub mod group {
         #[derive(Clone, Debug, Eq, PartialEq, Hash)]

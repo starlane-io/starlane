@@ -220,7 +220,7 @@ pub enum ErrCtx {
 pub enum VarErrCtx {
     #[error("invalid variable declaration after '$'")]
     VarToken,
-    #[error("invalid variable name. Legal values: alphanumeric + '_' (must start with a letter)")]
+    #[error("invalid variable name. Legal values: alphanumeric or underscore('_') (must start with a lowercase letter)")]
     VarName,
 }
 
@@ -242,7 +242,7 @@ pub enum PrimitiveErrCtx {
     Lower,
     #[error("expecting lower case alpha numeric")]
     LowerAlphaNumeric,
-    #[error("expecting lower case alpha numeric '.' and '-'")]
+    #[error("expecting lower case alpha numeric, '.' or '-'")]
     Domain,
     #[error("expecting {0}")]
     Brace(#[from] BraceErrCtx),

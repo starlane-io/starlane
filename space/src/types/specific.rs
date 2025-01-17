@@ -8,15 +8,15 @@ use nom_supreme::tag::complete::tag;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::loc::Version;
 use starlane_space::selector::Pattern;
-use starlane_space::types::parse::{ParserImpl, PrimitiveArchetype, PrimitiveParser};
+use starlane_space::types::parse::{PrimitiveArchetype, PrimitiveParser};
 use crate::parse::{Domain, Res, SkewerCase};
 use crate::parse::util::Span;
-use crate::types::class::{Class, ClassDef};
+use crate::types::variant::class::{Class, ClassDef};
 use crate::types::id::Id;
-use crate::types::parse::SpecificParser;
+use crate::types::parse::{SpecificParser, SpecificParserImpl};
 use crate::types::Schema;
 use crate::types::scope::Scope;
-use crate::types::schema::SchemaDef;
+use crate::types::variant::schema::SchemaDef;
 
 pub trait SpecificVariant {
     type Contributor: PrimitiveArchetype<Parser:PrimitiveParser>+Clone;
@@ -33,7 +33,7 @@ pub struct SpecificExt<V> where V: SpecificVariant {
 }
 
 impl <V> SpecificExt<V> where V: SpecificVariant {
-    pub fn parser() -> ParserImpl<V> {
+    pub fn parser() -> SpecificParserImpl<V> {
         Default::default()
     }
 }

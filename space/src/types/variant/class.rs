@@ -1,27 +1,17 @@
-use crate::types::{private, DataPoint, ExtType, Type, Ext, Case, Schema};
+use crate::parse::model::NestedBlockKind;
+use crate::parse::util::Span;
+use crate::parse::CamelCase;
+use crate::types::parse::util::TypeVariantStack;
+use crate::types::parse::{PrimitiveArchetype, TypeParserImpl};
+use crate::types::variant::class::service::Service;
 use crate::types::TypeDiscriminant;
 use core::str::FromStr;
-use std::borrow::Borrow;
-use derive_builder::Builder;
 use derive_name::Name;
-use nom::combinator::{cut, fail, into};
 use nom::Parser;
-use nom::sequence::delimited;
 use serde_derive::{Deserialize, Serialize};
-use strum::ParseError;
-use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
-use starlane_space::parse::{delim_kind_lex, from_camel};
-use starlane_space::types::private::Generic;
-use crate::parse::{camel_case, camel_chars, lex_block, unwrap_block, CamelCase, NomErr, Res};
-use crate::parse::model::{BlockKind, NestedBlockKind};
-use crate::parse::util::Span;
-use crate::point::Point;
-use crate::types::class::service::Service;
-use crate::types::parse::{ParserImpl, PrimitiveArchetype};
-use crate::types::parse::util::VariantStack;
-use crate::types::private::{Variant};
-use crate::types::schema::SchemaDiscriminant;
+use std::borrow::Borrow;
+use strum_macros::EnumDiscriminants;
 
 #[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
 #[strum_discriminants(vis(pub))]
@@ -87,10 +77,12 @@ pub enum Class {
 
 
 
+impl PrimitiveArchetype for Class {
+    type Parser = TypeParserImpl<Self>;
+}
 
-impl Generic for Class {
-
-    type Parser = ParserImpl<Self>;
+impl TypeVariant for Class {
+    type Parser = TypeParserImpl<Self>;
     type Discriminant = ClassDiscriminant;
     type Segment = CamelCase;
 
@@ -99,17 +91,14 @@ impl Generic for Class {
     }
 
     fn block() -> &'static NestedBlockKind {
-
-        &NestedBlockKind::Angle
+        & NestedBlockKind::Angle
     }
-
-
 }
 
-impl TryFrom<VariantStack<Class>>  for Class {
+impl TryFrom<TypeVariantStack<Class>>  for Class {
     type Error = ParseErrs;
 
-    fn try_from(stack: VariantStack<Class>) -> Result<Self, Self::Error> {
+    fn try_from(stack: TypeVariantStack<Class>) -> Result<Self, Self::Error> {
 
         match stack.two()? {
             (disc, None) => Ok(Class::from(disc)),
@@ -138,77 +127,16 @@ impl TryFrom<ClassDiscriminant> for Class{
 
 
 
-/*
-impl TypeParsers for ClassParsers {
-    type Output = Class;
-    type Discriminant = ClassDiscriminant;
-    type GroupSegment = CamelCase;
 
-
-    fn block<I,F,O>(f: F) -> impl FnMut(I) -> Res<I, O> where F: FnMut(I) -> Res<I,O>+Copy, I: Span {
-        unwrap_block(BlockKind::Nested(NestedBlockKind::Angle),f)
-    }
-
-    fn segment<I>(input: I) -> Res<I, Self::GroupSegment>
-    where
-        I: Span
-    {
-        camel_case(input)
-    }
-
-    fn discriminant<I>(input: I) -> Res<I, Self::Discriminant>
-    where
-        I: Span
-    {
-      let (next,segment) = Self::segment(input)?;
-      Ok((next,ClassDiscriminant::from_str(segment.as_str()).unwrap_or_else(|_| ClassDiscriminant::_Ext)))
-    }
-
-    fn create(disc: Self::Discriminant, variant: Self::GroupSegment) -> Result<Self::Output, strum::ParseError> {
-        match disc {
-            Self::Discriminant::Service => Ok(Service::from(variant).into()),
-            _ => Err(strum::ParseError::VariantNotFound)
-        }
-    }
-
-    fn block_kind() -> NestedBlockKind {
-        NestedBlockKind::Angle
-    }
-
-    type VariantSegment = ();
-}
-
- */
-
-
-/*
-impl Class {
-    pub fn from_variant( variant: CamelCase, sub: CamelCase ) -> Result<Class,ParseErrs> {
-        match variant.as_str() {
-            "Service" => {
-                Ok(Class::Service(Service::from_str(sub.as_str())?))
-            }
-            oops => Err(ParseErrs::new(format!("Class variant not found: '{}'", oops)))
-        }
-    }
-}
-
- */
 
 pub mod service {
-    use std::str::FromStr;
+    use crate::parse::CamelCase;
+    use crate::types::variant::class::Class;
     use derive_name::Name;
-    use nom::combinator::into;
     use nom::Parser;
     use serde_derive::{Deserialize, Serialize};
-    use strum::ParseError;
+    use std::str::FromStr;
     use strum_macros::{EnumDiscriminants, EnumString};
-    use starlane_space::types::private::Variant;
-    use crate::err::ParseErrs;
-    use crate::parse::{camel_case, from_camel, CamelCase, NomErr, Res};
-    use crate::parse::util::Span;
-    use crate::types::Type;
-    use crate::types::class::{Class, ClassDiscriminant};
 
     /// variants for [super::Class::Service]
     #[derive(
@@ -255,9 +183,6 @@ pub mod service {
     impl Variant for Service {
         type Type = Class;
         type Discriminant = Discriminant;
-
-
-
     }
 
     impl From<CamelCase> for Service{
@@ -344,6 +269,10 @@ impl Into<CamelCase> for ClassDiscriminant {
 pub struct ClassDef;
 
 
+use crate::types;
+use crate::types::variant::TypeVariant;
+
+pub type Identifier = types::private::variants::Identifier<Class>;
 
 
 

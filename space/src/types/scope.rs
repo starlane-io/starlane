@@ -16,7 +16,7 @@ use crate::parse::util::{new_span, result, Span};
 use once_cell::sync::Lazy;
 use strum::ParseError;
 use starlane_space::types::parse::PrimitiveParser;
-use starlane_space::types::private::Generic;
+use starlane_space::types::private::TypeVariant;
 use crate::types::parse::PrimitiveArchetype;
 use crate::types::specific::Specific;
 

@@ -9,10 +9,10 @@ pub mod parse {
     use crate::parse::{camel_case, from_camel, CamelCase};
     use crate::parse::model::{BlockKind, NestedBlockKind};
     use crate::parse::util::{new_span, result};
-    use crate::types::class::{Class, ClassDiscriminant};
-    use crate::types::class::service::Service;
+    use crate::types::variant::class::{Class, ClassDiscriminant};
+    use crate::types::variant::class::service::Service;
     use crate::types::parse::{TypeParser, PrimitiveParser};
-    use crate::types::private::{Generic};
+    use crate::types::private::{TypeVariant};
     use crate::types::Schema;
     use crate::types::specific::variants::Identifier;
 
@@ -116,7 +116,7 @@ pub mod parse {
         let s = format!("[{}]", inner);
         let i = new_span(s.as_str());
 
-//        let schema = result(<Schema as Generic>::Parser::
+//        let schema = result(<Schema as TypeVariant>::Parser::
     }
 
     #[test]
