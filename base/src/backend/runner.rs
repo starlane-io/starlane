@@ -6,7 +6,11 @@ use starlane_macros::logger;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use async_trait::async_trait;
 use tokio::sync::watch::Receiver;
+use starlane_hyperspace::base::config::BaseConfig;
+use starlane_hyperspace::base::Foundation;
+use starlane_hyperspace::base::provider::Provider;
 use crate::backend::relay::FoundationTx;
 
 
@@ -22,16 +26,15 @@ impl<K, C> Wrapper<K, C> {
 
 struct DependencyTx<F>
 where
-    F: foundation::Foundation,
+    F: Foundation,
 {
-    config: <<F as foundation::Foundation>::Dependency as foundation::Dependency>::Config,
     call_tx: tokio::sync::mpsc::Sender<DepCall<F>>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
 impl<F> DependencyTx<F>
 where
-    F: foundation::Foundation,
+    F: Foundation,
 {
     fn new(
         config: F::Dependency::Config,
@@ -47,9 +50,9 @@ where
 }
 
 #[async_trait]
-impl<F> foundation::Dependency for DependencyTx<F>
+impl<F> Dependency for DependencyTx<F>
 where
-    F: foundation::Foundation,
+    F: Foundation,
 {
     type Config = F::Config;
     type Provider = F::Provider;

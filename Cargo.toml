@@ -11,9 +11,9 @@ description="The Workspace package for Starlane.  What to see: './space' contain
 version="0.3.20"
 
 [workspace]
-default-run = "starlane"
+default-run = "main"
 resolver = "2"
-members = ["starlane", "space", "hyperspace", "base","macros", "foundation/docker-desktop", "platform/registry/postgres", "platform/postgres"]
+members = ["main", "space", "hyperspace", "base","macros", "foundation/docker-desktop", "platform/registry/postgres", "platform/postgres"]
 
 exclude = [ ]
 
