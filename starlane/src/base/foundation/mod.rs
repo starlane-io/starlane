@@ -77,7 +77,8 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::watch::Receiver;
-
+use crate::env::config;
+use crate::hyperspace::err::HypErr;
 //pub mod proxy;
 
 //pub mod runner;
@@ -222,6 +223,17 @@ pub struct StarlaneConfig {
     pub can_scorch: bool,
     pub control_port: u16,
     //    pub foundation: ProtoFoundationSettings,
+}
+
+impl Default for StarlaneConfig {
+    fn default() -> Self {
+        if let Ok(Some(config)) = config() {
+            config
+        }
+        else {
+            todo!("StarlaneConfig::default() not yet implemented")
+        }
+    }
 }
 
 fn deserialize_from_value<'de, D>(deserializer: D) -> Result<Value, D::Error>

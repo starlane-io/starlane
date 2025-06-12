@@ -4,6 +4,7 @@ use crate::hyperspace::registry::postgres::{
     PostgresRegistryContextHandle,
 };
 
+use crate::hyperspace::reg::Registry;
 use crate::hyperspace::driver::base::BaseDriverFactory;
 use crate::hyperspace::driver::control::ControlDriverFactory;
 use crate::hyperspace::driver::root::RootDriverFactory;
@@ -17,7 +18,6 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::base::foundation::settings::ProtoFoundationSettings;
 use crate::base::foundation::Foundation;
 use crate::env::{config_path, STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_HOME};
 use crate::hyperspace::driver::space::SpaceDriverFactory;
@@ -38,6 +38,7 @@ use starlane_primitive_macros::{logger, push_loc};
 use std::collections::HashSet;
 use std::ops::Deref;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
+use crate::hyperspace::reg::RegistryApi;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
@@ -95,7 +96,7 @@ impl Default for StarlaneConfig {
 pub struct Starlane {
     config: StarlaneConfig,
     artifacts: Artifacts,
-    registry: Registry,
+    registry: Arc<dyn RegistryApi>
     //    config: DockerDesktopFoundation,
 }
 

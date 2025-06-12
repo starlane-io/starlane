@@ -24,7 +24,8 @@ repository.workspace = true
 
 [features]
 full = ["server"]
-default = ["hyperspace"]
+#default = ["hyperspace"]
+default = ["full"]
 #server=["space","service","hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dependency:threadpool", "dependency:oneshot", "dependency:anyhow", "dependency:virtual-fs"]
 server = ["space", "service", "hyperspace", "hyperlane", "hyperlane-tcp", "cli", "dep:oneshot", "dep:anyhow", "dep:bollard"]
 cli = ["dep:text_io", "dep:clap", "dep:walkdir", "parse"]
