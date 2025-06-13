@@ -17,8 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Build
-      working-directory: ./starlane
-      run: cargo build --verbose
+      run: cargo build --package starlane --verbose
 #    - name: Run tests
 #      run: cargo test --verbose --workspace
     - name: Upload release artifact
