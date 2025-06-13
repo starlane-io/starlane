@@ -19,15 +19,13 @@ exclude = [ ]
 
 [workspace.dependencies]
 
-
+starlane = { package="starlane", path= "main" }
 starlane-macros = { package="starlane-macros", path= "macros", version = "0.3.20" }
 starlane-space = { package="starlane-space", path= "space", version = "0.3.20" }
 starlane-hyperspace = { package="starlane-hyperspace", path= "hyperspace", version = "0.3.20" }
 starlane-base = { package="starlane-base", path= "base", version = "0.3.20" }
 starlane-platform-for-postgres = { package="starlane-platform-for-postgres", path= "platform/postgres" }
 starlane-platform-for-postgres-registry = { package="starlane-platform-for-postgres-registry", path= "platform/registry/postgres" }
-
-starlane = { package="starlane", path= "starlane" }
 
 lazy_static = "1.5.0"
 uuid = { version="1.11.0" }

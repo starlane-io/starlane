@@ -133,7 +133,7 @@ mod concrete {
     impl Provider for PostgresDatabaseProvider {
         type Config = Config;
 
-        fn kind(&self) -> ProviderKindDef {
+        fn provider_kind(&self) -> ProviderKindDef {
             ProviderKindDef::PostgresService
         }
 

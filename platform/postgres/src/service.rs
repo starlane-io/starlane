@@ -190,7 +190,7 @@ mod concrete {
     use async_trait::async_trait;
     use sqlx;
     use sqlx::{Acquire, ConnectOptions, Connection, Postgres};
-    use starlane_hyperspace::base::provider::{Manager, Provider, ProviderKindDef};
+    use starlane_hyperspace::base::provider::{Strata, Provider, ProviderKindDef};
     use starlane_base::Foundation;
     use starlane_base::Platform;
     use starlane_space::status;
@@ -245,7 +245,7 @@ mod concrete {
     impl Provider for PostgresServiceProvider {
         type Config = PostgresProviderConfig;
 
-        fn kind(&self) -> ProviderKindDef {
+        fn provider_kind(&self) -> ProviderKindDef {
             ProviderKindDef::PostgresService
         }
 
@@ -263,10 +263,10 @@ mod concrete {
 
     /// the [StatusProbe] implementation which tracks with a Postgres Connection [Pool].
     /// With any [StatusProbe] the goal is to get to a [Status::Ready] state.  [PostgresService]
-    /// should abstract the specific [Manager] details.  A [PostgresService] may be a
-    /// [Manager::Foundation] in which the [PostgresService] would be responsible for
+    /// should abstract the specific [Strata] details.  A [PostgresService] may be a
+    /// [Strata::Foundation] in which the [PostgresService] would be responsible for
     /// downloading, installing, initializing and starting Postgres before it creates the pool or if
-    /// [Manager::External] then Starlane's [Platform] is only responsible for maintaining
+    /// [Strata::External] then Starlane's [Platform] is only responsible for maintaining
     /// a connection pool to the given Postgres Cluster
     ///
     #[derive(Clone)]

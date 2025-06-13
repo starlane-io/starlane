@@ -7,9 +7,7 @@ use std::hash::{Hash, Hasher};
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::parse::CamelCase;
-use starlane_space::status::{
-    Action, ActionRequest, Entity, EntityReadier, PendingDetail, StatusProbe,
-};
+use starlane_space::status::{Action, ActionRequest, Entity, EntityReadier, EntityResult, PendingDetail, StatusProbe};
 use std::sync::Arc;
 use strum_macros::EnumDiscriminants;
 
@@ -19,7 +17,7 @@ use crate::base::{kinds, BaseSub};
 use crate::base::config::BaseConfig;
 use crate::base::kinds::Kind;
 
-#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
+#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize,Eq,PartialEq,Hash)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ProviderKind))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
@@ -80,7 +78,7 @@ pub enum PostgresDatabaseKindDef {
 /// indicates which architecture layer manages this dependency or if management is external
 /// to starlane itself.  Managing entails: downloading, installing and starting the [StatusProbe]
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Manager {
+pub enum Strata {
     /// the [StatusProbe] is managed by Starlane's Foundation.  For example a running Starlane
     /// local development cluster might use DockerDesktopFoundation to provide services like
     /// Postgres.
@@ -92,22 +90,20 @@ pub enum Manager {
     /// and status reporting on the health of the connection pool (which isn't the same as
     /// Foundation which is responsible for making the service available and in a ready state)
     Platform,
-
-    /// A completely  external entity manages this [StatusProbe]
-    External,
 }
 
-/// A [`Provider`] is an add-on to the [`Foundation`] infrastructure which may need to be
-/// downloaded, installed, initialized and started.
-///
-/// The Dependency facilitates instances via ['Provider'].  In other words if the Dependency
-/// is a Database server like Postgres... the Dependency will download, install, initialize and
-/// start the service whereas a Provider in this example would represent an individual Database
+/// [Provider] can be from a [Foundation] or a [Platform].
+/// 
+/// A [Provider] is an add-on to the [Foundation] infrastructure which may need to be
+/// downloaded, installed, initialized and started... and [Platform] [Provider]s typically
+/// make a contextual connection available for the [Provider]'s service... 
 #[async_trait]
-pub trait Provider: BaseSub<Config:config::ProviderConfig>+ StatusProbe + EntityReadier + Send + Sync {
+pub trait Provider: BaseSub<Config:config::ProviderConfig>+ StatusProbe + Send + Sync {
 
+    type Entity: Entity;
 
-    /*
+    fn provider_kind(&self) -> &ProviderKind;
+
     /// Returns an interface clone for [Provider::Entity] when it reaches [Status::Ready].
     ///
     /// If [Provider::Entity] is NOT ready [Provider::ready] will start the `readying` tasks
@@ -125,9 +121,8 @@ pub trait Provider: BaseSub<Config:config::ProviderConfig>+ StatusProbe + Entity
     /// [StateDetail::Fatal] should fail immediately.
     ///
     /// Progress [Status] of [Self::ready] can be tracked using: [Self::status_watcher]
-    async fn ready(&self) -> status::ReadyResult<Self::Entity>;
+    async fn ready(&self) -> EntityResult<Self::Entity>;
 
-     */
 }
 
 /*

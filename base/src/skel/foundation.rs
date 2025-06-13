@@ -220,7 +220,7 @@ pub mod concrete {
             type Config = ProviderConfig;
             type Entity = ();
 
-            fn kind(&self) -> ProviderKindDef {
+            fn provider_kind(&self) -> ProviderKindDef {
                 todo!()
             }
 

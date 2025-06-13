@@ -9,8 +9,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tokio::sync::watch::Receiver;
 use starlane_hyperspace::base::config::BaseConfig;
-use starlane_hyperspace::base::Foundation;
+use starlane_hyperspace::base::{BaseSub, Foundation};
+use starlane_hyperspace::base::kinds::ProviderKind;
 use starlane_hyperspace::base::provider::Provider;
+use starlane_space::status::{EntityReadier, EntityResult, Status, StatusProbe, StatusResult};
+use crate::backend::call::Call;
 use crate::backend::relay::FoundationTx;
 
 
@@ -24,100 +27,11 @@ impl<K, C> Wrapper<K, C> {
     }
 }
 
-struct DependencyTx<F>
-where
-    F: Foundation,
-{
-    call_tx: tokio::sync::mpsc::Sender<DepCall<F>>,
-    status: Arc<tokio::sync::watch::Receiver<Status>>,
-}
-
-impl<F> DependencyTx<F>
-where
-    F: Foundation,
-{
-    fn new(
-        config: F::Dependency::Config,
-        call_tx: tokio::sync::mpsc::Sender<DepCall<F>>,
-        status: Arc<tokio::sync::watch::Receiver<Status>>,
-    ) -> F::Dependency {
-        Self {
-            config,
-            call_tx,
-            status,
-        }
-    }
-}
-
-#[async_trait]
-impl<F> Dependency for DependencyTx<F>
-where
-    F: Foundation,
-{
-    type Config = F::Config;
-    type Provider = F::Provider;
-
-    fn kind(&self) -> &DependencyKind {
-        self.config.kind()
-    }
-
-    fn config(&self) -> Self::Config {
-        self.config.clone()
-    }
-
-    fn status(&self) -> Status {
-        self.status.borrow().clone()
-    }
-
-    fn status_watcher(&self) -> Arc<Receiver<Status>> {
-        self.status.clone()
-    }
-
-    async fn download(&self, progress: Progress) -> Result<(), BaseErr> {
-        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-        let call = DepCall::Download { progress, rtn };
-        self.call_tx.send(call).await.unwrap();
-        rtn_rx.await?
-    }
-
-    async fn install(&self, progress: Progress) -> Result<(), BaseErr> {
-        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-        let call = DepCall::Install { progress, rtn };
-        self.call_tx.send(call).await.unwrap();
-        rtn_rx.await?
-    }
-
-    async fn initialize(&self, progress: Progress) -> Result<(), BaseErr> {
-        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-        let call = DepCall::Initialize { progress, rtn };
-        self.call_tx.send(call).await.unwrap();
-        rtn_rx.await?
-    }
-
-    async fn start(
-        &self,
-        progress: Progress,
-    ) -> Result<LiveService<DependencyKind>, BaseErr> {
-        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-        let call = DepCall::Start { progress, rtn };
-        self.call_tx.send(call).await.unwrap();
-        rtn_rx.await?
-    }
-
-    fn provider(&self, kind: &ProviderKind) -> Result<Option<Self::Provider>, BaseErr> {
-        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-        let kind = kind.clone();
-        let call = DepCall::Provider { kind, rtn };
-        self.call_tx.try_send(call).map_err(BaseErr::msg)?;
-        rtn_rx.blocking_recv().map_err(BaseErr::msg)?
-    }
-}
-
 struct ProviderTx<P>
 where
     P: Provider,
 {
-    config: P::Config,
+//    config: <P as BaseSub>::Config,
     call_tx: tokio::sync::mpsc::Sender<Call<P>>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
@@ -127,26 +41,43 @@ where
     P: Provider,
 {
     fn new(
-        config: Arc<dyn ProviderConfig>,
         call_tx: tokio::sync::mpsc::Sender<Call<P>>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
     ) -> Self {
         Self {
-            config,
             call_tx,
             status,
         }
     }
 }
 
-#[async_trait]
-impl<P> Provider for ProviderTx<P>
+
+impl<P> StatusProbe for ProviderTx<P>
 where
     P: Provider,
 {
-    type Config = P::Config;
+    async fn probe(&self) -> StatusResult {
+        todo!()
+    }
+}
 
-    fn kind(&self) -> &ProviderKind {
+impl<P> EntityReadier for ProviderTx<P>
+where
+    P: Provider,
+{
+    type Entity = ();
+
+    async fn ready(&self) -> EntityResult<Self::Entity> {
+        todo!()
+    }
+}
+
+#[async_trait]
+impl<P> Provider for ProviderTx<P>
+where
+    P: Provider {
+
+    fn provider_kind(&self) -> &ProviderKind {
         &self.config.kind()
     }
 

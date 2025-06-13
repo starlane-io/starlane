@@ -2,23 +2,28 @@ use std::sync::Arc;
 use tokio::sync::watch::Receiver;
 use starlane_space::progress::Progress;
 use std::marker::PhantomData;
+use async_trait::async_trait;
+use starlane_hyperspace::base::Foundation;
+use starlane_space::status::Status;
+use crate::backend::provider::Method;
+use crate::base;
+use crate::foundation::config::FoundationConfig;
 
 pub struct FoundationTx<F>
 where
-    F: foundation::Foundation,
+    F: Foundation,
 {
     phantom: PhantomData<F>,
-    config: base::config::default::FoundationConfig,
-    call_tx: tokio::sync::mpsc::Sender<Method<F>>,
+    call_tx: tokio::sync::mpsc::Sender<Method>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
 impl<F> FoundationTx<F>
 where
-    F: foundation::Foundation,
+    F: Foundation,
 {
     fn new(
-        config: base::config::default::FoundationConfig,
+        config: Box<dyn FoundationConfig<Kind=(), Provider=()>>,
         call_tx: tokio::sync::mpsc::Sender<Method<F>>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
     ) -> Self {

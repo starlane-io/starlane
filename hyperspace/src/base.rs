@@ -1,4 +1,3 @@
-pub mod kinds;
 pub mod config;
 pub mod err;
 pub mod provider;
@@ -29,6 +28,7 @@ use starlane_space::status::{Entity, EntityReadier, Status, StatusProbe, StatusR
 use err::BaseErr;
 use crate::base::config::{BaseSubConfig, FoundationConfig, ProviderConfig};
 use crate::base::provider::context::FoundationContext;
+use crate::base::provider::Provider;
 
 pub trait BaseSub: Send + Sync {
    type Config: config::BaseSubConfig<Kind:kinds::Kind>+?Sized;
@@ -47,7 +47,6 @@ where Self: 'static,
     type Err: std::error::Error + Send + Sync + From<anyhow::Error>+?Sized;
     type StarAuth: HyperAuthenticator+?Sized;
     type RemoteStarConnectionFactory: HyperwayEndpointFactory+Sized;
-    type Foundation: Foundation<>;
     type ProviderKind: kinds::ProviderKind+?Sized;
 
     fn config(&self) -> &Self::Config;
@@ -263,7 +262,7 @@ pub trait Foundation: BaseSub<Config:FoundationConfig> {
     async fn ready(&self, progress: Progress) -> StatusResult;
 
     /// Returns a [Provider] by this [Foundation]
-    fn provider(&self, kind: &<Self::Config as BaseSubConfig>::Kind) -> Result<Option<Box<<Self::Config as FoundationConfig>::Provider>>, BaseErr>;
+    fn provider<P>(&self, kind: &<Self::Config as BaseSubConfig>::Kind) -> Result<Option<& P>, BaseErr> where P: Provider+EntityReadier;
 }
 
 

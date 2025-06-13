@@ -168,9 +168,6 @@ pub mod status;
 #[cfg(feature = "types2")]
 pub mod types;
 
-#[cfg(test)]
-pub mod test;
-
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
 

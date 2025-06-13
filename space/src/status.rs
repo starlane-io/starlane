@@ -25,19 +25,10 @@ use strum_macros::EnumDiscriminants;
 ///
 /// [starlane_hyperspace]: ../../starlane_hyperspace
 /// [Provider]: ../../starlane_hyperspace/src/provider.rs
-pub trait Entity {
-    type DerefTarget;
+pub trait Entity: Send + Sync {
+    type Kind: Eq+PartialEq+Hash+ToString;
 
-    fn deref_target(&self) -> &Self::DerefTarget;
-}
-
-/// wonky impe
-impl<T> Deref for dyn Entity<DerefTarget = T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.deref_target()
-    }
+    fn kind(&self) -> &Self::Kind;
 }
 
 /// [StatusWatcher] is type bound to [tokio::sync::watch::Receiver<StatusResult>]) can get the realtime
@@ -105,16 +96,7 @@ where
     hold: tokio::sync::mpsc::Sender<()>,
 }
 
-impl<E> Deref for Handle<E>
-where
-    E: Entity + Send + Sync + ?Sized,
-{
-    type Target = E::DerefTarget;
 
-    fn deref(&self) -> &Self::Target {
-        self.entity.deref_target()
-    }
-}
 
 impl<E> Handle<E>
 where
@@ -191,15 +173,15 @@ where
 pub enum Status {
     /// [Status::Unknown] is the default status
     Unknown,
-    /// [Status::Idle] is a healthy state of [StatusProbe] that indicates not [Status::Ready]
+    /// [Status::Offline] is a healthy state of [StatusProbe] that indicates not [Status::Ready]
     /// because the [StatusProbe::start] action has not been requested by the host
-    Idle,
+    Offline,
+    /// the [StatusProbe] is waiting on a prerequisite condition to be true before it can
+    /// return to [Status::Initializing] state and complete the [StatusProbe::start]
+    Pending,
     /// meaning the [StatusProbe] is healthy and is working towards reaching a
     /// [Status::Ready] state... i.e. `readying` itself
-    Readying,
-    /// the [StatusProbe] is waiting on a prerequisite condition to be true before it can
-    /// return to [Status::Readying] state and complete the [StatusProbe::start]
-    Pending,
+    Initializing,
     /// [StatusProbe::start] procedure has been halted by a problem that the [StatusProbe]
     /// understands and perhaps can supply an [ActionRequest] so an external [Actor] can
     /// remedy the situation.  An example: a Database depends on a DatabaseConnectionPool
@@ -210,14 +192,16 @@ pub enum Status {
     /// the [Entity]s actually [Status] cannot be determined because it cannot
     /// be reached over the network.
     Unreachable,
-    /// A non-fatal error occurred that [StatusProbe] does not compre
+    /// A non-fatal error occurred that [StatusProbe] does not comprehend.  Panic signals that 
+    /// no more attempts will be made to remedy the situation.  The entity must be `unpanicked` 
+    /// in order for trying to resume.
     Panic,
     /// the [StatusProbe] reports that it cannot go on... [Status::Fatal] is a suggestion
     /// leaving the [StatusProbe]'s [EntityReadier] with the choice to: delete and recreate the
     /// [StatusProbe], abort its [EntityReadier::ready] attempt or kill the entire process
     /// with an error code
     Fatal,
-    /// the desired state
+    /// the desired state 
     Ready,
 }
 
@@ -677,39 +661,8 @@ pub mod test {
     use crate::status::{Entity, Handle};
     use std::ops::Deref;
 
-    #[tokio::test]
-    pub async fn test_handle_deref() {
-        let value = "blah";
-        struct Mock {
-            pub value: String,
-        }
-        impl Entity for Mock {
-            type DerefTarget = String;
-            fn deref_target(&self) -> &Self::DerefTarget {
-                &self.value
-             }
-        }
 
-        impl Default for Mock {
-            fn default() -> Self {
-                Self {
-                    value: "blah".to_string(),
-                }
-            }
-        }
+    #[test]
+    pub fn compiles() { }
 
-        impl Deref for Mock {
-            type Target = String;
-
-            fn deref(&self) -> &Self::Target {
-                &self.value
-            }
-        }
-
-        let mock = Mock::default();
-
-        let handle = Handle::mock(mock);
-
-        assert_eq!(handle.deref(), value);
-    }
 }

@@ -23,13 +23,13 @@ pub mod provider {
     use thiserror::Error;
     use crate::backend::watch::ActivityWatcher;
     use crate::status::Stage;
-    use crate::backend::call as backend;
+    use crate::backend as backend;
 
     pub struct Backend;
 
     impl backend::Backend for Backend {
         type Method = Method;
-        type Result = Result;
+        type Result = dyn backend::Result<Ok=bool,Error=String>;
     }
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash)]

@@ -14,7 +14,6 @@ use starlane_space::selector::Selector;
 use starlane_space::substance::SubstanceList;
 use std::sync::Arc;
 use crate::base::config::{BaseConfig, BaseSubConfig};
-use crate::base::kinds;
 
 pub mod err;
 

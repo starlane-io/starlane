@@ -25,13 +25,11 @@ pub trait BaseSubConfig: Send + Sync {
 }
 
 pub trait FoundationConfig: BaseSubConfig {
-    type Provider: Provider + ?Sized;
-
     fn required(&self) -> HashSet<ProviderKind>;
 
     fn provider_kinds(&self) -> &HashSet<ProviderKind>;
 
-    fn provider<K>(&self, kind: &<<Self::Provider as BaseSub>::Config as BaseSubConfig>::Kind) -> Option<&Self::Provider>;
+    fn provider<P>(&self, kind: <Self as BaseSubConfig>::Kind) -> Option<&P> where P: Provider+BaseSub<Config: BaseSubConfig<Kind=<Self as BaseSubConfig>::Kind>>;
 }
 
 pub trait ProviderConfig: provider::config::ProviderConfig { }
