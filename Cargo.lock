@@ -3052,6 +3052,7 @@ dependencies = [
  "dashmap",
  "derive-name",
  "derive_builder",
+ "dirs",
  "enum-ordinalize",
  "eyre",
  "futures",

@@ -78,6 +78,8 @@ tracing-core = { workspace = true, features = ["valuable", "default"] }
 url = { workspace = true }
 indexmap = {workspace = true}
 eyre = {workspace = true}
+# added this as a hack for 'service_conf()' to work ... hopefully can be removed later
+dirs = {workspace = true}
 
 [dev-dependencies]
 starlane-space = { workspace = true, features = ["test"] }

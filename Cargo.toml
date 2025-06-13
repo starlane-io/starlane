@@ -13,6 +13,7 @@ version="0.3.20"
 [workspace]
 default-run = "main"
 resolver = "2"
+#members = ["main", "space", "hyperspace", "base","macros", "foundation/docker-desktop", "platform/registry/postgres", "platform/postgres", "ext/service/starlane-cli-local-filestore-service" ]
 members = ["main", "space", "hyperspace", "base","macros", "foundation/docker-desktop", "platform/registry/postgres", "platform/postgres"]
 
 exclude = [ ]

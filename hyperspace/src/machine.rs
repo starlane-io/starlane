@@ -7,9 +7,7 @@ use crate::hyperlane::{
 };
 use crate::base::Platform;
 use crate::registry::Registry;
-use crate::service::{
-    service_conf, Service, ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate,
-};
+use crate::service::{service_conf, Service, ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate};
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 use crate::template::Templates;
 use async_trait::async_trait;
