@@ -294,7 +294,7 @@ pub fn test_point_var() {
 pub fn test_point() {
     util::log(
         result(all_consuming(point_var)(new_span(
-            "[hub]::my-domain.com:name:base",
+            "hub::my-domain.com:name:base",
         )))
         .unwrap()
         .to_point(),
@@ -302,7 +302,7 @@ pub fn test_point() {
     .unwrap();
     util::log(
         result(all_consuming(point_var)(new_span(
-            "[hub]::my-domain.com:1.0.0:/dorko/x/",
+            "hub::my-domain.com:1.0.0:/dorko/x/",
         )))
         .unwrap()
         .to_point(),
@@ -310,7 +310,7 @@ pub fn test_point() {
     .unwrap();
     util::log(
         result(all_consuming(point_var)(new_span(
-            "[hub]::my-domain.com:1.0.0:/dorko/xyz/",
+            "hub::my-domain.com:1.0.0:/dorko/xyz/",
         )))
         .unwrap()
         .to_point(),

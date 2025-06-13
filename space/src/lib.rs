@@ -165,8 +165,8 @@ pub mod status;
 /// its having some compile problems and isn't as-of-yet used by
 /// anything so makes sense to disable it for a while, so I can focus
 /// on getting `CI/CD` working
-#[cfg(feature = "types2")]
-pub mod types;
+//#[cfg(feature = "types2")]
+//pub mod types;
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
