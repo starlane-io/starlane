@@ -12,5 +12,8 @@ pub enum Kind {
 
 pub trait Handler {
     type Backend: Backend;
-    async fn handle(& self, request: Call<Self::Backend> )  -> Result<Self::Backend::Result,>;
+    /*
+    async fn handle(& self, request: Call<Self::Backend::Method> )  -> Self::Backend::Result;
+    
+     */
 }

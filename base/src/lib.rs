@@ -108,7 +108,6 @@ pub mod foundation;
 pub mod err;
 pub mod partial;
 pub mod mode;
-pub mod kind;
 
 use once_cell::sync::Lazy;
 use std::str::FromStr;

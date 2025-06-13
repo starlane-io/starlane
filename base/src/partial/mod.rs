@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use crate::status::Status;
-use crate::Foundation;
 
 /// [Partial]s are generic definitions that can be inherited by [starlane_hyperspace::base::config], [crate::base] and
 /// [crate::foundation] definitions.  Whereas a [crate::base] definition describes the abstract

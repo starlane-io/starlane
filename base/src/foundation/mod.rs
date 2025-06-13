@@ -42,11 +42,21 @@ use std::future::Future;
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
+use strum_macros::EnumDiscriminants;
 use starlane_hyperspace::registry::Registry;
-use crate::Foundation;
-use starlane_hyperspace::base::provider::Provider;
-use crate::kind::{ProviderKind,ProviderKindDef,FoundationKind};
+use starlane_hyperspace::base::provider::{PostgresDatabaseKind, PostgresDatabaseKindDef, Provider, ProviderKind, ProviderKindDef};
+use starlane_space::parse::CamelCase;
+use starlane_space::status::{ActionRequest, Status};
+use crate::env::{STARLANE_CONTROL_PORT, STARLANE_HOME};
 
+#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize,Eq,PartialEq,Hash)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(FoundationKind))]
+#[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
+pub enum FoundationKindDef {
+    DockerDaemon,
+    _Ext(CamelCase),
+}
 
 pub mod config;
 pub mod context;
@@ -69,6 +79,18 @@ pub struct StarlaneConfig {
     pub can_scorch: bool,
     pub control_port: u16,
     //    pub foundation: ProtoFoundationSettings,
+}
+
+impl Default for StarlaneConfig {
+    fn default() -> Self {
+        Self {
+            context: "starlane".to_string(),
+            home: STARLANE_HOME.clone(),
+            can_nuke: false,
+            can_scorch: false,
+            control_port: STARLANE_CONTROL_PORT.clone(),
+        }
+    }
 }
 
 fn deserialize_from_value<'de, D>(deserializer: D) -> Result<Value, D::Error>

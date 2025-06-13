@@ -5,8 +5,8 @@ use serde_yaml::Value;
 use std::fmt::Display;
 use std::sync::Arc;
 use thiserror::Error;
-use crate::kind::ProviderKind;
-use crate::kind::FoundationKind;
+use starlane_hyperspace::base::provider::ProviderKind;
+use crate::foundation::FoundationKind;
 use crate::status::ActionRequest;
 
 impl BaseErr {

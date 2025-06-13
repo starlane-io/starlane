@@ -31,20 +31,16 @@ use crate::base::provider::context::FoundationContext;
 use crate::base::provider::{Provider, ProviderKind, ProviderKindDef};
 
 pub trait BaseSub: Send + Sync {
-   type Config: config::BaseSubConfig+?Sized;
 
-   fn config(&self) -> & Self::Config;
 }
 
 #[async_trait]
-pub trait Platform: BaseSub<Config:PlatformConfig> + Sized + Clone
+pub trait Platform: BaseSub + Sized + Clone
 where Self: 'static,
 {
     type Err: std::error::Error + Send + Sync + From<anyhow::Error>+?Sized;
     type StarAuth: HyperAuthenticator+?Sized;
     type RemoteStarConnectionFactory: HyperwayEndpointFactory+Sized;
-
-    fn config(&self) -> &Self::Config;
 
     async fn machine(&self) -> Result<MachineApi, Self::Err> {
         Ok(Machine::new_api(self.clone()).await?)
@@ -239,7 +235,7 @@ pub trait PlatformConfig: BaseSubConfig
 
 
 #[async_trait ]
-pub trait Foundation: BaseSub<Config:FoundationConfig> {
+pub trait Foundation: BaseSub {
     fn status(&self) -> StatusResult {
         self.status_watcher().borrow().clone()
     }

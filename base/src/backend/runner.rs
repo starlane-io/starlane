@@ -10,10 +10,11 @@ use async_trait::async_trait;
 use tokio::sync::watch::Receiver;
 use starlane_hyperspace::base::config::BaseConfig;
 use starlane_hyperspace::base::{BaseSub, Foundation};
-use starlane_hyperspace::base::kinds::ProviderKind;
-use starlane_hyperspace::base::provider::Provider;
+use starlane_hyperspace::base::provider::{Provider, ProviderKind};
 use starlane_space::status::{EntityReadier, EntityResult, Status, StatusProbe, StatusResult};
+use crate::backend::Backend;
 use crate::backend::call::Call;
+use crate::backend::provider::Method;
 use crate::backend::relay::FoundationTx;
 
 
@@ -27,21 +28,21 @@ impl<K, C> Wrapper<K, C> {
     }
 }
 
-struct ProviderTx<P>
+struct ProviderTx<B>
 where
-    P: Provider,
+    B: Backend
 {
 //    config: <P as BaseSub>::Config,
-    call_tx: tokio::sync::mpsc::Sender<Call<P>>,
+    call_tx: tokio::sync::mpsc::Sender<Call<B::Method>>,
     status: Arc<tokio::sync::watch::Receiver<Status>>,
 }
 
-impl<P> ProviderTx<P>
+impl<B> ProviderTx<B>
 where
-    P: Provider,
+    B: Backend,
 {
     fn new(
-        call_tx: tokio::sync::mpsc::Sender<Call<P>>,
+        call_tx: tokio::sync::mpsc::Sender<Call<B::Method>>,
         status: Arc<tokio::sync::watch::Receiver<Status>>,
     ) -> Self {
         Self {
@@ -52,31 +53,25 @@ where
 }
 
 
-impl<P> StatusProbe for ProviderTx<P>
+#[async_trait]
+impl<B> StatusProbe for ProviderTx<B>
 where
-    P: Provider,
-{
+    B: Backend {
     async fn probe(&self) -> StatusResult {
         todo!()
     }
 }
 
-impl<P> EntityReadier for ProviderTx<P>
-where
-    P: Provider,
-{
-    type Entity = ();
-
-    async fn ready(&self) -> EntityResult<Self::Entity> {
-        todo!()
-    }
+impl <B> BaseSub for ProviderTx<B> where B: Backend {
+    
 }
 
 #[async_trait]
-impl<P> Provider for ProviderTx<P>
+impl<B> Provider for ProviderTx<B>
 where
-    P: Provider {
+    B: Backend<Method=Call<String>,Result=EntityResult<()>>{
 
+    /*
     fn provider_kind(&self) -> &ProviderKind {
         &self.config.kind()
     }
@@ -106,22 +101,25 @@ where
         self.call_tx.send(call).await.unwrap();
         rtn_rx.await?
     }
+    
+     */
 }
 
 struct Runner<F>
 where
     F: Foundation,
 {
-    call_rx: tokio::sync::mpsc::Receiver<Method<F>>,
-    call_tx: tokio::sync::mpsc::Sender<Method<F>>,
+    call_rx: tokio::sync::mpsc::Receiver<Method>,
+    call_tx: tokio::sync::mpsc::Sender<Method>,
     foundation: F,
-    runners: HashMap<DependencyKind, DependencyRunner<Self>>,
+//    runners: HashMap<ProviderKind, DependencyRunner<F>>,
 }
 
 impl<F> Runner<F>
 where
     F: Foundation,
 {
+    /*
     fn new(foundation: F) -> impl Foundation {
         let (call_tx, call_rx) = tokio::sync::mpsc::channel(64);
         let config = foundation.config().clone();
@@ -135,32 +133,17 @@ where
         runner.start();
         proxy
     }
+    
+     */
 
     fn start(self) {
         tokio::spawn(async move {
-            self.run().await;
+            todo!();
+            //self.run().await;
         });
     }
 
-    fn dependency(
-        &mut self,
-        kind: DependencyKind,
-    ) -> Result<Option<&DependencyRunner<F>>, BaseErr> {
-        if !self.runners.contains_key(&kind) {
-            match self.foundation.dependency(&kind) {
-                Ok(None) => return Ok(None),
-                Err(err) => return Err(err),
-                Ok(Some(dep)) => {
-                    let runner = DependencyRunner::new(dep, self.call_tx.clone());
-                    self.runners.insert(kind.clone(), runner);
-                }
-            }
-        }
-
-        let runner = self.runners.get(&kind).unwrap();
-
-        Ok(Some(runner))
-    }
+    /*
 
     fn proxy(
         &mut self,
@@ -200,112 +183,12 @@ where
         }
         Ok(())
     }
+    
+     */
 }
 
-struct DependencyRunner<F>
-where
-    F: Foundation,
-{
-    dependency: F::Dependency,
-    runners: HashMap<ProviderKind, ProviderRunner<F>>,
-    call_tx: tokio::sync::mpsc::Sender<Method<F::Dependency>>,
-}
 
-impl<F> DependencyRunner<F>
-where
-    F: Foundation,
-{
-    fn new(dependency: F::Dependency, call_tx: tokio::sync::mpsc::Sender<Method<F>>) -> Self {
-        Self {
-            dependency,
-            runners: Default::default(),
-            call_tx,
-        }
-    }
-
-    fn proxy(&self) -> F::Dependency {
-        let kind = self.kind().clone();
-        let (dep_call_tx, mut dep_call_rx) = tokio::sync::mpsc::channel(64);
-        let foundation_call_tx = self.call_tx.clone();
-        tokio::spawn(async move {
-            while let Some(dep_call) = dep_call_rx.recv().await {
-                let prov_wrapper = DepWrapper::new(kind.clone(), dep_call);
-                let call = Method::DepCall(prov_wrapper);
-                foundation_call_tx.send(call).await.unwrap_or_default();
-            }
-        });
-        Box::new(DependencyTx::new(
-            self.dependency.config(),
-            dep_call_tx,
-            self.dependency.status_watcher(),
-        ))
-    }
-
-    fn kind(&self) -> &DependencyKind {
-        &self.dependency.kind()
-    }
-
-    fn provider(
-        &mut self,
-        kind: ProviderKind,
-    ) -> Result<Option<&mut ProviderRunner<F>>, BaseErr> {
-        if !self.runners.contains_key(&kind) {
-            match self.dependency.provider(&kind) {
-                Ok(None) => return Ok(None),
-                Err(err) => return Err(err),
-                Ok(Some(dep)) => {
-                    let runner = ProviderRunner::new(dep, self.call_tx.clone());
-                    self.runners.insert(kind.clone(), runner);
-                }
-            }
-        }
-
-        /// we can because we have already confirmed that kind is set via [`HashMap::contains_key()`]
-        let runner = self.runners.get_mut(&kind).unwrap();
-
-        Ok(Some(runner))
-    }
-    fn provider_proxy(
-        &mut self,
-        kind: ProviderKind,
-    ) -> Result<Option<Box<F::Provider>>, BaseErr> {
-        let runner = self
-            .provider(kind.clone())?
-            .ok_or(BaseErr::provider_not_available(kind))?;
-        Ok(Some(runner.proxy()))
-    }
-
-    async fn handle(&mut self, call: DepCall<F>) {
-        match call {
-            DepCall::Download { progress, rtn } => {
-                rtn.send(self.dependency.download(progress).await)
-                    .unwrap_or_default();
-            }
-            DepCall::Install { progress, rtn } => {
-                rtn.send(self.dependency.install(progress).await)
-                    .unwrap_or_default();
-            }
-            DepCall::Initialize { progress, rtn } => {
-                rtn.send(self.dependency.initialize(progress).await)
-                    .unwrap_or_default();
-            }
-            DepCall::Start { progress, rtn } => {
-                rtn.send(self.dependency.start(progress).await)
-                    .unwrap_or_default();
-            }
-            DepCall::Provider { kind, rtn } => {
-                rtn.send(self.provider_proxy(kind)).unwrap_or_default();
-            }
-            DepCall::ProviderCall(wrap) => {
-                if let Some(provider) = self.provider(wrap.kind).unwrap_or_default() {
-                    provider.handle(wrap.call).await;
-                }
-            }
-            DepCall::_Phantom(_) => {}
-        }
-    }
-}
-
+/*
 struct ProviderRunner<F>
 where
     F: Foundation,
@@ -366,3 +249,5 @@ where
         }
     }
 }
+
+ */

@@ -14,7 +14,7 @@ pub trait Backend: Sync+Send {
     type Result: Result+?Sized;
 }
 
-pub trait Result:  Send+Sync+Into<result::Result<Self::Ok,Self::Error>>{
+pub trait Result:  Send+Sync{
     type Ok: Sync+Send+Sync+?Sized;
     type Error: Sync+Send+Sync+?Sized;
 }
@@ -62,7 +62,7 @@ pub mod provider {
         watcher:  tokio::sync::oneshot::Sender<ActivityWatcher>,
     }
 
-    #[derive(Error)]
+    #[derive(Error,Debug,strum_macros::Display)]
     pub enum Error {
         None
     }

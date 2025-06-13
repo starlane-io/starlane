@@ -97,12 +97,14 @@ pub enum Strata {
 /// downloaded, installed, initialized and started... and [Platform] [Provider]s typically
 /// make a contextual connection available for the [Provider]'s service... 
 #[async_trait]
-pub trait Provider: BaseSub<Config:config::ProviderConfig>+ StatusProbe + Send + Sync {
+pub trait Provider: BaseSub + StatusProbe + Send + Sync {
 
-    type Entity: Entity;
 
-    fn provider_kind(&self) -> &ProviderKind;
+    fn provider_kind(&self) -> &ProviderKind {
+        todo!()
+    }
 
+    /*
     /// Returns an interface clone for [Provider::Entity] when it reaches [Status::Ready].
     ///
     /// If [Provider::Entity] is NOT ready [Provider::ready] will start the `readying` tasks
@@ -120,7 +122,11 @@ pub trait Provider: BaseSub<Config:config::ProviderConfig>+ StatusProbe + Send +
     /// [StateDetail::Fatal] should fail immediately.
     ///
     /// Progress [Status] of [Self::ready] can be tracked using: [Self::status_watcher]
+    
+    DISABLED for now... trying to get project compiling and passing tests first
     async fn ready(&self) -> EntityResult<Self::Entity>;
+    
+     */
 
 }
 

@@ -26,10 +26,11 @@ use strum_macros::EnumDiscriminants;
 /// [starlane_hyperspace]: ../../starlane_hyperspace
 /// [Provider]: ../../starlane_hyperspace/src/provider.rs
 pub trait Entity: Send + Sync {
-    type Kind: Eq+PartialEq+Hash+ToString;
 
-    fn kind(&self) -> &Self::Kind;
+    //fn kind(&self) -> &Self::Kind;
 }
+
+impl Entity for () { }
 
 /// [StatusWatcher] is type bound to [tokio::sync::watch::Receiver<StatusResult>]) can get the realtime
 /// [StatusDetail] of a [StatusProbe] by polling: [StatusWatcher::borrow] or by listening for
