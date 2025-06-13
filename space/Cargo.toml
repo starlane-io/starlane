@@ -70,7 +70,6 @@ futures = { workspace = true }
 dashmap = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true }
-rustls = { workspace = true, features = ["aws_lc_rs"] }
 
 ariadne = { workspace = true }
 nom = { workspace = true }

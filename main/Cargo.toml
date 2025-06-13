@@ -44,7 +44,7 @@ zip = { workspace = true }
 dirs = { workspace = true }
 semver = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ['derive', 'rc'] }
-rustls = { workspace = true, features = ["aws_lc_rs"] }
+rustls = { workspace = true, default-features = false}
 
 clap = { workspace = true, features = ["derive"] }
 walkdir = { workspace = true }

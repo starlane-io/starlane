@@ -54,7 +54,7 @@ semver = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 #rustls = { workspace = true, features = ["aws_lc_rs"] }
-rustls = { workspace = true }
+rustls = { workspace = true, default-features = false }
 
 clap = { workspace = true, features = ["derive"] }
 walkdir = { workspace = true }

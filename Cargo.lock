@@ -3132,7 +3132,6 @@ dependencies = [
  "nom_locate",
  "once_cell",
  "regex",
- "rustls",
  "semver",
  "serde",
  "serde_derive",
