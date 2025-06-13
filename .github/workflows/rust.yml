@@ -12,7 +12,6 @@ env:
 defaults:
   run:
     shell: bash
-    working-directory: rust 
 
 jobs:
   build:
