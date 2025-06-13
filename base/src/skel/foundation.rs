@@ -90,7 +90,7 @@ pub mod concrete {
     use crate::foundation;
     use serde::{Deserialize, Serialize};
     use tokio::sync::watch::Receiver;
-    use starlane_hyperspace::base::provider::ProviderKind;
+    use starlane_hyperspace::base::provider::ProviderKindDisc;
     use starlane_space::progress::Progress;
     use crate::err::BaseErr;
     use crate::kind::FoundationKind;
@@ -150,7 +150,7 @@ pub mod concrete {
             todo!()
         }
 
-        fn provider(&self, kind: &ProviderKind) -> Result<Option<Box<Self::Provider>>, BaseErr> {
+        fn provider(&self, kind: &ProviderKindDisc) -> Result<Option<Box<Self::Provider>>, BaseErr> {
             todo!()
         }
     }
@@ -163,7 +163,7 @@ pub mod concrete {
         use async_trait::async_trait;
         use starlane::config;
         use starlane_hyperspace::base::provider::err::ProviderErr;
-        use starlane_hyperspace::base::provider::ProviderKindDef;
+        use starlane_hyperspace::base::provider::ProviderKind;
         use starlane_space::status::{StatusProbe, StatusWatcher};
         use crate::foundation;
         use starlane_hyperspace::base::config;
@@ -220,7 +220,7 @@ pub mod concrete {
             type Config = ProviderConfig;
             type Entity = ();
 
-            fn provider_kind(&self) -> ProviderKindDef {
+            fn provider_kind(&self) -> ProviderKind {
                 todo!()
             }
 

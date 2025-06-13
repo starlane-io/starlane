@@ -27,6 +27,7 @@ starlane-hyperspace = { package="starlane-hyperspace", path= "hyperspace", versi
 starlane-base = { package="starlane-base", path= "base", version = "0.3.20" }
 starlane-platform-for-postgres = { package="starlane-platform-for-postgres", path= "platform/postgres" }
 starlane-platform-for-postgres-registry = { package="starlane-platform-for-postgres-registry", path= "platform/registry/postgres" }
+starlane-foundation-for-docker-desktop = { package="starlane-foundation-for-docker-desktop", path= "foundation/docker-desktop"}
 
 lazy_static = "1.5.0"
 uuid = { version="1.11.0" }

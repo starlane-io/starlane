@@ -192,7 +192,7 @@ mod concrete {
     use async_trait::async_trait;
     use sqlx;
     use sqlx::{Acquire, ConnectOptions, Connection, Postgres};
-    use starlane_hyperspace::base::provider::{Provider, ProviderKindDef, Strata};
+    use starlane_hyperspace::base::provider::{Provider, ProviderKind, Strata};
     use starlane_space::status;
     use starlane_space::status::{Entity, EntityReadier, StatusReporter, StatusResult};
     use status::{EntityResult, Handle, Status, StatusDetail, StatusProbe, StatusWatcher};

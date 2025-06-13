@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use tokio::sync::watch::Receiver;
 use starlane_hyperspace::base::config::BaseConfig;
 use starlane_hyperspace::base::{BaseSub, Foundation};
-use starlane_hyperspace::base::provider::{Provider, ProviderKind};
+use starlane_hyperspace::base::provider::{Provider, ProviderKindDisc};
 use starlane_space::status::{EntityReadier, EntityResult, Status, StatusProbe, StatusResult};
 use crate::backend::Backend;
 use crate::backend::call::Call;

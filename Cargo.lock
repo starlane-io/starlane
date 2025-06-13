@@ -2959,6 +2959,7 @@ dependencies = [
  "serde_yaml",
  "shadow-rs",
  "starlane-base",
+ "starlane-foundation-for-docker-desktop",
  "starlane-hyperspace",
  "starlane-macros",
  "starlane-platform-for-postgres",
@@ -3032,6 +3033,7 @@ dependencies = [
 name = "starlane-foundation-for-docker-desktop"
 version = "0.3.20"
 dependencies = [
+ "async-trait",
  "starlane-base",
  "starlane-hyperspace",
  "starlane-macros",

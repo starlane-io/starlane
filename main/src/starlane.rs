@@ -22,31 +22,31 @@ use starlane_hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
 use starlane_hyperspace::shutdown::panic_shutdown;
 use starlane_macros::push_loc;
 use starlane_space::point::Point;
-use base::env::STARLANE_CONTROL_PORT;
+use base::env::{config_path, STARLANE_CONTROL_PORT};
+use base::foundation::StarlaneConfig;
+use hyperspace::base::BaseSub;
 use hyperspace::registry;
-
+use hyperspace::registry::Registry;
+use hyperspace::service::STARLANE_DATA_DIR;
+use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
 
 pub mod prelude {
    use starlane_hyperspace::base;
    /// abstract
-   pub use base::kinds::Kind;
    pub use base::config::BaseConfig;
    pub use base::config::BaseSubConfig;
 
    /// [Platform]
    pub use base::Platform;
    pub use base::config::PlatformConfig;
-   pub use base::kinds::PlatformKind;
 
    /// [foundation]
    pub use base::Foundation;
    pub use base::config::FoundationConfig;
-   pub use base::kinds::FoundationKind;
 
    /// [provider]
    pub use base::provider::Provider;
    pub use base::config::ProviderConfig;
-   pub use base::kinds::ProviderKind;
 
 
     pub mod platform {
@@ -55,9 +55,9 @@ pub mod prelude {
                 use starlane_platform_for_postgres::service::{Provider,ProviderConfig,PostgresService,PostgresServiceHandle};
             }
             pub mod database {
-                use starlane_platform_for_postgres::database::{Provider,ProviderConfig,PostgresService,PostgresDatabaseHandle};
+                //use starlane_platform_for_postgres::database::{Provider,ProviderConfig,PostgresService,PostgresDatabaseHandle};
+                use starlane_platform_for_postgres::database::{ProviderConfig,PostgresDatabaseHandle};
             }
-
 
 
         }
@@ -67,6 +67,8 @@ pub mod prelude {
 
 
 mod concrete {
+    use base::foundation::StarlaneConfig;
+    use hyperspace::base::config::{BaseSubConfig, RegistryConfig};
     use crate::starlane::prelude;
 
 
@@ -79,8 +81,8 @@ mod concrete {
         kind: PlatformKind,
     }
 
-    impl prelude::PlatformConfig for PlatformConfig {
-        type RegistryConfig = RegistryConfig;
+    impl hyperspace::base::PlatformConfig for PlatformConfig {
+        type RegistryConfig = StarlaneConfig;
 
         fn can_scorch(&self) -> bool {
             todo!()
@@ -103,18 +105,15 @@ mod concrete {
         }
     }
 
+    impl BaseSubConfig for PlatformConfig { }
+
+    impl prelude::PlatformConfig for PlatformConfig { }
+
 
     #[derive(Clone,Debug,Eq,PartialEq,Hash)]
     pub enum PlatformKind{
        Standalone
     }
-
-    impl prelude::Kind for PlatformKind{ }
-
-    impl prelude::ProviderKind for PlatformKind{ }
-
-
-
 
 
 
@@ -129,14 +128,16 @@ pub mod config {
 
 #[derive(Clone)]
 pub struct Starlane {
+    config: StarlaneConfig,
     artifacts: Artifacts,
-    registry: Arc<dyn config::RegistryConfig>
+    registry: Registry
 }
+
 
 impl  Starlane  {
     pub async fn new(
-        config: P::Config,
-        foundation: DockerDesktopFoundation,
+        config: StarlaneConfig,
+        foundation: DockerDaemonFoundation,
     ) -> Result<Starlane, HypErr> {
         todo!();
         /*
@@ -182,19 +183,21 @@ impl  Starlane  {
     }
 }
 
+impl BaseSub for Starlane {}
+
 #[async_trait]
 impl Platform for Starlane
 where
     Self: Sync + Send + Sized,
 {
+    type Config = StarlaneConfig;
+    
     type Err = HypErr;
 
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
-
-    type Foundation = ();
-
-    type Config = StarlaneConfig;
+    
+    
 
     fn data_dir(&self) -> String {
         STARLANE_DATA_DIR.clone()
@@ -264,8 +267,8 @@ where
         builder
     }
 
-    async fn global_registry(&self) -> Result<Registry, Self::Err> {
-        Ok(self.registry.clone())
+    async fn global_registry(&self) -> Result<&Registry, Self::Err> {
+        Ok(&self.registry)
     }
 
     async fn star_registry(&self, star: &StarKey) -> Result<Registry, Self::Err> {
@@ -312,17 +315,18 @@ where
         server.start().unwrap();
     }
 
-    fn config(&self) -> &Self::Config {
-        &self.config
-    }
 
     async fn scorch(&self) -> Result<(), Self::Err> {
-        if !self.config().can_scorch() {
+        if !self.config().can_scorch {
             Err(anyhow!("in config '{}' can_scorch=false", config_path()))?;
         }
         self.global_registry().await.unwrap().scorch().await?;
         Ok(())
     }
+
+    fn config(&self) -> &Self::Config {
+        & self.config
+     }
 }
 
 
@@ -331,6 +335,8 @@ mod partial {
 
     pub mod config {
         use serde_derive::{Deserialize, Serialize};
+        use base::foundation::StarlaneConfig;
+        use hyperspace::base::config::BaseSubConfig;
         use starlane_hyperspace::registry;
         use super::my;
 
@@ -351,8 +357,10 @@ mod partial {
             pub control_port: u16,
         }
 
-        impl <R> my::PlatformConfig for PlatformConfig where R: my::config::RegistryConfig {
-            type RegistryConfig = R;
+        impl BaseSubConfig for PlatformConfig { }
+
+        impl my::PlatformConfig for PlatformConfig {
+            type RegistryConfig = StarlaneConfig;
 
             fn can_scorch(&self) -> bool {
                 self.can_scorch
@@ -385,11 +393,5 @@ mod partial {
 
 
 mod platform {
-
-
-    pub struct Platform {
-
-    }
-
-    impl Platform
+    pub struct Platform {}
 }

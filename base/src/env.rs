@@ -87,7 +87,8 @@ pub static STARLANE_LOG_DIR: Lazy<String> = Lazy::new(|| {
         .unwrap_or(format!("{}/log", STARLANE_HOME.as_str()).to_string())
 });
 
-pub static STARLANE_DATA_DIR: Lazy<String> = Lazy::new(|| {
+
+pub(crate) static STARLANE_DATA_DIR: Lazy<String> = Lazy::new(|| {
     std::env::var("STARLANE_DATA_DIR").unwrap_or_else(|e| {
         let dir: String = match dirs::home_dir() {
             None => current_dir().unwrap().display().to_string(),

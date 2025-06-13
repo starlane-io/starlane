@@ -1,4 +1,4 @@
-use crate::base::provider::ProviderKind;
+use crate::base::provider::ProviderKindDisc;
 use crate::registry::err::RegErr;
 use async_trait::async_trait;
 use indexmap::IndexMap;
@@ -16,5 +16,5 @@ pub trait ProviderContext: Send + Sync {
     async fn select<'a>(
         &'a self,
         select: &'a mut KindSelector,
-    ) -> Result<IndexMap<ProviderKind, Details>, RegErr>;
+    ) -> Result<IndexMap<ProviderKindDisc, Details>, RegErr>;
 }

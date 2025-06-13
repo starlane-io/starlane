@@ -206,7 +206,7 @@ where
     pub async fn new_api(platform: P) -> Result<MachineApi, P::Err> {
         let (call_tx, call_rx) = mpsc::channel(1024);
         let artifacts = platform.artifact_hub();
-        let registry = platform.global_registry().await?;
+        let registry = platform.global_registry().await?.clone();
         let machine_api = MachineApi::new(call_tx.clone(), registry, artifacts, &platform);
         tokio::spawn(async move { Machine::init(platform, call_tx, call_rx).await });
 
@@ -221,7 +221,7 @@ where
         let template = platform.machine_template();
         let machine_name = platform.machine_name();
         let artifacts = platform.artifact_hub();
-        let registry = platform.global_registry().await?;
+        let registry = platform.global_registry().await?.clone();
         let machine_api = MachineApi::new(call_tx.clone(), registry, artifacts, &platform);
         let (mpsc_status_tx, mut mpsc_status_rx) = mpsc::channel(128);
         let (watch_status_tx, watch_status_rx) = watch::channel(MachineStatus::Init);
@@ -247,7 +247,7 @@ where
         let skel = MachineSkel {
             name: machine_name.clone(),
             machine_star: machine_star.clone(),
-            registry: platform.global_registry().await?,
+            registry: platform.global_registry().await?.clone(),
             artifacts: platform.artifact_hub(),
             logger: platform.logger(),
             timeouts: Timeouts::default(),

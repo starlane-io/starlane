@@ -26,9 +26,9 @@ use starlane_space::progress::Progress;
 use starlane_space::status;
 use starlane_space::status::{Entity, EntityReadier, Status, StatusProbe, StatusReporter, StatusResult, StatusWatcher};
 use err::BaseErr;
-use crate::base::config::{BaseSubConfig, FoundationConfig, ProviderConfig};
+use crate::base::config::{BaseConfig, BaseSubConfig, FoundationConfig, ProviderConfig};
 use crate::base::provider::context::FoundationContext;
-use crate::base::provider::{Provider, ProviderKind, ProviderKindDef};
+use crate::base::provider::{Provider, ProviderKindDisc, ProviderKind};
 
 pub trait BaseSub: Send + Sync {
 
@@ -38,9 +38,14 @@ pub trait BaseSub: Send + Sync {
 pub trait Platform: BaseSub + Sized + Clone
 where Self: 'static,
 {
+    
+    type Config;
+    
     type Err: std::error::Error + Send + Sync + From<anyhow::Error>+?Sized;
     type StarAuth: HyperAuthenticator+?Sized;
     type RemoteStarConnectionFactory: HyperwayEndpointFactory+Sized;
+    
+    fn config(&self) -> & Self::Config;
 
     async fn machine(&self) -> Result<MachineApi, Self::Err> {
         Ok(Machine::new_api(self.clone()).await?)
@@ -91,7 +96,7 @@ where Self: 'static,
     }
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder;
-    async fn global_registry(&self) -> Result<Registry, Self::Err>;
+    async fn global_registry(&self) -> Result<&Registry, Self::Err>;
     async fn star_registry(&self, star: &StarKey) -> Result<Registry, Self::Err>;
     fn artifact_hub(&self) -> Artifacts;
     async fn start_services(&self, gate: &Arc<HyperGateSelector>) {}
@@ -253,7 +258,7 @@ pub trait Foundation: BaseSub {
     async fn ready(&self, progress: Progress) -> StatusResult;
 
     /// Returns a [Provider] by this [Foundation]
-    fn provider<P>(&self, kind: & ProviderKindDef) -> Result<Option<& P>, BaseErr> where P: Provider+EntityReadier;
+    fn provider<P>(&self, kind: &ProviderKind) -> Result<Option<& P>, BaseErr> where P: Provider+EntityReadier;
 }
 
 

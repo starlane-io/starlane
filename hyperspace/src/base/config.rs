@@ -1,5 +1,5 @@
 use crate::base::provider::Provider;
-use crate::base::provider::ProviderKind;
+use crate::base::provider::ProviderKindDisc;
 use std::collections::HashSet;
 use std::hash::Hash;
 
@@ -22,9 +22,9 @@ pub trait BaseSubConfig: Send + Sync {
 }
 
 pub trait FoundationConfig: BaseSubConfig {
-    fn required(&self) -> HashSet<ProviderKind>;
+    fn required(&self) -> HashSet<ProviderKindDisc>;
 
-    fn provider_kinds(&self) -> &HashSet<ProviderKind>;
+    fn provider_kinds(&self) -> &HashSet<ProviderKindDisc>;
 
     /*
     fn provider<P>(&self, kind: <Self as BaseSubConfig>::Kind) -> Option<&P> where P: Provider+BaseSub<Config: BaseSubConfig>;

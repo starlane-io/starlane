@@ -11,7 +11,7 @@
 /// etc. that `Starlane` can incorporate in order to enable new functionality.
 ///
 /// Installing a Postgres Database is a great example since at the time of this writing postgres
-/// is required by the Starlane [Registry] and [ProviderKind::PostgresDatabase] is builtin to
+/// is required by the Starlane [Registry] and [ProviderKindDisc::PostgresDatabase] is builtin to
 /// Starlane.
 ///
 /// Using [DockerDesktopFoundation] as the concrete [crate::Foundation]
@@ -43,8 +43,9 @@ use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use strum_macros::EnumDiscriminants;
-use starlane_hyperspace::registry::Registry;
-use starlane_hyperspace::base::provider::{PostgresDatabaseKind, PostgresDatabaseKindDef, Provider, ProviderKind, ProviderKindDef};
+use starlane_hyperspace::base::config::BaseSubConfig;
+use starlane_hyperspace::registry::{Registry, RegistryConfig};
+use starlane_hyperspace::base::provider::{PostgresDatabaseKind, PostgresDatabaseKindDef, Provider, ProviderKindDisc, ProviderKind};
 use starlane_space::parse::CamelCase;
 use starlane_space::status::{ActionRequest, Status};
 use crate::env::{STARLANE_CONTROL_PORT, STARLANE_HOME};
@@ -64,9 +65,9 @@ pub mod context;
 /// disabled for now ...
 //pub mod util;
 
-static REQUIRED: Lazy<Vec<ProviderKindDef>> = Lazy::new(|| vec![]);
+static REQUIRED: Lazy<Vec<ProviderKind>> = Lazy::new(|| vec![]);
 
-pub fn default_requirements() -> Vec<ProviderKindDef> {
+pub fn default_requirements() -> Vec<ProviderKind> {
     REQUIRED.clone()
 }
 
@@ -80,6 +81,10 @@ pub struct StarlaneConfig {
     pub control_port: u16,
     //    pub foundation: ProtoFoundationSettings,
 }
+
+impl BaseSubConfig for StarlaneConfig {}
+
+impl RegistryConfig for StarlaneConfig {}
 
 impl Default for StarlaneConfig {
     fn default() -> Self {

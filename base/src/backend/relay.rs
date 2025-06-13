@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use async_trait::async_trait;
 use starlane_hyperspace::base::err::BaseErr;
 use starlane_hyperspace::base::{BaseSub, Foundation};
-use starlane_hyperspace::base::provider::{Provider, ProviderKindDef};
+use starlane_hyperspace::base::provider::{Provider, ProviderKind};
 use starlane_space::status::{EntityReadier, Status, StatusDetail, StatusResult, StatusWatcher};
 use crate::backend::call::Call;
 use crate::backend::provider::Method;
@@ -62,7 +62,7 @@ where
         todo!()
     }
 
-    fn provider<P>(&self, kind: &ProviderKindDef) -> Result<Option<&P>, BaseErr>
+    fn provider<P>(&self, kind: &ProviderKind) -> Result<Option<&P>, BaseErr>
     where
         P: Provider + EntityReadier
     {

@@ -45,9 +45,7 @@ use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
 use shadow_rs::shadow;
 use starlane_base::env;
-use starlane_base::env::{
-    enviro_dir, ensure_global_settings, save_global_settings, set_enviro, STARLANE_HOME,
-};
+use starlane_base::env::{enviro_dir, ensure_global_settings, save_global_settings, set_enviro, STARLANE_HOME, config_exists, enviro};
 use starlane::starlane::Starlane;
 pub use starlane_hyperspace::base::Platform;
 use starlane_hyperspace::shutdown::shutdown;
@@ -71,6 +69,7 @@ use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::{FileOptionExtension, FileOptions};
+use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
 /*
 let config = Default::default();
 
@@ -85,6 +84,10 @@ pub fn init() {
             .install_default()
             .expect("crypto provider could not be installed");
     }
+}
+
+fn context() -> String {
+    enviro()
 }
 
 pub fn main() -> Result<(), anyhow::Error> {
@@ -207,6 +210,8 @@ fn run() -> Result<(), anyhow::Error> {
 
  */
 
+pub type StandAloneFoundation = DockerDaemonFoundation;
+
 async fn run() -> Result<(), anyhow::Error> {
     let console = Console::new();
     console.info("starlane started.")?;
@@ -267,7 +272,7 @@ async fn run() -> Result<(), anyhow::Error> {
         );
 
         console.long_delay();
-        let starlane = Starlane::new(config, StandAloneFoundation())
+        let starlane = Starlane::new(config, DockerDaemonFoundation())
             .await
             .map_err(|e| {
                 println!("{}", e.to_string());
@@ -506,8 +511,22 @@ pub fn zip_dir<T>(
 where
     T: Write + Seek,
 {
+ todo!()
+}
+/*
+*
+pub fn zip_dir<T>(
+    it: impl Iterator<Item = DirEntry>,
+    prefix: &str,
+    writer: T,
+    method: zip::CompressionMethod,
+) -> zip::result::ZipResult<T>
+where
+    T: Write + Seek,
+{
     let mut zip = zip::ZipWriter::new(writer);
-    let options: FileOptions<'_, FileOptionExtension> = FileOptions::default()
+    
+    let options: FileOptions<'_, _> = FileOptions::default()
         .compression_method(method)
         .unix_permissions(0o755);
 
@@ -534,6 +553,7 @@ where
     let result = zip.finish()?;
     Result::Ok(result)
 }
+ */
 
 /*
 

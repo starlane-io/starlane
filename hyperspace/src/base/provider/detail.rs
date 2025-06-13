@@ -1,5 +1,5 @@
-use crate::base::provider::{ProviderKind, ProviderKindDef};
+use crate::base::provider::{ProviderKindDisc, ProviderKind};
 
 pub struct ProviderDetail {
-    kind: ProviderKindDef,
+    kind: ProviderKind,
 }

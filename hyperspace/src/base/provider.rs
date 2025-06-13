@@ -18,9 +18,9 @@ use crate::base::config::BaseConfig;
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize,Eq,PartialEq,Hash)]
 #[strum_discriminants(vis(pub))]
-#[strum_discriminants(name(ProviderKind))]
+#[strum_discriminants(name(ProviderKindDisc))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
-pub enum ProviderKindDef {
+pub enum ProviderKind {
     /// [Provider::probe] should ascertain if the docker daemon is installed and running.
     /// If the DockerDaemon is accessible set [Status::Ready].
     /// If not accessible set [Status::Pending] with an [ActionRequest] providing helpful guidance
@@ -31,15 +31,16 @@ pub enum ProviderKindDef {
     /// The whole point of the DockerDaemon dependency is to provide a way to extend Starlane using
     /// secure containers
     DockerDaemon,
-    /// Represents a postgres cluster instance that serves [ProviderKindDef::PostgresDatabase]
+    /// Represents a postgres cluster instance that serves [ProviderKind::PostgresDatabase]
     PostgresService,
-    /// depends upon a readied [ProviderKindDef::PostgresService]
+    /// depends upon a readied [ProviderKind::PostgresService]
     PostgresDatabase(PostgresDatabaseKind),
-    /// depends upon [ProviderKindDef::PostgresDatabase]::[PostgresDatabaseKindDef::Registry]
+    /// depends upon [ProviderKind::PostgresDatabase]::[PostgresDatabaseKindDef::Registry]
     Registry,
-    /// [ProviderKindDef::_Ext] defines a new [ProviderKind] that is not builtin to Starlane
+    /// [ProviderKind::_Ext] defines a new [ProviderKindDisc] that is not builtin to Starlane
     _Ext(CamelCase),
 }
+
 
 /*
 impl kinds::ProviderKind for ProviderKind{ }
@@ -68,7 +69,7 @@ impl Hash for ProviderKindDef {
 pub enum PostgresDatabaseKindDef {
     /// just a plain, empty postgres database full of potential
     Default,
-    /// a variant of [ProviderKindDef::PostgresDatabase] that is initialized with the [Registry]
+    /// a variant of [ProviderKind::PostgresDatabase] that is initialized with the [Registry]
     /// sql schema to be utilized by a
     Registry,
     _Ext(CamelCase),
@@ -100,7 +101,7 @@ pub enum Strata {
 pub trait Provider: BaseSub + StatusProbe + Send + Sync {
 
 
-    fn provider_kind(&self) -> &ProviderKind {
+    fn provider_kind(&self) -> &ProviderKindDisc {
         todo!()
     }
 

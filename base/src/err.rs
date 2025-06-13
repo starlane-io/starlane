@@ -5,7 +5,7 @@ use serde_yaml::Value;
 use std::fmt::Display;
 use std::sync::Arc;
 use thiserror::Error;
-use starlane_hyperspace::base::provider::ProviderKind;
+use starlane_hyperspace::base::provider::ProviderKindDisc;
 use crate::foundation::FoundationKind;
 use crate::status::ActionRequest;
 
@@ -90,12 +90,12 @@ impl BaseErr {
         BaseErr::ProviderNotFound(kind.as_ref().to_string())
     }
 
-    pub fn provider_not_available(kind: ProviderKind) -> Self {
+    pub fn provider_not_available(kind: ProviderKindDisc) -> Self {
         BaseErr::ProviderNotAvailable(kind.to_string())
     }
 
 
-    pub fn prov_err(kind: ProviderKind, msg: String) -> Self {
+    pub fn prov_err(kind: ProviderKindDisc, msg: String) -> Self {
         Self::ProviderErr { kind: kind, msg }
     }
 
@@ -137,7 +137,7 @@ impl BaseErr {
     }
 
 
-    pub fn prov_conf_err(kind: ProviderKind, err: serde_yaml::Error, config: Value) -> Self {
+    pub fn prov_conf_err(kind: ProviderKindDisc, err: serde_yaml::Error, config: Value) -> Self {
         let err = Arc::new(err);
 
         let config = config.as_str().unwrap_or("?").to_string();
@@ -203,11 +203,11 @@ pub enum BaseErr {
         summary: String,
     },
     #[error("[{kind}] Error: '{msg}'")]
-    ProviderErr { kind: ProviderKind, msg: String },
+    ProviderErr { kind: ProviderKindDisc, msg: String },
     #[error("error converting config args for provider: '{kind}' serialization err: '{err}' from config: '{config}'"
     )]
     ProvConfErr {
-        kind: ProviderKind,
+        kind: ProviderKindDisc,
         err: Arc<serde_yaml::Error>,
         config: String,
     },

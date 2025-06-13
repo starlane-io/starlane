@@ -21,7 +21,8 @@ use std::time::Duration;
 use strum_macros::EnumString;
 use tokio::io::AsyncWriteExt;
 use walkdir::{DirEntry, WalkDir};
-use zip::write::FileOptions;
+use zip::write::{FileOptions, FullFileOptions};
+use macros::logger;
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -262,7 +263,19 @@ impl Session {
         eprintln!("{}", err.to_string())
     }
 }
+fn zip_dir<T>(
+    it: impl Iterator<Item = DirEntry>,
+    prefix: &str,
+    writer: T,
+    method: zip::CompressionMethod,
+) -> zip::result::ZipResult<T>
+where
+    T: Write + Seek,
+{
 
+    todo!()
+}
+/*
 fn zip_dir<T>(
     it: impl Iterator<Item = DirEntry>,
     prefix: &str,
@@ -273,7 +286,7 @@ where
     T: Write + Seek,
 {
     let mut zip = zip::ZipWriter::new(writer);
-    let options = FileOptions::default()
+    let options: FileOptions<'_,FullFileOptions> = FileOptions::default()
         .compression_method(method)
         .unix_permissions(0o755);
 
@@ -300,3 +313,5 @@ where
     let result = zip.finish()?;
     Result::Ok(result)
 }
+
+ */
