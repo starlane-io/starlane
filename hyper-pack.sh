@@ -18,7 +18,7 @@ replace="s#crate::$1#starlane_hyperspace::$1#g"
 
 echo $replace
 
-find starlane -name "*.rs" -exec sed -i "" -e $replace {} +
+find main -name "*.rs" -exec sed -i "" -e $replace {} +
 
 
 

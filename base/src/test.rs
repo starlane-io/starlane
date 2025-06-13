@@ -1,0 +1,2 @@
+#[test]
+pub fn test() {}

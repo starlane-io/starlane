@@ -1,0 +1,94 @@
+[package]
+name = "starlane"
+
+description = """
+Starlane -- An Orchestration and Infrastructure Framework for WebAssembly Components (https://starlane.io)
+
+
+"""
+
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+
+
+[dependencies]
+starlane-macros = { workspace = true, version = "0.3.21" }
+starlane-space = { workspace = true  }
+starlane-hyperspace = { workspace = true, version = "0.3.21" }
+starlane-base = { workspace = true, version = "0.3.21" }
+starlane-platform-for-postgres = {workspace = true }
+starlane-platform-for-postgres-registry = {workspace = true }
+starlane-foundation-for-docker-desktop= {workspace = true }
+
+lazy_static = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+chrono = { workspace = true, features = ["serde"] }
+tokio = { workspace = true, features = ["full"] }
+async-trait = { workspace = true }
+ctrlc = { workspace = true }
+shadow-rs = { workspace = true, features = ["metadata"] }
+once_cell = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+zip = { workspace = true }
+dirs = { workspace = true }
+semver = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ['derive', 'rc'] }
+rustls = { workspace = true, features = ["aws_lc_rs"] }
+
+clap = { workspace = true, features = ["derive"] }
+walkdir = { workspace = true }
+nom = { workspace = true }
+
+
+
+
+
+anyhow = { workspace = true }
+rustyline = { workspace = true, features = ["with-file-history", "with-dirs"] }
+cliclack = { workspace = true }
+
+serde_yaml = { workspace = true }
+text-to-ascii-art = { workspace = true }
+colored = { workspace = true }
+lerp = { workspace = true, features = ["derive"] }
+atty = { workspace = true }
+#rolling-file = {workspace = true}
+termsize = { workspace = true }
+port_check = { workspace = true }
+crossterm = { workspace = true }
+#log= {workspace = true}
+textwrap = { workspace = true }
+console = { workspace = true }
+
+#tracing = { workspace = true, features=["std","log","attributes","tracing-attributes","max_level_trace"]}
+tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-attributes", "async-await"] }
+serde_with = { workspace = true }
+serde_derive = { workspace = true }
+# Future crates...
+#zipsign = { workspace = true }
+#insta= { workspace = true }
+
+[build-dependencies]
+shadow-rs = { workspace = true }
+
+
+[lib]
+name = "starlane"
+path = "src/lib.rs"
+
+
+[[bin]]
+name = "starlane"
+doc = false
+path = "src/main.rs"

@@ -1,0 +1,31 @@
+[package]
+name = "starlane-platform-for-postgres"
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+description.workspace = true
+version.workspace = true
+
+[features]
+test=[]
+
+[dependencies]
+starlane-base = {workspace = true}
+starlane-space = { workspace = true }
+starlane-hyperspace = { workspace = true }
+url  = { workspace = true }
+thiserror = {workspace = true}
+tokio = {workspace = true}
+strum = {workspace = true}
+strum_macros = {workspace = true}
+async-trait = {workspace = true}
+#[non_exhaustive]
+sqlx = { workspace = true, features = ["runtime-tokio", "runtime-tokio-rustls", "postgres", "macros", "any"] }
+
+[dev-dependencies]
+starlane-base = { workspace= true, features = ["test"] }
+starlane-hyperspace = { workspace = true, features = ["test"] }
+starlane-space = { workspace = true, features = ["test"] }

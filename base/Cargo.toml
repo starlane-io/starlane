@@ -1,0 +1,95 @@
+[package]
+name = "starlane-base"
+
+description = """
+This is a support crate for starlane: 'https://starlane.io'
+"""
+
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+# 'skel' enables the various starter implentatation templates. Activate this feature so your can review
+# the skel code in your IDE
+skel=[]
+
+test=[]
+
+
+[dependencies]
+
+starlane-macros = { workspace = true, version = "0.3.21" }
+starlane-space = { workspace = true, version = "0.3.21", features = ["types2"] }
+starlane-hyperspace = { package="starlane-hyperspace", workspace = true, version = "0.3.21" }
+
+thiserror = { workspace = true }
+lazy_static = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+chrono = { workspace = true, features = ["serde"] }
+tokio = { workspace = true, features = ["full"] }
+async-trait = { workspace = true }
+ctrlc = { workspace = true }
+bincode = { workspace = true }
+strum_macros = { workspace = true }
+strum = { workspace = true }
+itertools = { workspace = true }
+shadow-rs = { workspace = true, features = ["metadata"] }
+once_cell = { workspace = true }
+zip = { workspace = true }
+dirs = { workspace = true }
+serde_with = { workspace = true }
+serde_with_macros = { workspace = true }
+typetag = { workspace = true }
+# hyper requirements
+futures = { workspace = true }
+semver = { workspace = true }
+serde = { workspace = true }
+serde_derive = { workspace = true }
+rustls = { workspace = true, features = ["aws_lc_rs"] }
+
+clap = { workspace = true, features = ["derive"] }
+walkdir = { workspace = true }
+nom = { workspace = true }
+downcast-rs = { workspace = true }
+
+
+anyhow = { workspace = true }
+rustyline = { workspace = true, features = ["with-file-history", "with-dirs"] }
+cliclack = { workspace = true }
+
+serde_yaml = { workspace = true }
+derive_builder = { workspace = true }
+text-to-ascii-art = { workspace = true }
+colored = { workspace = true }
+lerp = { workspace = true, features = ["derive"] }
+atty = { workspace = true }
+termsize = { workspace = true }
+port_check = { workspace = true }
+crossterm = { workspace = true }
+textwrap = { workspace = true }
+console = { workspace = true }
+derive-name = { workspace = true }
+
+tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-attributes", "async-await"] }
+
+[dev-dependencies]
+starlane-hyperspace = { workspace = true, features = ["test"] }
+starlane-space = { workspace = true, features = ["test"] }
+
+[build-dependencies]
+shadow-rs = { workspace = true }
+
+
+[lib]
+name = "starlane_base"
+path = "src/lib.rs"
+
+

@@ -1,0 +1,10 @@
+Bind(version=1.0.0)
+{
+   Route -> {
+       Hyp<Init> -> (());
+       Hyp<Transport> -> (());
+       Hyp<Assign> -> (()) => &;
+       Hyp<Search> -> (()) => &;
+       Hyp<Provision> -> (()) => &;
+   }
+}

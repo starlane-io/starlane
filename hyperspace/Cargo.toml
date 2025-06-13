@@ -1,0 +1,99 @@
+[package]
+name = "starlane-hyperspace"
+
+description = """
+Starlane -- An Orchestration and Infrastructure Framework for WebAssembly Components (https://starlane.io)
+
+This packaged manages `HyperSpace` which provides infrastructure for `Space`
+Apis (WebAssembly & external programs meant to provide custom behaviors in Starlane),
+
+This package references the `starlane-space` package and reuses of it to run the infrastructure and
+it also contains mechanisms (Drivers) for extending the Starlane Type system
+"""
+
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+skel=[]
+test=[]
+
+
+[dependencies]
+starlane-macros = { workspace = true, version = "0.3.21" }
+starlane-space = { workspace = true, version = "0.3.21" }
+
+thiserror = { workspace = true }
+lazy_static = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+tokio = { workspace = true, features = ["full"] }
+async-trait = { workspace = true }
+ctrlc = { workspace = true }
+bincode = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+
+itertools = { workspace = true }
+
+once_cell = { workspace = true }
+
+futures = { workspace = true, default-features = true }
+dashmap = { workspace = true }
+semver = { workspace = true, features = ['serde'] }
+
+
+# postgres deps
+sqlx = { workspace = true, features = ["runtime-tokio", "runtime-tokio-rustls", "postgres", "macros", "any"] }
+serde = { workspace = true, features = ['derive', 'rc'] }
+serde_derive = { workspace = true }
+async-recursion = { workspace = true }
+enum-ordinalize = { workspace = true }
+
+rcgen = { workspace = true, features = ["pem", "x509-parser"] }
+rustls = { workspace = true, features = ["aws_lc_rs"] }
+rustls-pemfile = { workspace = true }
+tokio-rustls = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+nom = { workspace = true }
+
+anyhow = { workspace = true }
+path-clean = { workspace = true }
+thiserror-context = { workspace = true }
+rustyline = { workspace = true, features = ["with-file-history", "with-dirs"] }
+derive_builder = { workspace = true }
+port_check = { workspace = true }
+derive-name = { workspace = true }
+
+#tracing = { workspace = true, features=["std","log","attributes","tracing-attributes","max_level_trace"]}
+tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-attributes", "async-await"] }
+tracing-core = { workspace = true, features = ["valuable", "default"] }
+url = { workspace = true }
+indexmap = {workspace = true}
+eyre = {workspace = true}
+# added this as a hack for 'service_conf()' to work ... hopefully can be removed later
+dirs = {workspace = true}
+
+[dev-dependencies]
+starlane-space = { workspace = true, features = ["test"] }
+
+[build-dependencies]
+shadow-rs = { workspace = true }
+
+
+[lib]
+name = "starlane"
+path = "src/lib.rs"
+
+
+[[bin]]
+name = "starlane"
+doc = false
+path = "src/main.rs"

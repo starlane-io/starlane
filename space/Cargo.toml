@@ -1,0 +1,111 @@
+[package]
+name = "starlane-space"
+
+description = """
+Starlane --  (https://starlane.io)
+# THE SPACE LIB
+The 'Space' lib provides basic utilities and APIs for interacting with a Starlane cluster.
+Other parts of Starlane actually build on the Space API in order to drive and control the Starlane Cluster.
+The essential point of Starlane is that it can be extended with new functionality and the Space Api
+is in most cases all that is needed to create a fully working Application.
+
+Features, utilties and APIs provided by the Space lib include support for:
+Configuration, Parsing, Type definitions, Access to the Starlane Registry, Access to the ArtifactCache, and much more.
+
+Within the lib exists the Space API which is essential for Starlane to fulfill it's primary goal:
+
+'To enable developers to focus on an application's VALUE ADDING CODE by reducing or eliminating the need to struggle
+with the infrastructure code that supports the value adding code.'
+
+# THE HYPERSPACE LIB
+Space is better understood when compared to the other main Starlane lib and api 'HyperSpace'
+
+HyperSpace IS the shadow lib that magically provides the support infrastructure for the Space lib.  Within HyperSpace
+exists the 'TypeDrivers' and 'Foundation Service' code that supports 'Space'.  If there is need a developer can
+create a custom Driver in order to supply some feature aspect that Starlane doesn't presently provide... of course
+writing a Driver means writing infrastructure support code which is what we are trying to avoid.  Luckily Starlane
+provides a central artifact repository: 'https://hub.starlane.io' where 3rd parties can create new HyperSpace drivers
+which the application developer can easily install to extend his Starlane Cluster. For more info see:
+https://crates.io/crates/starlane-hyperspace
+
+"""
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+types2=[]
+default=["std"]
+std=[]
+test=[]
+
+
+[dependencies]
+starlane-macros = { workspace = true, version = "0.3.21" }
+thiserror = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+chrono = { workspace = true, features = ["serde"] }
+tokio = { workspace = true, features = ["full"] }
+eyre = { workspace = true }
+indexmap = { workspace = true }
+
+async-trait = { workspace = true }
+bincode = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+itertools = { workspace = true }
+once_cell = { workspace = true }
+ascii = { workspace = true }
+url = { workspace = true, features = ["serde"] }
+serde_with_macros = { workspace = true }
+# hyper requirements
+futures = { workspace = true }
+dashmap = { workspace = true }
+semver = { workspace = true }
+serde = { workspace = true }
+rustls = { workspace = true, features = ["aws_lc_rs"] }
+
+ariadne = { workspace = true }
+nom = { workspace = true }
+nom-supreme = { workspace = true }
+nom_locate = { workspace = true }
+regex = { workspace = true }
+serde_json = { workspace = true }
+serde_with = { workspace = true }
+serde_urlencoded = { workspace = true }
+serde_derive = { workspace = true }
+enum-ordinalize = { workspace = true }
+convert_case = { workspace = true }
+validator = { workspace = true }
+
+
+miette = {workspace = true}
+
+anyhow = { workspace = true }
+cliclack = { workspace = true }
+derive_builder = { workspace = true }
+derive-name = { workspace = true }
+md5 = { workspace = true }
+
+#tracing = { workspace = true, features=["std","log","attributes","tracing-attributes","max_level_trace"]}
+tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-attributes", "async-await"] }
+dyn-clone = { workspace = true }
+
+[dev-dependencies]
+
+
+[build-dependencies]
+shadow-rs = { workspace = true }
+
+
+[lib]
+name = "starlane"
+path = "src/lib.rs"
+

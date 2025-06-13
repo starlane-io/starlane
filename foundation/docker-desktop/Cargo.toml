@@ -1,0 +1,18 @@
+[package]
+name = "starlane-foundation-for-docker-desktop"
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+description.workspace = true
+version.workspace = true
+
+[dependencies]
+
+starlane-macros= { workspace = true }
+starlane-hyperspace = { workspace = true }
+starlane-space= { workspace = true }
+starlane-base = { workspace = true }
+async-trait = "0.1.83"
