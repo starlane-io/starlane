@@ -300,10 +300,7 @@ impl FrameMuxer {
                             wave = self.rx.recv() => {
                                 match wave {
                                     None => {
-                               //         return Err(SpaceErr::Msg("rx discon".to_string());
-
-                                      todo!()
-
+                                        return Err(SpaceErr::Msg("rx discon".to_string()))
                                     },
                                     Some(wave) => {
                                        self.stream.write_wave(wave.clone()).await?;

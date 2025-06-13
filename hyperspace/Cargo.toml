@@ -87,13 +87,6 @@ starlane-space = { workspace = true, features = ["test"] }
 [build-dependencies]
 shadow-rs = { workspace = true }
 
-
 [lib]
 name = "starlane"
 path = "src/lib.rs"
-
-
-[[bin]]
-name = "starlane"
-doc = false
-path = "src/main.rs"
