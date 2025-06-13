@@ -1,16 +1,13 @@
+use crate::database::partial::pool::PostgresDatabaseConnectionPoolProvider;
+/// these reexports must come from [crate::service] since they are mocks when `#[cfg(test)]`
+use crate::service;
 use async_trait::async_trait;
 use base::status::{Entity, Handle, StatusProbe};
 use starlane_base as base;
 use std::future::Future;
 use std::ops::Deref;
-use sqlx::postgres::PgConnectOptions;
-use crate::database::partial::pool::PostgresDatabaseConnectionPoolProvider;
-/// these reexports must come from [crate::service] since they are mocks when `#[cfg(test)]`
-use crate::service;
-use service::{PgConnection, Pool, PoolConnection};
-use crate::service::config;
 
-pub type PostgresDatabaseHandle = Handle<dyn PostgresDatabase<DerefTarget = Pool>>;
+pub type PostgresDatabaseHandle = Handle<dyn PostgresDatabase>;
 
 /// tried to make [Handle] expose [Pool] by implementing
 /// ```
@@ -36,7 +33,6 @@ pub trait ProviderConfig: service::ProviderConfig {
 }
 
 mod concrete {
-    use super::base;
     use std::future::Future;
     mod my {
         pub use super::super::*;
@@ -44,18 +40,18 @@ mod concrete {
 
     use crate::database::concrete::my::PostgresDatabaseConnectionPoolProvider;
     use crate::service::config::PostgresUtilizationConfig;
-    use crate::service::{PgConnection, PostgresServiceHandle};
+    use crate::service::{Pool, PostgresServiceHandle};
     use async_trait::async_trait;
-    use starlane_hyperspace::base::provider::{Provider, ProviderKindDef};
     use sqlx::postgres::PgConnectOptions;
     use sqlx::{Connection, PgPool};
     use starlane_base::foundation::config::ProviderConfig;
-    use starlane_hyperspace::base::provider;
     use starlane_base::status::{Entity, EntityReadier, EntityResult, StatusResult};
     use starlane_base::status::{Status, StatusProbe};
+    use starlane_hyperspace::base::config::BaseSubConfig;
+    use starlane_hyperspace::base::provider::Provider;
+    use starlane_hyperspace::base::{provider, BaseSub};
     use std::ops::Deref;
     use std::sync::Arc;
-    use tokio::sync::Mutex;
 
     #[derive(Clone, Eq, PartialEq)]
     pub struct Config {
@@ -81,11 +77,11 @@ mod concrete {
         }
     }
 
-    impl starlane_hyperspace::base::config::ProviderConfig for Config {
-        fn kind(&self) -> &ProviderKindDef {
-            todo!()
-        }
-    }
+    impl provider::config::ProviderConfig for Config { }
+
+    impl BaseSubConfig for Config { }
+
+    impl starlane_hyperspace::base::config::ProviderConfig for Config { }
 
     impl ProviderConfig for Config {}
 
@@ -112,7 +108,7 @@ mod concrete {
     }
 
     impl PostgresDatabaseConnectionPoolProvider for PostgresDatabase {
-        fn pool(&self) -> &my::Pool {
+        fn pool(&self) -> &Pool {
             &self.pool
         }
     }
@@ -129,18 +125,10 @@ mod concrete {
         }
     }
 
+    impl BaseSub for PostgresDatabaseProvider { }
+
     #[async_trait]
-    impl Provider for PostgresDatabaseProvider {
-        type Config = Config;
-
-        fn provider_kind(&self) -> ProviderKindDef {
-            ProviderKindDef::PostgresService
-        }
-
-        fn config(&self) -> Arc<Self::Config> {
-            self.config.clone()
-        }
-    }
+    impl Provider for PostgresDatabaseProvider { }
 
     #[async_trait]
     impl StatusProbe for PostgresDatabaseProvider {
@@ -152,7 +140,7 @@ mod concrete {
     pub struct PostgresDatabase {
         config: Config,
         service: PostgresServiceHandle,
-        pool: my::Pool,
+        pool: Pool
     }
 
     impl PostgresDatabase {
@@ -175,25 +163,19 @@ mod concrete {
             let pool: MockPool<sqlx::Postgres> = Pool::default();
             Self {
                 config,
-                service,
-                pool,
+                service, pool,
             }
         }
     }
 
-    impl Entity for PostgresDatabase {
-        type DerefTarget = my::Pool;
-
-        fn deref_target(&self) -> &Self::DerefTarget {
-            todo!()
-        }
-    }
+    impl Entity for PostgresDatabase { }
+    
 
     #[async_trait]
     impl StatusProbe for PostgresDatabase {
         async fn probe(&self) -> StatusResult {
             #[cfg(not(test))]
-            async fn ping(pool: &my::Pool) -> Result<Status, sqlx::Error> {
+            async fn ping(pool: &Pool) -> Result<Status, sqlx::Error> {
                 pool.acquire().await?.ping().await.map(|_| Status::Ready)
             }
 
@@ -215,20 +197,15 @@ pub mod partial {
 
     /// connection pool support
     pub mod pool {
-        use super::my;
+        use crate::service::Pool;
         pub trait PostgresDatabaseConnectionPoolProvider {
-            fn pool(&self) -> &my::Pool;
+            fn pool(&self) -> &Pool;
         }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use super::concrete::{PostgresDatabase, PostgresDatabaseProvider};
-    use starlane_base::status::Handle;
-    use starlane_space::status::EntityReadier;
-    use std::ops::Deref;
-
     #[tokio::test]
     pub async fn test_handle_deref() {
 

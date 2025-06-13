@@ -9,22 +9,33 @@
 //! with a matching [ProviderKindDef]... the [Foundation] [provider::Provider] can be a dependency of the
 //! [Platform]
 
-#[cfg(not(test))]
-#[cfg(not(feature = "test"))]
-pub use types::*;
+// #[cfg(not(test))]
+// #[cfg(not(feature = "test"))]
+// pub use crate::service::types::*;
 
 #[cfg(test)]
 #[cfg(feature = "test")]
-pub use tests::types::*;
+pub use crate::service::tests::types::*;
 
-#[cfg(not(test))]
-#[cfg(not(feature = "test"))]
-pub(super) mod types {
+pub use crate::service::types::*;
+
+mod types {
+    pub type Pool = sqlx::Pool<sqlx::Postgres>;
+    pub type PoolConnection = sqlx::pool::PoolConnection<sqlx::Postgres>;
+    pub type PgConnection = sqlx::postgres::PgConnection;
+}
+
+/*
+#[cfg(test)]
+#[cfg(feature = "test")]
+pub mod types {
     pub type Pool = sqlx::Pool<sqlx::Postgres>;
 
     pub type PoolConnection = sqlx::pool::PoolConnection<sqlx::Postgres>;
     pub type PgConnection = sqlx::postgres::PgConnection;
 }
+
+ */
 
 /// maybe add proper postgres type constraints on the following stuff:
 pub type Username = VarCase;
@@ -39,10 +50,7 @@ use async_trait::async_trait;
 use sqlx::postgres::PgConnectOptions;
 use sqlx::Error;
 use starlane_base as base;
-use starlane_base::kind::ProviderKindDef;
 use starlane_hyperspace::base::provider;
-use starlane_base::Foundation;
-use starlane_base::Platform;
 use starlane_space::parse::{Domain, VarCase};
 use starlane_space::status;
 use starlane_space::status::{Handle, StatusProbe};
@@ -64,20 +72,13 @@ pub trait ProviderConfig: config::ProviderConfig {
 
 /// final [provider::Provider] trait definitions for [concrete::PostgresServiceProvider]
 #[async_trait]
-pub trait Provider: provider::Provider<Entity = Arc<dyn PostgresService>> {
+pub trait Provider: provider::Provider {
     type Config: ProviderConfig + ?Sized;
 }
 
 /// trait implementation [Provider::Entity]
 #[async_trait]
-pub trait PostgresService:
-    status::Entity<DerefTarget = Arc<PgConnection>>
-    + StatusProbe
-    + Send
-    + Sync
-    + PostgresConnectionProvider
-{
-}
+pub trait PostgresService: status::Entity + StatusProbe + Send + Sync + PostgresConnectionProvider { }
 
 pub type PostgresServiceHandle = Handle<dyn PostgresService>;
 
@@ -170,6 +171,7 @@ pub mod partial {
     /// connection pool support
     pub mod connection {
         use super::my;
+        use crate::service::PgConnection;
         use async_trait::async_trait;
         use starlane_space::status::Entity;
         use std::future::Future;
@@ -178,21 +180,19 @@ pub mod partial {
 
         #[async_trait]
         pub trait PostgresConnectionProvider {
-            fn connection(&self) -> &Arc<my::PgConnection>;
+            fn connection(&self) -> &Arc<PgConnection>;
         }
     }
     pub mod mount {}
 }
 
 mod concrete {
-    use super::base;
     use super::config;
+    use super::{base, PgConnection};
     use async_trait::async_trait;
     use sqlx;
     use sqlx::{Acquire, ConnectOptions, Connection, Postgres};
-    use starlane_hyperspace::base::provider::{Strata, Provider, ProviderKindDef};
-    use starlane_base::Foundation;
-    use starlane_base::Platform;
+    use starlane_hyperspace::base::provider::{Provider, ProviderKindDef, Strata};
     use starlane_space::status;
     use starlane_space::status::{Entity, EntityReadier, StatusReporter, StatusResult};
     use status::{EntityResult, Handle, Status, StatusDetail, StatusProbe, StatusWatcher};
@@ -204,7 +204,8 @@ mod concrete {
 
     use crate::service::concrete::my::{Error, PostgresConnectionProvider};
     use config::PostgresUtilizationConfig;
-    use starlane_hyperspace::base::config::ProviderConfig;
+    use starlane_hyperspace::base::config::{BaseSubConfig, ProviderConfig};
+    use starlane_hyperspace::base::BaseSub;
 
     pub mod my {
         pub use super::super::*;
@@ -241,18 +242,10 @@ mod concrete {
         }
     }
 
+    impl BaseSub for PostgresServiceProvider {}
+
     #[async_trait]
-    impl Provider for PostgresServiceProvider {
-        type Config = PostgresProviderConfig;
-
-        fn provider_kind(&self) -> ProviderKindDef {
-            ProviderKindDef::PostgresService
-        }
-
-        fn config(&self) -> Arc<Self::Config> {
-            self.config.clone()
-        }
-    }
+    impl Provider for PostgresServiceProvider {}
 
     #[async_trait]
     impl StatusProbe for PostgresServiceProvider {
@@ -275,20 +268,14 @@ mod concrete {
         connection: Arc<my::PgConnection>,
     }
 
-    impl Entity for PostgresService {
-        type DerefTarget = Arc<my::PgConnection>;
-
-        fn deref_target(&self) -> &Self::DerefTarget {
-            todo!()
-        }
-    }
-
     #[async_trait]
     impl PostgresConnectionProvider for PostgresService {
-        fn connection(&self) -> &<Self as Entity>::DerefTarget {
+        fn connection(&self) -> &Arc<PgConnection> {
             &self.connection
         }
     }
+
+    impl Entity for PostgresService {}
 
     #[async_trait]
     impl my::PostgresService for PostgresService {}
@@ -345,12 +332,12 @@ mod concrete {
         }
     }
 
+    impl starlane_hyperspace::base::provider::config::ProviderConfig for PostgresProviderConfig {}
+
+    impl BaseSubConfig for PostgresProviderConfig {}
+
     #[async_trait]
-    impl starlane_hyperspace::base::config::ProviderConfig for PostgresProviderConfig {
-        fn kind(&self) -> &ProviderKindDef {
-            todo!()
-        }
-    }
+    impl starlane_hyperspace::base::config::ProviderConfig for PostgresProviderConfig {}
 
     #[async_trait]
     impl config::ProviderConfig for PostgresProviderConfig {}
