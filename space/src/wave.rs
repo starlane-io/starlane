@@ -1682,12 +1682,18 @@ impl FromReflectedAggregate for WaveVariantDef<PongCore> {
                 ReflectedWave::Pong(pong) => Ok(pong),
                 _ => Err(SpaceErr::bad_request("expected a Pong Reflected")),
             },
+<<<<<<< HEAD:space/src/wave.rs
             ReflectedAggregate::None => Err(SpaceErr::bad_request(
                 "expected a Single Reflected, encountered: None",
             )),
             ReflectedAggregate::Multi(_) => Err(SpaceErr::bad_request(
                 "expected a Single Reflected, encountered: Multi",
             )),
+=======
+            ReflectedAggregate::None => Err(SpaceErr::bad_request("expected a Single Reflected, encountered: None")),
+            ReflectedAggregate::Multi(_) =>Err(SpaceErr::bad_request("expected a Single Reflected, encountered: Multi"))
+
+>>>>>>> refs/remotes/origin/stage:rust/cosmic/cosmic-space/src/wave.rs
         }
     }
 }
@@ -1734,7 +1740,11 @@ impl PongCore {
                     message: errs.to_string(),
                 })
             } else if let Substance::Err(err) = &self.core.body {
+<<<<<<< HEAD:space/src/wave.rs
                 Err(SpaceErr::Msg(err.to_string()))
+=======
+                Err(err.clone())
+>>>>>>> refs/remotes/origin/stage:rust/cosmic/cosmic-space/src/wave.rs
             } else {
                 Err(SpaceErr::Msg("wave err".to_string()))
             }
