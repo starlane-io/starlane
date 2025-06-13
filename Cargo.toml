@@ -30,42 +30,43 @@ starlane-platform-for-postgres-registry = { package="starlane-platform-for-postg
 starlane-foundation-for-docker-desktop = { package="starlane-foundation-for-docker-desktop", path= "foundation/docker-desktop"}
 
 lazy_static = "1.5.0"
-uuid = { version="1.11.0" }
-chrono = { version="0.4.39" }
-tokio = "1.42.0"
-tokio-rustls = "0.26.1"
+uuid = { version="1.17.0" }
+chrono = { version="0.4.41" }
+tokio = "1.45.1"
+tokio-rustls = "0.26.2"
 
 bincode = "1.3.3"
-sqlx = "0.8.2"
+sqlx = "0.8.6"
 strum = "0.26.3"
 strum_macros = "0.26.4"
 
 
-zip = "2.2.2"
+zip = "2.4.2"
 dirs = "5.0.1"
 ascii = "1.1.0"
 url = "2.5.4"
-once_cell = "1.20.2"
-indexmap = "2.7.0"
+once_cell = "1.21.3"
+indexmap = "2.9.0"
 
-syn = "2.0.93"
-async-trait = "0.1.83"
+syn = "2.0.103"
+async-trait = "0.1.88"
 futures = {version = "0.3.31", default-features = true }
 dashmap = "6.1.0"
-semver = { version="1.0.24", features=['serde'] }
+semver = { version="1.0.26", features=['serde'] }
 eyre = "0.6.12" # NOTE: add 'miette = "7.4.0"' for reporting later!
-miette = "7.4.0"
+miette = "7.6.0"
 itertools = "0.13.0"
 
-serde = "1.0.217"
-serde_derive = "1.0.217"
+serde = "1.0.219"
+serde_derive = "1.0.219"
 async-recursion = "1.1.1"
 
 rcgen = "0.13.2"
-rustls = "0.23.20"
+rustls = "0.23.27"
+
 rustls-pemfile = "2.2.0"
 
-clap = "4.5.23"
+clap = "4.5.40"
 walkdir = "2.5.0"
 
 md5 = "0.7.0"
@@ -76,45 +77,45 @@ nom = "7.1.3"
 nom-supreme = "0.8.0"
 nom_locate = "4.2.0"
 regex = "1.11.1"
-serde_json = "1.0.134"
+serde_json = "1.0.140"
 serde_with = "3.12.0"
-typetag = "0.2.19"
+typetag = "0.2.20"
 serde_with_macros = "3.12.0"
 serde_urlencoded = "0.7.1"
 enum-ordinalize = "4.3.0"
-dyn-clone = "1.0.17"
+dyn-clone = "1.0.19"
 downcast-rs = "1.2.1"
 validator = "0.19.0"
 
 shadow-rs = "0.37.0"
 convert_case = "0.6.0"
 
-anyhow = "1.0.95"
+anyhow = "1.0.98"
 crossterm = "0.28.1"
-console = "0.15.10"
+console = "0.15.11"
 
-quote = "1.0.38"
-proc-macro2 = "1.0.92"
+quote = "1.0.40"
+proc-macro2 = "1.0.95"
 
-thiserror = "2.0.9"
+thiserror = "2.0.12"
 path-clean = "1.0.1"
 thiserror-context = "0.1.2"
 
 rustyline = "15.0.0"
-cliclack = "0.3.5"
+cliclack = "0.3.6"
 derive_builder = "0.20.2"
 serde_yaml = "0.9.34"
 text-to-ascii-art = "0.1.10"
-ctrlc = "3.4.5"
+ctrlc = "3.4.7"
 colored = "2.2.0"
 lerp = "0.5.0"
 atty = "0.2.14"
 termsize = "0.1.9"
-textwrap = "0.16.1"
+textwrap = "0.16.2"
 port_check = "0.2.1"
 derive-name = "1.1.0"
 tracing = "0.1.41"
-tracing-core = "0.1.33"
+tracing-core = "0.1.34"
 
 # dependencies currently in the `Penalty Box`:
 #retry-if = "0.2.3"

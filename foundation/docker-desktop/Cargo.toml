@@ -15,4 +15,4 @@ starlane-macros= { workspace = true }
 starlane-hyperspace = { workspace = true }
 starlane-space= { workspace = true }
 starlane-base = { workspace = true }
-async-trait = "0.1.83"
+async-trait = "0.1.88"
