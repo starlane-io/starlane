@@ -1593,9 +1593,12 @@ pub type Point = PointDef<RouteSeg, PointSeg>;
 /// with a proper Env (environment) reference which should have a contextual point set:
 /// ```
 /// use std::str::FromStr;
+/// use starlane::parse::Env;
 /// use starlane::point::{Point, PointCtx};
+/// use starlane::util::ToResolved;
+/// let env = Env::default();
 /// let point_var = PointCtx::from_str("..:another-app:something")?;
-/// let point: Point = point_ctx.to_resolve(&env)?;
+/// let point: Point = point_var.to_resolved(&env)?;
 /// ```
 pub type PointCtx = PointDef<RouteSeg, PointSegCtx>;
 
@@ -1604,8 +1607,11 @@ pub type PointCtx = PointDef<RouteSeg, PointSegCtx>;
 /// usable point it must be resolved like so:
 /// ```
 /// use std::str::FromStr;
+/// use starlane::parse::Env;
 /// use starlane::point::{Point, PointVar};
+/// use starlane::util::ToResolved;
+/// let env = Env::default();
 /// let point_var = PointVar::from_str("my-domain:users:${user}")?;
-/// let point: Point = point_var.to_resolve(&env)?;
+/// let point: Point = point_var.to_resolved(&env)?;
 /// ```
 pub type PointVar = PointDef<RouteSegVar, PointSegVar>;

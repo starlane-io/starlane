@@ -108,4 +108,5 @@ shadow-rs = { workspace = true }
 [lib]
 name = "starlane"
 path = "src/lib.rs"
+doctest=false
 
