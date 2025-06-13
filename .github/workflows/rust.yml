@@ -21,4 +21,4 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Run tests
-      run: cargo test --no-fail-fast --workspace  
+      run: cargo test --no-fail-fast --workspace --lib --bins

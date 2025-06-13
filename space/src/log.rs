@@ -34,6 +34,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::{Arc, LazyLock};
+use tokio::task::LocalKey;
 use tokio::task_local;
 
 task_local! {
@@ -67,8 +68,11 @@ impl LoggerStack {
     }
 }
 
+
 pub fn logger() -> Logger {
-    STACK.get()
+    STACK.try_with(|logger| logger.clone()).unwrap_or_else(|_| {
+        Logger::default()
+    })
 }
 
 macro_rules! enter {
@@ -105,7 +109,7 @@ where
 {
     if STACK.try_with(|v| {}).is_ok() {}
 
-    let root = root_logger();
+    let root = logger();
     let logx = root.push_mark(mark);
     STACK
         .scope(logx, async move {
