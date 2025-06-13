@@ -300,8 +300,10 @@ impl FrameMuxer {
                             wave = self.rx.recv() => {
                                 match wave {
                                     None => {
-                                        self.logger.warn("rx discon");
-                                        break
+                               //         return Err(SpaceErr::Msg("rx discon".to_string());
+
+                                      todo!()
+
                                     },
                                     Some(wave) => {
                                        self.stream.write_wave(wave.clone()).await?;
@@ -315,7 +317,7 @@ impl FrameMuxer {
                                    },
                                    Err(err) => {
             //                          self.logger.error(format!("read stream err: {}",err.to_string()));
-                                      break
+                                       return Err(SpaceErr::Msg(err.to_string()));
                                    }
                                 }
                             }
@@ -323,28 +325,8 @@ impl FrameMuxer {
                                  self.logger.warn(format!("terminated"));
                                  return Ok(())
                                 }
-                        }
-<<<<<<< HEAD:hyperspace/src/hyperlane/tcp.rs
-                    }
-                }
-                wave = self.stream.read_wave() => {
-                    match wave {
-                       Ok(wave) => {
-                            self.tx.send(wave).await?;
-                       },
-                       Err(err) => {
-                            self.logger.error(format!("read stream err: {}",err.to_string()));
-                            break;
-                       }
-                    }
-                }
-                _ = self.terminate_rx.recv() => {
-                     self.logger.warn(format!("terminated"));
-                     return Ok(())
-                    }
+
             }
-=======
->>>>>>> refs/remotes/origin/stage:rust/cosmic/cosmic-hyperlane-tcp/src/lib.rs
         }
         Ok(())
     }
@@ -597,7 +579,6 @@ impl From<&str> for Error {
 
 #[cfg(test)]
 mod tests {
-<<<<<<< HEAD:hyperspace/src/hyperlane/tcp.rs
     use crate::hyperlane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
     use crate::hyperlane::test_util::{
         LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
@@ -611,22 +592,6 @@ mod tests {
     use starlane_space::point::Point;
     use std::str::FromStr;
     use std::sync::Arc;
-=======
-    use std::time::Duration;
-
-    use cosmic_hyperlane::test_util::{SingleInterchangePlatform, WaveTest, FAE, LESS};
-    use cosmic_space::loc::{Point, ToSurface};
-    use cosmic_space::log::RootLogger;
-
-    use chrono::DateTime;
-    use chrono::Utc;
-    use cosmic_hyperlane::HyperClient;
-    use cosmic_space::settings::Timeouts;
-    use cosmic_space::wave::exchange::asynch::Exchanger;
-    use cosmic_space::wave::DirectedProto;
-
-    use super::*;
->>>>>>> refs/remotes/origin/stage:rust/cosmic/cosmic-hyperlane-tcp/src/lib.rs
 
     /*
     #[no_mangle]
@@ -639,7 +604,6 @@ mod tests {
         Utc::now()
     }
 
-<<<<<<< HEAD:hyperspace/src/hyperlane/tcp.rs
     #[no_mangle]
     extern "C" fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>, SpaceErr> {
         Ok(Arc::new(StdOutAppender()))
@@ -647,8 +611,6 @@ mod tests {
 
      */
 
-=======
->>>>>>> refs/remotes/origin/stage:rust/cosmic/cosmic-hyperlane-tcp/src/lib.rs
     //#[tokio::test]
     async fn test_tcp() -> Result<(), Error> {
         let platform = SingleInterchangePlatform::new().await;
@@ -689,11 +651,7 @@ mod tests {
         Ok(())
     }
 
-<<<<<<< HEAD:hyperspace/src/hyperlane/tcp.rs
     //    #[tokio::test]
-=======
-   // #[tokio::test]
->>>>>>> refs/remotes/origin/stage:rust/cosmic/cosmic-hyperlane-tcp/src/lib.rs
     async fn test_large_frame() -> Result<(), Error> {
         let platform = SingleInterchangePlatform::new().await;
 
@@ -717,7 +675,6 @@ mod tests {
             less_logger,
         ));
 
-<<<<<<< HEAD:hyperspace/src/hyperlane/tcp.rs
         let fae_logger = push_loc!((logger, &*FAE));
         let fae_client = Box::new(HyperlaneTcpClient::new(
             format!("localhost:{}", port),
@@ -730,35 +687,6 @@ mod tests {
         let test = LargeFrameTest::new(fae_client, less_client);
 
         test.go().await.unwrap();
-=======
-        let less_exchanger = Exchanger::new(
-            LESS.push("exchanger").unwrap().to_surface(),
-            Timeouts::default(),
-            PointLogger::default(),
-        );
-
-        let root_logger = RootLogger::default();
-        let logger = root_logger.point(Point::from_str("less-client").unwrap());
-        let less_client =
-            HyperClient::new_with_exchanger(less_client, Some(less_exchanger.clone()), logger)
-                .unwrap();
-
-        less_client
-            .wait_for_ready(Duration::from_secs(5))
-            .await
-            .unwrap();
-        let transmitter = less_client.transmitter_builder().await.unwrap().build();
-
-        let size = 100_000;
-        let mut bin = Vec::with_capacity(100_100);
-        for _ in 0..size {
-            bin.push(0u8);
-        }
-        let bin = Arc::new(bin);
-        let mut wave = DirectedProto::signal();
-        wave.body(Substance::Bin(bin));
-        transmitter.signal(wave).await.unwrap();
->>>>>>> refs/remotes/origin/stage:rust/cosmic/cosmic-hyperlane-tcp/src/lib.rs
 
         Ok(())
     }

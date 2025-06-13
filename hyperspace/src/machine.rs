@@ -777,7 +777,6 @@ impl ArtifactFetcher for ClientArtifactFetcher {
         todo!()
     }
 
-<<<<<<< HEAD:hyperspace/src/machine.rs
     async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, ArtErr> {
         let transmitter = self
             .client
@@ -785,22 +784,16 @@ impl ArtifactFetcher for ClientArtifactFetcher {
             .await
             .map_err(anyhow::Error::from)?
             .build();
-=======
-    async fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr> {
-        let transmitter = self.client.transmitter_builder().await?.build();
->>>>>>> refs/remotes/origin/stage:rust/cosmic/cosmic-hyperspace/src/machine.rs
+
 
         let mut wave = DirectedProto::ping();
         wave.method(CmdMethod::Read);
         wave.to(point.clone().to_surface().with_layer(Layer::Core));
-<<<<<<< HEAD:hyperspace/src/machine.rs
         let pong: WaveVariantDef<PongCore> = transmitter
             .direct(wave)
             .await
             .map_err(anyhow::Error::from)?;
-=======
-        let pong: Wave<Pong> = transmitter.direct(wave).await?;
->>>>>>> refs/remotes/origin/stage:rust/cosmic/cosmic-hyperspace/src/machine.rs
+
 
         pong.ok_or().err();
 
