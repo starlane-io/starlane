@@ -7,7 +7,7 @@ use sqlx::{Acquire, Executor, Postgres, Row, Transaction};
 use starlane_hyperspace::registry::err::RegErr;
 use starlane_hyperspace::registry::{Registration, RegistryApi};
 use starlane_macros::push_loc;
-use starlane_platform_for_postgres::database::PostgresDatabaseHandle;
+use starlane_platform_for_postgres::database::{PostgresDatabase, PostgresDatabaseHandle};
 use starlane_platform_for_postgres::service::{DbKey, PostgresService, PostgresServiceHandle};
 /// embedded postgres for local development environments is slated to be removed in favor of
 /// Postgres provided by `DockerDesktopFoundation`
@@ -55,7 +55,10 @@ pub struct PostgresRegistry {
 }
 
 impl PostgresRegistry {
-    pub async fn new(handle: PostgresDatabaseHandle, logger: Logger) -> Result<Self, RegErr> {
+    pub async fn new(
+        handle: Handle<PostgresDatabase>,
+        logger: Logger
+    ) -> Result<Self, RegErr> {
         let logger = push_loc!((logger, Point::global_registry()));
 
         let registry = Self {

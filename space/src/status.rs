@@ -97,6 +97,14 @@ where
     hold: tokio::sync::mpsc::Sender<()>,
 }
 
+impl <E> Deref for Handle<E> where
+    E: Entity + Send + Sync + ?Sized{
+    type Target = Arc<E>;
+
+    fn deref(&self) -> & Self::Target {
+        & self.entity
+    }
+}
 
 
 impl<E> Handle<E>

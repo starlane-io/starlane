@@ -6,8 +6,9 @@ use base::status::{Entity, Handle, StatusProbe};
 use starlane_base as base;
 use std::future::Future;
 use std::ops::Deref;
+use crate::service::Pool;
 
-pub type PostgresDatabaseHandle = Handle<dyn PostgresDatabase>;
+pub type PostgresDatabaseHandle = Handle<PostgresDatabase>;
 
 /// tried to make [Handle] expose [Pool] by implementing
 /// ```
@@ -23,8 +24,26 @@ pub type PostgresDatabaseHandle = Handle<dyn PostgresDatabase>;
 ///     }
 /// }
 /// ```
-#[async_trait]
-pub trait PostgresDatabase: Entity + PostgresDatabaseConnectionPoolProvider + StatusProbe + Send + Sync { }
+/// 
+/// 
+pub struct PostgresDatabase {
+    pool: Pool
+}
+impl Entity for PostgresDatabase {}
+
+impl Deref for PostgresDatabase {
+    type Target = Pool;
+
+    fn deref(&self) -> &Self::Target {
+        & self.pool
+    }
+}
+
+impl PostgresDatabaseConnectionPoolProvider  for PostgresDatabase {
+    fn pool(&self) -> &Pool {
+        & self.pool
+    }
+}
 
 
 /// final [starlane::config::ProviderConfig] trait definitions for [concrete::PostgresProviderConfig]
@@ -107,14 +126,20 @@ mod concrete {
         }
     }
 
+    impl Deref for PostgresDatabase {
+        type Target = Pool;
+
+        fn deref(&self) -> &Self::Target {
+            & self.pool
+        }
+    }
+
     impl PostgresDatabaseConnectionPoolProvider for PostgresDatabase {
         fn pool(&self) -> &Pool {
             &self.pool
         }
     }
 
-    #[async_trait]
-    impl my::PostgresDatabase for PostgresDatabase {}
 
     #[async_trait]
     impl EntityReadier for PostgresDatabaseProvider {
@@ -197,8 +222,10 @@ pub mod partial {
 
     /// connection pool support
     pub mod pool {
+        use std::ops::Deref;
+        use sqlx::PgPool;
         use crate::service::Pool;
-        pub trait PostgresDatabaseConnectionPoolProvider {
+        pub trait PostgresDatabaseConnectionPoolProvider: Deref<Target = Pool> {
             fn pool(&self) -> &Pool;
         }
     }
