@@ -13,9 +13,8 @@ use strum_macros::EnumDiscriminants;
 
 use crate::registry::Registry;
 use starlane_space::status::Status;
-use crate::base::{kinds, BaseSub};
+use crate::base::BaseSub;
 use crate::base::config::BaseConfig;
-use crate::base::kinds::Kind;
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize,Eq,PartialEq,Hash)]
 #[strum_discriminants(vis(pub))]

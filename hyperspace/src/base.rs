@@ -28,14 +28,10 @@ use starlane_space::status::{Entity, EntityReadier, Status, StatusProbe, StatusR
 use err::BaseErr;
 use crate::base::config::{BaseSubConfig, FoundationConfig, ProviderConfig};
 use crate::base::provider::context::FoundationContext;
-use crate::base::provider::Provider;
+use crate::base::provider::{Provider, ProviderKind, ProviderKindDef};
 
 pub trait BaseSub: Send + Sync {
-   type Config: config::BaseSubConfig<Kind:kinds::Kind>+?Sized;
-
-   fn kind(&self) -> &<Self::Config as BaseSubConfig>::Kind {
-       self.config().kind()
-   }
+   type Config: config::BaseSubConfig+?Sized;
 
    fn config(&self) -> & Self::Config;
 }
@@ -47,7 +43,6 @@ where Self: 'static,
     type Err: std::error::Error + Send + Sync + From<anyhow::Error>+?Sized;
     type StarAuth: HyperAuthenticator+?Sized;
     type RemoteStarConnectionFactory: HyperwayEndpointFactory+Sized;
-    type ProviderKind: kinds::ProviderKind+?Sized;
 
     fn config(&self) -> &Self::Config;
 
@@ -227,7 +222,7 @@ impl Default for Settings {
     }
 }
 
-pub trait PlatformConfig: BaseSubConfig<Kind:kinds::PlatformKind>
+pub trait PlatformConfig: BaseSubConfig
 {
     type RegistryConfig: RegistryConfig+?Sized;
 
@@ -262,7 +257,7 @@ pub trait Foundation: BaseSub<Config:FoundationConfig> {
     async fn ready(&self, progress: Progress) -> StatusResult;
 
     /// Returns a [Provider] by this [Foundation]
-    fn provider<P>(&self, kind: &<Self::Config as BaseSubConfig>::Kind) -> Result<Option<& P>, BaseErr> where P: Provider+EntityReadier;
+    fn provider<P>(&self, kind: & ProviderKindDef) -> Result<Option<& P>, BaseErr> where P: Provider+EntityReadier;
 }
 
 

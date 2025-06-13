@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::hash::Hash;
 
 use crate::base::err::BaseErr;
-use crate::base::{kinds, provider, BaseSub};
+use crate::base::{provider, BaseSub};
 use crate::registry;
 
 /// a container for all sub-strata layers
@@ -19,9 +19,6 @@ pub trait BaseConfig: Send + Sync {
 
 //
 pub trait BaseSubConfig: Send + Sync {
-    type Kind: kinds::Kind + ?Sized;
-
-    fn kind(&self) -> &Self::Kind;
 }
 
 pub trait FoundationConfig: BaseSubConfig {
@@ -29,7 +26,10 @@ pub trait FoundationConfig: BaseSubConfig {
 
     fn provider_kinds(&self) -> &HashSet<ProviderKind>;
 
-    fn provider<P>(&self, kind: <Self as BaseSubConfig>::Kind) -> Option<&P> where P: Provider+BaseSub<Config: BaseSubConfig<Kind=<Self as BaseSubConfig>::Kind>>;
+    /*
+    fn provider<P>(&self, kind: <Self as BaseSubConfig>::Kind) -> Option<&P> where P: Provider+BaseSub<Config: BaseSubConfig>;
+    
+     */
 }
 
 pub trait ProviderConfig: provider::config::ProviderConfig { }

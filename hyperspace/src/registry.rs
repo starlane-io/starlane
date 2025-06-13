@@ -19,7 +19,7 @@ pub mod err;
 
 pub type Registry = Arc<dyn RegistryApi>;
 
-pub trait RegistryConfig: BaseSubConfig<Kind: kinds::RegistryKind> {}
+pub trait RegistryConfig: BaseSubConfig {}
 
 #[async_trait]
 pub trait RegistryApi: Send + Sync {
