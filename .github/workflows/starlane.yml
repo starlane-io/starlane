@@ -31,8 +31,14 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
 
-    - name: download mac target
+    - name: download target aarch64-apple-darwin
+
       run: rustup target add aarch64-apple-darwin
+    - name: download target x86_64-apple-darwin
+      run: rustup target add x86_64-apple-darwin
+
+    - name: Build x86_64-apple-darwin
+      run: cargo build --target x86_64-apple-darwin --package starlane 
 
     - name: Build aarch64-apple-darwin
       run: cargo build --target aarch64-apple-darwin --package starlane 
