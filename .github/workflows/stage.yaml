@@ -1,0 +1,26 @@
+name: Stage Test
+
+on:
+  push:
+    branches: [ "stage" ]
+  pull_request:
+    branches: [ "stage" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        BUILD_TARGET: [debug] 
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run tests
+      run: cargo test --workspace
+
+
