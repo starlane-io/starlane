@@ -16,23 +16,8 @@ jobs:
     name: Release - ${{ matrix.platform.os-name }}
     strategy:
       matrix:
-        BUILD_TARGET: [debug] 
+        BUILD_TARGET: [release] 
         platform:
-          - os-name: FreeBSD-x86_64
-            runs-on: ubuntu-24.04
-            target: x86_64-unknown-freebsd
-
-          - os-name: Linux-x86_64
-            runs-on: ubuntu-24.04
-            target: x86_64-unknown-linux-musl
-
-          - os-name: Linux-aarch64
-            runs-on: ubuntu-24.04
-            target: aarch64-unknown-linux-musl
-
-          - os-name: Linux-riscv64
-            runs-on: ubuntu-24.04
-            target: riscv64gc-unknown-linux-gnu
 
           - os-name: Windows-x86_64
             runs-on: windows-latest
@@ -41,6 +26,13 @@ jobs:
           - os-name: macOS-x86_64
             runs-on: macOS-latest
             target: x86_64-apple-darwin
+
+
+          - os-name: macOS-aarch64
+            runs-on: macOS-latest
+            target: aarch64-apple-darwin
+
+
 
           # more targets here ...
 
@@ -53,12 +45,12 @@ jobs:
         with:
           command: build
           target: ${{ matrix.platform.target }}
-          args: "--locked --release"
+          args: "--locked --release --package starlane"
           strip: true
       - name: Publish artifacts and release
         uses: houseabsolute/actions-rust-release@v0
         with:
-          executable-name: ubi
+          executable-name: starlane
           target: ${{ matrix.platform.target }}
 
 
