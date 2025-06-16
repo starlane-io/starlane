@@ -1,4 +1,4 @@
-name: Rust
+name: Release
 
 on:
   push:
@@ -47,7 +47,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: "--locked --release --package starlane"
           strip: true
-      - name: Publish artifacts and release
+      - name: GitHub Release
         uses: houseabsolute/actions-rust-release@v0
         with:
           executable-name: starlane
