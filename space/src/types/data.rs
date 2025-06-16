@@ -1,4 +1,4 @@
-use crate::types::{private, AbstractDiscriminant, SrcDef, Abstract, Exact, ExactGen};
+use crate::types::{private, SrcDef, Abstract, Exact, ExactGen, AbstractDisc};
 use core::str::FromStr;
 use derive_name::Name;
 use serde_derive::{Deserialize, Serialize};
@@ -6,7 +6,7 @@ use strum::ParseError;
 use strum_macros::EnumDiscriminants;
 use starlane_space::err::ParseErrs;
 use starlane_space::parse::{camel_chars, from_camel};
-use starlane_space::types::parse::schema;
+use starlane_space::types::parse::data;
 use starlane_space::types::PointKindDefSrc;
 use crate::parse::{camel_case, CamelCase, Res};
 use crate::parse::util::Span;
@@ -50,18 +50,12 @@ impl Delimited for Data {
 
 
 impl Generic for Data {
-    type Abstract = Data;
-    type Discriminant = DataDisc;
-
-    fn discriminant(&self) -> super::AbstractDiscriminant {
-        self.clone().into()
-    }
 
     fn parse<I>(input: I) -> Res<I, Self>
     where
         I: Span
     {
-        schema(input)
+        data(input)
     }
 
 }
@@ -112,9 +106,9 @@ impl Into<CamelCase> for Data {
     }
 }
 
-impl Into<AbstractDiscriminant> for Data {
-    fn into(self) -> AbstractDiscriminant {
-        AbstractDiscriminant::Data
+impl Into<AbstractDisc> for Data {
+    fn into(self) -> AbstractDisc{
+        AbstractDisc::Data
     }
 }
 

@@ -25,7 +25,7 @@ pub mod test;
 /// which references a definition in [Specific]
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants,strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
-#[strum_discriminants(name(AbstractDiscriminant))]
+#[strum_discriminants(name(AbstractDisc))]
 #[strum_discriminants(derive( Hash, strum_macros::EnumString, strum_macros::ToString, strum_macros::IntoStaticStr ))]
 pub enum Abstract {
     Class(Class),
@@ -196,22 +196,6 @@ pub(crate) mod private {
     use strum_macros::EnumDiscriminants;
 
     pub(crate) trait Generic: Name+Clone+Into<Abstract>+Clone+FromStr+Delimited{
-
-        type Abstract;
-
-        type Discriminant;
-
-
-        fn discriminant(&self) -> super::AbstractDiscriminant;
-
-        fn plus(self, scope: Scope, specific: Specific) -> GenericExact<Self> {
-            GenericExact::scoped(scope, self, specific)
-        }
-
-        fn plus_specific(self, specific: Specific) -> GenericExact<Self>{
-            GenericExact::new(self, specific)
-        }
-
         fn parse<I>(input: I) -> Res<I, Self> where I: Span;
     }
 
@@ -219,7 +203,7 @@ pub(crate) mod private {
        fn type_delimiters() -> (&'static str, &'static str);
     }
 
-    /// [Variant] implies inheritance from a
+    /// [Variant] implies inheritance from a 
     pub(crate) trait Variant {
         /// the base [Abstract] variant [Class] or [Data]
         type Root: Generic+?Sized;

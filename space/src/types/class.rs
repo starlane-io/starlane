@@ -1,19 +1,15 @@
-use crate::types::{private, DataPoint, Exact, Abstract, ExactGen};
-use crate::types::AbstractDiscriminant;
+use crate::parse::util::Span;
+use crate::parse::{CamelCase, Res};
+use crate::types::class::service::Service;
+use crate::types::private::Delimited;
+use crate::types::private;
 use core::str::FromStr;
-use std::borrow::Borrow;
-use derive_builder::Builder;
 use derive_name::Name;
 use nom::Parser;
 use serde_derive::{Deserialize, Serialize};
-use strum_macros::EnumDiscriminants;
-use starlane_space::err::ParseErrs;
 use starlane_space::parse::from_camel;
-use crate::parse::{camel_case, camel_chars, CamelCase, NomErr, Res};
-use crate::parse::util::Span;
-use crate::point::Point;
-use crate::types::class::service::Service;
-use crate::types::private::Delimited;
+use std::borrow::Borrow;
+use strum_macros::EnumDiscriminants;
 
 #[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
 #[strum_discriminants(vis(pub))]
@@ -78,14 +74,13 @@ pub enum Class {
 }
 
 pub mod service {
+    use crate::parse::CamelCase;
+    use crate::types::class::Class;
+    use crate::types::private::Super;
     use derive_name::Name;
     use serde_derive::{Deserialize, Serialize};
-    use strum_macros::{EnumDiscriminants, EnumString};
     use starlane_space::types::private::Variant;
-    use crate::parse::CamelCase;
-    use crate::types::Abstract;
-    use crate::types::class::{Class, ClassDiscriminant};
-    use crate::types::private::Super;
+    use strum_macros::{EnumDiscriminants, EnumString};
 
     /// variants for [super::Class::Service]
     #[derive(
@@ -139,8 +134,6 @@ pub mod service {
 
 }
 
-
-
 impl Delimited for Class {
     fn type_delimiters() -> (&'static str, &'static str) {
         ("<",">")
@@ -148,13 +141,6 @@ impl Delimited for Class {
 }
 
 impl private::Generic for Class {
-    type Abstract = Class;
-    type Discriminant =ClassDiscriminant;
-
-    fn discriminant(&self) -> AbstractDiscriminant {
-        AbstractDiscriminant::Class
-    }
-
 
     fn parse<I>(input: I) -> Res<I, Self>
     where

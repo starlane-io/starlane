@@ -40,7 +40,7 @@ pub fn type_kind<I>(input: I) -> Res<I, Abstract>
 where
     I: Span,
 {
-    alt((into(schema), into(class)))(input)
+    alt((into(data), into(class)))(input)
     //alt((map(schema_kind,TypeKind::from),map(class_kind,TypeKind::from) ))
 }
 
@@ -55,7 +55,7 @@ pub fn class<I: Span>(input: I) -> Res<I, Class> {
     from_camel(input)
 }
 
-pub fn schema<I: Span>(input: I) -> Res<I, Data> {
+pub fn data<I: Span>(input: I) -> Res<I, Data> {
     from_camel(input)
 }
 
@@ -70,7 +70,7 @@ pub mod delim {
     use nom_supreme::tag::complete::tag;
     use starlane_space::types::private::Delimited;
     use crate::types::class::{Class, ClassDiscriminant};
-    use crate::types::parse::{class, schema};
+    use crate::types::parse::{class, data};
     use crate::types::Data;
 
     pub fn delim<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
@@ -119,7 +119,7 @@ pub mod delim {
     pub fn test_schema() {
         let s = "[Text]";
         let i = new_span(s);
-        let text = result(delim(schema)(i)).unwrap();
+        let text = result(delim(data)(i)).unwrap();
         assert_eq!(text, Data::Text);
     }
 
