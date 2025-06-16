@@ -2,7 +2,7 @@ use crate::parse::util::Span;
 use crate::parse::{CamelCase, Res};
 use crate::types::class::Class;
 use crate::types::private::Generic;
-use crate::types::{scope::parse::domain, Abstract, Exact, Schema};
+use crate::types::{scope::parse::scope, Abstract, Exact, Data};
 use futures::FutureExt;
 use nom::branch::alt;
 use nom::combinator::{into, opt};
@@ -55,7 +55,7 @@ pub fn class<I: Span>(input: I) -> Res<I, Class> {
     from_camel(input)
 }
 
-pub fn schema<I: Span>(input: I) -> Res<I, Schema> {
+pub fn schema<I: Span>(input: I) -> Res<I, Data> {
     from_camel(input)
 }
 
@@ -71,7 +71,7 @@ pub mod delim {
     use starlane_space::types::private::Delimited;
     use crate::types::class::{Class, ClassDiscriminant};
     use crate::types::parse::{class, schema};
-    use crate::types::Schema;
+    use crate::types::Data;
 
     pub fn delim<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
     where
@@ -120,7 +120,7 @@ pub mod delim {
         let s = "[Text]";
         let i = new_span(s);
         let text = result(delim(schema)(i)).unwrap();
-        assert_eq!(text, Schema::Text);
+        assert_eq!(text, Data::Text);
     }
 
     #[test]

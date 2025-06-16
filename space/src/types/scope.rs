@@ -15,22 +15,25 @@ use starlane_space::types::private::Generic;
 use crate::types::GenericExact;
 use crate::types::specific::Specific;
 
-pub static ROOT_SCOPE: Lazy<Scope> = Lazy::new(|| Scope(Some(Keyword::Root), vec![]));
+pub static ROOT_SCOPE: Lazy<Scope> = Lazy::new(|| Scope(Some(ScopeKeyword::Root), vec![]));
 
 
 /// Some Domain Prefixes are reserved builtins like `root` & `starlane`
 #[non_exhaustive]
 #[derive(Clone, Debug, Eq, PartialEq, Hash, strum_macros::Display,EnumString,Serialize,Deserialize)]
 #[strum(serialize_all = "lowercase")]
-pub enum Keyword {
+#[strum(ascii_case_insensitive)]
+pub enum ScopeKeyword {
     /// Represents a `Type` that `Starlane` uses internally
+    #[strum(ascii_case_insensitive)]
     Starlane,
-    /// a special prefix indicating that scoped item is the [Keyword::Root] definition.
+    /// a special prefix indicating that scoped item is the [ScopeKeyword::Root] definition.
     /// The registry must have one and only one `root` definition for every `Type` and
     /// all of starlane's builtin root Type definitions can only be defined by
     /// starlane.  There will be a way of renaming or re-scoping `Type` definitions
     /// with the registry in order to version proof the case of future unforeseen
     /// collisions
+    #[strum(ascii_case_insensitive)]
     Root
 }
 
@@ -67,10 +70,10 @@ impl FromStr for Segment {
 }
 
 #[derive(Clone,Eq,PartialEq,Hash,Debug,Serialize,Deserialize)]
-pub struct Scope(Option<Keyword>, Vec<Segment>);
+pub struct Scope(Option<ScopeKeyword>, Vec<Segment>);
 
 impl Scope {
-    pub fn new(prefix: Option<Keyword>, segments: Vec<Segment> ) -> Self  {
+    pub fn new(prefix: Option<ScopeKeyword>, segments: Vec<Segment> ) -> Self  {
         Self(prefix,segments)
     }
 
@@ -97,7 +100,7 @@ impl FromStr for Scope {
     type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        result(all_consuming(parse::domain)(new_span(s)))
+        result(all_consuming(parse::scope)(new_span(s)))
     }
 }
 
@@ -113,7 +116,7 @@ impl ToString for Scope {
                 /// so we can use [Vec::push] ...
                 segs.reverse();
                 segs.push(prefix.to_string());
-                /// because [Keyword] should be first...
+                /// because [ScopeKeyword] should be first...
                 segs.reverse();
             }
         }
@@ -131,7 +134,7 @@ impl Scope {
         self.prefix().is_some()
     }
 
-    pub fn prefix(&self) -> &Option<Keyword>  {
+    pub fn prefix(&self) -> &Option<ScopeKeyword>  {
         &self.0
     }
 
@@ -147,31 +150,40 @@ impl Scope {
 
 #[cfg(test)]
 pub mod test {
+    use std::str::FromStr;
     use crate::types::scope::parse::parse;
+    use crate::types::scope::ScopeKeyword;
 
     #[test]
     fn text_x( )  {
-        assert!(false);
         let domain = parse("hello").unwrap();
         assert_eq!(domain.to_string().as_str(), "hello");
         assert_eq!(domain.reserved(), false);
         assert_eq!(domain.prefix().is_none(), true);
+        
+        assert_eq!( ScopeKeyword::from_str("root").unwrap(),ScopeKeyword::Root);
 
-        let domain = parse("root").unwrap();
-        assert_eq!(domain.to_string().as_str(), "root");
-        assert_eq!(domain.reserved(), true);
-        assert_eq!(domain.prefix().is_none(), true);
+        let scope = parse("root").unwrap();
+        
+        println!("{:?}", scope);
+        assert!(scope.prefix().is_some());
+        println!();
+
+        assert_eq!( scope.0.clone().unwrap(),ScopeKeyword::Root);
+        assert_eq!(scope.to_string().as_str(), "root");
+        assert_eq!(scope.reserved(), true);
+        assert_eq!(scope.prefix().is_some(), true);
 
 
-        let domain = parse("starlane::child").unwrap();
-        assert_eq!(domain.to_string().as_str(), "starlane::child");
-        assert_eq!(domain.reserved(), true);
-        assert_eq!(domain.prefix().is_some(), true);
+        let scope = parse("starlane::child").unwrap();
+        assert_eq!(scope.to_string().as_str(), "starlane::child");
+        assert_eq!(scope.reserved(), true);
+        assert_eq!(scope.prefix().is_some(), true);
 
-        let domain = parse("root::some::1.3.7").unwrap();
-        assert_eq!(domain.to_string().as_str(), "root::some::1.3.7");
-        assert_eq!(domain.reserved(), true);
-        assert_eq!(domain.prefix().is_some(), true);
+        let scope = parse("root::some::1.3.7").unwrap();
+        assert_eq!(scope.to_string().as_str(), "root::some::1.3.7");
+        assert_eq!(scope.reserved(), true);
+        assert_eq!(scope.prefix().is_some(), true);
 
 
        // let domain = DomainScope(Some(Prefix::Starlane),vec!["one","two","truee"].into());
@@ -189,7 +201,7 @@ pub mod parse {
     use crate::err;
     use crate::parse::{skewer_case, version, NomErr, Res};
     use crate::parse::util::{new_span, result, Span};
-    use crate::types::scope::{Keyword, Scope, Segment};
+    use crate::types::scope::{ScopeKeyword, Scope, Segment};
     use nom::Parser;
     use nom::branch::alt;
     use nom_supreme::ParserExt;
@@ -197,18 +209,18 @@ pub mod parse {
 
     pub(crate) fn parse(s: impl AsRef<str> ) -> Result<Scope,err::ParseErrs> {
         let span = new_span(s.as_ref());
-        result(domain(span))
+        result(scope(span))
     }
     /// will return an empty [Scope]  -> `DomainScope(None,Vec:default())` if nothing is found
-    pub fn domain<I: Span>(input: I) -> Res<I, Scope> {
-        tuple((opt(prefix), separated_list0(tag("::"), postfix_segment)))(input).map(|(input,(prefix,segments))|{
+    pub fn scope<I: Span>(input: I) -> Res<I, Scope> {
+        tuple((opt(terminated(prefix,opt(tag("::")))), separated_list0(tag("::"), postfix_segment)))(input).map(|(input,(prefix,segments))|{
             (input, Scope(prefix, segments))
         })
     }
 
-    fn prefix <I: Span>(input: I) -> Res<I, Keyword> {
-        let (next, skewer) = terminated(skewer_case,tag("::"))(input.clone())?;
-        match Keyword::from_str(skewer.as_str()) {
+    fn prefix <I: Span>(input: I) -> Res<I, ScopeKeyword> {
+        let (next, skewer) = skewer_case(input.clone())?;
+        match ScopeKeyword::from_str(skewer.as_str()) {
             Ok(prefix) => Ok((next,prefix)),
             Err(_) => Err(nom::Err::Error(NomErr::from_tag(input,"prefix")))
         }

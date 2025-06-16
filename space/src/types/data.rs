@@ -1,7 +1,6 @@
 use crate::types::{private, AbstractDiscriminant, SrcDef, Abstract, Exact, ExactGen};
 use core::str::FromStr;
 use derive_name::Name;
-use rustls::client::verify_server_cert_signed_by_trust_anchor;
 use serde_derive::{Deserialize, Serialize};
 use strum::ParseError;
 use strum_macros::EnumDiscriminants;
@@ -16,7 +15,7 @@ use crate::types::private::{Delimited, Generic};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::EnumString, strum_macros::Display, Serialize,Deserialize,Name)]
 #[strum_discriminants(vis(pub))]
-#[strum_discriminants(name(SchemaDiscriminant))]
+#[strum_discriminants(name(DataDisc))]
 #[strum_discriminants(derive(
     Hash,
     strum_macros::EnumString,
@@ -24,15 +23,16 @@ use crate::types::private::{Delimited, Generic};
     strum_macros::IntoStaticStr
 ))]
 #[non_exhaustive]
-pub enum Schema {
+pub enum Data {
     Bytes,
     Text,
-    /// a [Schema::BindConfig] definition for a [Class]
+    /// a [Data::BindConfig] definition for a [Class]
     BindConfig,
     #[strum(disabled)]
     #[strum(to_string = "{0}")]
     _Ext(CamelCase),
 }
+
 
 /*
 impl Into<TypeKind> for SchemaKind {
@@ -42,16 +42,16 @@ impl Into<TypeKind> for SchemaKind {
 }
 
  */
-impl Delimited for Schema {
+impl Delimited for Data {
     fn type_delimiters() -> (&'static str, &'static str) {
         ("[","]")
     }
 }
 
 
-impl Generic for Schema {
-    type Abstract = Schema;
-    type Discriminant = SchemaDiscriminant;
+impl Generic for Data {
+    type Abstract = Data;
+    type Discriminant = DataDisc;
 
     fn discriminant(&self) -> super::AbstractDiscriminant {
         self.clone().into()
@@ -76,15 +76,15 @@ impl Into<TypeKind>  for SchemaKind {
  */
 
 
-impl From<CamelCase> for Schema {
+impl From<CamelCase> for Data {
     fn from(camel: CamelCase) -> Self {
         ///
-        match SchemaDiscriminant::from_str(camel.as_str()) {
+        match DataDisc::from_str(camel.as_str()) {
             /// this Ok match is actually an Error
-            Ok(SchemaDiscriminant::_Ext) => panic!("SchemaDiscriminant: not CamelCase '{}'",camel),
+            Ok(DataDisc::_Ext) => panic!("DataDiscriminant: not CamelCase '{}'",camel),
             Ok(discriminant) => Self::try_from(discriminant.to_string().as_str()).unwrap(),
             /// if no match then it is an extension: [Class::_Ext]
-            Err(_) => Schema::_Ext(camel),
+            Err(_) => Data::_Ext(camel),
         }
     }
 }
@@ -106,19 +106,19 @@ impl Into<TypeKind> for SchemaKind {
 
 
 
-impl Into<CamelCase> for Schema {
+impl Into<CamelCase> for Data {
     fn into(self) -> CamelCase {
         CamelCase::from_str(self.to_string().as_str()).unwrap()
     }
 }
 
-impl Into<AbstractDiscriminant> for Schema {
+impl Into<AbstractDiscriminant> for Data {
     fn into(self) -> AbstractDiscriminant {
-        AbstractDiscriminant::Schema
+        AbstractDiscriminant::Data
     }
 }
 
-pub type BindConfigSrc = PointKindDefSrc<Schema>;
+pub type BindConfigSrc = PointKindDefSrc<Data>;
 
 
 /*
@@ -144,4 +144,4 @@ mod parse {
 
  */
 #[derive(Clone, Serialize, Deserialize)]
-pub struct SchemaDef;
+pub struct DataDef;

@@ -14,8 +14,6 @@ use crate::parse::util::Span;
 use crate::point::Point;
 use crate::types::class::service::Service;
 use crate::types::private::Delimited;
-use crate::types::schema::SchemaDiscriminant;
-use crate::types::specific::Specific;
 
 #[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
 #[strum_discriminants(vis(pub))]

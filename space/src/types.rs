@@ -5,7 +5,7 @@ use serde_derive::{Deserialize, Serialize};
 use strum_macros::EnumDiscriminants;
 
 pub mod class;
-pub mod schema;
+pub mod data;
 
 pub mod registry;
 pub mod specific;
@@ -13,7 +13,6 @@ pub mod err;
 
 pub mod scope;
 pub mod selector;
-pub mod def;
 pub mod id;
 pub mod tag;
 pub mod parse;
@@ -29,8 +28,8 @@ pub mod test;
 #[strum_discriminants(name(AbstractDiscriminant))]
 #[strum_discriminants(derive( Hash, strum_macros::EnumString, strum_macros::ToString, strum_macros::IntoStaticStr ))]
 pub enum Abstract {
-    Schema(Schema),
     Class(Class),
+    Data(Data),
 }
 
 
@@ -49,7 +48,7 @@ impl <A> From<GenericExact<A>> for Exact where A: Generic {
 pub type Exact = ExactGen<Scope,Abstract,Specific>;
 
 pub type ExactClass = GenericExact<Class>;
-pub type ExactSchema = GenericExact<Schema>;
+pub type ExactSchema = GenericExact<Data>;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub(crate) struct ExactGen<Scope,Abstract,Specific> where Scope: Default
@@ -69,14 +68,14 @@ impl <Scope,Abstract,Specific> ExactGen<Scope,Abstract,Specific> {
  */
 
 impl From<Class> for Abstract {
-    fn from(kind: Class) -> Self {
-        Self::Class(kind)
+    fn from(class: Class) -> Self {
+        Self::Class(class)
     }
 }
 
-impl From<Schema> for Abstract {
-    fn from(kind: Schema) -> Self {
-        Self::Schema(kind)
+impl From<Data> for Abstract {
+    fn from(data: Data) -> Self {
+        Self::Data(data)
     }
 }
 
@@ -124,7 +123,7 @@ struct SrcDef<Point,Kind> {
 pub type PointKindDefSrc<Kind> = SrcDef<Point,Kind>;
 
 
-pub type DataPoint = PointTypeDef<Point, Schema>;
+pub type DataPoint = PointTypeDef<Point, Data>;
 
 
 /// meaning where does this Type definition come from
@@ -166,7 +165,7 @@ use crate::err::ParseErrs;
 use crate::parse::{CamelCase, Res, SkewerCase};
 use crate::point::Point;
 use crate::types::private::{Generic, Super};
-pub use schema::Schema;
+pub use data::Data;
 use specific::Specific;
 use starlane_space::types::private::Variant;
 use crate::parse::util::Span;
@@ -175,7 +174,7 @@ use crate::types::scope::Scope;
 
 
 pub(crate) mod private {
-    use super::{err, Abstract, GenericExact, Exact, ExactGen, Schema};
+    use super::{err, Abstract, GenericExact, Exact, ExactGen, Data};
     use crate::err::ParseErrs;
     use super::specific::Specific;
     use crate::parse::util::Span;
@@ -222,7 +221,7 @@ pub(crate) mod private {
 
     /// [Variant] implies inheritance from a
     pub(crate) trait Variant {
-        /// the base [Abstract] variant [Class] or [Schema]
+        /// the base [Abstract] variant [Class] or [Data]
         type Root: Generic+?Sized;
 
         /// return the parent which may be another [Variant] or
@@ -418,11 +417,11 @@ pub(crate) mod private {
     pub(crate) struct Layer {
         specific: Specific,
         classes: HashMap<Class,ClassPointRef>,
-        schema: HashMap<Schema,SchemaPointRef>
+        schema: HashMap<Data,SchemaPointRef>
     }
 
     pub type ClassPointRef = Ref<Point,Class>;
-    pub type SchemaPointRef = Ref<Point,Schema>;
+    pub type SchemaPointRef = Ref<Point, Data>;
     pub type GenericPointRef<G:Generic> = Ref<Point,G>;
     pub type ExactPointRef = Ref<Point,Exact>;
 

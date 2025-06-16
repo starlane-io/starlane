@@ -9,8 +9,8 @@ use crate::parse::{Domain, SkewerCase};
 use crate::selector::VersionReq;
 use crate::types::class::{Class, ClassDef};
 use crate::types::scope::Scope;
-use crate::types::{Schema, TagWrap};
-use crate::types::schema::SchemaDef;
+use crate::types::{Data, TagWrap};
+use crate::types::data::DataDef;
 use crate::types::tag::VersionTag;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -40,7 +40,7 @@ pub struct TypeDefs {
 
 pub type Defs<A,D>  = HashMap<A,D>;
 pub type ClassDefs = Defs<Class,ClassDef>;
-pub type SchemaDefs = Defs<Schema,SchemaDef>;
+pub type SchemaDefs = Defs<Data, DataDef>;
 
 
 pub type Specific = SpecificGen<Contributor,Package,Version>;
