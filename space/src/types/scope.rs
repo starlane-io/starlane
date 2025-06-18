@@ -11,8 +11,8 @@ use crate::parse::SkewerCase;
 use crate::parse::util::{new_span, result};
 
 use once_cell::sync::Lazy;
-use starlane_space::types::private::Generic;
-use crate::types::GenericExact;
+use starlane_space::types::private::Parsable;
+use crate::types::FullAbstract;
 use crate::types::specific::Specific;
 
 pub static ROOT_SCOPE: Lazy<Scope> = Lazy::new(|| Scope(Some(ScopeKeyword::Root), vec![]));

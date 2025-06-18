@@ -1,6 +1,8 @@
-use crate::types::{private, SrcDef, Abstract, Exact, ExactGen, AbstractDisc};
+use crate::types::{private, SrcDef, Abstract, Full, FullGeneric, AbstractDisc};
 use core::str::FromStr;
 use derive_name::Name;
+use nom::bytes::complete::tag;
+use nom::sequence::delimited;
 use serde_derive::{Deserialize, Serialize};
 use strum::ParseError;
 use strum_macros::EnumDiscriminants;
@@ -11,7 +13,8 @@ use starlane_space::types::PointKindDefSrc;
 use crate::parse::{camel_case, CamelCase, Res};
 use crate::parse::util::Span;
 use crate::types::class::{Class, ClassDiscriminant};
-use crate::types::private::{Delimited, Generic};
+use crate::types::parse::delim::delim;
+use crate::types::private::{Delimited, Parsable};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::EnumString, strum_macros::Display, Serialize,Deserialize,Name)]
 #[strum_discriminants(vis(pub))]
@@ -42,22 +45,25 @@ impl Into<TypeKind> for SchemaKind {
 }
 
  */
+
 impl Delimited for Data {
-    fn type_delimiters() -> (&'static str, &'static str) {
+    fn delimiters() -> (&'static str, &'static str) {
         ("[","]")
     }
 }
 
+impl private::Parsable for Data {
 
-impl Generic for Data {
-
-    fn parse<I>(input: I) -> Res<I, Self>
+    fn parser<I>(input: I) -> Res<I, Self>
     where
         I: Span
     {
-        data(input)
+        from_camel(input)
     }
 
+    fn outer_parser<I>(input: I) -> Res<I, Self> where I: Span {
+        delim(Self::parser)(input)
+    }
 }
 
 /*

@@ -28,7 +28,6 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 /// which the route selector matches.
 /// To implement:
 /// ```
-///
 /// use #crt::err::SpaceErr;
 /// use #crt::hyper::HyperSubstance;
 /// use #crt::log::PointLogger;
@@ -43,22 +42,23 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 /// }
 ///
 /// #[handler]
-// /// impl MyHandler {
-// ///     /// the route attribute captures an ExtMethod implementing a custom `MyNameIs`
-// ///     /// notice that the InCtx will accept any valid substance::Substance
-// ///     #[route("Ext<MyNameIs>")]
-// ///     pub async fn hello(&self, ctx: InCtx<'_, Text>) -> Result<String, SpaceErr> {
-// ///         /// also we can return any Substance in our Reflected wave
-// ///         Ok(format!("Hello, {}", ctx.input.to_string()))
-// ///     }
-// ///
-// ///     /// if the function returns nothing then an Empty Ok Reflected will be returned unless
-// ///     /// the wave type is `Wave<Signal>`
-// ///     #[route("Ext<Bye>")]
-// ///     pub async fn bye(&self, ctx: InCtx<'_,()>) {
-// ///        self.logger.info("funny that! He left without saying a word!");
+/// impl MyHandler {
+/// /// the route attribute captures an ExtMethod implementing a custom `MyNameIs`
+/// /// notice that the InCtx will accept any valid substance::Substance
+///     #[route("Ext<MyNameIs>")]
+///      pub async fn hello(&self, ctx: InCtx<'_, Text>) -> Result<String, SpaceErr> {
+///          /// also we can return any Substance in our Reflected wave
+///          Ok(format!("Hello, {}", ctx.input.to_string()))
+///      }
+/// 
+///      /// if the function returns nothing then an Empty Ok Reflected will be returned unless
+///      /// the wave type is `Wave<Signal>`
+///      #[route("Ext<Bye>")]
+///      pub async fn bye(&self, ctx: InCtx<'_,()>) {
+///         self.logger.info("funny that! He left without saying a word!");
 ///     }
 /// }
+/// ```
 #[proc_macro_attribute]
 pub fn handler(attr: TokenStream, item: TokenStream) -> TokenStream {
     _handler(attr, item, true)

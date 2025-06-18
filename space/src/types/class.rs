@@ -1,7 +1,7 @@
 use crate::parse::util::Span;
 use crate::parse::{CamelCase, Res};
 use crate::types::class::service::Service;
-use crate::types::private::Delimited;
+use crate::types::private::{Delimited, Parsable};
 use crate::types::private;
 use core::str::FromStr;
 use derive_name::Name;
@@ -9,7 +9,10 @@ use nom::Parser;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::parse::from_camel;
 use std::borrow::Borrow;
+use nom::bytes::complete::tag;
+use nom::sequence::delimited;
 use strum_macros::EnumDiscriminants;
+use crate::types::parse::delim::delim;
 
 #[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
 #[strum_discriminants(vis(pub))]
@@ -135,18 +138,22 @@ pub mod service {
 }
 
 impl Delimited for Class {
-    fn type_delimiters() -> (&'static str, &'static str) {
+    fn delimiters() -> (&'static str, &'static str) {
         ("<",">")
     }
 }
 
-impl private::Generic for Class {
+impl private::Parsable for Class {
 
-    fn parse<I>(input: I) -> Res<I, Self>
+    fn parser<I>(input: I) -> Res<I, Self>
     where
         I: Span
     {
         from_camel(input)
+    }
+
+    fn outer_parser<I>(input: I) -> Res<I, Self> where I: Span {
+        delim(Self::parser)(input)
     }
 }
 

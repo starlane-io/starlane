@@ -1,8 +1,8 @@
 use crate::parse::util::Span;
 use crate::parse::{CamelCase, Res};
 use crate::types::class::Class;
-use crate::types::private::Generic;
-use crate::types::{scope::parse::scope, Abstract, Exact, Data};
+use crate::types::private::Parsable;
+use crate::types::{scope::parse::scope, Abstract, Full, Data};
 use futures::FutureExt;
 use nom::branch::alt;
 use nom::combinator::{into, opt};
@@ -10,8 +10,8 @@ use nom::Parser;
 use nom_supreme::ParserExt;
 use starlane_space::parse::from_camel;
 use std::str::FromStr;
-
-
+use nom::sequence::delimited;
+use nom_supreme::tag::complete::tag;
 
 pub mod case {
 
@@ -29,9 +29,9 @@ where
     move |input| opt(f)(input).map(|(next, opt)| (next, opt.unwrap_or_default()))
 }
 
-fn kind<K: Generic, I: Span>(input: I) -> Res<I, K>
+fn kind<K: Parsable, I: Span>(input: I) -> Res<I, K>
 where
-    K: Generic + From<CamelCase>,
+    K: Parsable + From<CamelCase>,
 {
     from_camel(input)
 }
@@ -51,6 +51,15 @@ fn into<I,O>((input,kind):(I,impl Into<O>)) -> (I,O) {
 
  */
 
+
+pub fn parse_abstract<I: Span>(input: I) -> Res<I, Abstract> {
+    alt((delimited(tag("<"),into(class),tag(">")),delimited(tag("["),into(data),tag("]"))))(input).map(|(input, abs):(I, Abstract)| {
+        (input, abs)
+    })
+}
+
+
+
 pub fn class<I: Span>(input: I) -> Res<I, Class> {
     from_camel(input)
 }
@@ -65,7 +74,7 @@ pub mod delim {
     use std::str::FromStr;
     use crate::parse::util::{new_span, result, Span};
     use crate::parse::{from_camel, CamelCase, Res};
-    use crate::types::private::Generic;
+    use crate::types::private::Parsable;
     use nom::sequence::delimited;
     use nom_supreme::tag::complete::tag;
     use starlane_space::types::private::Delimited;
@@ -85,11 +94,10 @@ pub mod delim {
             (tag(open), tag(close))
         }
 
-        let (open, close) = tags(O::type_delimiters());
+        let (open, close) = tags(O::delimiters());
         delimited(open, f, close)
     }
-
-
+    
     #[test]
     pub fn test_from_camel() {
         #[derive(Eq, PartialEq, Debug)]
