@@ -1,10 +1,11 @@
 use derive_name::Name;
-use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::{into, opt};
-use nom::sequence::{delimited, terminated, tuple, Tuple};
+use nom::sequence::{delimited, tuple, Tuple};
 use std::fmt::Display;
 use std::str::FromStr;
+use nom::branch::alt;
+use nom::combinator::{into, not, value};
+use nom::multi::many1;
 use strum_macros::EnumDiscriminants;
 
 pub mod class;
@@ -39,20 +40,24 @@ pub enum Abstract {
     Data(Data),
 }
 
-impl Parsable for Abstract {
-    fn parser<I>(input: I) -> Res<I, Self>
-    where
-        I: Span,
-    {
-        todo!()
+
+impl From<Class> for Abstract {
+    fn from(value: Class) -> Self {
+        Abstract::Class(value)
     }
 }
+
+impl From<Data> for Abstract {
+    fn from(value: Data) -> Self {
+        Abstract::Data(value)
+    }
+}
+
 
 pub type AsType = dyn Into<Full>;
 pub type AsTypeKind = dyn Into<Abstract>;
 
 pub type FullAbstract<Abstract: Parsable> = FullGeneric<Scope, Abstract, Specific>;
-
 
 pub type Full = FullGeneric<Scope, Abstract, Specific>;
 pub type FullSelector = FullGeneric<Pattern<Scope>, Pattern<Abstract>, SpecificSelector>;
@@ -67,13 +72,8 @@ where
     where
         I: Span,
     {
-        tuple((
-            Scope::parser,
-            Abstract::outer_parser,
-            tag("@"),
-            Specific::parser,
-        ))(input)
-        .map(|(next, (scope, abs, _, specific))| (next, Self::new(scope, abs, specific)))
+        tuple((Scope::parser, Abstract::parser, tag("@"), Specific::parser))(input)
+            .map(|(next, (scope, abs, _, specific))| (next, Self::new(scope, abs, specific)))
     }
 }
 
@@ -93,17 +93,6 @@ impl <Scope,Abstract,Specific> ExactGen<Scope,Abstract,Specific> {
 
  */
 
-impl From<Class> for Abstract {
-    fn from(class: Class) -> Self {
-        Self::Class(class)
-    }
-}
-
-impl From<Data> for Abstract {
-    fn from(data: Data) -> Self {
-        Self::Data(data)
-    }
-}
 
 impl Abstract {
     pub fn convention(&self) -> Convention {
@@ -171,43 +160,37 @@ pub enum TagWrap<S, T> {
 
 use crate::err::ParseErrs;
 use crate::parse::util::Span;
-use crate::parse::{camel_case, skewer_case, CamelCase, Res, SkewerCase};
+use crate::parse::{delim_kind_lex, lex_block, unwrap_block, CamelCase, Res, SkewerCase};
 use crate::point::Point;
 use crate::selector::Pattern;
-use crate::types::class::Class;
-use crate::types::parse::{class, data, parse_abstract};
-use crate::types::private::{Delimited, Parsable, Super};
+use crate::types::class::{Class, ClassDiscriminant};
+use crate::types::private::{AbstractParsable, Delimited, Parsable};
 use crate::types::scope::Scope;
 use crate::types::specific::SpecificSelector;
 pub use data::Data;
 use specific::Specific;
 use starlane_space::types::private::Variant;
-use starlane_space::types::scope::parse::scope;
-use starlane_space::types::specific::parse::specific;
+use crate::parse::model::{BlockKind, NestedBlockKind};
+use crate::types::parse::delim::delim;
 
 pub(crate) mod private {
     use super::specific::Specific;
-    use super::{err, Abstract, Data, Full, FullAbstract, FullGeneric};
-    use crate::err::ParseErrs;
+    use super::{err, Abstract, AbstractDisc, Data, Full, FullGeneric};
     use crate::parse::util::Span;
     use crate::parse::Res;
     use crate::point::Point;
-    use crate::types;
     use crate::types::class::Class;
-    use crate::types::parse::delim::delim;
-    use crate::types::scope::Scope;
-    use derive_name::Name;
     use indexmap::IndexMap;
     use itertools::Itertools;
-    use nom::bytes::complete::tag;
-    use nom::sequence::{delimited, preceded};
     use nom::Parser;
     use std::collections::HashMap;
-    use std::fmt::{Display, Formatter};
+    use std::fmt::Display;
     use std::hash::Hash;
     use std::ops::{Deref, DerefMut};
     use std::str::FromStr;
-    use std::sync::Arc;
+    use nom::bytes::complete::tag;
+    use nom::combinator::into;
+    use nom::sequence::delimited;
     use strum_macros::EnumDiscriminants;
 
     /// anything that can be parsed
@@ -218,25 +201,28 @@ pub(crate) mod private {
         fn parser<I>(input: I) -> Res<I, Self>
         where
             I: Span;
-
-        /// use if for instance can be decorated with delimiters or preceders:
-        /// ```
-        /// impl Parsable {
-        /// fn outer_parser<I>() -> impl FnMut(I) -> Res<I, Self> where I: Span {
-        ///  delimited(tag("<"),Self::parser,(,tag(">"))(input)
-        /// }
-        /// ```
-        /// 
-        fn outer_parser<I>(input: I) -> Res<I, Self> where I: Span {
-            Self::parser(input)
-        }
     }
+    
+    
+    pub(crate) trait AbstractParsable: Clone
+    where
+        Self: Sized,
+    {
+        fn abstract_parser<I,F,O>(disc: AbstractDisc) -> impl FnMut(I) -> Res<I, O>
+        where F: FnMut(I) -> Res<I,O>+Copy, I: Span;
+    }
+
 
     pub trait Delimited: Parsable + Sized {
         fn delimiters() -> (&'static str, &'static str);
+        
+        fn delimited_parser<I,O>(f: impl FnMut(I) -> Res<I,O>) -> impl FnMut(I) -> Res<I, O>
+        where I: Span {
+            delimited( tag(Self::delimiters().0),f,tag(Self::delimiters().1))
+        }
     }
 
-    /// [Variant] implies inheritance from a
+    /// [Variant] implies inheritance from a parent construct
     pub(crate) trait Variant {
         /// the base [Abstract] variant [Class] or [Data]
         type Root: Parsable + ?Sized;
@@ -267,7 +253,7 @@ pub(crate) mod private {
 
     #[derive(EnumDiscriminants, strum_macros::Display)]
     #[strum_discriminants(vis(pub))]
-    #[strum_discriminants(name(SuperDiscriminant))]
+    #[strum_discriminants(name(SuperDisc))]
     #[strum_discriminants(derive(
         Hash,
         strum_macros::EnumString,
@@ -286,7 +272,7 @@ pub(crate) mod private {
 
     #[derive(EnumDiscriminants, strum_macros::Display)]
     #[strum_discriminants(vis(pub))]
-    #[strum_discriminants(name(GroupDiscriminant))]
+    #[strum_discriminants(name(GroupDisc))]
     #[strum_discriminants(derive(
         Hash,
         strum_macros::EnumString,

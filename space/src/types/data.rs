@@ -37,6 +37,7 @@ pub enum Data {
 }
 
 
+
 /*
 impl Into<TypeKind> for SchemaKind {
     fn into(self) -> TypeKind {
@@ -61,9 +62,6 @@ impl private::Parsable for Data {
         from_camel(input)
     }
 
-    fn outer_parser<I>(input: I) -> Res<I, Self> where I: Span {
-        delim(Self::parser)(input)
-    }
 }
 
 /*

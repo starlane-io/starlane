@@ -1,17 +1,18 @@
+use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
-use crate::parse::{CamelCase, Res};
+use crate::parse::{lex_block, CamelCase, Res};
 use crate::types::class::Class;
-use crate::types::private::Parsable;
-use crate::types::{scope::parse::scope, Abstract, Full, Data};
+use crate::types::private::{Delimited, Parsable};
+use crate::types::{class, Abstract, AbstractDisc, Data};
 use futures::FutureExt;
 use nom::branch::alt;
-use nom::combinator::{into, opt};
+use nom::combinator::{into, opt, value};
+use nom::sequence::delimited;
 use nom::Parser;
+use nom_supreme::tag::complete::tag;
 use nom_supreme::ParserExt;
 use starlane_space::parse::from_camel;
 use std::str::FromStr;
-use nom::sequence::delimited;
-use nom_supreme::tag::complete::tag;
 
 pub mod case {
 
@@ -50,14 +51,17 @@ fn into<I,O>((input,kind):(I,impl Into<O>)) -> (I,O) {
 }
 
  */
-
-
-pub fn parse_abstract<I: Span>(input: I) -> Res<I, Abstract> {
-    alt((delimited(tag("<"),into(class),tag(">")),delimited(tag("["),into(data),tag("]"))))(input).map(|(input, abs):(I, Abstract)| {
-        (input, abs)
-    })
+pub fn identify_abstract_disc<I>(input:I) -> Res<I,AbstractDisc> where I: Span {
+  alt((value( AbstractDisc::Class, lex_block( BlockKind::Nested(NestedBlockKind::Angle))),value( AbstractDisc::Data, lex_block( BlockKind::Nested(NestedBlockKind::Square)))))(input)
 }
 
+pub fn unwrap_abstract<I>(input: I) -> Res<I, Abstract> where I: Span {
+    let (next,r#abstract) = identify_abstract_disc(input.clone())?;
+    match r#abstract {
+        AbstractDisc::Class => into(Class::delimited_parser(Class::parser))(input),
+        AbstractDisc::Data => into(Data::delimited_parser(Data::parser))(input)
+    }
+}
 
 
 pub fn class<I: Span>(input: I) -> Res<I, Class> {
@@ -69,18 +73,16 @@ pub fn data<I: Span>(input: I) -> Res<I, Data> {
 }
 
 
-
 pub mod delim {
-    use std::str::FromStr;
     use crate::parse::util::{new_span, result, Span};
     use crate::parse::{from_camel, CamelCase, Res};
-    use crate::types::private::Parsable;
+    use crate::types::class::Class;
+    use crate::types::parse::{class, data};
+    use crate::types::Data;
     use nom::sequence::delimited;
     use nom_supreme::tag::complete::tag;
     use starlane_space::types::private::Delimited;
-    use crate::types::class::{Class, ClassDiscriminant};
-    use crate::types::parse::{class, data};
-    use crate::types::Data;
+    use std::str::FromStr;
 
     pub fn delim<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
     where

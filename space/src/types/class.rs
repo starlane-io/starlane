@@ -1,7 +1,7 @@
 use crate::parse::util::Span;
 use crate::parse::{CamelCase, Res};
 use crate::types::class::service::Service;
-use crate::types::private::{Delimited, Parsable};
+use crate::types::private::{AbstractParsable, Delimited, Parsable};
 use crate::types::private;
 use core::str::FromStr;
 use derive_name::Name;
@@ -9,10 +9,7 @@ use nom::Parser;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::parse::from_camel;
 use std::borrow::Borrow;
-use nom::bytes::complete::tag;
-use nom::sequence::delimited;
 use strum_macros::EnumDiscriminants;
-use crate::types::parse::delim::delim;
 
 #[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
 #[strum_discriminants(vis(pub))]
@@ -75,6 +72,8 @@ pub enum Class {
     #[strum(to_string = "{0}")]
     _Ext(CamelCase),
 }
+
+
 
 pub mod service {
     use crate::parse::CamelCase;
@@ -151,20 +150,8 @@ impl private::Parsable for Class {
     {
         from_camel(input)
     }
-
-    fn outer_parser<I>(input: I) -> Res<I, Self> where I: Span {
-        delim(Self::parser)(input)
-    }
 }
 
-/*
-impl Into<Abstract> for Class {
-    fn into(self) -> Abstract {
-        Abstract::Class(self)
-    }
-}
-
- */
 
 impl From<CamelCase> for Class {
     fn from(camel: CamelCase) -> Self {
