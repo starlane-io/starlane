@@ -6,7 +6,7 @@ use nom::error::{ErrorKind, ParseError};
 use nom::multi::many1;
 use nom::sequence::{delimited, tuple, Tuple};
 use nom_supreme::context::ContextError;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
@@ -57,10 +57,25 @@ impl Abstract {
             ))(i)
         }
     }
+
+    pub fn identify<I>(input: I) -> Res<I, AbstractDisc>
+    where
+        I: Span,
+    {
+        alt((
+            value(
+                AbstractDisc::Class,
+                lex_block(BlockKind::Nested(NestedBlockKind::Angle)),
+            ),
+            value(
+                AbstractDisc::Data,
+                lex_block(BlockKind::Nested(NestedBlockKind::Square)),
+            ),
+        ))(input)
+    }
 }
 
 impl AbstractParsable for Abstract {
-
     fn abstract_parser<I>(disc: &AbstractDisc) -> impl FnMut(I) -> Res<I, Self>
     where
         I: Span,
@@ -95,7 +110,13 @@ where
     pub r#abstract: Abstract,
 }
 
-impl<Scope,Abstract,Specific> From<Generic<Scope,Abstract,Specific>> for Cat<Scope,Abstract> where Scope: Parsable+Default, Specific: std::clone::Clone, Specific: std::clone::Clone, Abstract: std::clone::Clone{
+impl<Scope, Abstract, Specific> From<Generic<Scope, Abstract, Specific>> for Cat<Scope, Abstract>
+where
+    Scope: Parsable + Default,
+    Specific: std::clone::Clone,
+    Specific: std::clone::Clone,
+    Abstract: std::clone::Clone,
+{
     fn from(gen: Generic<Scope, Abstract, Specific>) -> Self {
         Self {
             scope: gen.scope,
@@ -147,43 +168,70 @@ pub type Full = Generic<Scope, Abstract, Specific>;
 
 pub type FullSelector = Generic<Pattern<Scope>, Pattern<Abstract>, SpecificSelector>;
 
-
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct GenericLex<Scope,Specific> where Scope: Parsable+Default, Specific: Parsable {
-    generic: Generic<Scope,CamelCase,Option<Specific>>,
+pub struct GenericLex<Scope, Specific>
+where
+    Scope: Parsable + Default,
+    Specific: Parsable,
+{
+    generic: Generic<Scope, CamelCase, Option<Specific>>,
     disc: AbstractDisc,
 }
 
-impl <Specific> Parsable for GenericLex<Scope,Specific> where Specific: Parsable{
+impl<Specific> Display for GenericLex<Scope, Specific>
+where
+    Specific: Parsable,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f,"{}{}",self.generic.scope,self.generic.r#abstract);
+        if let Some(specific) = &self.generic.specific {
+            write!(f,"@{}", specific );
+        }
+        Ok(())
+    }
+}
+
+impl<Specific> Parsable for GenericLex<Scope, Specific>
+where
+    Specific: Parsable,
+{
     fn parser<I>(input: I) -> Res<I, Self>
     where
-        I: Span
+        I: Span,
     {
-        let (_,disc) = identify_abstract_disc(input.clone())?;
-        tuple((Scope::parser, camel_case, opt(preceded(tag("@"),Specific::parser))))(input).map( |(next,(scope,r#abstract,specific))| {
+        let (_, disc) = identify_abstract_disc(input.clone())?;
+        tuple((
+            Scope::parser,
+            camel_case,
+            opt(preceded(tag("@"), Specific::parser)),
+        ))(input)
+        .map(|(next, (scope, r#abstract, specific))| {
             let generic = Generic {
                 scope,
                 r#abstract,
                 specific,
             };
 
-            let lex = Self {
-                generic,
-                disc
-            };
+            let lex = Self { generic, disc };
 
-            (next,lex)
+            (next, lex)
         })
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash,Error)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Error)]
 pub enum CastErr {
     #[error("a `Cat` (category) cannot be turned into a `Generic` that requires a `Specific`")]
-    MissingSpecific
+    MissingSpecific,
 }
 
-impl <Scope,Abstract,Specific> TryInto<Generic<Scope,Abstract,Specific>> for GenericLex<Scope,Specific> where Scope: Parsable+Default, Specific: Parsable, Abstract: From<CamelCase>+Clone{
+impl<Scope, Abstract, Specific> TryInto<Generic<Scope, Abstract, Specific>>
+    for GenericLex<Scope, Specific>
+where
+    Scope: Parsable + Default,
+    Specific: Parsable,
+    Abstract: From<CamelCase> + Clone,
+{
     type Error = CastErr;
 
     fn try_into(self) -> Result<Generic<Scope, Abstract, Specific>, Self::Error> {
@@ -191,7 +239,7 @@ impl <Scope,Abstract,Specific> TryInto<Generic<Scope,Abstract,Specific>> for Gen
             Ok(Generic {
                 scope: self.generic.scope,
                 r#abstract: self.generic.r#abstract.into(),
-                specific
+                specific,
             })
         } else {
             Err(CastErr::MissingSpecific)
@@ -199,17 +247,19 @@ impl <Scope,Abstract,Specific> TryInto<Generic<Scope,Abstract,Specific>> for Gen
     }
 }
 
-
-
-impl <Scope,Abstract,Specific> Into<Cat<Scope,Abstract>> for GenericLex<Scope,Specific> where Scope: Parsable+Default, Abstract: From<CamelCase>+Clone, Specific: Parsable {
+impl<Scope, Abstract, Specific> Into<Cat<Scope, Abstract>> for GenericLex<Scope, Specific>
+where
+    Scope: Parsable + Default,
+    Abstract: From<CamelCase> + Clone,
+    Specific: Parsable,
+{
     fn into(self) -> Cat<Scope, Abstract> {
-        Cat{
+        Cat {
             scope: self.generic.scope,
             r#abstract: self.generic.r#abstract.into(),
         }
     }
 }
-
 
 impl<Scope, Specific> Generic<Scope, Class, Specific>
 where
@@ -231,9 +281,6 @@ where
     }
 }
 
-
-
-
 impl<Scope, Specific> AbstractParsable for Generic<Scope, Abstract, Specific>
 where
     Scope: Parsable + Default,
@@ -243,17 +290,28 @@ where
     where
         I: Span,
     {
-         |i| {
-             delimited(tag(disc.get_delimiters().0), tuple((Scope::parser, Abstract::abstract_parser(disc), tag("@"), Specific::parser)), tag(disc.get_delimiters().1))(i)
-                 .map( |(next,(scope,r#abstract,_,specific))|{
-                     ( next,
+        |i| {
+            delimited(
+                tag(disc.get_delimiters().0),
+                tuple((
+                    Scope::parser,
+                    Abstract::abstract_parser(disc),
+                    tag("@"),
+                    Specific::parser,
+                )),
+                tag(disc.get_delimiters().1),
+            )(i)
+            .map(|(next, (scope, r#abstract, _, specific))| {
+                (
+                    next,
                     Self {
                         scope,
                         r#abstract,
-                        specific
-                    } )
-                 })
-         }
+                        specific,
+                    },
+                )
+            })
+        }
     }
 }
 
@@ -333,7 +391,9 @@ pub enum TagWrap<S, T> {
 use crate::err::ParseErrs;
 use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::{preceded, Span};
-use crate::parse::{camel_case, delim_kind_lex, lex_block, unwrap_block, CamelCase, ErrCtx, NomErr, Res, SkewerCase};
+use crate::parse::{
+    camel_case, delim_kind_lex, lex_block, unwrap_block, CamelCase, ErrCtx, NomErr, Res, SkewerCase,
+};
 use crate::point::Point;
 use crate::selector::Pattern;
 use crate::types::class::{Class, ClassDiscriminant};
@@ -352,6 +412,7 @@ pub(crate) mod private {
     use crate::parse::util::Span;
     use crate::parse::{ErrCtx, NomErr, Res};
     use crate::point::Point;
+    use crate::types::class::Class;
     use indexmap::IndexMap;
     use itertools::Itertools;
     use nom::bytes::complete::tag;
@@ -367,10 +428,9 @@ pub(crate) mod private {
     use std::ops::{Deref, DerefMut};
     use std::str::FromStr;
     use strum_macros::EnumDiscriminants;
-    use crate::types::class::Class;
 
     /// anything that can be parsed
-    pub(crate) trait Parsable: Clone
+    pub(crate) trait Parsable: Display+Clone
     where
         Self: Sized,
     {
@@ -715,11 +775,22 @@ pub(crate) mod private {
 
 #[cfg(test)]
 pub mod test2 {
-    use crate::parse::util::new_span;
+    use crate::parse::util::{new_span, result};
+    use crate::types::class::Class;
     use crate::types::private::Parsable;
     use crate::types::scope::Scope;
     use crate::types::specific::Specific;
-    use crate::types::Full;
+    use crate::types::{Abstract, Full};
+
+    #[test]
+    pub fn test_abstract() {
+        let class = result(Class::parser(new_span("Root"))).unwrap();
+        
+        assert_eq!(class, Class::Root);
+        
+        let abs: Abstract = class.into();
+        assert_eq!(abs, Abstract::Class(Class::Root));
+    }
 
     #[test]
     pub fn test_full() {

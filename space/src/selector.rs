@@ -1,21 +1,23 @@
 use core::fmt::{Debug, Formatter};
 use core::str::FromStr;
+use std::fmt::Display;
+use std::hash::Hash;
 use std::ops::Deref;
-
-use nom::combinator::all_consuming;
+use derive_name::Name;
+use nom::branch::alt;
+use nom::bytes::complete::tag;
+use nom::combinator::{all_consuming, into, value};
 use serde::de::{DeserializeOwned, Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-
+use strum_macros::EnumDiscriminants;
+use thiserror::Error;
 use crate::err::ParseErrs;
 use crate::err::SpaceErr;
 use crate::kind::{BaseKind, Kind, KindParts, Specific, SubKind};
 use crate::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};
-use crate::parse::util::result;
+use crate::parse::util::{result, Span};
 use crate::parse::util::{new_span, Trace};
-use crate::parse::{
-    consume_hierarchy, kind_selector, point_segment_selector, point_selector, specific_selector,
-    CamelCase, Env,
-};
+use crate::parse::{consume_hierarchy, kind_selector, point_segment_selector, point_selector, specific_selector, CamelCase, Env, Res};
 use crate::point::{Point, PointCtx, PointDef, PointSeg, PointVar, RouteSeg};
 use crate::substance::{
     CallWithConfigDef, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
@@ -23,6 +25,7 @@ use crate::substance::{
 };
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
+use crate::types::private::Parsable;
 
 pub type PointSegKindHop = HopDef<PointSegSelector, KindSelector>;
 pub type PointSegKindHopCtx = HopDef<PointSegSelectorCtx, KindSelector>;
@@ -927,24 +930,50 @@ impl ToString for PointSegKindHop {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash,strum_macros::EnumString)]
 pub enum Pattern<P> {
+    #[strum(to_string = "*")]
     Always,
+    #[strum(disabled)]
+    #[strum(to_string = "{0}")]
     Exact(P),
 }
 
-impl<I: ToString> Pattern<I> {
-    pub fn to_string_version(self) -> Pattern<String> {
+impl<P> Display for Pattern<P> where P: Display
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Pattern::Always => Pattern::Always,
-            Pattern::Exact(exact) => Pattern::Exact(exact.to_string()),
+            Pattern::Always => write!(f, "*"),
+            Pattern::Exact(e) => write!(f, "{}", e)
         }
     }
 }
 
+impl <P> Parsable for Pattern<P> where P: Parsable + Into<Pattern<P>>  {
+    fn parser<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        alt((value(Self::Always,tag("*")),into(P::parser)))(input)
+    }
+}
+
+
+/*
+impl<I: ToString> Pattern<I> where I: Parsable{
+pub fn to_string_version(self) -> Pattern<String> {
+    match self {
+        Pattern::Always => Pattern::Always,
+        Pattern::Exact(exact) => Pattern::Exact(exact.to_string()),
+    }
+}
+}
+
+ */
+
 impl<P> Pattern<P>
 where
-    P: Eq + PartialEq,
+P: Parsable+Eq + PartialEq,
 {
     pub fn is_any(&self) -> bool {
         match self {
@@ -971,126 +1000,118 @@ where
             }
         }
     }
-
-    pub fn convert<To>(self) -> Result<Pattern<To>, SpaceErr>
-    where
-        P: TryInto<To, Error = SpaceErr> + Eq + PartialEq,
-    {
-        Ok(match self {
-            Pattern::Always => Pattern::Always,
-            Pattern::Exact(exact) => Pattern::Exact(exact.try_into()?),
-        })
-    }
 }
 
-impl<P> ToString for Pattern<P>
-where
-    P: ToString,
+    /*
+pub fn convert<To>(self) -> Result<Pattern<To>, SpaceErr>
 {
-    fn to_string(&self) -> String {
-        match self {
-            Pattern::Always => "*".to_string(),
-            Pattern::Exact(exact) => exact.to_string(),
-        }
-    }
+    Ok(match self {
+        Pattern::Always => Pattern::Always,
+        Pattern::Exact(exact) => Pattern::Exact(exact.try_into()?),
+    })
 }
+}
+
+     */
+
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EmptyPattern<P> {
-    Any,
-    Pattern(P),
+Any,
+Pattern(P),
 }
 
 impl<P> EmptyPattern<P>
 where
-    P: Eq + PartialEq,
+P: Eq + PartialEq,
 {
-    pub fn matches(&self, t: &P) -> bool {
-        match self {
-            Self::Any => true,
-            Self::Pattern(p) => *p == *t,
-        }
+pub fn matches(&self, t: &P) -> bool {
+    match self {
+        Self::Any => true,
+        Self::Pattern(p) => *p == *t,
     }
-    pub fn matches_opt(&self, other: Option<&P>) -> bool {
-        match self {
-            Self::Any => true,
-            Self::Pattern(exact) => {
-                if let Option::Some(other) = other {
-                    *exact == *other
-                } else {
-                    false
-                }
+}
+pub fn matches_opt(&self, other: Option<&P>) -> bool {
+    match self {
+        Self::Any => true,
+        Self::Pattern(exact) => {
+            if let Option::Some(other) = other {
+                *exact == *other
+            } else {
+                false
             }
         }
     }
+}
 
-    pub fn convert<To>(self) -> Result<EmptyPattern<To>, SpaceErr>
-    where
-        P: TryInto<To, Error = SpaceErr> + Eq + PartialEq,
-    {
-        Ok(match self {
-            EmptyPattern::Any => EmptyPattern::Any,
-            EmptyPattern::Pattern(exact) => EmptyPattern::Pattern(exact.try_into()?),
-        })
-    }
+pub fn convert<To>(self) -> Result<EmptyPattern<To>, SpaceErr>
+where
+    P: TryInto<To, Error = SpaceErr> + Eq + PartialEq,
+{
+    Ok(match self {
+        EmptyPattern::Any => EmptyPattern::Any,
+        EmptyPattern::Pattern(exact) => EmptyPattern::Pattern(exact.try_into()?),
+    })
+}
 }
 
 impl Into<EmptyPattern<String>> for EmptyPattern<&str> {
-    fn into(self) -> EmptyPattern<String> {
-        match self {
-            EmptyPattern::Any => EmptyPattern::Any,
-            EmptyPattern::Pattern(f) => EmptyPattern::Pattern(f.to_string()),
-        }
+fn into(self) -> EmptyPattern<String> {
+    match self {
+        EmptyPattern::Any => EmptyPattern::Any,
+        EmptyPattern::Pattern(f) => EmptyPattern::Pattern(f.to_string()),
     }
+}
 }
 
 impl<P> ToString for EmptyPattern<P>
 where
-    P: ToString,
+P: ToString,
 {
-    fn to_string(&self) -> String {
-        match self {
-            EmptyPattern::Any => "".to_string(),
-            EmptyPattern::Pattern(exact) => exact.to_string(),
-        }
+fn to_string(&self) -> String {
+    match self {
+        EmptyPattern::Any => "".to_string(),
+        EmptyPattern::Pattern(exact) => exact.to_string(),
     }
+}
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum KindBaseSelector {
-    #[strum(to_string = "*")]
-    Always,
-    #[strum(to_string = "!")]
-    Never,
-    #[strum(to_string = "{0}")]
-    Exact(BaseKind),
+#[strum(to_string = "*")]
+Always,
+#[strum(to_string = "!")]
+Never,
+#[strum(to_string = "{0}")]
+Exact(BaseKind),
 }
 
 impl KindBaseSelector {
-    pub fn is_match(&self, other: &BaseKind) -> Result<(), ()> {
-        match self {
-            KindBaseSelector::Always => Ok(()),
-            KindBaseSelector::Never => Err(()),
-            KindBaseSelector::Exact(me) if me == other => Ok(()),
-            _ => Err(()),
-        }
+pub fn is_match(&self, other: &BaseKind) -> Result<(), ()> {
+    match self {
+        KindBaseSelector::Always => Ok(()),
+        KindBaseSelector::Never => Err(()),
+        KindBaseSelector::Exact(me) if me == other => Ok(()),
+        _ => Err(()),
     }
+}
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PortHierarchy {
-    pub topic: Topic,
-    pub layer: Layer,
-    pub point_hierarchy: PointHierarchy,
+pub topic: Topic,
+pub layer: Layer,
+pub point_hierarchy: PointHierarchy,
 }
 
 impl PortHierarchy {
-    pub fn new(point_hierarchy: PointHierarchy, layer: Layer, topic: Topic) -> Self {
-        Self {
-            topic,
-            layer,
-            point_hierarchy,
-        }
+pub fn new(point_hierarchy: PointHierarchy, layer: Layer, topic: Topic) -> Self {
+    Self {
+        topic,
+        layer,
+        point_hierarchy,
     }
+}
 }
 
 pub type PointHierarchy = PointDef<RouteSeg, PointKindSeg>;
@@ -1098,184 +1119,184 @@ pub type PointHierarchy = PointDef<RouteSeg, PointKindSeg>;
 pub type PointHierarchyOpt = PointDef<RouteSeg, PointKindSegOpt>;
 
 impl From<&PointHierarchy> for PointHierarchyOpt {
-    fn from(value: &PointHierarchy) -> Self {
-        Self {
-            route: value.route.clone(),
-            segments: value.segments.iter().map(|s| s.clone().into()).collect(),
-        }
+fn from(value: &PointHierarchy) -> Self {
+    Self {
+        route: value.route.clone(),
+        segments: value.segments.iter().map(|s| s.clone().into()).collect(),
     }
+}
 }
 
 impl From<&Point> for PointHierarchyOpt {
-    fn from(value: &Point) -> Self {
-        Self {
-            route: value.route.clone(),
-            segments: value
-                .segments
-                .iter()
-                .map(|s| PointKindSegOpt {
-                    segment: s.clone(),
-                    kind: None,
-                })
-                .collect(),
-        }
+fn from(value: &Point) -> Self {
+    Self {
+        route: value.route.clone(),
+        segments: value
+            .segments
+            .iter()
+            .map(|s| PointKindSegOpt {
+                segment: s.clone(),
+                kind: None,
+            })
+            .collect(),
     }
+}
 }
 
 impl From<Point> for PointHierarchyOpt {
-    fn from(value: Point) -> Self {
-        Self {
-            route: value.route.clone(),
-            segments: value
-                .segments
-                .into_iter()
-                .map(|segment| PointKindSegOpt {
-                    segment,
-                    kind: None,
-                })
-                .collect(),
-        }
+fn from(value: Point) -> Self {
+    Self {
+        route: value.route.clone(),
+        segments: value
+            .segments
+            .into_iter()
+            .map(|segment| PointKindSegOpt {
+                segment,
+                kind: None,
+            })
+            .collect(),
     }
+}
 }
 
 impl FromStr for PointHierarchy {
-    type Err = ParseErrs;
+type Err = ParseErrs;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        consume_hierarchy(new_span(s))
-    }
+fn from_str(s: &str) -> Result<Self, Self::Err> {
+    consume_hierarchy(new_span(s))
+}
 }
 
 impl PointHierarchy {
-    pub fn new(route: RouteSeg, segments: Vec<PointKindSeg>) -> Self {
-        Self { route, segments }
-    }
+pub fn new(route: RouteSeg, segments: Vec<PointKindSeg>) -> Self {
+    Self { route, segments }
+}
 }
 
 impl PointHierarchy {
-    pub fn push(&self, segment: PointKindSeg) -> PointHierarchy
-    where
-        KindParts: Clone,
-        BaseKind: Clone,
-    {
-        let mut segments = self.segments.clone();
-        segments.push(segment);
-        Self {
-            route: self.route.clone(),
-            segments,
-        }
+pub fn push(&self, segment: PointKindSeg) -> PointHierarchy
+where
+    KindParts: Clone,
+    BaseKind: Clone,
+{
+    let mut segments = self.segments.clone();
+    segments.push(segment);
+    Self {
+        route: self.route.clone(),
+        segments,
     }
+}
 }
 
 impl PointDef<RouteSeg, PointKindSegOpt> {
-    pub fn consume(&self) -> Option<PointHierarchyOpt> {
-        if self.segments.len() <= 1 {
-            return Option::None;
-        }
-        let mut segments = self.segments.clone();
-        segments.remove(0);
-        Option::Some(PointHierarchyOpt {
-            route: self.route.clone(),
-            segments,
-        })
+pub fn consume(&self) -> Option<PointHierarchyOpt> {
+    if self.segments.len() <= 1 {
+        return Option::None;
     }
+    let mut segments = self.segments.clone();
+    segments.remove(0);
+    Option::Some(PointHierarchyOpt {
+        route: self.route.clone(),
+        segments,
+    })
+}
 
-    pub fn is_final(&self) -> bool {
-        self.segments.len() == 1
-    }
+pub fn is_final(&self) -> bool {
+    self.segments.len() == 1
+}
 }
 
 impl PointDef<RouteSeg, PointKindSeg> {
-    pub fn consume(&self) -> Option<PointHierarchy> {
-        if self.segments.len() <= 1 {
-            return Option::None;
-        }
-        let mut segments = self.segments.clone();
-        segments.remove(0);
-        Option::Some(PointHierarchy {
-            route: self.route.clone(),
-            segments,
-        })
+pub fn consume(&self) -> Option<PointHierarchy> {
+    if self.segments.len() <= 1 {
+        return Option::None;
     }
+    let mut segments = self.segments.clone();
+    segments.remove(0);
+    Option::Some(PointHierarchy {
+        route: self.route.clone(),
+        segments,
+    })
+}
 
-    pub fn is_final(&self) -> bool {
-        self.segments.len() == 1
-    }
+pub fn is_final(&self) -> bool {
+    self.segments.len() == 1
+}
 }
 
 impl Into<Point> for PointHierarchy {
-    fn into(self) -> Point {
-        let segments = self
-            .segments
-            .iter()
-            .map(|seg| seg.segment.clone())
-            .collect();
-        Point {
-            route: self.route,
-            segments,
-        }
+fn into(self) -> Point {
+    let segments = self
+        .segments
+        .iter()
+        .map(|seg| seg.segment.clone())
+        .collect();
+    Point {
+        route: self.route,
+        segments,
     }
+}
 }
 
 impl ToString for PointHierarchy {
-    fn to_string(&self) -> String {
-        let mut rtn = String::new();
-        match &self.route {
-            RouteSeg::This => {}
-            route => {
-                rtn.push_str(route.to_string().as_str());
-                rtn.push_str("::");
-            }
+fn to_string(&self) -> String {
+    let mut rtn = String::new();
+    match &self.route {
+        RouteSeg::This => {}
+        route => {
+            rtn.push_str(route.to_string().as_str());
+            rtn.push_str("::");
         }
-
-        let mut post_fileroot = false;
-        for (index, segment) in self.segments.iter().enumerate() {
-            if let PointSeg::FsRootDir = segment.segment {
-                post_fileroot = true;
-            }
-            rtn.push_str(segment.segment.preceding_delim(post_fileroot));
-            rtn.push_str(segment.to_string().as_str());
-        }
-
-        rtn
     }
+
+    let mut post_fileroot = false;
+    for (index, segment) in self.segments.iter().enumerate() {
+        if let PointSeg::FsRootDir = segment.segment {
+            post_fileroot = true;
+        }
+        rtn.push_str(segment.segment.preceding_delim(post_fileroot));
+        rtn.push_str(segment.to_string().as_str());
+    }
+
+    rtn
+}
 }
 
 pub type PointKindSeg = PointKindSegDef<Kind>;
 pub type PointKindSegOpt = PointKindSegDef<Option<Kind>>;
 
 impl Into<PointKindSegOpt> for PointKindSeg {
-    fn into(self) -> PointKindSegOpt {
-        PointKindSegOpt {
-            segment: self.segment,
-            kind: Some(self.kind),
-        }
+fn into(self) -> PointKindSegOpt {
+    PointKindSegOpt {
+        segment: self.segment,
+        kind: Some(self.kind),
     }
+}
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct PointKindSegDef<K> {
-    pub segment: PointSeg,
-    pub kind: K,
+pub segment: PointSeg,
+pub kind: K,
 }
 
 impl ToString for PointKindSeg {
-    fn to_string(&self) -> String {
-        format!("{}<{}>", self.segment.to_string(), self.kind.to_string())
-    }
+fn to_string(&self) -> String {
+    format!("{}<{}>", self.segment.to_string(), self.kind.to_string())
+}
 }
 
 impl ToString for PointKindSegOpt {
-    fn to_string(&self) -> String {
-        format!(
-            "{}<{}>",
-            self.segment.to_string(),
-            match &self.kind {
-                None => "?".to_string(),
-                Some(kind) => kind.to_string(),
-            }
-        )
-    }
+fn to_string(&self) -> String {
+    format!(
+        "{}<{}>",
+        self.segment.to_string(),
+        match &self.kind {
+            None => "?".to_string(),
+            Some(kind) => kind.to_string(),
+        }
+    )
+}
 }
 
 pub type PayloadBlock = PayloadBlockDef<Point>;
@@ -1283,29 +1304,29 @@ pub type PayloadBlockCtx = PayloadBlockDef<PointCtx>;
 pub type PayloadBlockVar = PayloadBlockDef<PointVar>;
 
 impl ToResolved<PayloadBlockCtx> for PayloadBlockVar {
-    fn to_resolved(self, env: &Env) -> Result<PayloadBlockCtx, ParseErrs> {
-        match self {
-            PayloadBlockVar::DirectPattern(block) => Ok(PayloadBlockCtx::DirectPattern(
-                block.modify(move |block| {
-                    let block: SubstancePatternCtx = block.to_resolved(env)?;
-                    Ok(block)
-                })?,
-            )),
-            PayloadBlockVar::ReflectPattern(block) => Ok(PayloadBlockCtx::ReflectPattern(
-                block.modify(move |block| block.to_resolved(env))?,
-            )),
-        }
+fn to_resolved(self, env: &Env) -> Result<PayloadBlockCtx, ParseErrs> {
+    match self {
+        PayloadBlockVar::DirectPattern(block) => Ok(PayloadBlockCtx::DirectPattern(
+            block.modify(move |block| {
+                let block: SubstancePatternCtx = block.to_resolved(env)?;
+                Ok(block)
+            })?,
+        )),
+        PayloadBlockVar::ReflectPattern(block) => Ok(PayloadBlockCtx::ReflectPattern(
+            block.modify(move |block| block.to_resolved(env))?,
+        )),
     }
+}
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UploadBlock {
-    pub name: String,
+pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateBlock {
-    pub payload: Substance,
+pub payload: Substance,
 }
 
 pub type PatternBlock = PatternBlockDef<Point>;
@@ -1314,75 +1335,75 @@ pub type PatternBlockVar = PatternBlockDef<PointVar>;
 pub type PatternBlockDef<Pnt> = ValuePattern<SubstancePatternDef<Pnt>>;
 
 impl ToResolved<PatternBlock> for PatternBlockCtx {
-    fn to_resolved(self, env: &Env) -> Result<PatternBlock, ParseErrs> {
-        match self {
-            PatternBlockCtx::Always => Ok(PatternBlock::Always),
-            PatternBlockCtx::Never => Ok(PatternBlock::Never),
-            PatternBlockCtx::Pattern(pattern) => {
-                Ok(PatternBlock::Pattern(pattern.to_resolved(env)?))
-            }
+fn to_resolved(self, env: &Env) -> Result<PatternBlock, ParseErrs> {
+    match self {
+        PatternBlockCtx::Always => Ok(PatternBlock::Always),
+        PatternBlockCtx::Never => Ok(PatternBlock::Never),
+        PatternBlockCtx::Pattern(pattern) => {
+            Ok(PatternBlock::Pattern(pattern.to_resolved(env)?))
         }
     }
 }
+}
 
 impl ToResolved<PatternBlockCtx> for PatternBlockVar {
-    fn to_resolved(self, env: &Env) -> Result<PatternBlockCtx, ParseErrs> {
-        match self {
-            PatternBlockVar::Always => Ok(PatternBlockCtx::Always),
-            PatternBlockVar::Never => Ok(PatternBlockCtx::Never),
-            PatternBlockVar::Pattern(pattern) => {
-                Ok(PatternBlockCtx::Pattern(pattern.to_resolved(env)?))
-            }
+fn to_resolved(self, env: &Env) -> Result<PatternBlockCtx, ParseErrs> {
+    match self {
+        PatternBlockVar::Always => Ok(PatternBlockCtx::Always),
+        PatternBlockVar::Never => Ok(PatternBlockCtx::Never),
+        PatternBlockVar::Pattern(pattern) => {
+            Ok(PatternBlockCtx::Pattern(pattern.to_resolved(env)?))
         }
     }
+}
 }
 
 #[derive(Debug, Clone)]
 pub enum PayloadBlockDef<Pnt> {
-    DirectPattern(PatternBlockDef<Pnt>),
-    ReflectPattern(PatternBlockDef<Pnt>),
+DirectPattern(PatternBlockDef<Pnt>),
+ReflectPattern(PatternBlockDef<Pnt>),
 }
 
 impl ToResolved<PayloadBlock> for PayloadBlockCtx {
-    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, ParseErrs> {
-        match self {
-            PayloadBlockCtx::DirectPattern(block) => {
-                Ok(PayloadBlock::DirectPattern(block.modify(move |block| {
-                    let block: SubstancePattern = block.to_resolved(env)?;
-                    Ok(block)
-                })?))
-            }
-            PayloadBlockCtx::ReflectPattern(block) => Ok(PayloadBlock::ReflectPattern(
-                block.modify(move |block| block.to_resolved(env))?,
-            )),
+fn to_resolved(self, env: &Env) -> Result<PayloadBlock, ParseErrs> {
+    match self {
+        PayloadBlockCtx::DirectPattern(block) => {
+            Ok(PayloadBlock::DirectPattern(block.modify(move |block| {
+                let block: SubstancePattern = block.to_resolved(env)?;
+                Ok(block)
+            })?))
         }
+        PayloadBlockCtx::ReflectPattern(block) => Ok(PayloadBlock::ReflectPattern(
+            block.modify(move |block| block.to_resolved(env))?,
+        )),
     }
+}
 }
 
 impl ToResolved<PayloadBlock> for PayloadBlockVar {
-    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, ParseErrs> {
-        let block: PayloadBlockCtx = self.to_resolved(env)?;
-        block.to_resolved(env)
-    }
+fn to_resolved(self, env: &Env) -> Result<PayloadBlock, ParseErrs> {
+    let block: PayloadBlockCtx = self.to_resolved(env)?;
+    block.to_resolved(env)
+}
 }
 
 #[cfg(test)]
 mod test {
-    use crate::kind::BaseKind;
-    use crate::selector::{PointSegKindHop, PointSelector};
-    use crate::util::ValueMatcher;
+use crate::kind::BaseKind;
+use crate::selector::{PointSegKindHop, PointSelector};
+use crate::util::ValueMatcher;
 
-    #[test]
-    pub fn test() {
-        let selector = PointSelector::always();
-        let point = BaseKind::Driver.bind();
-        assert!(selector.is_match(&point).is_ok())
-    }
+#[test]
+pub fn test() {
+    let selector = PointSelector::always();
+    let point = BaseKind::Driver.bind();
+    assert!(selector.is_match(&point).is_ok())
+}
 
-    #[test]
-    pub fn segment() {
-        let selector = PointSegKindHop::always();
-        let point = BaseKind::Driver.bind();
-        assert!(selector.is_match(point.segments.first().unwrap()).is_ok());
-    }
+#[test]
+pub fn segment() {
+    let selector = PointSegKindHop::always();
+    let point = BaseKind::Driver.bind();
+    assert!(selector.is_match(point.segments.first().unwrap()).is_ok());
+}
 }

@@ -1,16 +1,20 @@
 use std::collections::HashMap;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use indexmap::Equivalent;
+use nom::bytes::complete::tag;
+use nom::sequence::{pair, tuple};
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::loc::Version;
 use starlane_space::selector::Pattern;
-use crate::parse::{Domain, SkewerCase};
+use crate::parse::{Domain, Res, SkewerCase};
+use crate::parse::util::Span;
 use crate::selector::VersionReq;
 use crate::types::class::{Class, ClassDef};
 use crate::types::scope::Scope;
 use crate::types::{Data, TagWrap};
 use crate::types::data::DataDef;
+use crate::types::private::Parsable;
 use crate::types::tag::VersionTag;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -58,21 +62,31 @@ pub type Contributor = Domain;
 pub type Package = SkewerCase;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
-pub struct SpecificGen<Contributor,Package,Version> {
+pub struct SpecificGen<Contributor,Package,Version> where Contributor: Parsable, Package: Parsable, Version: Parsable{
     pub contributor: Contributor,
     pub package: Package,
     pub version: Version
 }
 
-impl <Contributor,Package,Version> Display for SpecificGen<Contributor,Package,Version> where Contributor:Display, Package:Display, Version: Display{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<Contributor, Package, Version> Display for SpecificGen<Contributor, Package, Version> where Contributor:Parsable, Package: Parsable, Version: Parsable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}:{}", self.contributor, self.package, self.version)
     }
 }
 
+impl <Contributor,Package,Version> Parsable for SpecificGen<Contributor,Package,Version> where Contributor: Parsable, Package: Parsable, Version: Parsable{
+    fn parser<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        tuple((Contributor::parser,tag(":"),Package::parser,tag(":"),Version::parser))(input).map(|(next,(contributor,_,package,_,version))|{
+            (next,SpecificGen{contributor,package,version})
+        })
+    }
+}
 
 
-impl <Contributor,Package,Version> SpecificGen<Contributor,Package,Version> {
+impl <Contributor,Package,Version> SpecificGen<Contributor,Package,Version> where Contributor: Parsable, Package: Parsable, Version: Parsable{
     pub fn new(contributor: Contributor, package: Package, version: Version) -> Self  {
         Self { contributor, package, version }
     }
@@ -84,6 +98,7 @@ pub type ContributorSelector = Pattern<Contributor>;
 pub type PackageSelector = Pattern<Package>;
 pub type VersionPattern = Pattern<VersionReq>;
 
+/*
 pub(crate) mod parse {
     use nom::sequence::tuple;
     use nom_supreme::tag::complete::tag;
@@ -116,3 +131,5 @@ pub(crate) mod parse {
         specific_gen(pattern(contributor), pattern(package), pattern(version_req), input)
     }
 }
+
+ */

@@ -1,9 +1,9 @@
 use crate::err::{ParseErrs, SpaceErr};
 use crate::kind::BaseKind;
 use crate::log::Trackable;
-use crate::parse::util::result;
+use crate::parse::util::{result, Span};
 use crate::parse::util::{new_span, Trace, Tw};
-use crate::parse::{parse_star_key, Env, ResolverErr, SkewerCase, VarCase};
+use crate::parse::{parse_star_key, skewer_case, version, Env, Res, ResolverErr, SkewerCase, VarCase};
 use crate::particle::traversal::TraversalPlan;
 use crate::point::{Point, PointSeg, PointSegKind, PointSegPairDef, RouteSeg};
 use crate::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
@@ -21,6 +21,7 @@ use starlane_macros::ToBase;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
+use crate::types::private::Parsable;
 
 pub static CENTRAL: Lazy<Point> = Lazy::new(|| StarKey::central().to_point());
 pub static GLOBAL_LOGGER: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::logger").unwrap());
@@ -132,6 +133,15 @@ pub struct Version {
     pub version: semver::Version,
 }
 
+
+impl Parsable for Version{
+    fn parser<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        version(input)
+    }
+}
 impl Display for Version {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.version.to_string())

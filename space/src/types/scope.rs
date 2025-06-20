@@ -1,7 +1,9 @@
 use core::str::FromStr;
+use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use futures::TryFutureExt;
-use nom::combinator::all_consuming;
+use nom::branch::alt;
+use nom::combinator::{all_consuming, into};
 use serde_derive::{Deserialize, Serialize};
 use strum_macros::{EnumDiscriminants, EnumString};
 use validator::ValidateRequired;
@@ -59,6 +61,27 @@ pub enum Segment {
     Segment(SkewerCase),
 }
 
+impl From<Version> for Segment {
+    fn from(version: Version) -> Self {
+        Self::Version(version)
+    }
+}
+
+impl From<SkewerCase> for Segment {
+    fn from(skewer: SkewerCase) -> Self {
+        Self::Segment(skewer)
+    }
+}
+
+impl Parsable for Segment {
+    fn parser<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+      alt((into(SkewerCase::parser),into(Version::parser)))(input)   
+    }
+}
+
 
 impl FromStr for Segment {
     type Err = ParseErrs;
@@ -71,6 +94,8 @@ impl FromStr for Segment {
 
 #[derive(Clone,Eq,PartialEq,Hash,Debug,Serialize,Deserialize)]
 pub struct Scope(Option<ScopeKeyword>, Vec<Segment>);
+
+
 
 impl Parsable for Scope {
     fn parser<I>(input: I) -> Res<I, Self>
@@ -114,9 +139,8 @@ impl FromStr for Scope {
 }
 
 
-impl ToString for Scope {
-    fn to_string(&self) -> String {
-
+impl Display for Scope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut segs = self.post_segments().iter().map(|segment| segment.to_string()).collect::<Vec<_>>();
 
         match self.prefix() {
@@ -129,8 +153,7 @@ impl ToString for Scope {
                 segs.reverse();
             }
         }
-        segs.join("::").to_string()
-
+        write!(f, "{}", segs.join("::").to_string())
     }
 }
 

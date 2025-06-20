@@ -101,6 +101,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
+use crate::types::private::Parsable;
 
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
 pub type StarParser<I: Span, O> = dyn nom_supreme::parser_ext::ParserExt<I, O, NomErr<I>>;
@@ -1598,6 +1599,15 @@ pub struct Domain {
     string: String,
 }
 
+impl Parsable for Domain {
+    fn parser<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        domain(input)
+    }
+}
+
 impl Serialize for Domain {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -1647,6 +1657,15 @@ impl Deref for Domain {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct SkewerCase {
     string: String,
+}
+
+impl Parsable for SkewerCase{
+    fn parser<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        skewer_case(input)
+    }
 }
 
 pub struct SnakeCase {
