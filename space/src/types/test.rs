@@ -1,5 +1,7 @@
 #![cfg(test)]
 
+#[test]
+pub fn test () { }
 
 
 pub mod parse {

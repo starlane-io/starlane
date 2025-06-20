@@ -7,8 +7,8 @@ use strum_macros::{EnumDiscriminants, EnumString};
 use validator::ValidateRequired;
 use crate::err::ParseErrs;
 use crate::loc::Version;
-use crate::parse::SkewerCase;
-use crate::parse::util::{new_span, result};
+use crate::parse::{Res, SkewerCase};
+use crate::parse::util::{new_span, result, Span};
 
 use once_cell::sync::Lazy;
 use starlane_space::types::private::Parsable;
@@ -71,6 +71,15 @@ impl FromStr for Segment {
 
 #[derive(Clone,Eq,PartialEq,Hash,Debug,Serialize,Deserialize)]
 pub struct Scope(Option<ScopeKeyword>, Vec<Segment>);
+
+impl Parsable for Scope {
+    fn parser<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        todo!()
+    }
+}
 
 impl Scope {
     pub fn new(prefix: Option<ScopeKeyword>, segments: Vec<Segment> ) -> Self  {

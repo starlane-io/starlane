@@ -3,7 +3,7 @@ use crate::parse::util::Span;
 use crate::parse::{lex_block, CamelCase, Res};
 use crate::types::class::Class;
 use crate::types::private::{Delimited, Parsable};
-use crate::types::{class, Abstract, AbstractDisc, Data};
+use crate::types::{Abstract, AbstractDisc, Data};
 use futures::FutureExt;
 use nom::branch::alt;
 use nom::combinator::{into, opt, value};

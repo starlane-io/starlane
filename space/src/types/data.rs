@@ -1,4 +1,4 @@
-use crate::types::{private, SrcDef, Abstract, Full, FullGeneric, AbstractDisc};
+use crate::types::{private, SrcDef, Abstract, Full, Generic, AbstractDisc};
 use core::str::FromStr;
 use derive_name::Name;
 use nom::bytes::complete::tag;
@@ -75,11 +75,11 @@ impl Into<TypeKind>  for SchemaKind {
 
 
 impl From<CamelCase> for Data {
-    fn from(camel: CamelCase) -> Self {
+   fn from(camel: CamelCase) -> Self {
         ///
         match DataDisc::from_str(camel.as_str()) {
             /// this Ok match is actually an Error
-            Ok(DataDisc::_Ext) => panic!("DataDiscriminant: not CamelCase '{}'",camel),
+            Ok(DataDisc::_Ext) => panic!("DataDisc : not CamelCase '{}'",camel),
             Ok(discriminant) => Self::try_from(discriminant.to_string().as_str()).unwrap(),
             /// if no match then it is an extension: [Class::_Ext]
             Err(_) => Data::_Ext(camel),

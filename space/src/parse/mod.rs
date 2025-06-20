@@ -211,6 +211,8 @@ pub enum ErrCtx {
     InvalidSubKind(BaseKind, String),
     #[error("variable substitution is not supported in this context")]
     ResolverNotAvailable,
+    #[error("unrecognized type delimiter: {0}")]
+    UnrecognizedTypeDelimeter(&'static str),
     #[error(transparent)]
     Primitive(#[from] PrimitiveErrCtx),
 }
