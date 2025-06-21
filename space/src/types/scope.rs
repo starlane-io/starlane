@@ -15,6 +15,7 @@ use crate::parse::util::{new_span, result, Span};
 use once_cell::sync::Lazy;
 use starlane_space::types::private::Parsable;
 use crate::types::FullAbstract;
+use crate::types::scope::parse::scope;
 use crate::types::specific::Specific;
 
 pub static ROOT_SCOPE: Lazy<Scope> = Lazy::new(|| Scope(Some(ScopeKeyword::Root), vec![]));
@@ -96,18 +97,38 @@ impl FromStr for Segment {
 pub struct Scope(Option<ScopeKeyword>, Vec<Segment>);
 
 
+impl Scope {
+    pub fn from_segments( mut segments: Vec<Segment>) -> Self {
+        let pre = if let Some(Segment::Segment(skewer)) = segments.first() {
+            if let Ok(key) = ScopeKeyword::from_str(skewer) {
+                segments.remove(0);
+                Some(key)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Scope(pre, segments)
+    }
+    
+
+}
+
 
 impl Parsable for Scope {
     fn parser<I>(input: I) -> Res<I, Self>
     where
         I: Span
     {
-        todo!()
+        scope(input)
     }
 }
 
 impl Scope {
-    pub fn new(prefix: Option<ScopeKeyword>, segments: Vec<Segment> ) -> Self  {
+    /// used for testing 
+    pub(crate) fn new(prefix: Option<ScopeKeyword>, segments: Vec<Segment> ) -> Self  {
         Self(prefix,segments)
     }
 
@@ -226,12 +247,12 @@ pub mod test {
 
 pub mod parse {
     use std::str::FromStr;
-    use nom::combinator::opt;
+    use nom::combinator::{opt, peek};
     use nom::multi::separated_list0;
     use nom::sequence::{terminated, tuple};
     use nom_supreme::tag::complete::tag;
     use crate::err;
-    use crate::parse::{skewer_case, version, NomErr, Res};
+    use crate::parse::{skewer_case, version, NomErr, Res, SkewerCase};
     use crate::parse::util::{new_span, result, Span};
     use crate::types::scope::{ScopeKeyword, Scope, Segment};
     use nom::Parser;
@@ -245,11 +266,13 @@ pub mod parse {
     }
     /// will return an empty [Scope]  -> `DomainScope(None,Vec:default())` if nothing is found
     pub fn scope<I: Span>(input: I) -> Res<I, Scope> {
-        tuple((opt(terminated(prefix,opt(tag("::")))), separated_list0(tag("::"), postfix_segment)))(input).map(|(input,(prefix,segments))|{
-            (input, Scope(prefix, segments))
+        terminated(separated_list0(tag("::"), postfix_segment),tag("::"))(input).map(|(input,mut segments)| {
+            (input, Scope::from_segments(segments))
         })
     }
+    
 
+    
     fn prefix <I: Span>(input: I) -> Res<I, ScopeKeyword> {
         let (next, skewer) = skewer_case(input.clone())?;
         match ScopeKeyword::from_str(skewer.as_str()) {
@@ -269,6 +292,14 @@ pub mod parse {
         alt((segment,semver))(input)
     }
 
+    #[test]
+    fn test_scope() {
+        assert_eq!( scope( new_span("root::")).unwrap().1, Scope(Some(ScopeKeyword::Root),vec![]) );
+        assert_eq!( scope( new_span("my::")).unwrap().1, Scope(None,vec![Segment::Segment(SkewerCase::from_str("my").unwrap())]) );
+        assert_eq!( scope( new_span("my::Root")).unwrap().1, Scope(None,vec![Segment::Segment(SkewerCase::from_str("my").unwrap())]) );
+        assert_eq!( scope( new_span("my::more::Root")).unwrap().1, Scope(None,vec![Segment::Segment(SkewerCase::from_str("my").unwrap()),Segment::Segment(SkewerCase::from_str("more").unwrap())]) );
+        assert_eq!( scope( new_span("root::more::Root")).unwrap().1, Scope(Some(ScopeKeyword::Root),vec![Segment::Segment(SkewerCase::from_str("more").unwrap())]) );
+    }
 
 
 }

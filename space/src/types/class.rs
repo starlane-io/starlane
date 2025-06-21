@@ -1,7 +1,7 @@
 use crate::parse::util::Span;
 use crate::parse::{CamelCase, Res};
 use crate::types::class::service::Service;
-use crate::types::private::{AbstractParsable, Delimited, Parsable};
+use crate::types::private::{ Delimited, Parsable};
 use crate::types::private;
 use core::str::FromStr;
 use derive_name::Name;

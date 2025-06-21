@@ -55,6 +55,8 @@ pub fn identify_abstract_disc<I>(input:I) -> Res<I,AbstractDisc> where I: Span {
   alt((value( AbstractDisc::Class, lex_block( BlockKind::Nested(NestedBlockKind::Angle))),value( AbstractDisc::Data, lex_block( BlockKind::Nested(NestedBlockKind::Square)))))(input)
 }
 
+
+
 pub fn unwrap_abstract<I>(input: I) -> Res<I, Abstract> where I: Span {
     let (next,r#abstract) = identify_abstract_disc(input.clone())?;
     match r#abstract {
