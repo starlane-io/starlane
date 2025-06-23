@@ -4,12 +4,13 @@ use std::ops::Deref;
 use getset::Getters;
 use crate::command::common::{PropertyMod, SetProperties};
 use crate::err::SpaceErr;
-use crate::kind::Kind;
 use crate::parse::{SkewerCase, SnakeCase};
 use crate::point::Point;
 use serde::Deserialize;
 use serde::Serialize;
+use thiserror::__private::AsDisplay;
 use validator::ValidateEmail;
+use crate::types::Absolute;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Getters)]
 #[get = "pub"]
@@ -132,14 +133,15 @@ pub enum PropertySource {
     CoreSecret,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Getters)]
+#[get = "pub"]
 pub struct PropertiesConfig {
-    pub properties: HashMap<String, PropertyDef>,
-    pub kind: Kind,
+    absolute: Absolute,
+    properties: HashMap<SnakeCase, PropertyDef>,
 }
 
 impl Deref for PropertiesConfig {
-    type Target = HashMap<String, PropertyDef>;
+    type Target = HashMap<SnakeCase, PropertyDef>;
 
     fn deref(&self) -> &Self::Target {
         &self.properties
@@ -147,21 +149,15 @@ impl Deref for PropertiesConfig {
 }
 
 impl PropertiesConfig {
-    pub fn new(kind: Kind) -> PropertiesConfig {
-        Self {
-            properties: HashMap::new(),
-            kind,
-        }
-    }
 
-    pub fn builder() -> PropertiesConfigBuilder {
+    pub fn builder(absolute: Absolute) -> PropertiesConfigBuilder {
         PropertiesConfigBuilder {
-            kind: None,
+            absolute,
             properties: HashMap::new(),
         }
     }
 
-    pub fn required(&self) -> Vec<String> {
+    pub fn required(&self) -> Vec<SnakeCase> {
         let mut rtn = vec![];
         for (key, def) in &self.properties {
             if def.required {
@@ -171,7 +167,7 @@ impl PropertiesConfig {
         rtn
     }
 
-    pub fn defaults(&self) -> Vec<String> {
+    pub fn defaults(&self) -> Vec<SnakeCase> {
         let mut rtn = vec![];
         for (key, def) in &self.properties {
             if def.default.is_some() {
@@ -180,13 +176,14 @@ impl PropertiesConfig {
         }
         rtn
     }
+    
 
     pub fn check_create(&self, set: &SetProperties) -> Result<(), SpaceErr> {
-        for req in self.required() {
-            if !set.contains_key(&req) {
+        for req in &self.required() {
+            if !set.contains_key(req) {
                 return Err(format!(
                     "{} missing required property: '{}'",
-                    self.kind.to_string(),
+                    self.absolute.to_string(),
                     req
                 )
                 .into());
@@ -196,7 +193,7 @@ impl PropertiesConfig {
         for (key, propmod) in &set.map {
             let def = self.get(key).ok_or(format!(
                 "{} illegal property: '{}'",
-                self.kind.to_string(),
+                self.absolute.to_string(),
                 key
             ))?;
             match propmod {
@@ -204,14 +201,14 @@ impl PropertiesConfig {
                     if def.constant && def.default.as_ref().unwrap().clone() != value.clone() {
                         return Err(format!(
                             "{} property: '{}' is constant and cannot be set",
-                            self.kind.to_string(),
+                            self.absolute.to_string(),
                             key
                         )
                         .into());
                     }
                     match def.source {
                         PropertySource::CoreReadOnly => {
-                            return Err(format!("{} property '{}' is flagged CoreReadOnly and cannot be set within the Mesh", self.kind.to_string(), key).into());
+                            return Err(format!("{} property '{}' is flagged CoreReadOnly and cannot be set within the Mesh", self.absolute.to_string(), key).into());
                         }
                         _ => {}
                     }
@@ -258,7 +255,7 @@ impl PropertiesConfig {
         Ok(())
     }
 
-    pub fn check_read(&self, keys: &Vec<String>) -> Result<(), SpaceErr> {
+    pub fn check_read(&self, keys: &Vec<SnakeCase>) -> Result<(), SpaceErr> {
         for key in keys {
             let def = self
                 .get(key)
@@ -308,14 +305,14 @@ pub enum PropertyPermit {
 }
 
 pub struct PropertiesConfigBuilder {
-    kind: Option<Kind>,
-    properties: HashMap<String, PropertyDef>,
+    absolute: Absolute,
+    properties: HashMap<SnakeCase, PropertyDef>,
 }
 
 impl PropertiesConfigBuilder {
-    pub fn new() -> Self {
+    pub fn new(absolute: Absolute) -> Self {
         let mut rtn = Self {
-            kind: None,
+            absolute,
             properties: HashMap::new(),
         };
         /// unwraps are bad unless it's a `&'static str`
@@ -325,21 +322,15 @@ impl PropertiesConfigBuilder {
 
     pub fn build(self) -> Result<PropertiesConfig, SpaceErr> {
         Ok(PropertiesConfig {
-            kind: self.kind.ok_or(SpaceErr::server_error(
-                "kind must be set before PropertiesConfig can be built",
-            ))?,
+            absolute: self.absolute,
             properties: self.properties,
         })
-    }
-
-    pub fn kind(&mut self, kind: Kind) {
-        self.kind.replace(kind);
     }
 
     pub fn add(
         &mut self,
         name: SnakeCase,
-        pattern: Box<dyn PropertyPattern>,
+        _: Box<dyn PropertyPattern>,
         required: bool,
         mutable: bool,
         source: PropertySource,
@@ -347,19 +338,27 @@ impl PropertiesConfigBuilder {
         constant: bool,
         permits: Vec<PropertyPermit>,
     ) -> Result<(), SpaceErr> {
-        let def = PropertyDef::new(name.clone(), required, mutable, source, default, constant, permits)?;
-        self.properties.insert(name.to_string(), def);
+        self.push(PropertyDef::new(name.clone(), required, mutable, source, default, constant, permits)?);
         Ok(())
     }
+    
+    pub fn push( &mut self, def: PropertyDef){
+        self.properties.insert(def.name.clone(), def);
+    }
+    
+    
+    pub fn remove(&mut self, name: & SnakeCase)  {
+        self.properties.remove(name);
+    }
 
-    pub fn add_string(&mut self, name: &str) -> Result<(), SpaceErr> {
-        let def = PropertyDef::new(false, true, PropertySource::Shell, None, false, vec![])?;
-        self.properties.insert(name.to_string(), def);
+    pub fn add_string(&mut self, name: SnakeCase) -> Result<(), SpaceErr> {
+        let def = PropertyDef::new(name.clone(),false, true, PropertySource::Shell, None, false, vec![])?;
+        self.properties.insert(name, def);
         Ok(())
     }
 
     pub fn add_point(&mut self, name: SnakeCase, required: bool, mutable: bool) -> Result<(), SpaceErr> {
-        let prop_name = name.to_string();
+        let prop_name = name.clone();
         let def = PropertyDef::new(
             name,
             required,

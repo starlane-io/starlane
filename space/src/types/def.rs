@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::fmt::Display;
 use crate::parse::{SkewerCase, SnakeCase};
-use crate::particle::property::PropertyDef;
+use crate::particle::property::{PropertiesConfigBuilder, PropertyDef};
 use crate::types::err::TypeErr;
 
 /// [Defs] for an [Absolute]
@@ -41,8 +41,8 @@ impl Defs
         }
     }
     
-    pub fn create_layer_composite(&self) -> Result<Composite,TypeErr> {
-        let mut rtn = Composite::of(self.specific.clone());
+    pub fn create_layer_composite(&self) -> Result<CompositeBuilder,TypeErr> {
+        let mut rtn = CompositeBuilder::of(self.specific.clone());
         
         for (r#type, layers) in &self.layers {
             for layer in layers {
@@ -51,7 +51,7 @@ impl Defs
 
                     let mut ty_comp= match rtn.types.get_mut(&change.r#type) {
                         None => {
-                            let ty_comp = TypeComposite::of(absolute);
+                            let ty_comp = TypeCompositeBuilder::of(absolute);
                             rtn.types.insert(change.r#type.clone(), ty_comp);
                             rtn.types.get_mut(&change.r#type).unwrap()
                         }
@@ -61,7 +61,7 @@ impl Defs
                     match &change.action {
                         Action::Add(add) => {
                             match add {
-                                Add::Property(prop) => { ty_comp.properties.insert(prop.name.clone(), prop.clone()); }
+                                Add::Property(prop) => { ty_comp.properties.push(prop.clone()); }
                             }
                         }
                         Action::Remove(remove) => {
@@ -147,28 +147,26 @@ pub enum Remove{
     Property(SnakeCase),
 }
 
-#[derive(Clone)]
-pub struct TypeComposite {
+pub struct TypeCompositeBuilder {
     absolute: Absolute,
-    properties: HashMap<SnakeCase,PropertyDef>,
+    properties: PropertiesConfigBuilder
 }
 
-impl TypeComposite {
+impl TypeCompositeBuilder {
     pub fn of( absolute: Absolute) -> Self {
         Self {
+            properties: PropertiesConfigBuilder::new(absolute.clone()),
             absolute,
-            properties: Default::default(),
         }
     }
 }
 
-#[derive(Clone)]
-pub struct Composite {
+pub struct CompositeBuilder {
     specific: SpecificLoc,
-    types: HashMap<Type, TypeComposite>,
+    types: HashMap<Type, TypeCompositeBuilder>,
 }
 
-impl Composite {
+impl CompositeBuilder {
    pub fn of(specific: SpecificLoc) -> Self {
        Self {
            specific,

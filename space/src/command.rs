@@ -30,6 +30,7 @@ pub mod common {
 
     use crate::err::ParseErrs;
     use crate::loc::Variable;
+    use crate::parse::{SkewerCase, SnakeCase};
     use crate::substance::{Bin, Substance};
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
@@ -77,11 +78,11 @@ pub mod common {
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub enum PropertyMod {
         Set {
-            key: String,
+            key: SnakeCase,
             value: String,
             lock: bool,
         },
-        UnSet(String),
+        UnSet(SnakeCase),
     }
 
     impl PropertyMod {
@@ -102,7 +103,7 @@ pub mod common {
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub struct SetProperties {
-        pub map: HashMap<String, PropertyMod>,
+        pub map: HashMap<SnakeCase, PropertyMod>,
     }
 
     impl Default for SetProperties {
@@ -137,13 +138,13 @@ pub mod common {
             }
         }
 
-        pub fn iter(&self) -> Iter<'_, String, PropertyMod> {
+        pub fn iter(&self) -> Iter<'_, SnakeCase, PropertyMod> {
             self.map.iter()
         }
     }
 
     impl Deref for SetProperties {
-        type Target = HashMap<String, PropertyMod>;
+        type Target = HashMap<SnakeCase, PropertyMod>;
 
         fn deref(&self) -> &Self::Target {
             &self.map

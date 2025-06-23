@@ -24,7 +24,7 @@ use parse::Delimited;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::str::FromStr;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::DeserializeOwned;
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
@@ -135,9 +135,27 @@ pub type AbsoluteAbsoluteGeneric<Type: Archetype> = Scaffold<Scope, Type, Specif
 
 pub type Absolute = Scaffold<Scope, Type, SpecificLoc>;
 
+impl Serialize for Absolute {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer
+    {
+        todo!()
+    }
+}
+
+impl <'de> Deserialize<'de> for Absolute {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>
+    {
+        todo!()
+    }
+}
+
 pub type AbsoluteSelector = Scaffold<Pattern<Scope>, Pattern<Type>, SpecificSelector>;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash,Getters,Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash,Getters)]
 #[get = "pub"]
 pub struct Scaffold<Scope, T, SpecificLoc>
 where
