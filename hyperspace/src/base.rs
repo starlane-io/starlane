@@ -84,11 +84,11 @@ where Self: 'static,
         builder.kind(kind.clone());
         match kind.to_base() {
             BaseKind::Mechtron => {
-                builder.add_point("config", true, true).unwrap();
+                builder.add_property("config", true, true).unwrap();
                 builder.build().unwrap()
             }
             BaseKind::Host => {
-                builder.add_point("bin", true, true).unwrap();
+                builder.add_property("bin", true, true).unwrap();
                 builder.build().unwrap()
             }
             _ => builder.build().unwrap(),

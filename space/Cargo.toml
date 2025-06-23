@@ -99,7 +99,7 @@ tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-a
 dyn-clone = { workspace = true }
 
 [dev-dependencies]
-
+dummy = { workspace = true }
 
 [build-dependencies]
 shadow-rs = { workspace = true }

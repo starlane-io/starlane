@@ -135,6 +135,20 @@ pub type AbsoluteAbsoluteGeneric<Type: Archetype> = Scaffold<Scope, Type, Specif
 
 pub type Absolute = Scaffold<Scope, Type, SpecificLoc>;
 
+
+#[cfg(test)]
+impl Absolute {
+    pub fn mock_default() -> Self {
+        Self::new(Default::default(),Type::Class(Class::Root),SpecificLoc::mock_default() )
+    }
+
+    pub fn mock_root() -> Self {
+        let mut mock = Self::mock_default();
+        mock.specific = mock.specific.root();
+        mock
+    }
+}
+
 impl Serialize for Absolute {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -143,6 +157,8 @@ impl Serialize for Absolute {
         todo!()
     }
 }
+
+
 
 impl <'de> Deserialize<'de> for Absolute {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

@@ -1,3 +1,6 @@
+use crate::parse::SnakeCase;
+use crate::particle::property::{PropertiesConfig, PropertiesConfigBuilder, PropertyDef};
+use crate::types::err::TypeErr;
 use crate::types::specific::SpecificLoc;
 use crate::types::{err, Absolute, Type};
 use derive_builder::Builder;
@@ -5,34 +8,28 @@ use getset::Getters;
 use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::fmt::Display;
-use crate::parse::{SkewerCase, SnakeCase};
-use crate::particle::property::{PropertiesConfigBuilder, PropertyDef};
-use crate::types::err::TypeErr;
 
 /// [Defs] for an [Absolute]
-#[derive(Clone,Getters,Builder)]
-pub struct Defs
-{
+#[derive(Clone, Getters, Builder)]
+pub struct Defs {
     r#specific: SpecificLoc,
     /// types support inheritance and their
     /// multiple type definition layers that are composited.
     /// [Layer]s define inheritance in regular order.  The last
     /// layer is the [Type]  of this [Defs] composite.
     #[getset(skip)]
-    layers: IndexMap<Type,Vec<Layer>>,
+    layers: IndexMap<Type, Vec<Layer>>,
 }
 
-impl Defs
-{
+impl Defs {
     pub fn new(specific: SpecificLoc) -> Result<Defs, err::TypeErr> {
-
-            Ok(Self {
-                specific,
-                layers: IndexMap::default(),
-            })
+        Ok(Self {
+            specific,
+            layers: IndexMap::default(),
+        })
     }
-    
-    pub fn add_layer(& mut self, r#type: Type, layer: Layer) {
+
+    pub fn add_layer(&mut self, r#type: Type, layer: Layer) {
         match self.layers.get_mut(&r#type) {
             None => {
                 self.layers.insert(r#type, vec![layer]);
@@ -40,40 +37,39 @@ impl Defs
             Some(layers) => layers.push(layer),
         }
     }
-    
-    pub fn create_layer_composite(&self) -> Result<CompositeBuilder,TypeErr> {
-        let mut rtn = CompositeBuilder::of(self.specific.clone());
-        
+
+    pub fn create_layer_composite(&self) -> Result<SpecificCompositeBuilder, TypeErr> {
+        let mut rtn = SpecificCompositeBuilder::of(self.specific.clone());
+
         for (r#type, layers) in &self.layers {
             for layer in layers {
                 for change in &layer.changes {
-                    let absolute = Absolute::new(Default::default(),r#type.clone(),self.specific.clone());
+                    let absolute =
+                        Absolute::new(Default::default(), r#type.clone(), self.specific.clone());
 
-                    let mut ty_comp= match rtn.types.get_mut(&change.r#type) {
+                    let mut ty_comp = match rtn.types.get_mut(&change.r#type) {
                         None => {
                             let ty_comp = TypeCompositeBuilder::of(absolute);
                             rtn.types.insert(change.r#type.clone(), ty_comp);
                             rtn.types.get_mut(&change.r#type).unwrap()
                         }
-                        Some(ty_comp) => ty_comp
+                        Some(ty_comp) => ty_comp,
                     };
-                    
+
                     match &change.action {
-                        Action::Add(add) => {
-                            match add {
-                                Add::Property(prop) => { ty_comp.properties.push(prop.clone()); }
+                        Action::Add(add) => match add {
+                            Add::Property(prop) => {
+                                ty_comp.properties.push(prop.clone());
                             }
-                        }
-                        Action::Remove(remove) => {
-                            match remove {
-                                Remove::Type => {
-                                    rtn.types.remove(&change.r#type);
-                                },
-                                Remove::Property(name) => {
-                                    ty_comp.properties.remove(name);
-                                }
+                        },
+                        Action::Remove(remove) => match remove {
+                            Remove::Type => {
+                                rtn.types.remove(&change.r#type);
                             }
-                        }
+                            Remove::Property(name) => {
+                                ty_comp.properties.remove(name);
+                            }
+                        },
                     }
                 }
             }
@@ -82,36 +78,27 @@ impl Defs
         Ok(rtn)
     }
 
-
-
     pub fn describe(&self) -> String {
         todo!()
         //            format!("Meta definitions for type '{}'", Self::name(())
     }
 
-
     fn layer_by_index(&self, index: usize) -> Result<&Layer, err::TypeErr> {
-/*        self.defs
-            .get_index(index)
-            .ok_or(err::TypeErr::meta_layer_index_out_of_bounds(
-                &self.r#absolute.clone().into(),
-                &index,
-                self.defs.len(),
-            ))
-            .map(|(_, layer)| layer)
-            
- */
+        /*        self.defs
+                   .get_index(index)
+                   .ok_or(err::TypeErr::meta_layer_index_out_of_bounds(
+                       &self.r#absolute.clone().into(),
+                       &index,
+                       self.defs.len(),
+                   ))
+                   .map(|(_, layer)| layer)
+
+        */
         todo!()
     }
-
-
-
 }
 
-
-
-
-#[derive(Clone,Builder,Getters)]
+#[derive(Clone, Builder, Getters)]
 pub struct Layer {
     specific: SpecificLoc,
     changes: Vec<Change>,
@@ -120,7 +107,6 @@ pub struct Layer {
 /// each [Layer] can modify the defs of it's inherited [Layer]...
 /// including the ability to remove [PropertyDef] ... etc
 
-
 #[derive(Clone)]
 pub struct Change {
     r#type: Type,
@@ -128,7 +114,7 @@ pub struct Change {
 }
 
 #[derive(Clone)]
-pub enum Action{
+pub enum Action {
     Add(Add),
     Remove(Remove),
 }
@@ -141,52 +127,97 @@ pub enum Add {
 }
 
 #[derive(Clone)]
-pub enum Remove{
+pub enum Remove {
     /// remove an entire [Type] from the composite
     Type,
     Property(SnakeCase),
 }
 
+#[derive(Clone,Getters)]
+#[getset(get = "pub")]
+pub struct TypeComposite{
+    absolute: Absolute,
+    properties: PropertiesConfig,
+}
+
 pub struct TypeCompositeBuilder {
     absolute: Absolute,
-    properties: PropertiesConfigBuilder
+    properties: PropertiesConfigBuilder,
 }
 
 impl TypeCompositeBuilder {
-    pub fn of( absolute: Absolute) -> Self {
+    pub fn of(absolute: Absolute) -> Self {
         Self {
             properties: PropertiesConfigBuilder::new(absolute.clone()),
             absolute,
         }
     }
+    
+    pub fn build(self) -> TypeComposite {
+        TypeComposite {
+            absolute: self.absolute,
+            properties: self.properties.build()
+        }
+    }
+    
+    pub fn add_property( & mut self, prop: PropertyDef ) {
+        self.properties.push(prop);
+    }
+
+    pub fn remove_property( & mut self, key: &SnakeCase) {
+        self.properties.remove(key);
+    }
+
 }
 
-pub struct CompositeBuilder {
+#[derive(Clone, Getters)]
+pub struct SpecificComposite {
+    pub specific: SpecificLoc,
+    pub types: HashMap<Type, TypeComposite>,   
+}
+
+pub struct SpecificCompositeBuilder {
     specific: SpecificLoc,
     types: HashMap<Type, TypeCompositeBuilder>,
 }
 
-impl CompositeBuilder {
-   pub fn of(specific: SpecificLoc) -> Self {
-       Self {
-           specific,
-           types: Default::default()
-       }
-   } 
+impl SpecificCompositeBuilder {
+    pub fn of(specific: SpecificLoc) -> Self {
+        Self {
+            specific,
+            types: Default::default(),
+        }
+    }
+    
+    pub fn build(self) -> SpecificComposite {
+        let types = self.types.into_iter().map(|(ty,builder)|(ty,builder.build())).collect();
+        SpecificComposite {
+            specific: self.specific,
+            types 
+        }
+    }
 }
 
+#[cfg(test)]
+mod tests {
+    use itertools::Itertools;
+    use crate::particle::property::PropertyDef;
+    use crate::types::Absolute;
+    use crate::types::def::TypeCompositeBuilder;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    #[test] 
+   pub fn type_builder() {
+       let absolute = Absolute::mock_default();
+       let mut builder = TypeCompositeBuilder::of(absolute.clone()); 
+        
+       assert_eq!(absolute, builder.absolute); 
+       builder.add_property(PropertyDef::mock_less());
+       let comp= builder.build(); 
+       assert_eq!(absolute, comp.absolute);
+       assert_eq!(1, comp.properties.len());
+       let less = PropertyDef::mock_less().name().clone();
+       let property = comp.properties.get(&less).unwrap();
+       assert_eq!("less", property.name().as_str()); 
+   }
+    
+}

@@ -1,4 +1,4 @@
-use crate::parse::util::{preceded, Span};
+use crate::parse::util::{new_span, preceded, result, Span};
 use crate::parse::{Domain, Res, SkewerCase};
 use crate::selector::VersionReq;
 use crate::types::archetype::Archetype;
@@ -13,8 +13,17 @@ use starlane_space::loc::VersionSegLoc;
 use starlane_space::selector::Pattern;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
+use crate::types::{Absolute, Type};
+use crate::types::class::Class;
 
 pub type SpecificLoc = SpecificScaffold<PublisherSegLoc, PackageSegLoc, VersionSegLoc, Segment>;
+
+#[cfg(test)]
+impl SpecificLoc{
+    pub fn mock_default() -> Self {
+        result(Self::parser(new_span("starlane.io:uberscott:1.0.1::main:7.0.7"))).unwrap()
+    }
+}
 
 pub type PublisherSegLoc = Domain;
 pub type PackageSegLoc = SkewerCase;

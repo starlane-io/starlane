@@ -52,6 +52,48 @@ impl PropertyDef {
     }
 }
 
+#[cfg(test)]
+impl PropertyDef {
+    pub fn mock_less() -> Self {
+        Self {
+            
+            name: SnakeCase::from_str("less").unwrap(),
+            required: false,
+            mutable: false,
+            source: PropertySource::Shell,
+            default: None,
+            constant: false,
+            permits: vec![],
+        }
+    }
+
+    pub fn mock_fae() -> Self {
+        Self {
+
+            name: SnakeCase::from_str("fae").unwrap(),
+            required: false,
+            mutable: false,
+            source: PropertySource::Shell,
+            default: None,
+            constant: false,
+            permits: vec![],
+        }
+    }
+
+    pub fn mock_modus() -> Self {
+        Self {
+
+            name: SnakeCase::from_str("modus").unwrap(),
+            required: false,
+            mutable: false,
+            source: PropertySource::Shell,
+            default: None,
+            constant: false,
+            permits: vec![],
+        }
+    }
+}
+
 pub trait PropertyPattern: Send + Sync + 'static {
     fn is_match(&self, value: &String) -> Result<(), SpaceErr>;
 }
@@ -315,16 +357,16 @@ impl PropertiesConfigBuilder {
             absolute,
             properties: HashMap::new(),
         };
-        /// unwraps are bad unless it's a `&'static str`
-        rtn.add_point(SnakeCase::from_str("bind").unwrap(), false, true).unwrap();
+        /// disabled for now while properties are getting better sorted out
+//        rtn.add_property(SnakeCase::from_str("bind").unwrap(), false, true).unwrap();
         rtn
     }
 
-    pub fn build(self) -> Result<PropertiesConfig, SpaceErr> {
-        Ok(PropertiesConfig {
+    pub fn build(self) -> PropertiesConfig {
+        PropertiesConfig {
             absolute: self.absolute,
             properties: self.properties,
-        })
+        }
     }
 
     pub fn add(
@@ -357,7 +399,7 @@ impl PropertiesConfigBuilder {
         Ok(())
     }
 
-    pub fn add_point(&mut self, name: SnakeCase, required: bool, mutable: bool) -> Result<(), SpaceErr> {
+    pub fn add_property(&mut self, name: SnakeCase, required: bool, mutable: bool) -> Result<(), SpaceErr> {
         let prop_name = name.clone();
         let def = PropertyDef::new(
             name,
