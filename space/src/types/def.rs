@@ -98,22 +98,56 @@ impl Defs {
     }
 }
 
-#[derive(Clone, Builder, Getters)]
+#[derive(Clone,  Getters)]
 pub struct Layer {
     specific: SpecificLoc,
     changes: Vec<Change>,
 }
 
+
+#[derive(Clone)]
+pub struct LayerBuilder {
+    specific: SpecificLoc,
+    changes: Vec<Change>,   
+}
+impl LayerBuilder {
+    pub fn new(specific: SpecificLoc) -> LayerBuilder
+    {
+        Self {
+            specific,
+            changes: Default::default()
+        }
+    }
+        
+    pub fn add_change(&mut self, change: Change) {
+        self.changes.push(change);
+    }
+    
+    pub fn build(self) -> Layer {
+        Layer {
+            changes: self.changes,
+            specific: self.specific
+        }
+    }
+}
+
 /// each [Layer] can modify the defs of it's inherited [Layer]...
 /// including the ability to remove [PropertyDef] ... etc
 
-#[derive(Clone)]
+#[derive(Clone,Debug,Eq, PartialEq)]
 pub struct Change {
     r#type: Type,
     action: Action,
 }
 
-#[derive(Clone)]
+impl Change {
+    pub fn new(r#type: Type, action: impl Into<Action>) -> Self {
+        let action = action.into();
+        Self { r#type, action }
+    }
+}
+
+#[derive(Clone,Debug,Eq, PartialEq)]
 pub enum Action {
     Add(Add),
     Remove(Remove),
@@ -121,16 +155,28 @@ pub enum Action {
 
 /// no need for [Add::Type] since it will happen automatically when any element
 /// of its composite is added.  
-#[derive(Clone)]
+#[derive(Clone,Debug,Eq, PartialEq)]
 pub enum Add {
     Property(PropertyDef),
 }
 
-#[derive(Clone)]
+impl Into<Action> for Add {
+    fn into(self) -> Action {
+        Action::Add(self)
+    }
+}
+
+#[derive(Clone,Debug,Eq, PartialEq)]
 pub enum Remove {
     /// remove an entire [Type] from the composite
     Type,
     Property(SnakeCase),
+}
+
+impl Into<Action> for Remove {
+    fn into(self) -> Action {
+        Action::Remove(self)
+    }
 }
 
 #[derive(Clone,Getters)]
@@ -202,22 +248,42 @@ impl SpecificCompositeBuilder {
 mod tests {
     use itertools::Itertools;
     use crate::particle::property::PropertyDef;
-    use crate::types::Absolute;
-    use crate::types::def::TypeCompositeBuilder;
+    use crate::types::{Absolute, Type};
+    use crate::types::class::Class;
+    use crate::types::def::{Add, Change, DefsBuilder, LayerBuilder, TypeCompositeBuilder};
+    use crate::types::specific::SpecificLoc;
 
     #[test] 
    pub fn type_builder() {
        let absolute = Absolute::mock_default();
+       let less = PropertyDef::mock_less(); 
        let mut builder = TypeCompositeBuilder::of(absolute.clone()); 
         
        assert_eq!(absolute, builder.absolute); 
-       builder.add_property(PropertyDef::mock_less());
+       builder.add_property(less.clone());
        let comp= builder.build(); 
        assert_eq!(absolute, comp.absolute);
        assert_eq!(1, comp.properties.len());
-       let less = PropertyDef::mock_less().name().clone();
-       let property = comp.properties.get(&less).unwrap();
-       assert_eq!("less", property.name().as_str()); 
+       let property = comp.properties.get(less.name()).unwrap();
+       assert_eq!(less, *property);
    }
+
+    #[test]
+    pub fn layer() {
+        let specific = SpecificLoc::mock_default();
+        let mut builder = LayerBuilder::new(specific.clone());
+        let less= PropertyDef::mock_less();
+        let fae = PropertyDef::mock_fae();
+
+        let add_less = Change::new(Type::Class(Class::Root), Add::Property(less.clone()));
+        let add_fae = Change::new(Type::Class(Class::User), Add::Property(fae.clone()));
+        builder.add_change(add_less.clone());
+        builder.add_change(add_fae.clone());
+        let layer = builder.clone().build();
+        assert_eq!(specific, layer.specific);
+        assert_eq!(2, layer.changes.len());
+        let first = layer.changes.first().cloned();
+        assert_eq!(Some(add_less), layer.changes.first().cloned());
+    } 
     
 }
