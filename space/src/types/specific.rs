@@ -4,12 +4,11 @@ use crate::selector::VersionReq;
 use crate::types::archetype::Archetype;
 use crate::types::scope::Segment;
 use getset::Getters;
-use indexmap::Equivalent;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
-use nom::multi::{separated_list0, separated_list1};
-use nom::sequence::{delimited, tuple};
-use serde_derive::{Deserialize, Serialize};
+use nom::multi::separated_list1;
+use nom::sequence::tuple;
+use serde::{Deserialize, Serialize};
 use starlane_space::loc::VersionSegLoc;
 use starlane_space::selector::Pattern;
 use std::fmt::{Display, Formatter};
@@ -20,8 +19,8 @@ pub type SpecificLoc = SpecificScaffold<PublisherSegLoc, PackageSegLoc, VersionS
 pub type PublisherSegLoc = Domain;
 pub type PackageSegLoc = SkewerCase;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, Getters)]
-#[getset(get = "pub")]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Hash, Getters)]
+#[get = "pub"]
 pub struct SpecificScaffold<Publisher, Package, Version, SliceSegment>
 where
     Publisher: Archetype,
@@ -34,8 +33,6 @@ where
     version: Version,
     slices: Vec<SliceSegment>,
 }
-
-
 
 impl<Publisher, Package, Version, SliceSegment> Display
     for SpecificScaffold<Publisher, Package, Version, SliceSegment>
@@ -99,8 +96,7 @@ where
     }
 }
 
-impl<Publisher, Package, Version, SliceSeg>
-    SpecificScaffold<Publisher, Package, Version, SliceSeg>
+impl<Publisher, Package, Version, SliceSeg> SpecificScaffold<Publisher, Package, Version, SliceSeg>
 where
     Publisher: Archetype,
     Package: Archetype,
@@ -120,7 +116,7 @@ where
             slices,
         }
     }
-    
+
     ///
     pub fn root(self) -> Self {
         if self.slices.is_empty() {

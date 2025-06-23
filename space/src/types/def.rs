@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone,Getters,Builder,Serialize,Deserialize)]
+#[derive(Clone,Getters,Builder)]
 pub struct Meta
 {
     r#absolute: Absolute,
@@ -128,7 +128,7 @@ impl<'y> MetaLayerAccess<'y>
     }
 }
 
-#[derive(Clone,Builder,Getters,Serialize,Deserialize)]
+#[derive(Clone,Builder,Getters)]
 pub struct Layer {
     specific: Specific,
     types: HashMap<Type, Meta>,

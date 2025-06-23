@@ -6,7 +6,7 @@ use crate::types::def::Meta;
 use crate::types::scope::Segment;
 use crate::types::Type;
 
-#[derive(Clone, Serialize, Deserialize, Builder)]
+#[derive(Clone, Builder)]
 pub struct Package {
     specific: SpecificLoc,
     title: String,
@@ -31,7 +31,7 @@ impl Package {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Builder)]
+#[derive(Clone, Builder)]
 pub struct Slice {
     segment: Segment,
     children: Box<Vec<Slice>>,

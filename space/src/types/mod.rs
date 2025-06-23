@@ -24,7 +24,7 @@ use parse::Delimited;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::str::FromStr;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
@@ -137,11 +137,12 @@ pub type Absolute = Scaffold<Scope, Type, SpecificLoc>;
 
 pub type AbsoluteSelector = Scaffold<Pattern<Scope>, Pattern<Type>, SpecificSelector>;
 
-#[derive(Clone, Eq, PartialEq, Hash,Getters,Serialize,Deserialize)]
+#[derive(Clone, Eq, PartialEq, Hash,Getters,Serialize)]
+#[get = "pub"]
 pub struct Scaffold<Scope, T, SpecificLoc>
 where
-    Scope: Archetype+Serialize+DeserializeOwned+Default,
-    SpecificLoc: Clone + Eq + PartialEq + Hash+serde::Serialize+DeserializeOwned
+    Scope: Archetype+Default,
+    SpecificLoc: Clone + Eq + PartialEq + Hash
 {
     scope: Scope,
     r#type: T,
@@ -152,8 +153,8 @@ where
 impl <Scope, T, SpecificLoc> Scaffold<Scope, T, SpecificLoc>
 where
 
-    Scope: Archetype+Serialize+DeserializeOwned+Default,
-    SpecificLoc: Clone + Eq + PartialEq + Hash+serde::Serialize+DeserializeOwned,
+    Scope: Archetype+Default,
+    SpecificLoc: Clone + Eq + PartialEq + Hash
 {
     pub fn new(scope: Scope, r#type: T, specific: SpecificLoc) -> Self {
         Self {scope,
@@ -167,8 +168,8 @@ where
 #[derive(Clone)]
 pub struct AbsoluteLex<Scope, Specific>
 where
-Scope: Archetype+Serialize+DeserializeOwned+Default,
-Specific: Clone + Eq + PartialEq + Hash+serde::Serialize+DeserializeOwned,
+Scope: Archetype+Default,
+Specific: Clone + Eq + PartialEq + Hash
 
 {
     r#absolute: Scaffold<Scope, CamelCase, Option<Specific>>,

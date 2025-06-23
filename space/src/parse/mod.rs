@@ -1642,7 +1642,6 @@ impl<'de> Deserialize<'de> for Domain {
     }
 }
 
-impl DeserializeOwned for Domain {}
 
 impl FromStr for Domain {
     type Err = ParseErrs;
