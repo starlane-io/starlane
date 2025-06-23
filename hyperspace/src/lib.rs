@@ -22,3 +22,4 @@ pub mod tests;
 //pub mod database;
 pub mod service;
 pub mod template;
+pub mod cache;
