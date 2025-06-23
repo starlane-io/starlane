@@ -1,29 +1,31 @@
 use core::str::FromStr;
 use std::collections::HashMap;
 use std::ops::Deref;
-
+use getset::Getters;
 use crate::command::common::{PropertyMod, SetProperties};
 use crate::err::SpaceErr;
 use crate::kind::Kind;
-use crate::parse::SkewerCase;
+use crate::parse::{SkewerCase, SnakeCase};
 use crate::point::Point;
 use serde::Deserialize;
 use serde::Serialize;
 use validator::ValidateEmail;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Getters)]
+#[get = "pub"]
 pub struct PropertyDef {
-    //pub pattern: Box<dyn PropertyPattern>,
-    pub required: bool,
-    pub mutable: bool,
-    pub source: PropertySource,
-    pub default: Option<String>,
-    pub constant: bool,
-    pub permits: Vec<PropertyPermit>,
+    name: SnakeCase,
+    required: bool,
+    mutable: bool,
+    source: PropertySource,
+    default: Option<String>,
+    constant: bool,
+    permits: Vec<PropertyPermit>,
 }
 
 impl PropertyDef {
     pub fn new(
+        name: SnakeCase,
         required: bool,
         mutable: bool,
         source: PropertySource,
@@ -38,6 +40,7 @@ impl PropertyDef {
         }
 
         Ok(Self {
+            name,
             required,
             mutable,
             source,
@@ -315,7 +318,8 @@ impl PropertiesConfigBuilder {
             kind: None,
             properties: HashMap::new(),
         };
-        rtn.add_point("bind", false, true).unwrap();
+        /// unwraps are bad unless it's a `&'static str`
+        rtn.add_point(SnakeCase::from_str("bind").unwrap(), false, true).unwrap();
         rtn
     }
 
@@ -334,7 +338,7 @@ impl PropertiesConfigBuilder {
 
     pub fn add(
         &mut self,
-        name: &str,
+        name: SnakeCase,
         pattern: Box<dyn PropertyPattern>,
         required: bool,
         mutable: bool,
@@ -343,7 +347,7 @@ impl PropertiesConfigBuilder {
         constant: bool,
         permits: Vec<PropertyPermit>,
     ) -> Result<(), SpaceErr> {
-        let def = PropertyDef::new(required, mutable, source, default, constant, permits)?;
+        let def = PropertyDef::new(name.clone(), required, mutable, source, default, constant, permits)?;
         self.properties.insert(name.to_string(), def);
         Ok(())
     }
@@ -354,8 +358,10 @@ impl PropertiesConfigBuilder {
         Ok(())
     }
 
-    pub fn add_point(&mut self, name: &str, required: bool, mutable: bool) -> Result<(), SpaceErr> {
+    pub fn add_point(&mut self, name: SnakeCase, required: bool, mutable: bool) -> Result<(), SpaceErr> {
+        let prop_name = name.to_string();
         let def = PropertyDef::new(
+            name,
             required,
             mutable,
             PropertySource::Shell,
@@ -363,7 +369,7 @@ impl PropertiesConfigBuilder {
             false,
             vec![],
         )?;
-        self.properties.insert(name.to_string(), def);
+        self.properties.insert(prop_name, def);
         Ok(())
     }
 }

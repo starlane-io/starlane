@@ -96,6 +96,7 @@ use serde_with_macros::{DeserializeFromStr, SerializeDisplay};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Formatter;
+use std::hash::{Hash, Hasher};
 use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -1682,6 +1683,7 @@ impl Archetype for SkewerCase{
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct SnakeCase {
     string: String,
 }
@@ -1824,6 +1826,17 @@ pub fn skewer_case<I: Span>(input: I) -> Res<I, SkewerCase> {
             next,
             SkewerCase {
                 string: skewer_case_chars.to_string(),
+            },
+        )
+    })
+}
+
+pub fn snake_case<I: Span>(input: I) -> Res<I, SnakeCase> {
+    context("expect-snake-case", skewer_case_chars)(input).map(|(next, chars)| {
+        (
+            next,
+            SnakeCase{
+                string: chars.to_string(),
             },
         )
     })
@@ -6607,6 +6620,20 @@ where
         ErrorKind::AlphaNumeric,
     )
 }
+pub fn snake<T>(i: T) -> Res<T, T>
+where
+    T: InputTakeAtPosition + nom::InputLength,
+    <T as InputTakeAtPosition>::Item: AsChar,
+{
+    i.split_at_position1_complete(
+        |item| {
+            let char_item = item.as_char();
+                 !(char_item == '_')
+                && !((char_item.is_alpha() && char_item.is_lowercase()) || char_item.is_dec_digit())
+        },
+        ErrorKind::AlphaNumeric,
+    )
+}
 
 pub fn not_quote<T>(i: T) -> Res<T, T>
 where
@@ -7814,3 +7841,64 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
 fn find_parse_err<I: Span>(_: &Err<NomErr<I>>) -> ParseErrs {
     todo!()
 }
+
+
+
+
+
+
+impl Archetype for SnakeCase {
+    fn parser<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        snake_case(input)
+    }
+}
+
+impl Serialize for SnakeCase{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.string.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for SnakeCase {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let string = String::deserialize(deserializer)?;
+
+        let result = result(snake_case(new_span(string.as_str())));
+        match result {
+            Ok(skewer) => Ok(skewer),
+            Err(err) => Err(serde::de::Error::custom(err.to_string())),
+        }
+    }
+}
+
+impl FromStr for SnakeCase {
+    type Err = ParseErrs;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        result(all_consuming(snake_case)(new_span(s)))
+    }
+}
+
+impl Display for SnakeCase {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(self.string.as_str())
+    }
+}
+
+impl Deref for SnakeCase {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.string
+    }
+}
+

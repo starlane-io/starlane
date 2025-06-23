@@ -1,4 +1,3 @@
-use crate::kind::Specific;
 use crate::types::specific::SpecificLoc;
 use crate::types::{err, Absolute, Type};
 use derive_builder::Builder;
@@ -6,53 +5,90 @@ use getset::Getters;
 use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::fmt::Display;
-use serde::{Deserialize, Serialize};
-use crate::parse::SkewerCase;
+use crate::parse::{SkewerCase, SnakeCase};
 use crate::particle::property::PropertyDef;
+use crate::types::err::TypeErr;
 
-/// [Defs] for 
+/// [Defs] for an [Absolute]
 #[derive(Clone,Getters,Builder)]
 pub struct Defs
 {
-    r#absolute: Absolute,
+    r#specific: SpecificLoc,
     /// types support inheritance and their
     /// multiple type definition layers that are composited.
     /// [Layer]s define inheritance in regular order.  The last
     /// layer is the [Type]  of this [Defs] composite.
     #[getset(skip)]
-    layers: IndexMap<Absolute, Layer>,
+    layers: IndexMap<Type,Vec<Layer>>,
 }
 
 impl Defs
 {
-    pub fn new(r#absolute: Absolute, layers: IndexMap<SpecificLoc, Layer>) -> Result<Defs, err::TypeErr> {
-        if layers.is_empty() {
-            Err(err::TypeErr::empty_meta(r#absolute.r#type))
-        } else {
-            Ok(Defs {
-                r#absolute,
-                layers: Default::default(),
+    pub fn new(specific: SpecificLoc) -> Result<Defs, err::TypeErr> {
+
+            Ok(Self {
+                specific,
+                layers: IndexMap::default(),
             })
+    }
+    
+    pub fn add_layer(& mut self, r#type: Type, layer: Layer) {
+        match self.layers.get_mut(&r#type) {
+            None => {
+                self.layers.insert(r#type, vec![layer]);
+            }
+            Some(layers) => layers.push(layer),
         }
     }
+    
+    pub fn create_layer_composite(&self) -> Result<Composite,TypeErr> {
+        let mut rtn = Composite::of(self.specific.clone());
+        
+        for (r#type, layers) in &self.layers {
+            for layer in layers {
+                for change in &layer.changes {
+                    let absolute = Absolute::new(Default::default(),r#type.clone(),self.specific.clone());
 
-    pub fn to_type(&self) -> & Type {
-        & self.r#absolute.r#type
+                    let mut ty_comp= match rtn.types.get_mut(&change.r#type) {
+                        None => {
+                            let ty_comp = TypeComposite::of(absolute);
+                            rtn.types.insert(change.r#type.clone(), ty_comp);
+                            rtn.types.get_mut(&change.r#type).unwrap()
+                        }
+                        Some(ty_comp) => ty_comp
+                    };
+                    
+                    match &change.action {
+                        Action::Add(add) => {
+                            match add {
+                                Add::Property(prop) => { ty_comp.properties.insert(prop.name.clone(), prop.clone()); }
+                            }
+                        }
+                        Action::Remove(remove) => {
+                            match remove {
+                                Remove::Type => {
+                                    rtn.types.remove(&change.r#type);
+                                },
+                                Remove::Property(name) => {
+                                    ty_comp.properties.remove(name);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(rtn)
     }
+
+
 
     pub fn describe(&self) -> String {
         todo!()
         //            format!("Meta definitions for type '{}'", Self::name(())
     }
 
-    pub fn r#type(&self) -> &Type {
-        &self.absolute.r#type
-    }
-
-    fn first(&self) -> &Layer {
-        /// it's safe to unwrap because [Defs::new] will not accept empty defs
-        self.layers.first().map(|(_, layer)| layer).unwrap()
-    }
 
     fn layer_by_index(&self, index: usize) -> Result<&Layer, err::TypeErr> {
 /*        self.defs
@@ -68,74 +104,82 @@ impl Defs
         todo!()
     }
 
-    fn layer_by_absolute(&self, loc: &Absolute) -> Result<&Layer, err::TypeErr> {
-        self.layers
-            .get(loc)
-            .ok_or(err::TypeErr::absolute_not_found(
-                loc.clone(),
-                self.describe(),
-            ))
-    }
 
-    /*
-    pub fn specific(&self) -> &SpecificLoc {
-        &self.first().specific
-    }
-    
-     */
 
-    pub fn by_index(
-        &self,
-        index: usize,
-    ) -> Result<MetaLayerAccess, err::TypeErr> {
-        Ok(MetaLayerAccess::new(self, self.layer_by_index(index)?))
-    }
-
-    pub fn by_absolute(
-        &self,
-        absolute: &Absolute,
-    ) -> Result<MetaLayerAccess, err::TypeErr> {
-        Ok(MetaLayerAccess::new(
-            self,
-            self.layer_by_absolute(absolute)?,
-        ))
-    }
 }
 
 
 
-
-pub(crate) struct MetaLayerAccess<'y>
-{
-    meta: &'y Defs,
-    layer: &'y Layer,
-}
-
-impl<'y> MetaLayerAccess<'y>
-{
-    fn new(meta: &'y Defs, layer: &'y Layer) -> MetaLayerAccess<'y> {
-        Self { meta, layer }
-    }
-
-    pub fn get_type(&'y self) -> &'y Type {
-        self.meta.to_type()
-    }
-
-    pub fn meta(&'y self) -> &'y Defs {
-        self.meta
-    }
-
-
-    pub fn layer(&'y self) -> &'y Layer {
-        self.layer
-    }
-}
 
 #[derive(Clone,Builder,Getters)]
 pub struct Layer {
     specific: SpecificLoc,
-    properties: HashMap<SkewerCase,PropertyDef>,
+    changes: Vec<Change>,
 }
+
+/// each [Layer] can modify the defs of it's inherited [Layer]...
+/// including the ability to remove [PropertyDef] ... etc
+
+
+#[derive(Clone)]
+pub struct Change {
+    r#type: Type,
+    action: Action,
+}
+
+#[derive(Clone)]
+pub enum Action{
+    Add(Add),
+    Remove(Remove),
+}
+
+/// no need for [Add::Type] since it will happen automatically when any element
+/// of its composite is added.  
+#[derive(Clone)]
+pub enum Add {
+    Property(PropertyDef),
+}
+
+#[derive(Clone)]
+pub enum Remove{
+    /// remove an entire [Type] from the composite
+    Type,
+    Property(SnakeCase),
+}
+
+#[derive(Clone)]
+pub struct TypeComposite {
+    absolute: Absolute,
+    properties: HashMap<SnakeCase,PropertyDef>,
+}
+
+impl TypeComposite {
+    pub fn of( absolute: Absolute) -> Self {
+        Self {
+            absolute,
+            properties: Default::default(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Composite {
+    specific: SpecificLoc,
+    types: HashMap<Type, TypeComposite>,
+}
+
+impl Composite {
+   pub fn of(specific: SpecificLoc) -> Self {
+       Self {
+           specific,
+           types: Default::default()
+       }
+   } 
+}
+
+
+
+
 
 
 
