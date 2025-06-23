@@ -2167,12 +2167,12 @@ pub fn template<I: Span>(input: I) -> Res<I, TemplateVar> {
 }
 
 pub fn set_property_mod<I: Span>(input: I) -> Res<I, PropertyMod> {
-    tuple((tag("+"), skewer_dot, tag("="), property_value))(input).map(
+    tuple((tag("+"), snake_case, tag("="), property_value))(input).map(
         |(next, (_, key, _, value))| {
             (
                 next,
                 PropertyMod::Set {
-                    key: key.to_string(),
+                    key: key,
                     value: value.to_string(),
                     lock: false,
                 },
@@ -2182,12 +2182,12 @@ pub fn set_property_mod<I: Span>(input: I) -> Res<I, PropertyMod> {
 }
 
 pub fn set_property_mod_lock<I: Span>(input: I) -> Res<I, PropertyMod> {
-    tuple((tag("+@"), skewer_dot, tag("="), property_value))(input).map(
+    tuple((tag("+@"), snake_case, tag("="), property_value))(input).map(
         |(next, (_, key, _, value))| {
             (
                 next,
                 PropertyMod::Set {
-                    key: key.to_string(),
+                    key,
                     value: value.to_string(),
                     lock: true,
                 },
@@ -2217,8 +2217,8 @@ pub fn property_value<I: Span>(input: I) -> Res<I, I> {
 }
 
 pub fn unset_property_mod<I: Span>(input: I) -> Res<I, PropertyMod> {
-    tuple((tag("!"), skewer_dot))(input)
-        .map(|(next, (_, name))| (next, PropertyMod::UnSet(name.to_string())))
+    tuple((tag("!"), snake_case))(input)
+        .map(|(next, (_, name))| (next, PropertyMod::UnSet(name)))
 }
 
 pub fn property_mod<I: Span>(input: I) -> Res<I, PropertyMod> {
@@ -5502,9 +5502,7 @@ pub mod cmd_test {
     use crate::selector::{PointHierarchy, PointKindSeg};
     use crate::util::ToResolved;
 
-    use crate::parse::{
-        command, create_command, point_selector, publish_command, script, upload_blocks, CamelCase,
-    };
+    use crate::parse::{command, create_command, point_selector, publish_command, script, upload_blocks, CamelCase, SkewerCase, SnakeCase};
     /*
     #[mem]
     pub async fn test2() -> Result<(),Error>{
@@ -5623,7 +5621,8 @@ pub mod cmd_test {
         let mut command = result(create_command(new_span(input)))?;
         let command = command.collapse()?;
         if let Command::Create(create) = command {
-            assert!(create.properties.get("config").is_some());
+            let config = SnakeCase::from_str("config").unwrap();
+            assert!(create.properties.get(&config).is_some());
         } else {
             assert!(false);
         }
