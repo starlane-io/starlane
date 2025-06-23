@@ -1,18 +1,14 @@
-use crate::parse::util::Span;
-use crate::parse::Res;
-use crate::types::archetype::Archetype;
-use crate::types::scope::Segment;
+use crate::kind::Specific;
 use crate::types::specific::SpecificLoc;
 use crate::types::{err, Absolute, Type};
 use derive_builder::Builder;
 use getset::Getters;
 use indexmap::IndexMap;
-use nom::multi::separated_list1;
-use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone,Getters,Builder)]
+#[derive(Clone,Getters,Builder,Serialize,Deserialize)]
 pub struct Meta
 {
     r#absolute: Absolute,
@@ -21,7 +17,7 @@ pub struct Meta
     /// [Layer]s define inheritance in regular order.  The last
     /// layer is the [Type]  of this [Meta] composite.
     #[getset(skip)]
-    defs: IndexMap<SpecificSliceLoc, Layer>,
+    defs: IndexMap<SpecificLoc, Layer>,
 }
 
 impl Meta
@@ -69,7 +65,7 @@ impl Meta
         todo!()
     }
 
-    fn layer_by_specific(&self, loc: &SpecificSliceLoc) -> Result<&Layer, err::TypeErr> {
+    fn layer_by_specific(&self, loc: &SpecificLoc) -> Result<&Layer, err::TypeErr> {
         self.defs
             .get(loc)
             .ok_or(err::TypeErr::specific_not_found(
@@ -94,7 +90,7 @@ impl Meta
 
     pub fn by_specific(
         &self,
-        specific: &SpecificSliceLoc,
+        specific: &SpecificLoc,
     ) -> Result<MetaLayerAccess, err::TypeErr> {
         Ok(MetaLayerAccess::new(
             self,
@@ -132,51 +128,19 @@ impl<'y> MetaLayerAccess<'y>
     }
 }
 
-#[derive(Clone,Builder,Getters)]
+#[derive(Clone,Builder,Getters,Serialize,Deserialize)]
 pub struct Layer {
-    id: SpecificSliceLoc,
+    specific: Specific,
     types: HashMap<Type, Meta>,
 }
 
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash,Builder)]
-pub struct SpecificSliceLoc {
-   specific: SpecificLoc, 
-    
-   /// the hierarchy of [SliceLoc]s in `reverse` order
-   ancestors: Vec<Segment>
-}
-
-
-impl Display for SpecificSliceLoc {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f,"{}",self.specific)?;
-        /// iterate in `reverse` since `SpecificSliceLoc::ancestors` 
-        for (index,slice) in self.ancestors.iter().rev().enumerate() {
-            write!(f, "{}", slice)?;
-            if index != self.ancestors.len() - 1 {
-                write!(f, ":")?;
-            }
-        }
-        Ok(())
-    }
-}
 
 
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash,Builder)]
-pub struct Package {
-  pub specific: SpecificLoc,
-  pub title: String,
-  pub slices: Vec<SliceLoc>,
-}
 
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash,derive_builder::Builder)]
-pub struct SliceLoc {
-  segment: Segment,
-  ancestors: Vec<Box<SliceLoc>>,
-}
+
 
 
 

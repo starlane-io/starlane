@@ -99,6 +99,7 @@ use std::fmt::Formatter;
 use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
+use serde::de::DeserializeOwned;
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
 use crate::types::archetype::Archetype;
@@ -1641,6 +1642,8 @@ impl<'de> Deserialize<'de> for Domain {
     }
 }
 
+impl DeserializeOwned for Domain {}
+
 impl FromStr for Domain {
     type Err = ParseErrs;
 
@@ -1654,6 +1657,9 @@ impl Display for Domain {
         f.write_str(self.string.as_str())
     }
 }
+
+
+
 
 impl Deref for Domain {
     type Target = String;

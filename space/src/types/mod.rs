@@ -24,6 +24,8 @@ use parse::Delimited;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::str::FromStr;
+use serde::{Deserialize, Deserializer, Serialize};
+use serde::de::DeserializeOwned;
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
 
@@ -46,7 +48,7 @@ pub mod archetype;
 
 /// [class::Class::Database] is an example of an [Type] because it is not an [ExactDef]
 /// which references a definition in [SpecificLoc]
-#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(TypeDisc))]
 #[strum_discriminants(derive(
@@ -135,21 +137,23 @@ pub type Absolute = Scaffold<Scope, Type, SpecificLoc>;
 
 pub type AbsoluteSelector = Scaffold<Pattern<Scope>, Pattern<Type>, SpecificSelector>;
 
-#[derive(Clone, Eq, PartialEq, Hash,Getters)]
+#[derive(Clone, Eq, PartialEq, Hash,Getters,Serialize,Deserialize)]
 pub struct Scaffold<Scope, T, SpecificLoc>
 where
-    Scope: Archetype,
-    SpecificLoc: Clone + Eq + PartialEq + Hash,
+    Scope: Archetype+Serialize+DeserializeOwned+Default,
+    SpecificLoc: Clone + Eq + PartialEq + Hash+serde::Serialize+DeserializeOwned
 {
     scope: Scope,
     r#type: T,
     specific: SpecificLoc,
 }
 
+
 impl <Scope, T, SpecificLoc> Scaffold<Scope, T, SpecificLoc>
 where
-    Scope: Archetype,
-    SpecificLoc: Clone + Eq + PartialEq + Hash,
+
+    Scope: Archetype+Serialize+DeserializeOwned+Default,
+    SpecificLoc: Clone + Eq + PartialEq + Hash+serde::Serialize+DeserializeOwned,
 {
     pub fn new(scope: Scope, r#type: T, specific: SpecificLoc) -> Self {
         Self {scope,
@@ -163,8 +167,9 @@ where
 #[derive(Clone)]
 pub struct AbsoluteLex<Scope, Specific>
 where
-    Scope: Archetype + Clone,
-    Specific: Archetype,
+Scope: Archetype+Serialize+DeserializeOwned+Default,
+Specific: Clone + Eq + PartialEq + Hash+serde::Serialize+DeserializeOwned,
+
 {
     r#absolute: Scaffold<Scope, CamelCase, Option<Specific>>,
     disc: TypeDisc,
@@ -175,7 +180,7 @@ impl<Scope, T, Specific> TryInto<Scaffold<Scope, T, Specific>>
 where
     Scope: Archetype + Default,
     T: From<Class> + From<Data> + Archetype,
-    Specific: Archetype
+    Specific: Archetype + for<'y> Deserialize<'y>
 {
     type Error = ParseErrs;
 
@@ -502,13 +507,29 @@ pub mod test2 {
 
 
     #[test]
-    pub fn test_slices() {
+    pub fn test_specific_slice_segments() {
         let specific = result(SpecificLoc::parser(new_span("contrib:package:1.0.0::slice"))).unwrap();
 
-        assert_eq!("contrib", specific.contributor().as_str());
-        assert_eq!("package", specific.package().as_str());
-        assert_eq!("1.0.0", specific.version().clone().to_string().as_str());
-        assert!(!specific.slices().is_empty())
+        assert_eq!(1,specific.slices().len());
+        assert_eq!("slice", specific.slices().first().unwrap().clone().to_string().as_str());
+
+
+        let specific = result(SpecificLoc::parser(new_span("contrib:package:1.0.0::one:two"))).unwrap();
+
+        assert_eq!(2,specific.slices().len());
+        let segments = specific.slices().clone();
+        let mut i = segments.iter();
+        assert_eq!("one", i.next().unwrap().clone().to_string().as_str());
+        assert_eq!("two", i.next().unwrap().clone().to_string().as_str());
+        
+        /// test [Segment::Version]
+        let specific = result(SpecificLoc::parser(new_span("contrib:package:1.0.0::1.2.3:two"))).unwrap();
+        assert_eq!(2,specific.slices().len());
+
+        let segments = specific.slices().clone();
+        let mut i = segments.iter();
+        assert_eq!("1.2.3", i.next().unwrap().clone().to_string().as_str());
+        assert_eq!("two", i.next().unwrap().clone().to_string().as_str());
     }
 
     #[test]

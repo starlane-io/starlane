@@ -54,7 +54,7 @@ uuid = { workspace = true, features = ["v4"] }
 chrono = { workspace = true, features = ["serde"] }
 tokio = { workspace = true, features = ["full"] }
 eyre = { workspace = true }
-indexmap = { workspace = true }
+indexmap = { workspace = true, features = ["serde"] }
 getset= { workspace = true }
 
 async-trait = { workspace = true }

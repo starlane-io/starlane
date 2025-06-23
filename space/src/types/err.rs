@@ -1,6 +1,5 @@
 use strum_macros::Display;
 use thiserror::Error;
-use crate::types::def::SpecificSliceLoc;
 use crate::types::specific::SpecificLoc;
 use crate::types::Type;
 
@@ -13,7 +12,7 @@ pub enum TypeErr {
     #[error("{kind} Meta::by_layer({tried}) index out of bounds because exceeds layers length {len}")]
     MetaLayerIndexOutOfBounds{ kind: Type, tried: usize, len: usize,  },
     #[error("specific '{specific} not found in '{search_location}'")]
-    SpecificNotFound{ search_location: String ,specific: SpecificSliceLoc },
+    SpecificNotFound{ search_location: String ,specific: SpecificLoc},
 }
 
 impl TypeErr {
@@ -32,7 +31,7 @@ impl TypeErr {
         Self::MetaLayerIndexOutOfBounds {kind, tried, len}
     }
 
-    pub fn specific_not_found(specific: SpecificSliceLoc, search_location: String) -> Self {
+    pub fn specific_not_found(specific: SpecificLoc, search_location: String) -> Self {
         Self::SpecificNotFound {search_location, specific}
     }
 }
