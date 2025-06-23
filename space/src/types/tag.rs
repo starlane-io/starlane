@@ -1,6 +1,6 @@
 use crate::parse::SkewerCase;
 use crate::point;
-use crate::types::specific::Specific;
+use crate::types::specific::SpecificLoc;
 
 #[non_exhaustive]
 pub enum VersionTag{
@@ -8,7 +8,7 @@ pub enum VersionTag{
     /// 1. [VersionTag::Using] (if set)
     /// 2. [VersionTag::Latest] use the latest
     Default,
-    /// the global version number for [Specific]
+    /// the global version number for [SpecificLoc]
     Using,
     /// reference the latest version...
     Latest,

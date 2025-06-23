@@ -1,9 +1,9 @@
 use crate::command::direct::create::KindTemplate;
 use crate::err::{ParseErrs, PrintErr};
 use crate::loc::{
-    ProvisionAffinity, StarKey, ToBaseKind, Version, CONTROL_WAVE_TRAVERSAL_PLAN,
-    MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
-    STD_WAVE_TRAVERSAL_PLAN,
+  ProvisionAffinity, StarKey, ToBaseKind, VersionSegLoc, CONTROL_WAVE_TRAVERSAL_PLAN,
+  MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
+  STD_WAVE_TRAVERSAL_PLAN,
 };
 use crate::parse::util::new_span;
 use crate::parse::util::result;
@@ -818,7 +818,7 @@ pub struct Specific {
     pub vendor: Domain,
     pub product: SkewerCase,
     pub variant: SkewerCase,
-    pub version: Version,
+    pub version: VersionSegLoc,
 }
 
 impl Equivalent<Specific> for &Specific {

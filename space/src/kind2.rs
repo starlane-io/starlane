@@ -1,5 +1,5 @@
 use crate::err::SpaceErr;
-use crate::loc::Version;
+use crate::loc::VersionSegLoc;
 use crate::parse::{CamelCase, Domain, SkewerCase};
 use crate::selector::VersionReq;
 use serde::{Deserialize, Serialize};
@@ -241,15 +241,15 @@ pub struct SpecificDef<Domain, Skewer, Version> {
     pub version: Version,
 }
 
-pub type Specific = SpecificDef<Domain, SkewerCase, Version>;
+pub type Specific = SpecificDef<Domain, SkewerCase, VersionSegLoc>;
 
 impl Specific {
     pub fn new(
-        provider: Domain,
-        vendor: Domain,
-        product: SkewerCase,
-        variant: SkewerCase,
-        version: Version,
+      provider: Domain,
+      vendor: Domain,
+      product: SkewerCase,
+      variant: SkewerCase,
+      version: VersionSegLoc,
     ) -> Self {
         Self {
             provider,
@@ -379,8 +379,8 @@ where
     }
 }
 
-impl IsMatch<Version> for VersionReq {
-    fn is_match(&self, other: &Version) -> bool {
+impl IsMatch<VersionSegLoc> for VersionReq {
+    fn is_match(&self, other: &VersionSegLoc) -> bool {
         self.version.matches(&other.version)
     }
 }
@@ -823,18 +823,18 @@ pub mod test {
         SpecificSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull, VariantFullSelector,
         VersionSelector,
     };
-    use crate::loc::Version;
+    use crate::loc::VersionSegLoc;
     use crate::parse::{CamelCase, Domain, SkewerCase};
     use crate::selector::VersionReq;
     use core::str::FromStr;
 
     fn create_specific() -> Specific {
         Specific::new(
-            Domain::from_str("my-domain.com").unwrap(),
-            Domain::from_str("my-domain.com").unwrap(),
-            SkewerCase::from_str("product").unwrap(),
-            SkewerCase::from_str("variant").unwrap(),
-            Version::from_str("1.0.0").unwrap(),
+          Domain::from_str("my-domain.com").unwrap(),
+          Domain::from_str("my-domain.com").unwrap(),
+          SkewerCase::from_str("product").unwrap(),
+          SkewerCase::from_str("variant").unwrap(),
+          VersionSegLoc::from_str("1.0.0").unwrap(),
         )
     }
 

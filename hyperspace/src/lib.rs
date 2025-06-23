@@ -23,3 +23,4 @@ pub mod tests;
 pub mod service;
 pub mod template;
 pub mod cache;
+pub mod package;

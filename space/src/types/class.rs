@@ -1,8 +1,7 @@
 use crate::parse::util::Span;
 use crate::parse::{CamelCase, Res};
 use crate::types::class::service::Service;
-use crate::types::private::{ Delimited, Parsable};
-use crate::types::private;
+use crate::types::parse;
 use core::str::FromStr;
 use derive_name::Name;
 use nom::Parser;
@@ -10,6 +9,8 @@ use serde_derive::{Deserialize, Serialize};
 use starlane_space::parse::from_camel;
 use std::borrow::Borrow;
 use strum_macros::EnumDiscriminants;
+use crate::types::archetype::Archetype;
+use crate::types::parse::Delimited;
 
 #[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
 #[strum_discriminants(vis(pub))]
@@ -78,10 +79,8 @@ pub enum Class {
 pub mod service {
     use crate::parse::CamelCase;
     use crate::types::class::Class;
-    use crate::types::private::Super;
     use derive_name::Name;
     use serde_derive::{Deserialize, Serialize};
-    use starlane_space::types::private::Variant;
     use strum_macros::{EnumDiscriminants, EnumString};
 
     /// variants for [super::Class::Service]
@@ -108,7 +107,7 @@ pub mod service {
     #[non_exhaustive]
     pub enum Service {
         /// an external facing web service such as `Nginx`
-        Web,
+        Http,
         /// a ref to a `Database Cluster` that serves [super::Class::Database] instances... NOT the same as
         Database,
         /// example: a `KeyCloak` instance which provides [super::Class::UserBase] which
@@ -125,13 +124,13 @@ pub mod service {
         }
     }
 
+    pub trait Variant {
+        type Root;
+        
+    }
 
     impl Variant for Service {
         type Root = Class;
-
-        fn parent(&self) -> Super<Self::Root> {
-            Super::Root(self.clone().into())
-        }
     }
 
 }
@@ -142,7 +141,7 @@ impl Delimited for Class {
     }
 }
 
-impl private::Parsable for Class {
+impl Archetype for Class {
 
     fn parser<I>(input: I) -> Res<I, Self>
     where

@@ -1,22 +1,23 @@
-use derive_name::Name;
-use nom::branch::alt;
-use nom::bytes::complete::tag;
-use nom::combinator::{into, not, opt, peek, value};
-use nom::error::{ErrorKind, FromExternalError, ParseError};
-use nom::multi::many1;
-use nom::sequence::{delimited, tuple, Tuple};
-use nom_supreme::context::ContextError;
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
-use itertools::Itertools;
-use strum_macros::EnumDiscriminants;
-use thiserror::Error;
-use crate::parse::{lex_block, Res};
 use crate::parse::model::{BlockKind, LexBlock, NestedBlockKind};
-use crate::parse::util::{new_span, Span};
+use crate::parse::util::Span;
+use crate::parse::{lex_block, Res};
 use crate::types::class::Class;
 use crate::types::data::Data;
 use crate::types::scope::Scope;
+use derive_name::Name;
+use itertools::Itertools;
+use nom::branch::alt;
+use nom::bytes::complete::tag;
+use nom::combinator::opt;
+use nom::error::{ErrorKind, FromExternalError, ParseError};
+use nom::sequence::{tuple, Tuple};
+use nom_supreme::context::ContextError;
+use std::fmt::{Display, Formatter};
+use std::hash::Hash;
+use std::str::FromStr;
+use strum_macros::EnumDiscriminants;
+use thiserror::Error;
+use archetype::Archetype;
 
 pub mod class;
 pub mod data;
@@ -25,239 +26,237 @@ pub mod err;
 pub mod registry;
 pub mod specific;
 
-pub mod id;
+pub mod def;
 pub mod parse;
 pub mod scope;
 pub mod selector;
 pub mod tag;
 #[cfg(test)]
 pub mod test;
+pub mod archetype;
 //pub(crate) trait Typical: Display+Into<TypeKind>+Into<Type> { }
 
-/// [class::Class::Database] is an example of an [Abstract] because it is not an [ExactDef]
-/// which references a definition in [Specific]
+/// [class::Class::Database] is an example of an [Type] because it is not an [ExactDef]
+/// which references a definition in [SpecificLoc]
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display)]
 #[strum_discriminants(vis(pub))]
-#[strum_discriminants(name(AbstractDisc))]
+#[strum_discriminants(name(TypeDisc))]
 #[strum_discriminants(derive(
     Hash,
     strum_macros::EnumString,
     strum_macros::ToString,
     strum_macros::IntoStaticStr
 ))]
-pub enum Abstract {
+pub enum Type {
     Class(Class),
     Data(Data),
 }
 
-impl Abstract {
-
+impl Type {
     pub fn parse_lex_block<I>(input: I) -> Res<I, LexBlock<I>>
     where
         I: Span,
     {
         alt((
-            
-                lex_block(BlockKind::Nested(NestedBlockKind::Angle)),
-                lex_block(BlockKind::Nested(NestedBlockKind::Square)),
+            lex_block(BlockKind::Nested(NestedBlockKind::Angle)),
+            lex_block(BlockKind::Nested(NestedBlockKind::Square)),
         ))(input)
     }
-
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Generic<Scope, Abstract, Specific>
+pub struct TypeLocation<Scope, Type, Specific>
 where
-    Scope: Parsable + Default,
-    Abstract: Clone,
+    Scope: Archetype + Default,
+    Type: Clone,
     Specific: Clone,
 {
-    pub scope: Scope,
-    pub r#abstract: Abstract,
-    pub specific: Specific,
+    scope: Scope,
+    r#type: Type,
+    slice: Specific,
 }
 
-
-/// [CategoryGeneric] stands for `category` ... a [Generic] is a category
-/// if a [Specific] is not supplied
+/// [CategoryGeneric] stands for `category` ... a [Type] is a category
+/// if a [SpecificLoc] is not supplied
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct CategoryGeneric<Scope, Abstract>
+pub struct CategoryGeneric<Scope, Type>
 where
-    Scope: Parsable + Default,
+    Scope: Archetype + Default,
 {
     pub scope: Scope,
-    pub r#abstract: Abstract,
+    pub r#type: Type,
 }
 
-impl<Scope, Abstract, Specific> From<Generic<Scope, Abstract, Specific>> for CategoryGeneric<Scope, Abstract>
-where
-    Scope: Parsable + Default,
-    Specific: std::clone::Clone,
-    Specific: std::clone::Clone,
-    Abstract: std::clone::Clone,
-{
-    fn from(gen: Generic<Scope, Abstract, Specific>) -> Self {
-        Self {
-            scope: gen.scope,
-            r#abstract: gen.r#abstract,
-        }
-    }
-}
-
-impl AbstractDisc {
+impl TypeDisc {
     pub fn get_delimiters(&self) -> (&'static str, &'static str) {
         match self {
-            AbstractDisc::Class => ("<", ">"),
-            AbstractDisc::Data => ("[", "]"),
+            TypeDisc::Class => ("<", ">"),
+            TypeDisc::Data => ("[", "]"),
         }
     }
 
-    pub fn parser<I>(&self) -> impl FnMut(I) -> Res<I, Abstract> where I: Span {
+    pub fn parser<I>(&self) -> impl FnMut(I) -> Res<I, Type>
+    where
+        I: Span,
+    {
         match self {
-            AbstractDisc::Class => |i| Class::parser(i).map(|(next,r#abstract)| (next, r#abstract.into())),
-            AbstractDisc::Data => |i| Data::parser(i).map(|(next,r#abstract)| (next, r#abstract.into())),
+            TypeDisc::Class => |i| Class::parser(i).map(|(next, r#type)| (next, r#type.into())),
+            TypeDisc::Data => |i| Data::parser(i).map(|(next, r#type)| (next, r#type.into())),
         }
     }
 }
 
-impl From<Class> for Abstract {
+impl From<Class> for Type {
     fn from(value: Class) -> Self {
-        Abstract::Class(value)
+        Type::Class(value)
     }
 }
 
-impl From<Data> for Abstract {
+impl From<Data> for Type {
     fn from(value: Data) -> Self {
-        Abstract::Data(value)
+        Type::Data(value)
     }
 }
 
-pub type AsType = dyn Into<Full>;
-pub type AsTypeKind = dyn Into<Abstract>;
+pub type AsType = dyn Into<Absolute>;
+pub type AsTypeKind = dyn Into<Type>;
 
-pub type FullAbstract<Abstract: Parsable> = Generic<Scope, Abstract, Specific>;
+pub type AbsoluteAbsoluteGeneric<Type: Archetype> = Scaffold<Scope, Type, SpecificLoc>;
 
-pub type Full = Generic<Scope, Abstract, Specific>;
+pub type Absolute = Scaffold<Scope, Type, SpecificLoc>;
 
-pub type FullSelector = Generic<Pattern<Scope>, Pattern<Abstract>, SpecificSelector>;
+pub type AbsoluteSelector = Scaffold<Pattern<Scope>, Pattern<Type>, SpecificSelector>;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct GenericLex<Scope, Specific>
+#[derive(Clone, Eq, PartialEq, Hash)]
+pub struct Scaffold<Scope, T, SpecificLoc>
 where
-    Scope: Parsable + Default,
-    Specific: Parsable,
+    Scope: Archetype,
+    T: Archetype,
+    SpecificLoc: Clone + Eq + PartialEq + Hash,
 {
-    generic: Generic<Scope, CamelCase, Option<Specific>>,
-    disc: AbstractDisc,
+    scope: Scope,
+    r#type: T,
+    specific: SpecificLoc,
 }
 
-impl <Scope,Abstract,Specific> TryInto<Generic<Scope,Abstract,Specific>> for GenericLex<Scope, Specific>
+#[derive(Clone)]
+pub struct AbsoluteLex<Scope, Specific>
 where
-Scope: Parsable + Default,
-Abstract: From<Class>+From<Data>+Clone,
-Specific: Parsable{
+    Scope: Archetype + Clone,
+    Specific: Archetype,
+{
+    r#absolute: Scaffold<Scope, CamelCase, Option<Specific>>,
+    disc: TypeDisc,
+}
 
+impl<Scope, T, Specific> TryInto<Scaffold<Scope, T, Specific>>
+    for AbsoluteLex<Scope, Specific>
+where
+    Scope: Archetype + Default,
+    T: From<Class> + From<Data> + Archetype,
+    Specific: Archetype
+{
     type Error = ParseErrs;
 
-    fn try_into(self) -> Result<Generic<Scope, Abstract, Specific>, Self::Error> {
-        let r#abstract = match self.disc {
-            AbstractDisc::Class => {
-                let class: Class = self.generic.r#abstract.into();
+    fn try_into(self) -> Result<Scaffold<Scope, T, Specific>, Self::Error> {
+        let r#type = match self.disc {
+            TypeDisc::Class => {
+                let class: Class = self.r#absolute.r#type.into();
                 class.into()
             }
-            AbstractDisc::Data => {
-                let data: Data = self.generic.r#abstract.into();
+            TypeDisc::Data => {
+                let data: Data = self.r#absolute.r#type.into();
                 data.into()
             }
         };
 
-        Ok(Generic {
-            scope: self.generic.scope,
-            r#abstract,
-            specific: self.generic.specific.ok_or(ParseErrs::expected( "TryInto<Generic>","Specific", "None"))?,
+        Ok(Scaffold {
+            scope: self.r#absolute.scope,
+            r#type,
+            specific: self.r#absolute.specific.ok_or(ParseErrs::expected(
+                "TryInto<Generic>",
+                "Specific",
+                "None",
+            ))?,
         })
     }
 }
 
-impl <Scope,Abstract,Specific> Into<CategoryGeneric<Scope,Abstract>> for GenericLex<Scope, Specific>
+impl<Scope, T, Specific> Into<CategoryGeneric<Scope, T>> for AbsoluteLex<Scope, Specific>
 where
-    Scope: Parsable + Default,
-    Abstract: From<Class>+From<Data>+Clone,
-    Specific: Parsable+Clone {
-
-    fn into(self) -> CategoryGeneric<Scope, Abstract> {
-        let r#abstract = match self.disc {
-            AbstractDisc::Class => {
-                let class: Class = self.generic.r#abstract.into();
+    Scope: Archetype + Default,
+    T: From<Class> + From<Data> + Clone,
+    Specific: Archetype + Clone,
+{
+    fn into(self) -> CategoryGeneric<Scope, T> {
+        let r#type = match self.disc {
+            TypeDisc::Class => {
+                let class: Class = self.r#absolute.r#type.into();
                 class.into()
             }
-            AbstractDisc::Data => {
-                let data: Data = self.generic.r#abstract.into();
+            TypeDisc::Data => {
+                let data: Data = self.r#absolute.r#type.into();
                 data.into()
             }
         };
 
         CategoryGeneric {
-            scope: self.generic.scope,
-            r#abstract,
+            scope: self.r#absolute.scope,
+            r#type: r#type,
         }
     }
 }
-impl<Specific> Display for GenericLex<Scope, Specific>
+impl<Specific> Display for AbsoluteLex<Scope, Specific>
 where
-    Specific: Parsable,
+    Specific: Archetype,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", self.generic.scope, self.generic.r#abstract)?;
-        if let Some(specific) = &self.generic.specific {
-            write!(f,"@{}", specific )?;
+        write!(f, "{}{}", self.r#absolute.scope, self.r#absolute.r#type)?;
+        if let Some(specific) = &self.r#absolute.specific {
+            write!(f, "@{}", specific)?;
         }
         Ok(())
     }
 }
-impl<Scope,Specific> GenericLex<Scope, Specific>
+impl<Scope, Specific> AbsoluteLex<Scope, Specific>
 where
-    Scope: Parsable+Default,
-    Specific: Parsable,
+    Scope: Archetype + Default,
+    Specific: Archetype,
 {
-
     fn outer_parser<I>(input: I) -> Res<I, Self>
     where
         I: Span,
     {
-        
-        let (next, block) = Abstract::parse_lex_block(input.clone())?;
-        
+        let (next, block) = Type::parse_lex_block(input.clone())?;
+
         let disc = match block.kind {
-            BlockKind::Nested(NestedBlockKind::Angle) => AbstractDisc::Class,
-            BlockKind::Nested(NestedBlockKind::Square) => AbstractDisc::Data,
+            BlockKind::Nested(NestedBlockKind::Angle) => TypeDisc::Class,
+            BlockKind::Nested(NestedBlockKind::Square) => TypeDisc::Data,
             kind => {
-                    let tree = nom::Err::Error(NomErr::from_error_kind(input, ErrorKind::Fail));
-                    return Err(tree);
+                let tree = nom::Err::Error(NomErr::from_error_kind(input, ErrorKind::Fail));
+                return Err(tree);
             }
         };
-        
+
         tuple((
             opt(Scope::parser),
             camel_case,
             opt(preceded(tag("@"), Specific::parser)),
         ))(block.content)
-            .map(|(_, (scope, r#abstract, specific))| {
-                let scope = scope.unwrap_or_default();
-                let generic = Generic {
-                    scope,
-                    r#abstract,
-                    specific,
-                };
+        .map(|(_, (scope, r#type, specific))| {
+            let scope = scope.unwrap_or_default();
+            let generic = Scaffold {
+                scope,
+                r#type,
+                specific,
+            };
 
-                let lex = Self { generic, disc };
+            let lex = Self { r#absolute: generic, disc };
 
-                (next, lex)
-            })
+            (next, lex)
+        })
     }
 }
-
-
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Error)]
 pub enum CastErr {
@@ -266,20 +265,20 @@ pub enum CastErr {
 }
 
 /*
-impl<Scope, Abstract, Specific> TryInto<Generic<Scope, Abstract, Specific>>
+impl<Scope, Type, Specific> TryInto<Generic<Scope, Type, Specific>>
     for GenericLex<Scope, Specific>
 where
     Scope: Parsable + Default,
     Specific: Parsable,
-    Abstract: From<CamelCase> + Clone,
+    Type: From<CamelCase> + Clone,
 {
     type Error = CastErr;
 
-    fn try_into(self) -> Result<Generic<Scope, Abstract, Specific>, Self::Error> {
+    fn try_into(self) -> Result<Generic<Scope, Type, Specific>, Self::Error> {
         if let Some(specific) = self.generic.specific {
             Ok(Generic {
                 scope: self.generic.scope,
-                r#abstract: self.generic.r#abstract.into(),
+                r#type: self.generic.r#type.into(),
                 specific,
             })
         } else {
@@ -291,53 +290,52 @@ where
  */
 
 /*
-impl<Scope, Abstract, Specific> Into<CategoryGeneric<Scope, Abstract>> for GenericLex<Scope, Specific>
+impl<Scope, Type, Specific> Into<CategoryGeneric<Scope, Type>> for GenericLex<Scope, Specific>
 where
     Scope: Parsable + Default,
-    Abstract: From<CamelCase> + Clone,
+    Type: From<CamelCase> + Clone,
     Specific: Parsable,
 {
-    fn into(self) -> CategoryGeneric<Scope, Abstract> {
+    fn into(self) -> CategoryGeneric<Scope, Type> {
         CategoryGeneric {
             scope: self.generic.scope,
-            r#abstract: self.generic.r#abstract.into(),
+            r#type: self.generic.r#type.into(),
         }
     }
 }
 
  */
 
-impl<Scope, Specific> Generic<Scope, Class, Specific>
+impl<Scope, Specific> Scaffold<Scope, Class, Specific>
 where
-    Scope: Parsable + Default,
-    Specific: Parsable,
+    Scope: Archetype + Default,
+    Specific: Archetype,
 {
-    fn abstract_disc(&self) -> &'static AbstractDisc {
-        &AbstractDisc::Class
+    fn abstract_disc(&self) -> &'static TypeDisc {
+        &TypeDisc::Class
     }
 }
 
-impl<Scope, Specific> Generic<Scope, Data, Specific>
+impl<Scope, Specific> Scaffold<Scope, Data, Specific>
 where
-    Scope: Parsable + Default,
-    Specific: Parsable,
+    Scope: Archetype + Default,
+    Specific: Archetype,
 {
-    fn abstract_disc(&self) -> &'static AbstractDisc {
-        &AbstractDisc::Data
+    fn abstract_disc(&self) -> &'static TypeDisc {
+        &TypeDisc::Data
     }
 }
-
 
 /*
-impl <Scope,Abstract,Specific> ExactGen<Scope,Abstract,Specific> {
-    pub fn new( scope: Scope, r#abstract: Abstract, specific: Specific ) -> ExactGen<Scope,Abstract,Specific>{
-        Self {scope, r#abstract, specific}
+impl <Scope,Type,Specific> ExactGen<Scope,Type,Specific> {
+    pub fn new( scope: Scope, r#type: Type, specific: Specific ) -> ExactGen<Scope,Type,Specific>{
+        Self {scope, r#type, specific}
     }
 }
 
  */
 
-impl Abstract {
+impl Type {
     pub fn convention(&self) -> Convention {
         /// it so happens everything is CamelCase, but that may change...
         Convention::CamelCase
@@ -402,464 +400,184 @@ pub enum TagWrap<S, T> {
 }
 
 use crate::err::ParseErrs;
-use crate::parse::util::{preceded};
-use crate::parse::{
-    camel_case, delim_kind_lex, unwrap_block, CamelCase, ErrCtx, NomErr,  SkewerCase,
-};
+use crate::parse::util::preceded;
+use crate::parse::{camel_case, CamelCase, NomErr, SkewerCase};
 use crate::point::Point;
 use crate::selector::Pattern;
-use crate::types::class::{ ClassDiscriminant};
-use crate::types::parse::delim::delim;
-use crate::types::parse::{class, data, identify_abstract_disc, unwrap_abstract};
-use crate::types::private::{Delimited, Parsable};
-use crate::types::specific::{Specific, SpecificSelector};
-use starlane_space::types::private::Variant;
+use crate::types::specific::{SpecificLoc, SpecificSelector};
+use parse::Delimited;
 
-pub(crate) mod private {
-    use super::specific::Specific;
-    use super::{err, Abstract, AbstractDisc, Data, Full, Generic};
-    use crate::err::ParseErrs;
-    use crate::parse::util::Span;
-    use crate::parse::{ErrCtx, NomErr, Res};
-    use crate::point::Point;
-    use crate::types::class::Class;
-    use indexmap::IndexMap;
-    use itertools::Itertools;
-    use nom::bytes::complete::tag;
-    use nom::combinator::into;
-    use nom::error::{ErrorKind, ParseError};
-    use nom::sequence::delimited;
-    use nom::Parser;
-    use nom_supreme::context::ContextError;
-    use nom_supreme::tag::TagError;
-    use std::collections::HashMap;
-    use std::fmt::Display;
-    use std::hash::Hash;
-    use std::ops::{Deref, DerefMut};
-    use std::str::FromStr;
-    use strum_macros::EnumDiscriminants;
+pub type ClassPointRef = Ref<Point, Class>;
+pub type SchemaPointRef = Ref<Point, Data>;
+pub type ParsePointRef<G: Archetype> = Ref<Point, G>;
+pub type ExactPointRef = Ref<Point, Absolute>;
 
-    /// anything that can be parsed
-    pub(crate) trait Parsable: Display+Clone
-    where
-        Self: Sized,
-    {
-        fn parser<I>(input: I) -> Res<I, Self>
-        where
-            I: Span;
+#[derive(Clone, Eq, PartialEq, Hash)]
+pub struct Ref<I, K>
+where
+    I: Clone + Eq + PartialEq + Hash,
+    K: Clone + Eq + PartialEq + Hash,
+{
+    id: I,
+    r#type: K,
+}
+
+impl<Scope, Type, Specific> Scaffold<Scope, Type, Specific>
+where
+    Scope: Archetype + Default,
+    Type: Delimited,
+    Specific: Archetype,
+{
+    pub fn of(r#type: Type, specific: Specific) -> Self {
+        Self::new(Scope::default(), r#type, specific)
     }
+}
 
-
-    pub trait Delimited: Parsable + Sized {
-        fn delimiters() -> (&'static str, &'static str);
-
-        fn delimited_parser<I, O>(f: impl FnMut(I) -> Res<I, O>) -> impl FnMut(I) -> Res<I, O>
-        where
-            I: Span,
-        {
-            delimited(tag(Self::delimiters().0), f, tag(Self::delimiters().1))
+impl<Scope, Type, Specific> Scaffold<Scope, Type, Specific>
+where
+    Scope: Archetype + Default,
+    Type: Delimited,
+    Specific: Archetype,
+{
+    pub fn new(scope: Scope, r#type: Type, specific: Specific) -> Self {
+        Self {
+            scope,
+            r#type,
+            specific,
         }
     }
 
-    /// [Variant] implies inheritance from a parent construct
-    pub(crate) trait Variant {
-        /// the base [Abstract] variant [Class] or [Data]
-        type Root: Parsable + ?Sized;
-
-        /// return the parent which may be another [Variant] or
-        /// the base level [Abstract]
-        fn parent(&self) -> Super<Self::Root>;
-
-        fn root(&self) -> Self::Root {
-            match self.parent() {
-                Super::Root(root) => root,
-                Super::Super(s) => s.root(),
-            }
-        }
+    pub fn plus_scope(self, scope: Scope) -> Self {
+        Self::new(scope, self.r#type, self.specific)
     }
 
-    /// [Member] of a [Group] for scoping purposes
-    pub(crate) trait Member {
-        fn group(&self) -> Group;
-
-        fn root(&self) -> Abstract {
-            match self.group() {
-                Group::Root(root) => root,
-                Group::Parent(s) => s.root(),
-            }
-        }
+    pub fn plus_specific(self, specific: Specific) -> Self {
+        Self::new(self.scope, self.r#type, specific)
     }
 
-    #[derive(EnumDiscriminants, strum_macros::Display)]
-    #[strum_discriminants(vis(pub))]
-    #[strum_discriminants(name(SuperDisc))]
-    #[strum_discriminants(derive(
-        Hash,
-        strum_macros::EnumString,
-        strum_macros::ToString,
-        strum_macros::IntoStaticStr
-    ))]
-    pub enum Super<A>
-    where
-        A: Parsable + ?Sized,
-    {
-        /// the `root` [Abstract] variant [Parsable] that a [Variant] derives from.
-        Root(A),
-        /// the `super` [Variant] of this [Variant] (which is not a `root`)
-        Super(Box<dyn Variant<Root = A>>),
+    pub fn r#type(&self) -> &Type {
+        &self.r#type
     }
-
-    #[derive(EnumDiscriminants, strum_macros::Display)]
-    #[strum_discriminants(vis(pub))]
-    #[strum_discriminants(name(GroupDisc))]
-    #[strum_discriminants(derive(
-        Hash,
-        strum_macros::EnumString,
-        strum_macros::ToString,
-        strum_macros::IntoStaticStr
-    ))]
-    pub enum Group {
-        /// the `root` group must be an [Abstract]
-        Root(Abstract),
-        /// parent
-        Parent(Box<dyn Member>),
-    }
-
-    /*
-    impl <K> Into<K> for Scoped<K> where K: Kind {
-        fn into(self) -> K {
-            self.item
-        }
-    }
-
-     */
-
-    pub(crate) struct Meta<G>
-    where
-        G: Parsable + Into<Abstract>,
-    {
-        /// Type is built from `kind` and the specific of the last layer
-        generic: G,
-        /// types support inheritance and their
-        /// multiple type definition layers that are composited.
-        /// Layers define inheritance in regular order.  The last
-        /// layer is the [Generic] of this [Meta] composite.
-        defs: IndexMap<Specific, Layer>,
-    }
-
-    impl<K> Meta<K>
-    where
-        K: Parsable + Into<Abstract>,
-    {
-        pub fn new(kind: K, layers: IndexMap<Specific, Layer>) -> Result<Meta<K>, err::TypeErr> {
-            if layers.is_empty() {
-                Err(err::TypeErr::empty_meta(kind.into()))
-            } else {
-                Ok(Meta {
-                    generic: kind,
-                    defs: Default::default(),
-                })
-            }
-        }
-
-        pub fn to_abstract(&self) -> Abstract {
-            self.generic.clone().into()
-        }
-
-        pub fn describe(&self) -> String {
-            todo!()
-            //            format!("Meta definitions for type '{}'", Self::name(())
-        }
-
-        pub fn generic(&self) -> &K {
-            &self.generic
-        }
-
-        fn first(&self) -> &Layer {
-            /// it's safe to unwrap because [Meta::new] will not accept empty defs
-            self.defs.first().map(|(_, layer)| layer).unwrap()
-        }
-
-        fn layer_by_index(&self, index: usize) -> Result<&Layer, err::TypeErr> {
-            self.defs
-                .get_index(index)
-                .ok_or(err::TypeErr::meta_layer_index_out_of_bounds(
-                    &self.generic.clone().into(),
-                    &index,
-                    self.defs.len(),
-                ))
-                .map(|(_, layer)| layer)
-        }
-
-        fn layer_by_specific(&self, specific: &Specific) -> Result<&Layer, err::TypeErr> {
-            self.defs
-                .get(&specific)
-                .ok_or(err::TypeErr::specific_not_found(
-                    specific.clone(),
-                    self.describe(),
-                ))
-        }
-
-        pub fn specific(&self) -> &Specific {
-            &self.first().specific
-        }
-
-        pub fn by_index<'x>(
-            &'x self,
-            index: usize,
-        ) -> Result<MetaLayerAccess<'x, K>, err::TypeErr> {
-            Ok(MetaLayerAccess::new(self, self.layer_by_index(index)?))
-        }
-
-        pub fn by_specific<'x>(
-            &'x self,
-            specific: &Specific,
-        ) -> Result<MetaLayerAccess<'x, K>, err::TypeErr> {
-            Ok(MetaLayerAccess::new(
-                self,
-                self.layer_by_specific(specific)?,
-            ))
-        }
-    }
-
-    pub(crate) struct MetaBuilder<T>
-    where
-        T: Parsable,
-    {
-        r#type: T,
-        defs: IndexMap<Specific, Layer>,
-    }
-
-    impl<T> MetaBuilder<T>
-    where
-        T: Parsable + Into<Abstract>,
-    {
-        pub fn new(typical: T) -> MetaBuilder<T> {
-            Self {
-                r#type: typical,
-                defs: Default::default(),
-            }
-        }
-
-        pub fn build(self) -> Result<Meta<T>, err::TypeErr> {
-            todo!();
-            //            Meta::new(self.r#type.into(), self.defs)
-        }
-    }
-    impl<T> Deref for MetaBuilder<T>
-    where
-        T: Parsable,
-    {
-        type Target = IndexMap<Specific, Layer>;
-
-        fn deref(&self) -> &Self::Target {
-            &self.defs
-        }
-    }
-
-    impl<T> DerefMut for MetaBuilder<T>
-    where
-        T: Parsable + Into<Abstract>,
-    {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.defs
-        }
-    }
-
-    pub(crate) struct MetaLayerAccess<'y, K>
-    where
-        K: Parsable + Into<Abstract>,
-    {
-        meta: &'y Meta<K>,
-        layer: &'y Layer,
-    }
-
-    impl<'y, K> MetaLayerAccess<'y, K>
-    where
-        K: Parsable + Into<Abstract>,
-    {
-        fn new(meta: &'y Meta<K>, layer: &'y Layer) -> MetaLayerAccess<'y, K> {
-            Self { meta, layer }
-        }
-
-        pub fn get_type(&'y self) -> Abstract {
-            self.meta.to_abstract()
-        }
-
-        pub fn meta(&'y self) -> &'y Meta<K> {
-            self.meta
-        }
-
-        pub fn specific(&'y self) -> &'y Specific {
-            self.meta.specific()
-        }
-
-        pub fn layer(&'y self) -> &'y Layer {
-            self.layer
-        }
-    }
-
-    #[derive(Clone)]
-    pub(crate) struct Layer {
-        specific: Specific,
-        classes: HashMap<Class, ClassPointRef>,
-        data: HashMap<Data, SchemaPointRef>,
-    }
-
-    pub type ClassPointRef = Ref<Point, Class>;
-    pub type SchemaPointRef = Ref<Point, Data>;
-    pub type ParselPointRef<G: Parsable> = Ref<Point, G>;
-    pub type ExactPointRef = Ref<Point, Full>;
-
-    #[derive(Clone, Eq, PartialEq, Hash)]
-    pub struct Ref<I, K>
-    where
-        I: Clone + Eq + PartialEq + Hash,
-        K: Clone + Eq + PartialEq + Hash,
-    {
-        id: I,
-        r#type: K,
-    }
-
-    impl<Scope, Abstract, Specific> Generic<Scope, Abstract, Specific>
-    where
-        Scope: Parsable + Default,
-        Abstract: Delimited,
-        Specific: Parsable,
-    {
-        pub fn of(r#abstract: Abstract, specific: Specific) -> Self {
-            Self::new(Scope::default(), r#abstract, specific)
-        }
-    }
-
-    impl<Scope, Abstract, Specific> Generic<Scope, Abstract, Specific>
-    where
-        Scope: Parsable + Default,
-        Abstract: Delimited,
-        Specific: Parsable,
-    {
-        pub fn new(scope: Scope, r#abstract: Abstract, specific: Specific) -> Self {
-            Self {
-                scope,
-                r#abstract,
-                specific,
-            }
-        }
-
-        pub fn plus_scope(self, scope: Scope) -> Self {
-            Self::new(scope, self.r#abstract, self.specific)
-        }
-
-        pub fn plus_specific(self, specific: Specific) -> Self {
-            Self::new(self.scope, self.r#abstract, specific)
-        }
-
-        pub fn r#abstract(&self) -> &Abstract {
-            &self.r#abstract
-        }
-        pub fn specific(&self) -> &Specific {
-            &self.specific
-        }
+    pub fn specific(&self) -> &Specific {
+        &self.specific
     }
 }
 
 #[cfg(test)]
 pub mod test2 {
-    use std::str::FromStr;
-    use nom::combinator::peek;
-    use nom::Parser;
-    use starlane_space::types::data::Data;
-    use crate::parse::model::{BlockKind, NestedBlockKind};
-    use crate::parse::SkewerCase;
     use crate::parse::util::{new_span, result};
+    use crate::parse::SkewerCase;
     use crate::types::class::Class;
-    use crate::types::private::{ Parsable};
-    use crate::types::specific::Specific;
-    use crate::types::{Abstract, CategoryGeneric, Full, GenericLex};
+    use crate::types::archetype::Archetype;
     use crate::types::scope::parse::scope;
     use crate::types::scope::{Scope, ScopeKeyword, Segment};
-
-
+    use crate::types::specific::SpecificLoc;
+    use crate::types::{Absolute, AbsoluteLex, CategoryGeneric, Type};
+    use nom::Parser;
+    use starlane_space::types::data::Data;
+    use std::str::FromStr;
 
     #[test]
     pub fn test_specific() {
-        use super::{Delimited, Parsable};
-        use crate::types::{err, Abstract, AbstractDisc, Data, Full, Generic};
-        let specific = result(Specific::parser( new_span("contrib:package:1.0.0") )).unwrap();
-        
-        assert_eq!( "contrib", specific.contributor.as_str() );
-        assert_eq!( "package", specific.package.as_str() );
-        assert_eq!( "1.0.0", specific.version.to_string().as_str() );
+        let specific = result(SpecificLoc::parser(new_span("contrib:package:1.0.0"))).unwrap();
+
+        assert_eq!("contrib", specific.contributor.as_str());
+        assert_eq!("package", specific.package.as_str());
+        assert_eq!("1.0.0", specific.version.to_string().as_str());
     }
-    
-    
+
     #[test]
     pub fn test_abstract() {
         let i = new_span("<File>");
-        let lex : GenericLex<Scope,Specific> = GenericLex::outer_parser(i).unwrap().1;
-        let cat : CategoryGeneric<Scope,Abstract> = lex.try_into().unwrap();
-        assert_eq!(cat.r#abstract, Abstract::Class(Class::File));
+        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let cat: CategoryGeneric<Scope, Type> = lex.try_into().unwrap();
+        assert_eq!(cat.r#type, Type::Class(Class::File));
 
         let i = new_span("[BindConfig]");
-        let lex : GenericLex<Scope,Specific> = GenericLex::outer_parser(i).unwrap().1;
-        let cat : CategoryGeneric<Scope,Abstract> = lex.try_into().unwrap();
-        assert_eq!(cat.r#abstract, Abstract::Data(Data::BindConfig));
+        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let cat: CategoryGeneric<Scope, Type> = lex.try_into().unwrap();
+        assert_eq!(cat.r#type, Type::Data(Data::BindConfig));
     }
-
 
     #[test]
     pub fn test_full() {
         let i = new_span("<File@contrib:package:1.0.0>");
-        let lex : GenericLex<Scope,Specific> = GenericLex::outer_parser(i).unwrap().1;
-        let full: Full = lex.try_into().unwrap();
-        assert_eq!(full.r#abstract, Abstract::Class(Class::File));
-        assert_eq!(full.scope, Scope::default());
-        assert_eq!(full.specific.to_string().as_str(), "contrib:package:1.0.0");
+        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let r#absolute: Absolute = lex.try_into().unwrap();
+        assert_eq!(r#absolute.r#type, Type::Class(Class::File));
+        assert_eq!(r#absolute.scope, Scope::default());
+        assert_eq!(r#absolute.specific.to_string().as_str(), "contrib:package:1.0.0");
 
         let i = new_span("[BindConfig@contrib:package:1.0.0]");
-        let lex : GenericLex<Scope,Specific> = GenericLex::outer_parser(i).unwrap().1;
-        let full: Full = lex.try_into().unwrap();
-        assert_eq!(full.r#abstract, Abstract::Data(Data::BindConfig));
+        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let full: Absolute = lex.try_into().unwrap();
+        assert_eq!(full.r#type, Type::Data(Data::BindConfig));
         assert_eq!(full.scope, Scope::default());
         assert_eq!(full.specific.to_string().as_str(), "contrib:package:1.0.0");
     }
 
-    
     #[test]
     pub fn test_full_scope() {
         let i = new_span("<my::File@contrib:package:1.0.0>");
-        let lex : GenericLex<Scope,Specific> = GenericLex::outer_parser(i).unwrap().1;
-        let full: Full = lex.try_into().unwrap();
-        assert_eq!(full.r#abstract, Abstract::Class(Class::File));
+        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let full: Absolute = lex.try_into().unwrap();
+        assert_eq!(full.r#type, Type::Class(Class::File));
         assert_eq!(full.scope.to_string().as_str(), "my");
         assert_eq!(full.specific.to_string().as_str(), "contrib:package:1.0.0");
 
         let i = new_span("[my::BindConfig@contrib:package:1.0.0]");
-        let lex : GenericLex<Scope,Specific> = GenericLex::outer_parser(i).unwrap().1;
-        let full: Full = lex.try_into().unwrap();
-        assert_eq!(full.r#abstract, Abstract::Data(Data::BindConfig));
+        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let full: Absolute = lex.try_into().unwrap();
+        assert_eq!(full.r#type, Type::Data(Data::BindConfig));
         assert_eq!(full.scope.to_string().as_str(), "my");
         assert_eq!(full.specific.to_string().as_str(), "contrib:package:1.0.0");
     }
 
-
-
     #[test]
     fn test_scope() {
-        assert_eq!( scope( new_span("root::")).unwrap().1, Scope::new(Some(ScopeKeyword::Root),vec![]) );
-        assert_eq!( scope( new_span("my::")).unwrap().1, Scope::new(None,vec![Segment::Segment(SkewerCase::from_str("my").unwrap())]) );
-        assert_eq!( scope( new_span("my::Root")).unwrap().1, Scope::new(None,vec![Segment::Segment(SkewerCase::from_str("my").unwrap())]) );
-        assert_eq!( scope( new_span("my::more::Root")).unwrap().1, Scope::new(None,vec![Segment::Segment(SkewerCase::from_str("my").unwrap()),Segment::Segment(SkewerCase::from_str("more").unwrap())]) );
-        assert_eq!( scope( new_span("root::more::Root")).unwrap().1, Scope::new(Some(ScopeKeyword::Root),vec![Segment::Segment(SkewerCase::from_str("more").unwrap())]) );
-        assert_eq!( scope( new_span("Root")).is_err(), true );
+        assert_eq!(
+            scope(new_span("root::")).unwrap().1,
+            Scope::new(Some(ScopeKeyword::Root), vec![])
+        );
+        assert_eq!(
+            scope(new_span("my::")).unwrap().1,
+            Scope::new(
+                None,
+                vec![Segment::Segment(SkewerCase::from_str("my").unwrap())]
+            )
+        );
+        assert_eq!(
+            scope(new_span("my::Root")).unwrap().1,
+            Scope::new(
+                None,
+                vec![Segment::Segment(SkewerCase::from_str("my").unwrap())]
+            )
+        );
+        assert_eq!(
+            scope(new_span("my::more::Root")).unwrap().1,
+            Scope::new(
+                None,
+                vec![
+                    Segment::Segment(SkewerCase::from_str("my").unwrap()),
+                    Segment::Segment(SkewerCase::from_str("more").unwrap())
+                ]
+            )
+        );
+        assert_eq!(
+            scope(new_span("root::more::Root")).unwrap().1,
+            Scope::new(
+                Some(ScopeKeyword::Root),
+                vec![Segment::Segment(SkewerCase::from_str("more").unwrap())]
+            )
+        );
+        assert_eq!(scope(new_span("Root")).is_err(), true);
     }
 
     #[test]
     pub fn id_abstract_disc() {
         let i = new_span("<File>");
-        let lex : GenericLex<Scope,Specific> = GenericLex::outer_parser(i).unwrap().1;
-        let cat : CategoryGeneric<Scope,Abstract> = lex.try_into().unwrap();
-        assert_eq!(cat.r#abstract, Abstract::Class(Class::File));
+        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let cat: CategoryGeneric<Scope, Type> = lex.try_into().unwrap();
+        assert_eq!(cat.r#type, Type::Class(Class::File));
     }
-
 }

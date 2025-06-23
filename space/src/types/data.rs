@@ -1,20 +1,15 @@
-use crate::types::{private, SrcDef, Abstract, Full, Generic, AbstractDisc};
 use core::str::FromStr;
 use derive_name::Name;
-use nom::bytes::complete::tag;
-use nom::sequence::delimited;
 use serde_derive::{Deserialize, Serialize};
-use strum::ParseError;
 use strum_macros::EnumDiscriminants;
-use starlane_space::err::ParseErrs;
-use starlane_space::parse::{camel_chars, from_camel};
-use starlane_space::types::parse::data;
+use starlane_space::parse::from_camel;
 use starlane_space::types::PointKindDefSrc;
-use crate::parse::{camel_case, CamelCase, Res};
+use crate::parse::{CamelCase, Res};
 use crate::parse::util::Span;
-use crate::types::class::{Class, ClassDiscriminant};
-use crate::types::parse::delim::delim;
-use crate::types::private::{Delimited, Parsable};
+use crate::types::archetype::Archetype;
+use crate::types::class::Class;
+use crate::types::parse::Delimited;
+use crate::types::TypeDisc;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::EnumString, strum_macros::Display, Serialize,Deserialize,Name)]
 #[strum_discriminants(vis(pub))]
@@ -53,7 +48,7 @@ impl Delimited for Data {
     }
 }
 
-impl private::Parsable for Data {
+impl Archetype for Data {
 
     fn parser<I>(input: I) -> Res<I, Self>
     where
@@ -110,9 +105,9 @@ impl Into<CamelCase> for Data {
     }
 }
 
-impl Into<AbstractDisc> for Data {
-    fn into(self) -> AbstractDisc{
-        AbstractDisc::Data
+impl Into<TypeDisc> for Data {
+    fn into(self) -> TypeDisc{
+        TypeDisc::Data
     }
 }
 

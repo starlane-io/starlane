@@ -2,17 +2,18 @@ use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::parse::{lex_block, CamelCase, Res};
 use crate::types::class::Class;
-use crate::types::private::{Delimited, Parsable};
-use crate::types::{Abstract, AbstractDisc, Data};
+use crate::types::{Data, Type, TypeDisc};
 use futures::FutureExt;
 use nom::branch::alt;
 use nom::combinator::{into, opt, value};
-use nom::sequence::delimited;
 use nom::Parser;
-use nom_supreme::tag::complete::tag;
 use nom_supreme::ParserExt;
 use starlane_space::parse::from_camel;
 use std::str::FromStr;
+use nom::sequence::delimited;
+use nom::bytes::complete::tag;
+use std::fmt::Display;
+use crate::types::archetype::Archetype;
 
 pub mod case {
 
@@ -30,14 +31,14 @@ where
     move |input| opt(f)(input).map(|(next, opt)| (next, opt.unwrap_or_default()))
 }
 
-fn kind<K: Parsable, I: Span>(input: I) -> Res<I, K>
+fn kind<K: Archetype, I: Span>(input: I) -> Res<I, K>
 where
-    K: Parsable + From<CamelCase>,
+    K: Archetype + From<CamelCase>,
 {
     from_camel(input)
 }
 
-pub fn type_kind<I>(input: I) -> Res<I, Abstract>
+pub fn type_kind<I>(input: I) -> Res<I, Type>
 where
     I: Span,
 {
@@ -51,17 +52,17 @@ fn into<I,O>((input,kind):(I,impl Into<O>)) -> (I,O) {
 }
 
  */
-pub fn identify_abstract_disc<I>(input:I) -> Res<I,AbstractDisc> where I: Span {
-  alt((value( AbstractDisc::Class, lex_block( BlockKind::Nested(NestedBlockKind::Angle))),value( AbstractDisc::Data, lex_block( BlockKind::Nested(NestedBlockKind::Square)))))(input)
+pub fn identify_abstract_disc<I>(input:I) -> Res<I,TypeDisc> where I: Span {
+  alt((value( TypeDisc::Class, lex_block( BlockKind::Nested(NestedBlockKind::Angle))),value( TypeDisc::Data, lex_block( BlockKind::Nested(NestedBlockKind::Square)))))(input)
 }
 
 
 
-pub fn unwrap_abstract<I>(input: I) -> Res<I, Abstract> where I: Span {
+pub fn unwrap_abstract<I>(input: I) -> Res<I, Type> where I: Span {
     let (next,r#abstract) = identify_abstract_disc(input.clone())?;
     match r#abstract {
-        AbstractDisc::Class => into(Class::delimited_parser(Class::parser))(input),
-        AbstractDisc::Data => into(Data::delimited_parser(Data::parser))(input)
+        TypeDisc::Class => into(Class::delimited_parser(Class::parser))(input),
+        TypeDisc::Data => into(Data::delimited_parser(Data::parser))(input)
     }
 }
 
@@ -83,7 +84,7 @@ pub mod delim {
     use crate::types::Data;
     use nom::sequence::delimited;
     use nom_supreme::tag::complete::tag;
-    use starlane_space::types::private::Delimited;
+    use crate::types::parse::Delimited;
     use std::str::FromStr;
 
     pub fn delim<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
@@ -186,4 +187,15 @@ pub mod delim {
 pub mod test {
    #[test]
     pub fn delimit() {}
+}
+
+pub trait Delimited: Archetype + Sized {
+    fn delimiters() -> (&'static str, &'static str);
+
+    fn delimited_parser<I, O>(f: impl FnMut(I) -> Res<I, O>) -> impl FnMut(I) -> Res<I, O>
+    where
+        I: Span,
+    {
+        delimited(tag(Self::delimiters().0), f, tag(Self::delimiters().1))
+    }
 }

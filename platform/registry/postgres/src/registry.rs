@@ -22,7 +22,7 @@ use starlane_space::command::direct::set::Set;
 use starlane_space::err::SpaceErr;
 use starlane_space::hyper::{ParticleLocation, ParticleRecord};
 use starlane_space::kind::{BaseKind, Kind, KindParts, Specific};
-use starlane_space::loc::{StarKey, ToBaseKind, Version};
+use starlane_space::loc::{StarKey, ToBaseKind, VersionSegLoc};
 use starlane_space::log::Logger;
 use starlane_space::parse::util::{parse_errs, result};
 use starlane_space::parse::{CamelCase, Domain, SkewerCase};
@@ -1098,9 +1098,9 @@ impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord {
                                 let version = if let Option::Some(version_variant) = version_variant
                                 {
                                     let version = format!("{}-{}", version, version_variant);
-                                    Version::from_str(version.as_str())?
+                                    VersionSegLoc::from_str(version.as_str())?
                                 } else {
-                                    Version::from_str(version.as_str())?
+                                    VersionSegLoc::from_str(version.as_str())?
                                 };
 
                                 let provider = Domain::from_str(provider.as_str())?;

@@ -21,7 +21,7 @@ use starlane_macros::ToBase;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
-use crate::types::private::Parsable;
+use crate::types::archetype::Archetype;
 
 pub static CENTRAL: Lazy<Point> = Lazy::new(|| StarKey::central().to_point());
 pub static GLOBAL_LOGGER: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::logger").unwrap());
@@ -129,12 +129,12 @@ pub type Meta = HashMap<String, String>;
 pub type HostKey = String;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Version {
+pub struct VersionSegLoc {
     pub version: semver::Version,
 }
 
 
-impl Parsable for Version{
+impl Archetype for VersionSegLoc {
     fn parser<I>(input: I) -> Res<I, Self>
     where
         I: Span
@@ -142,13 +142,13 @@ impl Parsable for Version{
         version(input)
     }
 }
-impl Display for Version {
+impl Display for VersionSegLoc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.version.to_string())
     }
 }
 
-impl Deref for Version {
+impl Deref for VersionSegLoc {
     type Target = semver::Version;
 
     fn deref(&self) -> &Self::Target {
@@ -156,7 +156,7 @@ impl Deref for Version {
     }
 }
 
-impl Serialize for Version {
+impl Serialize for VersionSegLoc {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -168,7 +168,7 @@ impl Serialize for Version {
 struct VersionVisitor;
 
 impl<'de> Visitor<'de> for VersionVisitor {
-    type Value = Version;
+    type Value = VersionSegLoc;
 
     fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
         formatter.write_str("SemVer version")
@@ -178,7 +178,7 @@ impl<'de> Visitor<'de> for VersionVisitor {
     where
         E: de::Error,
     {
-        match Version::from_str(v) {
+        match VersionSegLoc::from_str(v) {
             Ok(version) => Ok(version),
             Err(error) => {
                 //Err(de::Error::custom(error.to_string() ))
@@ -188,7 +188,7 @@ impl<'de> Visitor<'de> for VersionVisitor {
     }
 }
 
-impl<'de> Deserialize<'de> for Version {
+impl<'de> Deserialize<'de> for VersionSegLoc {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -197,7 +197,7 @@ impl<'de> Deserialize<'de> for Version {
     }
 }
 
-impl TryInto<semver::Version> for Version {
+impl TryInto<semver::Version> for VersionSegLoc {
     type Error = ParseErrs;
 
     fn try_into(self) -> Result<semver::Version, Self::Error> {
@@ -205,7 +205,7 @@ impl TryInto<semver::Version> for Version {
     }
 }
 
-impl FromStr for Version {
+impl FromStr for VersionSegLoc {
     type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {

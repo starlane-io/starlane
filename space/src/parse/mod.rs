@@ -27,7 +27,7 @@ use crate::kind::{
     Sub, UserBaseSubKind,
 };
 use crate::loc::StarKey;
-use crate::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, Version};
+use crate::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, VersionSegLoc};
 use crate::parse::util::unstack;
 use crate::parse::util::{log_parse_err, preceded, recognize, result};
 use crate::particle::PointKindVar;
@@ -101,7 +101,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
-use crate::types::private::Parsable;
+use crate::types::archetype::Archetype;
 
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
 pub type StarParser<I: Span, O> = dyn nom_supreme::parser_ext::ParserExt<I, O, NomErr<I>>;
@@ -1548,6 +1548,15 @@ impl FromStr for CamelCase {
     }
 }
 
+impl Archetype for CamelCase {
+    fn parser<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        camel_case(input)
+    }
+}
+
 /*
 
 impl Serialize for CamelCase {
@@ -1599,7 +1608,7 @@ pub struct Domain {
     string: String,
 }
 
-impl Parsable for Domain {
+impl Archetype for Domain {
     fn parser<I>(input: I) -> Res<I, Self>
     where
         I: Span
@@ -1659,7 +1668,7 @@ pub struct SkewerCase {
     string: String,
 }
 
-impl Parsable for SkewerCase{
+impl Archetype for SkewerCase{
     fn parser<I>(input: I) -> Res<I, Self>
     where
         I: Span
@@ -3875,7 +3884,7 @@ where
     ))(input)
 }
 
-pub fn root_scope_selector<I: Span>(input: I) -> Res<I, RootScopeSelector<I, Spanned<I, Version>>> {
+pub fn root_scope_selector<I: Span>(input: I) -> Res<I, RootScopeSelector<I, Spanned<I, VersionSegLoc>>> {
     context(
         "root-scope-selector",
         cut(preceded(
@@ -3889,7 +3898,7 @@ pub fn root_scope_selector<I: Span>(input: I) -> Res<I, RootScopeSelector<I, Spa
     .map(|(next, (name, version))| (next, RootScopeSelector { version, name }))
 }
 
-pub fn scope_version<I: Span>(input: I) -> Res<I, Spanned<I, Version>> {
+pub fn scope_version<I: Span>(input: I) -> Res<I, Spanned<I, VersionSegLoc>> {
     context(
         "scope-selector-version",
         tuple((
@@ -3969,7 +3978,7 @@ pub mod model {
 
     use crate::config::bind::{PipelineStepDef, PipelineStopDef};
     use crate::err::ParseErrs;
-    use crate::loc::Version;
+    use crate::loc::VersionSegLoc;
     use crate::parse::util::{new_span, result, Span, Trace, Tw};
     use crate::parse::{
         lex_child_scopes, method_kind, pipeline, subst_path, value_pattern, wrapped_cmd_method,
@@ -4084,10 +4093,10 @@ pub mod model {
     }
 
     impl<I: ToString, V: ToString> RootScopeSelector<I, V> {
-        pub fn to_concrete(self) -> Result<RootScopeSelector<String, Version>, ParseErrs> {
+        pub fn to_concrete(self) -> Result<RootScopeSelector<String, VersionSegLoc>, ParseErrs> {
             Ok(RootScopeSelector {
                 name: self.name.to_string(),
-                version: Version::from_str(self.version.to_string().as_str())?,
+                version: VersionSegLoc::from_str(self.version.to_string().as_str())?,
             })
         }
     }
@@ -4533,7 +4542,7 @@ pub mod model {
     pub type ScopeFilter = ScopeFilterDef<String>;
     pub type ScopeFilters = ScopeFiltersDef<String>;
     pub type LexBlock<I> = Block<I, ()>;
-    pub type LexRootScope<I> = Scope<RootScopeSelector<I, Spanned<I, Version>>, Block<I, ()>, I>;
+    pub type LexRootScope<I> = Scope<RootScopeSelector<I, Spanned<I, VersionSegLoc>>, Block<I, ()>, I>;
     pub type LexScope<I> = Scope<LexScopeSelector<I>, Block<I, ()>, I>;
     pub type LexParentScope<I> = Scope<LexScopeSelector<I>, Vec<LexScope<I>>, I>;
 
@@ -6494,14 +6503,14 @@ pub fn point_and_kind<I: Span>(input: I) -> Res<I, PointKindVar> {
         .map(|(next, (point, kind))| (next, PointKindVar { point, kind }))
 }
 
-pub fn version<I: Span>(input: I) -> Res<I, Version> {
+pub fn version<I: Span>(input: I) -> Res<I, VersionSegLoc> {
     let (next, version) = rec_version(input.clone())?;
     let version = version.to_string();
     let str_input = version.as_str();
     let rtn = semver::Version::parse(str_input);
 
     match rtn {
-        Ok(version) => Ok((next, Version { version })),
+        Ok(version) => Ok((next, VersionSegLoc { version })),
         Err(err) => {
             let tree = Err::Error(NomErr::from_error_kind(input, ErrorKind::Fail));
             Err(tree)
@@ -7235,7 +7244,7 @@ pub fn doc(src: &str) -> Result<Document, ParseErrs> {
     let lex_root_scope = lex_root_scope(span.clone())?;
     let root_scope_selector = lex_root_scope.selector.clone().to_concrete()?;
     if root_scope_selector.name.as_str() == "Mechtron" {
-        if root_scope_selector.version == Version::from_str("1.0.0")? {
+        if root_scope_selector.version == VersionSegLoc::from_str("1.0.0")? {
             let mechtron = result(parse_mechtron_config(lex_root_scope.block.content.clone()))?;
 
             let mechtron = MechtronConfig::new(mechtron)?;
@@ -7260,7 +7269,7 @@ pub fn doc(src: &str) -> Result<Document, ParseErrs> {
             Err(ParseErrs::from_report(report, lex_root_scope.block.content.extra.clone()).into())
         }
     } else if root_scope_selector.name.as_str() == "Bind" {
-        if root_scope_selector.version == Version::from_str("1.0.0")? {
+        if root_scope_selector.version == VersionSegLoc::from_str("1.0.0")? {
             let bind = parse_bind_config(lex_root_scope.block.content.clone())?;
 
             return Ok(Document::BindConfig(bind));

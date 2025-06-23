@@ -1,7 +1,7 @@
 use crate::err::ParseErrs;
 use crate::loc::{
     Layer, PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Topic, VarVal,
-    Variable, Version, CENTRAL, GLOBAL_DEPENDENCIES, GLOBAL_EXEC, GLOBAL_FOUNDATION, GLOBAL_LOGGER,
+    Variable, VersionSegLoc, CENTRAL, GLOBAL_DEPENDENCIES, GLOBAL_EXEC, GLOBAL_FOUNDATION, GLOBAL_LOGGER,
     GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT,
 };
 use crate::parse::util::result;
@@ -392,7 +392,7 @@ pub enum PointSegCtx {
     FilesystemRootDir,
     Dir(String),
     File(String),
-    Version(Version),
+    Version(VersionSegLoc),
     Working(Trace),
     Pop(Trace),
 }
@@ -405,7 +405,7 @@ pub enum PointSegVar {
     FilesystemRootDir,
     Dir(String),
     File(String),
-    Version(Version),
+    Version(VersionSegLoc),
     Working(Trace),
     Pop(Trace),
     Var(Variable),
@@ -548,7 +548,7 @@ pub enum PointSeg {
     FsRootDir,
     Dir(String),
     File(String),
-    Version(Version),
+    Version(VersionSegLoc),
 }
 
 impl PointSeg {

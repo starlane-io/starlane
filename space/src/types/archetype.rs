@@ -1,0 +1,14 @@
+use std::fmt::Display;
+use std::hash::Hash;
+use crate::parse::Res;
+use crate::parse::util::Span;
+
+/// anything that can be parsed
+pub(crate) trait Archetype: Eq+PartialEq+Hash+Clone+Display 
+where
+    Self: Sized,
+{
+    fn parser<I>(input: I) -> Res<I, Self>
+    where
+        I: Span;
+}

@@ -14,7 +14,7 @@ use thiserror::Error;
 use crate::err::ParseErrs;
 use crate::err::SpaceErr;
 use crate::kind::{BaseKind, Kind, KindParts, Specific, SubKind};
-use crate::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};
+use crate::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, VersionSegLoc};
 use crate::parse::util::{result, Span};
 use crate::parse::util::{new_span, Trace};
 use crate::parse::{consume_hierarchy, kind_selector, point_segment_selector, point_selector, specific_selector, CamelCase, Env, Res};
@@ -25,7 +25,7 @@ use crate::substance::{
 };
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
-use crate::types::private::Parsable;
+use crate::types::archetype::Archetype;
 
 pub type PointSegKindHop = HopDef<PointSegSelector, KindSelector>;
 pub type PointSegKindHopCtx = HopDef<PointSegSelectorCtx, KindSelector>;
@@ -684,7 +684,7 @@ pub type KeySegment = String;
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub enum ExactPointSeg {
     PointSeg(PointSeg),
-    Version(Version),
+    Version(VersionSegLoc),
 }
 
 impl ExactPointSeg {
@@ -949,7 +949,7 @@ impl<P> Display for Pattern<P> where P: Display
     }
 }
 
-impl <P> Parsable for Pattern<P> where P: Parsable + Into<Pattern<P>>  {
+impl <P> Archetype for Pattern<P> where P: Archetype + Into<Pattern<P>>  {
     fn parser<I>(input: I) -> Res<I, Self>
     where
         I: Span
@@ -973,7 +973,7 @@ pub fn to_string_version(self) -> Pattern<String> {
 
 impl<P> Pattern<P>
 where
-P: Parsable+Eq + PartialEq,
+P: Archetype +Eq + PartialEq,
 {
     pub fn is_any(&self) -> bool {
         match self {
