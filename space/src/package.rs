@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-use crate::types::specific::SpecificLoc;
-use derive_builder::Builder;
-use serde_derive::{Deserialize, Serialize};
-use crate::types::def::Meta;
+use crate::types::def::Defs;
 use crate::types::scope::Segment;
+use crate::types::specific::SpecificLoc;
 use crate::types::Type;
+use derive_builder::Builder;
+use std::collections::HashMap;
 
 #[derive(Clone, Builder)]
 pub struct Package {
@@ -35,7 +34,7 @@ impl Package {
 pub struct Slice {
     segment: Segment,
     children: Box<Vec<Slice>>,
-    defs: HashMap<Type,Meta>
+    defs: HashMap<Type, Defs>
 }
 
 impl Slice {
@@ -51,7 +50,7 @@ impl Slice {
     self.children.push(child);
   }
 
-  pub fn add_def(&mut self, r#type: Type, def: Meta) {
+  pub fn add_def(&mut self, r#type: Type, def: Defs) {
     self.defs.insert(r#type,def);
   }
 }

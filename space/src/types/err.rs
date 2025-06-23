@@ -1,7 +1,7 @@
 use strum_macros::Display;
 use thiserror::Error;
 use crate::types::specific::SpecificLoc;
-use crate::types::Type;
+use crate::types::{Absolute, Type};
 
 #[derive(Clone, Debug, Error)]
 pub enum TypeErr {
@@ -11,6 +11,8 @@ pub enum TypeErr {
     EmptyMeta(Type),
     #[error("{kind} Meta::by_layer({tried}) index out of bounds because exceeds layers length {len}")]
     MetaLayerIndexOutOfBounds{ kind: Type, tried: usize, len: usize,  },
+    #[error("specific '{absolute} not found in '{search_location}'")]
+    AbsoluteNotFound{ search_location: String ,absolute: String},
     #[error("specific '{specific} not found in '{search_location}'")]
     SpecificNotFound{ search_location: String ,specific: SpecificLoc},
 }
@@ -33,5 +35,10 @@ impl TypeErr {
 
     pub fn specific_not_found(specific: SpecificLoc, search_location: String) -> Self {
         Self::SpecificNotFound {search_location, specific}
+    }
+
+    pub fn absolute_not_found(absolute: Absolute, search_location: String) -> Self {
+        let absolute = absolute.to_string();
+        Self::AbsoluteNotFound {search_location, absolute}
     }
 }

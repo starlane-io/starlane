@@ -137,7 +137,7 @@ pub type Absolute = Scaffold<Scope, Type, SpecificLoc>;
 
 pub type AbsoluteSelector = Scaffold<Pattern<Scope>, Pattern<Type>, SpecificSelector>;
 
-#[derive(Clone, Eq, PartialEq, Hash,Getters,Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash,Getters,Serialize)]
 #[get = "pub"]
 pub struct Scaffold<Scope, T, SpecificLoc>
 where
@@ -149,12 +149,24 @@ where
     specific: SpecificLoc,
 }
 
+impl <Scope, T, SpecificLoc> Display for Scaffold<Scope, T, SpecificLoc>
+where
+
+    Scope: Archetype+Default,
+    SpecificLoc: Clone + Eq + PartialEq + Hash+ Display,
+    T: Display
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}@{}", self.r#type, self.specific)
+    }
+}
 
 impl <Scope, T, SpecificLoc> Scaffold<Scope, T, SpecificLoc>
 where
 
     Scope: Archetype+Default,
-    SpecificLoc: Clone + Eq + PartialEq + Hash
+    SpecificLoc: Clone + Eq + PartialEq + Hash,
+    T: Display
 {
     pub fn new(scope: Scope, r#type: T, specific: SpecificLoc) -> Self {
         Self {scope,
@@ -169,7 +181,7 @@ where
 pub struct AbsoluteLex<Scope, Specific>
 where
 Scope: Archetype+Default,
-Specific: Clone + Eq + PartialEq + Hash
+Specific: Clone + Eq + PartialEq + Hash,
 
 {
     r#absolute: Scaffold<Scope, CamelCase, Option<Specific>>,

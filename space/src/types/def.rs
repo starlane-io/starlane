@@ -7,28 +7,31 @@ use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::fmt::Display;
 use serde::{Deserialize, Serialize};
+use crate::parse::SkewerCase;
+use crate::particle::property::PropertyDef;
 
+/// [Defs] for 
 #[derive(Clone,Getters,Builder)]
-pub struct Meta
+pub struct Defs
 {
     r#absolute: Absolute,
     /// types support inheritance and their
     /// multiple type definition layers that are composited.
     /// [Layer]s define inheritance in regular order.  The last
-    /// layer is the [Type]  of this [Meta] composite.
+    /// layer is the [Type]  of this [Defs] composite.
     #[getset(skip)]
-    defs: IndexMap<SpecificLoc, Layer>,
+    layers: IndexMap<Absolute, Layer>,
 }
 
-impl Meta
+impl Defs
 {
-    pub fn new(r#absolute: Absolute, layers: IndexMap<SpecificLoc, Layer>) -> Result<Meta, err::TypeErr> {
+    pub fn new(r#absolute: Absolute, layers: IndexMap<SpecificLoc, Layer>) -> Result<Defs, err::TypeErr> {
         if layers.is_empty() {
             Err(err::TypeErr::empty_meta(r#absolute.r#type))
         } else {
-            Ok(Meta {
+            Ok(Defs {
                 r#absolute,
-                defs: Default::default(),
+                layers: Default::default(),
             })
         }
     }
@@ -47,8 +50,8 @@ impl Meta
     }
 
     fn first(&self) -> &Layer {
-        /// it's safe to unwrap because [Meta::new] will not accept empty defs
-        self.defs.first().map(|(_, layer)| layer).unwrap()
+        /// it's safe to unwrap because [Defs::new] will not accept empty defs
+        self.layers.first().map(|(_, layer)| layer).unwrap()
     }
 
     fn layer_by_index(&self, index: usize) -> Result<&Layer, err::TypeErr> {
@@ -65,10 +68,10 @@ impl Meta
         todo!()
     }
 
-    fn layer_by_specific(&self, loc: &SpecificLoc) -> Result<&Layer, err::TypeErr> {
-        self.defs
+    fn layer_by_absolute(&self, loc: &Absolute) -> Result<&Layer, err::TypeErr> {
+        self.layers
             .get(loc)
-            .ok_or(err::TypeErr::specific_not_found(
+            .ok_or(err::TypeErr::absolute_not_found(
                 loc.clone(),
                 self.describe(),
             ))
@@ -88,13 +91,13 @@ impl Meta
         Ok(MetaLayerAccess::new(self, self.layer_by_index(index)?))
     }
 
-    pub fn by_specific(
+    pub fn by_absolute(
         &self,
-        specific: &SpecificLoc,
+        absolute: &Absolute,
     ) -> Result<MetaLayerAccess, err::TypeErr> {
         Ok(MetaLayerAccess::new(
             self,
-            self.layer_by_specific(specific)?,
+            self.layer_by_absolute(absolute)?,
         ))
     }
 }
@@ -104,13 +107,13 @@ impl Meta
 
 pub(crate) struct MetaLayerAccess<'y>
 {
-    meta: &'y Meta,
+    meta: &'y Defs,
     layer: &'y Layer,
 }
 
 impl<'y> MetaLayerAccess<'y>
 {
-    fn new(meta: &'y Meta, layer: &'y Layer) -> MetaLayerAccess<'y> {
+    fn new(meta: &'y Defs, layer: &'y Layer) -> MetaLayerAccess<'y> {
         Self { meta, layer }
     }
 
@@ -118,7 +121,7 @@ impl<'y> MetaLayerAccess<'y>
         self.meta.to_type()
     }
 
-    pub fn meta(&'y self) -> &'y Meta {
+    pub fn meta(&'y self) -> &'y Defs {
         self.meta
     }
 
@@ -130,8 +133,8 @@ impl<'y> MetaLayerAccess<'y>
 
 #[derive(Clone,Builder,Getters)]
 pub struct Layer {
-    specific: Specific,
-    types: HashMap<Type, Meta>,
+    specific: SpecificLoc,
+    properties: HashMap<SkewerCase,PropertyDef>,
 }
 
 
