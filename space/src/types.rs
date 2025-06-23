@@ -500,6 +500,17 @@ pub mod test2 {
         assert!(specific.slices().is_empty())
     }
 
+
+    #[test]
+    pub fn test_slices() {
+        let specific = result(SpecificLoc::parser(new_span("contrib:package:1.0.0::slice"))).unwrap();
+
+        assert_eq!("contrib", specific.contributor().as_str());
+        assert_eq!("package", specific.package().as_str());
+        assert_eq!("1.0.0", specific.version().clone().to_string().as_str());
+        assert!(!specific.slices().is_empty())
+    }
+
     #[test]
     pub fn test_abstract() {
         let i = new_span("<File>");

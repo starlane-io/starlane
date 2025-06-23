@@ -5,13 +5,12 @@ use crate::types::scope::Segment;
 use crate::types::specific::SpecificLoc;
 use crate::types::{err, Absolute, Type};
 use derive_builder::Builder;
+use getset::Getters;
 use indexmap::IndexMap;
+use nom::multi::separated_list1;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::ops::{Deref, DerefMut};
-use getset::Getters;
-
 
 #[derive(Clone,Getters,Builder)]
 pub struct Meta
@@ -145,7 +144,7 @@ pub struct SpecificSliceLoc {
    specific: SpecificLoc, 
     
    /// the hierarchy of [SliceLoc]s in `reverse` order
-   ancestors: Vec<SliceLoc>
+   ancestors: Vec<Segment>
 }
 
 
@@ -175,29 +174,10 @@ pub struct Package {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash,derive_builder::Builder)]
 pub struct SliceLoc {
-  loc: Segment,
-  children: Vec<Box<SliceLoc>>,
-}
-
-impl Archetype for SliceLoc {
-    fn parser<I>(input: I) -> Res<I, Self>
-    where
-        I: Span
-    {
-        todo!()
-    }
+  segment: Segment,
+  ancestors: Vec<Box<SliceLoc>>,
 }
 
 
-impl Display for SliceLoc {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f,"{}",self.loc)?;
-        for (index,slice) in self.children.iter().enumerate() {
-            write!(f, "{}", slice)?;
-            if index != self.children.len() - 1 {
-                write!(f, ":")?;
-            }
-        }
-        Ok(())
-    }
-}
+
+

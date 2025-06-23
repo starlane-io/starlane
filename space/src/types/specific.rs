@@ -19,7 +19,7 @@ use crate::types::def::SliceLoc;
 use crate::types::scope::Segment;
 use crate::types::tag::VersionTag;
 
-pub type SpecificLoc = SpecificScaffold<ContributorSegLoc, PackageSegLoc, VersionSegLoc,SliceLoc>;
+pub type SpecificLoc = SpecificScaffold<ContributorSegLoc, PackageSegLoc, VersionSegLoc,Segment>;
 
 pub type ContributorSegLoc = Domain;
 pub type PackageSegLoc = SkewerCase;
