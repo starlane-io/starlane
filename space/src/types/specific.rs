@@ -23,6 +23,14 @@ impl SpecificLoc{
     pub fn mock_default() -> Self {
         result(Self::parser(new_span("starlane.io:uberscott:1.0.1::main:7.0.7"))).unwrap()
     }
+
+    pub fn mock_0() -> Self {
+        result(Self::parser(new_span("lavalordgames.com:astrobattle:3.0.1::backend"))).unwrap()
+    }
+
+    pub fn mock_1() -> Self {
+        result(Self::parser(new_span("punch-line.app:jokes:10.0.1::a-material"))).unwrap()
+    }
 }
 
 pub type PublisherSegLoc = Domain;

@@ -3,33 +3,30 @@ use crate::particle::property::{PropertiesConfig, PropertiesConfigBuilder, Prope
 use crate::types::err::TypeErr;
 use crate::types::specific::SpecificLoc;
 use crate::types::{err, Absolute, Type};
-use derive_builder::Builder;
 use getset::Getters;
 use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::fmt::Display;
 
 /// [Defs] for an [Absolute]
-#[derive(Clone, Getters, Builder)]
+#[derive(Clone, Getters)]
 pub struct Defs {
-    r#specific: SpecificLoc,
-    /// types support inheritance and their
-    /// multiple type definition layers that are composited.
-    /// [Layer]s define inheritance in regular order.  The last
-    /// layer is the [Type]  of this [Defs] composite.
+    specific: SpecificLoc,
+
+    /// [Self::specific] must be in 
     #[getset(skip)]
-    layers: IndexMap<Type, Vec<Layer>>,
+    layers: HashMap<SpecificLoc, Layer>,
 }
 
 impl Defs {
-    pub fn new(specific: SpecificLoc) -> Result<Defs, err::TypeErr> {
-        Ok(Self {
+    pub fn new(specific: SpecificLoc) -> Defs {
+        Self {
             specific,
-            layers: IndexMap::default(),
-        })
+           layers: IndexMap::default(),
+        }
     }
 
-    pub fn add_layer(&mut self, r#type: Type, layer: Layer) {
+    pub fn push_layer(&mut self, r#type: Type, layer: Layer) {
         match self.layers.get_mut(&r#type) {
             None => {
                 self.layers.insert(r#type, vec![layer]);
@@ -100,6 +97,7 @@ impl Defs {
 
 #[derive(Clone,  Getters)]
 pub struct Layer {
+    parent: Option<SpecificLoc>,
     specific: SpecificLoc,
     changes: Vec<Change>,
 }
@@ -107,6 +105,7 @@ pub struct Layer {
 
 #[derive(Clone)]
 pub struct LayerBuilder {
+    parent: Option<Layer>,
     specific: SpecificLoc,
     changes: Vec<Change>,   
 }
@@ -115,8 +114,13 @@ impl LayerBuilder {
     {
         Self {
             specific,
-            changes: Default::default()
+            changes: Default::default(),
+            parent: Default::default()
         }
+    }
+    
+    pub fn set_parent(&mut self, parent: Layer) {
+        self.parent = Some(parent);
     }
         
     pub fn add_change(&mut self, change: Change) {
@@ -124,7 +128,9 @@ impl LayerBuilder {
     }
     
     pub fn build(self) -> Layer {
+        let parent = self.parent.map(Box::new);
         Layer {
+            parent,
             changes: self.changes,
             specific: self.specific
         }
@@ -250,7 +256,7 @@ mod tests {
     use crate::particle::property::PropertyDef;
     use crate::types::{Absolute, Type};
     use crate::types::class::Class;
-    use crate::types::def::{Add, Change, DefsBuilder, LayerBuilder, TypeCompositeBuilder};
+    use crate::types::def::{Add, Change, Defs, LayerBuilder, TypeCompositeBuilder};
     use crate::types::specific::SpecificLoc;
 
     #[test] 
@@ -270,20 +276,39 @@ mod tests {
 
     #[test]
     pub fn layer() {
-        let specific = SpecificLoc::mock_default();
-        let mut builder = LayerBuilder::new(specific.clone());
+        let mut defs= Defs::new(SpecificLoc::mock_default());
         let less= PropertyDef::mock_less();
         let fae = PropertyDef::mock_fae();
+        let layer = LayerBuilder::new(SpecificLoc::mock_default());
+        defs.push_layer()
+    }
+
+    #[test]
+    pub fn multi_layer() {
+        let specific = SpecificLoc::mock_default();
+        let specific0 = SpecificLoc::mock_0();
+        let specific1 = SpecificLoc::mock_1();
+        let mut builder = Defs::new(specific);
+        
+        let abs1 = Absolute::mock_default();
+        let abs2 = Absolute::mock_root();
+        
+        let less= PropertyDef::mock_less();
+        let fae = PropertyDef::mock_fae();
+        let modus = PropertyDef::mock_modus();
 
         let add_less = Change::new(Type::Class(Class::Root), Add::Property(less.clone()));
         let add_fae = Change::new(Type::Class(Class::User), Add::Property(fae.clone()));
+        let add_modus = Change::new(Type::Class(Class::User), Add::Property(modus.clone()));
+        
         builder.add_change(add_less.clone());
         builder.add_change(add_fae.clone());
+        
         let layer = builder.clone().build();
         assert_eq!(specific, layer.specific);
         assert_eq!(2, layer.changes.len());
         let first = layer.changes.first().cloned();
         assert_eq!(Some(add_less), layer.changes.first().cloned());
-    } 
+    }
     
 }
