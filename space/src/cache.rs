@@ -2,9 +2,11 @@ use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::Arc;
+use async_trait::async_trait;
 use strum_macros::EnumDiscriminants;
 use tokio::sync::watch;
-use crate::err::SpaceErr;
+use crate::err::{ParseErrs, SpaceErr};
+use crate::fetch::FetchErr;
 
 /// represents a cache for a given `type` i.e. [Cache<Id=Full,Entity=BindConfig>] ...
 pub trait Cache {
@@ -99,6 +101,38 @@ impl <Id,Entity> Deref for Artifact<Id,Entity> where Id: ArtifactId {
   }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum CacheErr {
+  /// an error occurred while trying to Fetch
+  #[error("Fetch Error: {0}")] 
+  Fetch(FetchErr),
+  #[error("Parse Errors: {0}")]
+  Parse(ParseErrs),
+  #[error("FileSystem Error: {0}")]
+  FileSystem(String)
+}
+
+#[async_trait]
+pub trait Watcher where Self::Id: ArtifactId{
+  type Id;
+  type Entity;
+
+  fn stage(&self) -> Result<Stage<Self::Id,Self::Entity>,CacheErr>;
+  
+  async fn get(&self, id: &Self::Id ) -> Result<Artifact<Self::Id,Self::Entity>, CacheErr>;
+  
+  /// return if [Stage::Ready]... else return [Option::None]
+  fn try_ready(&self, id: Self::Id) -> Result<Option<Artifact<Self::Id,Self::Entity>>, CacheErr> {
+     if let Stage::Ready(artifact) = self.stage()? {
+        Ok(Some(artifact)) 
+     } else {
+        Ok(None) 
+     }
+  }
+} 
+
+
+/*
 pub struct ArtifactWatcher<Id,Entity> where Id: ArtifactId {
   pub id: Id,
   pub entity: Entity,
@@ -126,6 +160,8 @@ impl <Id,Entity> ArtifactWatcher<Id,Entity> where Id: ArtifactId {
   }
   
 }
+
+ */
 
 
 

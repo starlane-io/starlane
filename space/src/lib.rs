@@ -163,6 +163,7 @@ pub mod status;
 
 pub mod types;
 pub mod cache;
+mod fetch;
 
 /// `types` mod is a work in progress for the proposed new type system
 /// its having some compile problems and isn't as-of-yet used by
