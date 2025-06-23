@@ -1,16 +1,19 @@
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
+use getset::Getters;
 use indexmap::Equivalent;
 use nom::bytes::complete::tag;
-use nom::sequence::tuple;
+use nom::combinator::opt;
+use nom::multi::{separated_list0, separated_list1};
+use nom::sequence::{delimited, tuple};
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::loc::VersionSegLoc;
 use starlane_space::selector::Pattern;
 use crate::cache::ArtifactLoc;
 use crate::parse::{Domain, Res, SkewerCase};
-use crate::parse::util::Span;
+use crate::parse::util::{preceded, Span};
 use crate::selector::VersionReq;
-use crate::types::TagWrap;
+use crate::types::{scope, TagWrap};
 use crate::types::archetype::Archetype;
 use crate::types::def::SliceLoc;
 use crate::types::scope::Segment;
@@ -18,20 +21,12 @@ use crate::types::tag::VersionTag;
 
 pub type SpecificLoc = SpecificScaffold<ContributorSegLoc, PackageSegLoc, VersionSegLoc,SliceLoc>;
 
-
-impl Equivalent<SpecificLoc> for &SpecificLoc {
-    fn equivalent(&self, specific: &SpecificLoc) -> bool {
-        *self == specific
-    }
-}
-
-
-pub type SpecificLocCtx = SpecificScaffold<ContributorSegLoc, PackageSegLoc,TagWrap<VersionSegLoc,VersionTag>>;
 pub type ContributorSegLoc = Domain;
 pub type PackageSegLoc = SkewerCase;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
-pub struct SpecificScaffold<Contributor,Package,Version,SliceSegment> where Contributor: Archetype, Package: Archetype, Version: Archetype, SliceSegment: Archetype 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash,Getters)]
+#[getset(get = "pub",)]
+pub struct SpecificScaffold<Contributor,Package,Version,SliceSegment> where Contributor: Archetype, Package: Archetype, Version: Archetype, SliceSegment: Archetype
 {
     contributor: Contributor,
     package: Package,
@@ -43,13 +38,13 @@ impl<Contributor, Package, Version,SliceSegment> Display for SpecificScaffold<Co
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}:{}", self.contributor, self.package, self.version)?;
-        
+
         /// this is a bit weird, but the delimiter between `version` & `slice` needs
-        /// two colons `::` ... the second one is prepended in the segment for loop 
+        /// two colons `::` ... the second one is prepended in the segment for loop
         if !self.slices.is_empty() {
             write!(f, ":")?;
         }
-        
+
         for seg in self.slices.iter() {
             write!(f, ":{}",seg)?;
         }
@@ -57,31 +52,33 @@ impl<Contributor, Package, Version,SliceSegment> Display for SpecificScaffold<Co
     }
 }
 
-impl <Contributor,Package,Version> Archetype for SpecificScaffold<Contributor,Package,Version> where Contributor: Archetype, Package: Archetype, Version: Archetype
+impl <Contributor,Package,Version,SliceSeg> Archetype for SpecificScaffold<Contributor,Package,Version,SliceSeg> where Contributor: Archetype, Package: Archetype, Version: Archetype, SliceSeg: Archetype
 {
     fn parser<I>(input: I) -> Res<I, Self>
     where
         I: Span
     {
-        tuple((Contributor::parser,tag(":"),Package::parser,tag(":"),Version::parser))(input).map(|(next,(contributor,_,package,_,version))|{
-            (next, SpecificScaffold {contributor,package,version})
+        tuple((Contributor::parser,tag(":"),Package::parser,tag(":"),Version::parser,opt(preceded(tag("::"),separated_list1( tag(":"), SliceSeg::parser)))))(input).map(|(next,(contributor,_,package,_,version, slices))|{
+             let slices = slices.unwrap_or_else(|| vec![]);
+            (next, SpecificScaffold {contributor,package,version,slices})
         })
     }
 }
 
 
-impl <Contributor,Package,Version> SpecificScaffold<Contributor,Package,Version> where Contributor: Archetype, Package: Archetype, Version: Archetype
+impl <Contributor,Package,Version,SliceSeg> SpecificScaffold<Contributor,Package,Version,SliceSeg> where Contributor: Archetype, Package: Archetype, Version: Archetype, SliceSeg: Archetype
 {
-    pub fn new(contributor: Contributor, package: Package, version: Version) -> Self  {
-        Self { contributor, package, version }
+    pub fn new(contributor: Contributor, package: Package, version: Version, slices: Vec<SliceSeg>) -> Self  {
+        Self { contributor, package, version, slices }
     }
 }
 
-pub type SpecificSelector = SpecificScaffold<ContributorSelector,PackageSelector,VersionPattern>;
+pub type SpecificSelector = SpecificScaffold<ContributorSelector,PackageSelector,VersionPattern,SlicePattern>;
 
 pub type ContributorSelector = Pattern<ContributorSegLoc>;
 pub type PackageSelector = Pattern<PackageSegLoc>;
 pub type VersionPattern = Pattern<VersionReq>;
+pub type SlicePattern = Pattern<SliceLoc>;
 
 /*
 pub(crate) mod parse {

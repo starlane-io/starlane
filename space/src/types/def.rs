@@ -1,48 +1,45 @@
+use crate::parse::util::Span;
+use crate::parse::Res;
+use crate::types::archetype::Archetype;
+use crate::types::scope::Segment;
+use crate::types::specific::SpecificLoc;
+use crate::types::{err, Absolute, Type};
+use derive_builder::Builder;
+use indexmap::IndexMap;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
-use strum_macros::EnumDiscriminants;
-use indexmap::IndexMap;
-use std::ops::{Deref, DerefMut, Index};
-use std::fmt::{write, Display, Formatter};
-use derive_builder::Builder;
-use crate::parse::util::Span;
-use crate::types::{err, ClassPointRef, Type, SchemaPointRef, TypeLocation, Absolute};
-use crate::types::class::{Class, ClassDef};
-use crate::types::data::{Data, DataDef};
-use crate::types::archetype::Archetype;
-use crate::types::scope::{Scope, Segment};
-use crate::types::specific::SpecificLoc;
+use std::fmt::{Display, Formatter};
+use std::ops::{Deref, DerefMut};
+use getset::Getters;
 
 
-
-pub type Defs = HashMap<SliceLoc,Type>;
-
-#[derive()]
-pub(crate) struct Meta
+#[derive(Clone,Getters,Builder)]
+pub struct Meta
 {
-    r#type: Type,
+    r#absolute: Absolute,
     /// types support inheritance and their
     /// multiple type definition layers that are composited.
     /// [Layer]s define inheritance in regular order.  The last
     /// layer is the [Type]  of this [Meta] composite.
+    #[getset(skip)]
     defs: IndexMap<SpecificSliceLoc, Layer>,
 }
 
 impl Meta
 {
-    pub fn new(r#type: Type, layers: IndexMap<SpecificLoc, Layer>) -> Result<Meta, err::TypeErr> {
+    pub fn new(r#absolute: Absolute, layers: IndexMap<SpecificLoc, Layer>) -> Result<Meta, err::TypeErr> {
         if layers.is_empty() {
-            Err(err::TypeErr::empty_meta(r#type.into()))
+            Err(err::TypeErr::empty_meta(r#absolute.r#type))
         } else {
             Ok(Meta {
-                r#type,
+                r#absolute,
                 defs: Default::default(),
             })
         }
     }
 
-    pub fn to_type(&self) -> Type {
-        self.r#type.clone().into()
+    pub fn to_type(&self) -> & Type {
+        & self.r#absolute.r#type
     }
 
     pub fn describe(&self) -> String {
@@ -51,7 +48,7 @@ impl Meta
     }
 
     pub fn r#type(&self) -> &Type {
-        &self.r#type
+        &self.absolute.r#type
     }
 
     fn first(&self) -> &Layer {
@@ -60,19 +57,22 @@ impl Meta
     }
 
     fn layer_by_index(&self, index: usize) -> Result<&Layer, err::TypeErr> {
-        self.defs
+/*        self.defs
             .get_index(index)
             .ok_or(err::TypeErr::meta_layer_index_out_of_bounds(
-                &self.r#type.clone().into(),
+                &self.r#absolute.clone().into(),
                 &index,
                 self.defs.len(),
             ))
             .map(|(_, layer)| layer)
+            
+ */
+        todo!()
     }
 
     fn layer_by_specific(&self, loc: &SpecificSliceLoc) -> Result<&Layer, err::TypeErr> {
         self.defs
-            .get(&loc)
+            .get(loc)
             .ok_or(err::TypeErr::specific_not_found(
                 loc.clone(),
                 self.describe(),
@@ -104,50 +104,8 @@ impl Meta
     }
 }
 
-pub(crate) struct MetaBuilder<T>
-where
-    T: Archetype,
-{
-    r#type: T,
-    defs: IndexMap<SpecificLoc, Layer>,
-}
 
-impl<T> MetaBuilder<T>
-where
-    T: Archetype + Into<Type>,
-{
-    pub fn new(typical: T) -> MetaBuilder<T> {
-        Self {
-            r#type: typical,
-            defs: Default::default(),
-        }
-    }
 
-    pub fn build(self) -> Result<Meta<T>, err::TypeErr> {
-        todo!();
-        //            Meta::new(self.r#type.into(), self.defs)
-    }
-}
-
-impl<T> Deref for MetaBuilder<T>
-where
-    T: Archetype,
-{
-    type Target = IndexMap<SpecificLoc, Layer>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.defs
-    }
-}
-
-impl<T> DerefMut for MetaBuilder<T>
-where
-    T: Archetype + Into<Type>,
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.defs
-    }
-}
 
 pub(crate) struct MetaLayerAccess<'y>
 {
@@ -161,27 +119,24 @@ impl<'y> MetaLayerAccess<'y>
         Self { meta, layer }
     }
 
-    pub fn get_type(&'y self) -> Type {
+    pub fn get_type(&'y self) -> &'y Type {
         self.meta.to_type()
     }
 
-    pub fn meta(&'y self) -> &'y Meta<K> {
+    pub fn meta(&'y self) -> &'y Meta {
         self.meta
     }
 
-    pub fn specific(&'y self) -> &'y SpecificLoc {
-        self.meta.specific()
-    }
 
     pub fn layer(&'y self) -> &'y Layer {
         self.layer
     }
 }
 
-#[derive(Clone,Builder)]
-pub(crate) struct Layer {
+#[derive(Clone,Builder,Getters)]
+pub struct Layer {
     id: SpecificSliceLoc,
-    types: HashMap<Type, Absolute>,
+    types: HashMap<Type, Meta>,
 }
 
 
@@ -223,6 +178,16 @@ pub struct SliceLoc {
   loc: Segment,
   children: Vec<Box<SliceLoc>>,
 }
+
+impl Archetype for SliceLoc {
+    fn parser<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        todo!()
+    }
+}
+
 
 impl Display for SliceLoc {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

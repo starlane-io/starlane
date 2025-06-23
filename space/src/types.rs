@@ -1,10 +1,18 @@
+use crate::err::ParseErrs;
 use crate::parse::model::{BlockKind, LexBlock, NestedBlockKind};
+use crate::parse::util::preceded;
 use crate::parse::util::Span;
+use crate::parse::{camel_case, CamelCase, NomErr, SkewerCase};
 use crate::parse::{lex_block, Res};
+use crate::point::Point;
+use crate::selector::Pattern;
 use crate::types::class::Class;
 use crate::types::data::Data;
 use crate::types::scope::Scope;
+use crate::types::specific::{SpecificLoc, SpecificSelector};
+use archetype::Archetype;
 use derive_name::Name;
+use getset::Getters;
 use itertools::Itertools;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -12,12 +20,12 @@ use nom::combinator::opt;
 use nom::error::{ErrorKind, FromExternalError, ParseError};
 use nom::sequence::{tuple, Tuple};
 use nom_supreme::context::ContextError;
+use parse::Delimited;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::str::FromStr;
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
-use archetype::Archetype;
 
 pub mod class;
 pub mod data;
@@ -127,17 +135,30 @@ pub type Absolute = Scaffold<Scope, Type, SpecificLoc>;
 
 pub type AbsoluteSelector = Scaffold<Pattern<Scope>, Pattern<Type>, SpecificSelector>;
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash,Getters)]
 pub struct Scaffold<Scope, T, SpecificLoc>
 where
     Scope: Archetype,
-    T: Archetype,
     SpecificLoc: Clone + Eq + PartialEq + Hash,
 {
     scope: Scope,
     r#type: T,
     specific: SpecificLoc,
 }
+
+impl <Scope, T, SpecificLoc> Scaffold<Scope, T, SpecificLoc>
+where
+    Scope: Archetype,
+    SpecificLoc: Clone + Eq + PartialEq + Hash,
+{
+    pub fn new(scope: Scope, r#type: T, specific: SpecificLoc) -> Self {
+        Self {scope,
+        r#type,
+            specific
+        }
+    }
+}
+
 
 #[derive(Clone)]
 pub struct AbsoluteLex<Scope, Specific>
@@ -182,6 +203,32 @@ where
     }
 }
 
+
+impl  TryInto<Absolute>
+for AbsoluteLex<Scope, SpecificLoc>
+where
+    Scope: Archetype + Default,
+    SpecificLoc: Archetype
+{
+    type Error = ParseErrs;
+
+    fn try_into(self) -> Result<Absolute, Self::Error> {
+        let r#type = match self.disc {
+            TypeDisc::Class => {
+                let class: Class = self.r#absolute.r#type.into();
+                class.into()
+            }
+            TypeDisc::Data => {
+                let data: Data = self.r#absolute.r#type.into();
+                data.into()
+            }
+        };
+
+        Ok(Absolute::new(self.absolute.scope,r#type,self.absolute.specific.ok_or(ParseErrs::expected("Specific", "Some", "None"))? ))
+    }
+}
+
+
 impl<Scope, T, Specific> Into<CategoryGeneric<Scope, T>> for AbsoluteLex<Scope, Specific>
 where
     Scope: Archetype + Default,
@@ -202,7 +249,7 @@ where
 
         CategoryGeneric {
             scope: self.r#absolute.scope,
-            r#type: r#type,
+            r#type,
         }
     }
 }
@@ -399,13 +446,7 @@ pub enum TagWrap<S, T> {
     Segment(S),
 }
 
-use crate::err::ParseErrs;
-use crate::parse::util::preceded;
-use crate::parse::{camel_case, CamelCase, NomErr, SkewerCase};
-use crate::point::Point;
-use crate::selector::Pattern;
-use crate::types::specific::{SpecificLoc, SpecificSelector};
-use parse::Delimited;
+
 
 pub type ClassPointRef = Ref<Point, Class>;
 pub type SchemaPointRef = Ref<Point, Data>;
@@ -433,42 +474,14 @@ where
     }
 }
 
-impl<Scope, Type, Specific> Scaffold<Scope, Type, Specific>
-where
-    Scope: Archetype + Default,
-    Type: Delimited,
-    Specific: Archetype,
-{
-    pub fn new(scope: Scope, r#type: Type, specific: Specific) -> Self {
-        Self {
-            scope,
-            r#type,
-            specific,
-        }
-    }
 
-    pub fn plus_scope(self, scope: Scope) -> Self {
-        Self::new(scope, self.r#type, self.specific)
-    }
-
-    pub fn plus_specific(self, specific: Specific) -> Self {
-        Self::new(self.scope, self.r#type, specific)
-    }
-
-    pub fn r#type(&self) -> &Type {
-        &self.r#type
-    }
-    pub fn specific(&self) -> &Specific {
-        &self.specific
-    }
-}
 
 #[cfg(test)]
 pub mod test2 {
     use crate::parse::util::{new_span, result};
     use crate::parse::SkewerCase;
-    use crate::types::class::Class;
     use crate::types::archetype::Archetype;
+    use crate::types::class::Class;
     use crate::types::scope::parse::scope;
     use crate::types::scope::{Scope, ScopeKeyword, Segment};
     use crate::types::specific::SpecificLoc;
@@ -481,9 +494,10 @@ pub mod test2 {
     pub fn test_specific() {
         let specific = result(SpecificLoc::parser(new_span("contrib:package:1.0.0"))).unwrap();
 
-        assert_eq!("contrib", specific.contributor.as_str());
-        assert_eq!("package", specific.package.as_str());
-        assert_eq!("1.0.0", specific.version.to_string().as_str());
+        assert_eq!("contrib", specific.contributor().as_str());
+        assert_eq!("package", specific.package().as_str());
+        assert_eq!("1.0.0", specific.version().clone().to_string().as_str());
+        assert!(specific.slices().is_empty())
     }
 
     #[test]
