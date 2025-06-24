@@ -2,6 +2,8 @@
 
 // so macros will work
 extern crate self as starlane_space;
+extern crate core;
+
 use crate::point::Point;
 use once_cell::sync::Lazy;
 use std::str::FromStr;

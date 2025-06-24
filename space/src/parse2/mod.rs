@@ -37,6 +37,8 @@ pub struct ParseOperationDef<'a,N,S> {
     data: &'a str
 }
 
+
+
 impl <'a,N,S> ParseOperationDef<'a,N,S> {
     fn from(name: N, stack:S, data: &'a str ) -> Self {
         Self {
@@ -49,6 +51,7 @@ impl <'a,N,S> ParseOperationDef<'a,N,S> {
         self.data
     }
 }
+
 impl <'a> Debug for ParseOpRef<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "ParseOp: '{}' data.len(): {}  ", self.name,self.data.len())?;
@@ -98,6 +101,12 @@ impl <'a > ParseOpRef<'a> {
             stack,
             data: self.data
         }
+    }
+}
+
+impl <'a> Clone for ParseOpRef<'a> {
+    fn clone(&self) -> Self {
+        Self::from(self.name, self.stack, self.data)
     }
 }
 

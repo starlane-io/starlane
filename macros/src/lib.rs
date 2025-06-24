@@ -477,7 +477,7 @@ mod test {
 /// }
 ///
 /// impl TryInto<Child> for Parent {
-///   type Err=ParseErrs;
+///   type Err=ParseErrs0;
 ///
 ///   fn try_into(self) -> Result<Child,Self::Err> {
 ///     if let Self::Child(child) = self {
@@ -521,12 +521,12 @@ pub fn autobox(item: TokenStream) -> TokenStream {
 
                             xforms.push(quote! {
                                 impl TryInto<#ty> for #ident {
-                                    type Error=ParseErrs;
+                                    type Error=ParseErrs0;
 
                                     fn try_into(self) -> Result<#ty,Self::Error> {
                                         match self {
                                         Self::#variant_ident(val) => Ok(*val),
-                                        _ => Err(ParseErrs::new(format!("expected {}",#ty_str)))
+                                        _ => Err(ParseErrs0::new(format!("expected {}",#ty_str)))
                                         }
                                     }
                                 }
@@ -543,12 +543,12 @@ pub fn autobox(item: TokenStream) -> TokenStream {
                             let ty_str = ty.to_token_stream().to_string();
                             xforms.push(quote! {
                                 impl TryInto<#ty> for #ident {
-                                    type Error=ParseErrs;
+                                    type Error=ParseErrs0;
 
                                     fn try_into(self) -> Result<#ty,Self::Error> {
                                         match self {
                                             Self::#variant_ident(val) => Ok(val),
-                                            _ => Err(ParseErrs::new(format!("expected {}",#ty_str)))
+                                            _ => Err(ParseErrs0::new(format!("expected {}",#ty_str)))
                                         }
                                     }
                                 }
@@ -610,17 +610,17 @@ pub fn to_substance(item: TokenStream) -> TokenStream {
 
                             xforms.push(quote! {
                             impl ToSubstance<#ty> for #ident {
-                                fn to_substance(self) -> Result<#ty,ParseErrs> {
+                                fn to_substance(self) -> Result<#ty,ParseErrs0> {
                                     match self {
                                     Self::#variant_ident(val) => Ok(*val),
-                                    _ => Err(ParseErrs::new(format!("expected {}",#ty_str)))
+                                    _ => Err(ParseErrs0::new(format!("expected {}",#ty_str)))
                                     }
                                 }
 
-                                fn to_substance_ref(&self) -> Result<&#ty,ParseErrs> {
+                                fn to_substance_ref(&self) -> Result<&#ty,ParseErrs0> {
                                     match self {
                                     Self::#variant_ident(val) => Ok(val.as_ref()),
-                                    _ => Err(ParseErrs::new(format!("expected {}",#ty_str)))
+                                    _ => Err(ParseErrs0::new(format!("expected {}",#ty_str)))
                                     }
                                 }
                             }
@@ -631,16 +631,16 @@ pub fn to_substance(item: TokenStream) -> TokenStream {
                             let ty_str = ty.to_token_stream().to_string();
                             xforms.push(quote! {
                             impl ToSubstance<#ty> for #ident {
-                                fn to_substance(self) -> Result<#ty,ParseErrs> {
+                                fn to_substance(self) -> Result<#ty,ParseErrs0> {
                                     match self {
                                     Self::#variant_ident(val) => Ok(val),
-                                    _ => Err(ParseErrs::new(format!("expected {}",#ty_str)))
+                                    _ => Err(ParseErrs0::new(format!("expected {}",#ty_str)))
                                     }
                                 }
-                                 fn to_substance_ref(&self) -> Result<&#ty,ParseErrs> {
+                                 fn to_substance_ref(&self) -> Result<&#ty,ParseErrs0> {
                                     match self {
                                     Self::#variant_ident(val) => Ok(val),
-                                    _ => Err(ParseErrs::new(format!("expected {}",#ty_str)))
+                                    _ => Err(ParseErrs0::new(format!("expected {}",#ty_str)))
                                     }
                                 }
                             }
@@ -655,16 +655,16 @@ pub fn to_substance(item: TokenStream) -> TokenStream {
             } else {
                 xforms.push(quote! {
                 impl ToSubstance<()> for #ident {
-                    fn to_substance(self) -> Result<(),ParseErrs> {
+                    fn to_substance(self) -> Result<(),ParseErrs0> {
                         match self {
                         Self::#variant_ident => Ok(()),
-                        _ => Err(ParseErrs::new(format!("expected Empty")))
+                        _ => Err(ParseErrs0::new(format!("expected Empty")))
                         }
                     }
-                     fn to_substance_ref(&self) -> Result<&(),ParseErrs> {
+                     fn to_substance_ref(&self) -> Result<&(),ParseErrs0> {
                         match self {
                         Self::#variant_ident => Ok(&()),
-                        _ => Err(ParseErrs::new(format!("expected Empty")))
+                        _ => Err(ParseErrs0::new(format!("expected Empty")))
                         }
                     }
                 }
@@ -690,7 +690,7 @@ pub fn mech_err(item: TokenStream) -> TokenStream {
     let from = vec![
         quote!(Box<bincode::ErrorKind>),
         quote!(mechtron::err::MembraneErr),
-        quote!(starlane::err::ParseErrs),
+        quote!(starlane::err::ParseErrs0),
         quote!(String),
         quote!(&'static str),
         quote!(mechtron::err::GuestErr),
