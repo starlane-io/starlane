@@ -18,7 +18,7 @@ use starlane_space::kind::{
 };
 use starlane_space::loc::{MachineName, StarKey, ToBaseKind};
 use starlane_space::log::Logger;
-use starlane_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
+use starlane_space::types::property::{PropertiesConfig, PropertiesConfigBuilder};
 use starlane_space::settings::Timeouts;
 use std::str::FromStr;
 use std::sync::Arc;

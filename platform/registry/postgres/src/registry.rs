@@ -1339,7 +1339,7 @@ pub mod test {
     use starlane_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
     use starlane_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
     use starlane_space::loc::{MachineName, StarKey, ToPoint};
-    use starlane_space::particle::property::PropertiesConfig;
+    use starlane_space::types::property::PropertiesConfig;
     use starlane_space::particle::Status;
     use starlane_space::point::Point;
     use starlane_space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};

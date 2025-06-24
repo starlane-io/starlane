@@ -22,7 +22,7 @@ use starlane_space::hyper::{InterchangeKind, Knock};
 use starlane_space::kind::{BaseKind, Kind, StarSub};
 use starlane_space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface};
 use starlane_space::log::Logger;
-use starlane_space::particle::property::PropertiesConfig;
+use starlane_space::types::property::PropertiesConfig;
 use starlane_space::particle::{Property, Status, Stub};
 use starlane_space::point::Point;
 use starlane_space::selector::{KindSelector, Selector};

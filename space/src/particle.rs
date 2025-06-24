@@ -15,7 +15,6 @@ use crate::util::ToResolved;
 use crate::wave::core::http2::StatusCode;
 use crate::wave::core::ReflectedCore;
 
-pub mod property;
 pub mod traversal;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

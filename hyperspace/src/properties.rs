@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use starlane_space::err::SpaceErr;
 use starlane_space::kind::BaseKind;
 use starlane_space::loc::ToBaseKind;
-use starlane_space::particle::property::{
+use starlane_space::types::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
     PropertySource, U64Pattern, UsernamePattern,
 };

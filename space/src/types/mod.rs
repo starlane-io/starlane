@@ -44,6 +44,7 @@ pub mod tag;
 #[cfg(test)]
 pub mod test;
 pub mod archetype;
+pub mod property;
 //pub(crate) trait Typical: Display+Into<TypeKind>+Into<Type> { }
 
 /// [class::Class::Database] is an example of an [Type] because it is not an [ExactDef]

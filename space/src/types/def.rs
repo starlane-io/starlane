@@ -1,5 +1,5 @@
 use crate::parse::SnakeCase;
-use crate::particle::property::{PropertiesConfig, PropertiesConfigBuilder, PropertyDef};
+use crate::types::property::{PropertiesConfig, PropertiesConfigBuilder, PropertyDef};
 use crate::types::err::TypeErr;
 use crate::types::specific::SpecificLoc;
 use crate::types::{err, Absolute, Type};
@@ -263,7 +263,7 @@ impl SpecificCompositeBuilder {
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
-    use crate::particle::property::PropertyDef;
+    use crate::types::property::PropertyDef;
     use crate::types::{Absolute, Type};
     use crate::types::class::Class;
     use crate::types::def::{Add, Change, Defs, LayerBuilder, TypeCompositeBuilder};
