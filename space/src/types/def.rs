@@ -4,7 +4,6 @@ use crate::types::err::TypeErr;
 use crate::types::specific::SpecificLoc;
 use crate::types::{err, Absolute, Type};
 use getset::Getters;
-use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::fmt::Display;
 
@@ -22,24 +21,29 @@ impl Defs {
     pub fn new(specific: SpecificLoc) -> Defs {
         Self {
             specific,
-           layers: IndexMap::default(),
+           layers: Default::default(),
         }
     }
 
     pub fn push_layer(&mut self, r#type: Type, layer: Layer) {
+        todo!()
+        /*
         match self.layers.get_mut(&r#type) {
             None => {
                 self.layers.insert(r#type, vec![layer]);
             }
             Some(layers) => layers.push(layer),
         }
+        
+         */
     }
 
     pub fn create_layer_composite(&self) -> Result<SpecificCompositeBuilder, TypeErr> {
+        todo!()
+        /*
         let mut rtn = SpecificCompositeBuilder::of(self.specific.clone());
 
-        for (r#type, layers) in &self.layers {
-            for layer in layers {
+        for (r#type, layer) in &self.layers {
                 for change in &layer.changes {
                     let absolute =
                         Absolute::new(Default::default(), r#type.clone(), self.specific.clone());
@@ -64,15 +68,17 @@ impl Defs {
                                 rtn.types.remove(&change.r#type);
                             }
                             Remove::Property(name) => {
-                                ty_comp.properties.remove(name);
+todo!()                                
+//                                ty_comp.properties.remove(name);
                             }
                         },
                     }
                 }
-            }
+            
         }
 
         Ok(rtn)
+        */
     }
 
     pub fn describe(&self) -> String {
@@ -129,11 +135,15 @@ impl LayerBuilder {
     
     pub fn build(self) -> Layer {
         let parent = self.parent.map(Box::new);
+        /*
         Layer {
             parent,
             changes: self.changes,
             specific: self.specific
         }
+        
+         */
+        todo!()
     }
 }
 
@@ -274,15 +284,20 @@ mod tests {
        assert_eq!(less, *property);
    }
 
+    /*
     #[test]
     pub fn layer() {
         let mut defs= Defs::new(SpecificLoc::mock_default());
         let less= PropertyDef::mock_less();
         let fae = PropertyDef::mock_fae();
         let layer = LayerBuilder::new(SpecificLoc::mock_default());
-        defs.push_layer()
+        //defs.push_layer()
+        todo!()
     }
+   
+     */
 
+    /*
     #[test]
     pub fn multi_layer() {
         let specific = SpecificLoc::mock_default();
@@ -310,5 +325,7 @@ mod tests {
         let first = layer.changes.first().cloned();
         assert_eq!(Some(add_less), layer.changes.first().cloned());
     }
+    
+     */
     
 }
