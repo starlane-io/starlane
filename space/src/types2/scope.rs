@@ -204,21 +204,21 @@ pub mod test {
     use std::str::FromStr;
     use crate::parse::util::{new_span, result};
     use crate::types2::scope::parse::scope;
-
+    
+    
     #[test]
     fn text_x() {
-        /*
+
+        assert_eq!(ScopeKeyword::from_str("root").unwrap(), ScopeKeyword::Root);
         let domain = result(scope(new_span("hello"))).unwrap();
         assert_eq!(domain.to_string().as_str(), "hello");
         assert_eq!(domain.reserved(), false);
         assert_eq!(domain.prefix().is_none(), true);
+    }
 
-        assert_eq!(ScopeKeyword::from_str("root").unwrap(), ScopeKeyword::Root);
-        
-         */
+/*
 
         let scope = parse("root").unwrap();
-
         println!("{:?}", scope);
         assert!(scope.prefix().is_some());
         println!();
@@ -242,6 +242,7 @@ pub mod test {
         // println!("domain: '{}'", domain.to_string());
         //assert!(false)
     }
+        */
 }
 
 pub mod parse {

@@ -80,10 +80,7 @@ use nom::combinator::{cut, eof, fail, not, peek, value, verify};
 use nom::error::{ErrorKind, ParseError};
 use nom::multi::{many0, many1, separated_list0};
 use nom::sequence::{delimited, pair, terminated, tuple};
-use nom::{
-    AsChar, Compare, FindToken, InputIter, InputLength, InputTake, InputTakeAtPosition, Offset,
-    Parser, Slice,
-};
+use nom::{AsChar, Compare, FindToken, Finish, InputIter, InputLength, InputTake, InputTakeAtPosition, Offset, Parser, Slice};
 use nom::{Err, IResult};
 use nom_locate::LocatedSpan;
 use nom_supreme::context::ContextError;
@@ -103,6 +100,7 @@ use std::sync::Arc;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
+use crate::types::archetype::Archetype;
 use crate::types::property::{PropertyMod, PropertyName, SetProperties};
 
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
@@ -307,6 +305,7 @@ impl BraceKindErrCtx {}
 
 pub type NomErr<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErrs>;
 
+use nom::error::VerboseError;
 
 pub type Res<I: Span, O> = IResult<I, O, NomErr<I>>;
 
@@ -5496,11 +5495,11 @@ pub mod cmd_test {
                     println!("err: {}", err.to_string())
                 }
             }
-    
-    
+
+
             Ok(())
         }
-    
+
          */
 
     //    #[test]
@@ -7875,7 +7874,7 @@ impl Deref for SnakeCase {
         &self.string
     }
 }
-  
+
 #[cfg(not(feature="types2") )]
 mod archetypes {
     use crate::parse::{camel_case, domain, skewer_case, snake_case, CamelCase, Domain, Res, SkewerCase, SnakeCase};
@@ -7959,4 +7958,3 @@ mod archetypes {
     }
 }
 
- 

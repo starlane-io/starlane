@@ -1,12 +1,10 @@
 #![allow(warnings)]
 
+// so macros will work
+extern crate self as starlane_space;
 use crate::point::Point;
 use once_cell::sync::Lazy;
 use std::str::FromStr;
-use crate::particle::Property;
-
-// so macros will work
-extern crate self as starlane_space;
 
 #[allow(missing_docs, unused_imports, warnings)]
 pub(crate) mod lib {
@@ -177,10 +175,10 @@ pub mod types {
     pub use super::types2::*;
 }
 
+#[cfg(feature = "parse2")]
+pub mod parse2;
+
 pub mod test;
-
-
-
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
