@@ -21,7 +21,7 @@ use crate::config::bind::{
 use crate::config::mechtron::MechtronConfig;
 use crate::config::{DocKind, Document};
 use crate::err::report::{Label, Report, ReportKind};
-use crate::err::ParseErrs;
+use crate::err::ParseErrs0;
 use crate::kind::{
     ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, Specific, StarSub,
     Sub, UserBaseSubKind,
@@ -108,13 +108,13 @@ pub type StarParser<I: Span, O> = dyn nom_supreme::parser_ext::ParserExt<I, O, N
 
 pub type Xpan<'a> = Wrap<LocatedSpan<&'a str, Arc<String>>>;
 
-impl<I> From<NomErr<I>> for ParseErrs
+impl<I> From<NomErr<I>> for ParseErrs0
 where
     I: Span,
 {
     fn from(err: NomErr<I>) -> Self {
         match err {
-            NomErr::Base { location, kind } => ParseErrs::from_loc_span(
+            NomErr::Base { location, kind } => ParseErrs0::from_loc_span(
                 "undefined parse error (error is not associated with an ErrorContext",
                 "undefined",
                 location.clone(),
@@ -135,7 +135,7 @@ where
                             let line = format!("\n\t\tcaused by: {}", unstack(&context));
                             message.push_str(line.as_str());
                         }
-                        return ParseErrs::from_loc_span(
+                        return ParseErrs0::from_loc_span(
                             message.as_str(),
                             last.to_string(),
                             location,
@@ -143,23 +143,23 @@ where
                     }
                 }
 
-                ParseErrs::default()
+                ParseErrs0::default()
             }
             NomErr::Alt(_) => {
                 //println!("ALT!");
-                ParseErrs::default()
+                ParseErrs0::default()
             }
         }
     }
 }
 
-impl<I> From<nom::Err<NomErr<I>>> for ParseErrs
+impl<I> From<nom::Err<NomErr<I>>> for ParseErrs0
 where
     I: Span,
 {
     fn from(err: nom::Err<NomErr<I>>) -> Self {
         match err {
-            Err::Incomplete(i) => ParseErrs::default(),
+            Err::Incomplete(i) => ParseErrs0::default(),
             Err::Error(err) => err.into(),
             Err::Failure(err) => err.into(),
         }
@@ -303,7 +303,7 @@ pub enum BraceKindErrCtx {
 
 impl BraceKindErrCtx {}
 
-pub type NomErr<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErrs>;
+pub type NomErr<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErrs0>;
 
 use nom::error::VerboseError;
 
@@ -885,15 +885,15 @@ pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
     )
 }
 
-pub fn consume_point(input: &str) -> Result<Point, ParseErrs> {
+pub fn consume_point(input: &str) -> Result<Point, ParseErrs0> {
     consume_point_ctx(input)?.collapse()
 }
 
-pub fn consume_point_ctx(input: &str) -> Result<PointCtx, ParseErrs> {
+pub fn consume_point_ctx(input: &str) -> Result<PointCtx, ParseErrs0> {
     consume_point_var(input)?.collapse()
 }
 
-pub fn consume_point_var(input: &str) -> Result<PointVar, ParseErrs> {
+pub fn consume_point_var(input: &str) -> Result<PointVar, ParseErrs0> {
     let span = new_span(input);
     let point = result(context("consume", all_consuming(point_var))(span))?;
     Ok(point)
@@ -1062,7 +1062,7 @@ pub fn version_point_kind_segment<I: Span>(input: I) -> Res<I, PointKindSeg> {
     })
 }
 
-pub fn consume_hierarchy<I: Span>(input: I) -> Result<PointHierarchy, ParseErrs> {
+pub fn consume_hierarchy<I: Span>(input: I) -> Result<PointHierarchy, ParseErrs0> {
     let (next, rtn) = all_consuming(point_kind_hierarchy)(input)?;
     Ok(rtn)
 }
@@ -1542,7 +1542,7 @@ impl CamelCase {
 }
 
 impl FromStr for CamelCase {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(camel_case)(new_span(s)))
@@ -1630,7 +1630,7 @@ impl<'de> Deserialize<'de> for Domain {
 
 
 impl FromStr for Domain {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(domain)(new_span(s)))
@@ -1700,7 +1700,7 @@ impl<'de> Deserialize<'de> for VarCase {
 }
 
 impl FromStr for VarCase {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(var_chars)(new_span(s)))?;
@@ -1749,7 +1749,7 @@ impl<'de> Deserialize<'de> for SkewerCase {
 }
 
 impl FromStr for SkewerCase {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(skewer_case)(new_span(s)))
@@ -2439,7 +2439,7 @@ impl Env {
         }
     }
 
-    pub fn push_working<S: ToString>(self, segs: S) -> Result<Self, ParseErrs> {
+    pub fn push_working<S: ToString>(self, segs: S) -> Result<Self, ParseErrs0> {
         Ok(Self {
             point: self.point.push(segs.to_string())?,
             parent: Some(Box::new(self)),
@@ -2449,14 +2449,14 @@ impl Env {
         })
     }
 
-    pub fn point_or(&self) -> Result<Point, ParseErrs> {
+    pub fn point_or(&self) -> Result<Point, ParseErrs0> {
         Ok(self.point.clone())
     }
 
-    pub fn pop(self) -> Result<Env, ParseErrs> {
+    pub fn pop(self) -> Result<Env, ParseErrs0> {
         Ok(*self
             .parent
-            .ok_or(ParseErrs::new(&"expected parent scopedVars"))?)
+            .ok_or(ParseErrs0::new(&"expected parent scopedVars"))?)
     }
 
     pub fn add_var_resolver(&mut self, var_resolver: Arc<dyn VarResolver>) {
@@ -2665,13 +2665,13 @@ impl VarResolver for CompositeResolver {
 }
 
 pub trait CtxResolver {
-    fn working_point(&self) -> Result<&Point, ParseErrs>;
+    fn working_point(&self) -> Result<&Point, ParseErrs0>;
 }
 
 pub struct PointCtxResolver(Point);
 
 impl CtxResolver for PointCtxResolver {
-    fn working_point(&self) -> Result<&Point, ParseErrs> {
+    fn working_point(&self) -> Result<&Point, ParseErrs0> {
         Ok(&self.0)
     }
 }
@@ -2742,10 +2742,10 @@ pub struct RegexCapturesResolver {
 }
 
 impl RegexCapturesResolver {
-    pub fn new(regex: Regex, text: String) -> Result<Self, ParseErrs> {
+    pub fn new(regex: Regex, text: String) -> Result<Self, ParseErrs0> {
         regex
             .captures(text.as_str())
-            .ok_or(ParseErrs::new("no regex captures"))?;
+            .ok_or(ParseErrs0::new("no regex captures"))?;
         Ok(Self { regex, text })
     }
 }
@@ -2828,7 +2828,7 @@ where
 }
 
 pub trait SubstParser<T: Sized> {
-    fn parse_string(&self, string: String) -> Result<T, ParseErrs> {
+    fn parse_string(&self, string: String) -> Result<T, ParseErrs0> {
         let span = new_span(string.as_str());
         let output = result(self.parse_span(span))?;
         Ok(output)
@@ -3024,7 +3024,7 @@ where
         + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     F: nom::Parser<I, O, NomErr<I>>,
-    O: Clone + FromStr<Err = ParseErrs>,
+    O: Clone + FromStr<Err =ParseErrs0>,
 {
     move |input: I| {
         let (next, element) = f.parse(input.clone())?;
@@ -3503,7 +3503,7 @@ where
     }
 }
 
-pub fn lex_child_scopes<I: Span>(parent: LexScope<I>) -> Result<LexParentScope<I>, ParseErrs> {
+pub fn lex_child_scopes<I: Span>(parent: LexScope<I>) -> Result<LexParentScope<I>, ParseErrs0> {
     if parent.selector.children.is_some() {
         let (_, child_selector) = all_consuming(lex_scope_selector)(
             parent
@@ -3635,7 +3635,7 @@ pub fn root_scope<I: Span>(input: I) -> Res<I, LexRootScope<I>> {
     })
 }
 
-pub fn lex_scopes<I: Span>(input: I) -> Result<Vec<LexScope<I>>, ParseErrs> {
+pub fn lex_scopes<I: Span>(input: I) -> Result<Vec<LexScope<I>>, ParseErrs0> {
     if input.len() == 0 {
         return Ok(vec![]);
     }
@@ -3959,7 +3959,7 @@ pub fn root_scope_selector_name<I: Span>(input: I) -> Res<I, I> {
     .map(|(next, (_, name))| (next, name))
 }
 
-pub fn lex_root_scope<I: Span>(span: I) -> Result<LexRootScope<I>, ParseErrs> {
+pub fn lex_root_scope<I: Span>(span: I) -> Result<LexRootScope<I>, ParseErrs0> {
     let root_scope = result(delimited(multispace0, root_scope, multispace0)(span))?;
     Ok(root_scope)
 }
@@ -3975,7 +3975,7 @@ pub mod model {
     use std::str::FromStr;
 
     use crate::config::bind::{PipelineStepDef, PipelineStopDef};
-    use crate::err::ParseErrs;
+    use crate::err::ParseErrs0;
     use crate::loc::VersionSegLoc;
     use crate::parse::util::{new_span, result, Span, Trace, Tw};
     use crate::parse::{
@@ -4091,7 +4091,7 @@ pub mod model {
     }
 
     impl<I: ToString, V: ToString> RootScopeSelector<I, V> {
-        pub fn to_concrete(self) -> Result<RootScopeSelector<String, VersionSegLoc>, ParseErrs> {
+        pub fn to_concrete(self) -> Result<RootScopeSelector<String, VersionSegLoc>, ParseErrs0> {
             Ok(RootScopeSelector {
                 name: self.name.to_string(),
                 version: VersionSegLoc::from_str(self.version.to_string().as_str())?,
@@ -4117,7 +4117,7 @@ pub mod model {
     }
 
     impl RouteScopeSelector {
-        pub fn new<I: ToString>(path: Option<I>) -> Result<Self, ParseErrs> {
+        pub fn new<I: ToString>(path: Option<I>) -> Result<Self, ParseErrs0> {
             let path = match path {
                 None => Regex::new(".*")?,
                 Some(path) => Regex::new(path.to_string().as_str())?,
@@ -4130,9 +4130,9 @@ pub mod model {
             })
         }
 
-        pub fn from<I: ToString>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs> {
+        pub fn from<I: ToString>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs0> {
             if selector.name.to_string().as_str() != "Route" {
-                return Err(ParseErrs::expected(
+                return Err(ParseErrs0::expected(
                     "",
                     "expected Route",
                     selector.name.to_string(),
@@ -4205,14 +4205,14 @@ pub mod model {
         }
     }
 
-    fn default_path<I: ToString>(path: Option<I>) -> Result<Regex, ParseErrs> {
+    fn default_path<I: ToString>(path: Option<I>) -> Result<Regex, ParseErrs0> {
         match path {
             None => Ok(Regex::new(".*")?),
             Some(path) => Ok(Regex::new(path.to_string().as_str())?),
         }
     }
     impl WaveScope {
-        pub fn from_scope<I: Span>(scope: LexParentScope<I>) -> Result<Self, ParseErrs> {
+        pub fn from_scope<I: Span>(scope: LexParentScope<I>) -> Result<Self, ParseErrs0> {
             let selector = MessageScopeSelectorAndFilters::from_selector(scope.selector)?;
             let mut block = vec![];
 
@@ -4236,7 +4236,7 @@ pub mod model {
     }
 
     impl MessageScopeSelectorAndFilters {
-        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs0> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = MessageScopeSelector::from_selector(selector)?;
             Ok(Self { selector, filters })
@@ -4244,7 +4244,7 @@ pub mod model {
     }
 
     impl RouteScopeSelectorAndFilters {
-        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs0> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = RouteScopeSelector::new(selector.path.clone())?;
             Ok(Self { selector, filters })
@@ -4297,7 +4297,7 @@ pub mod model {
         pub fn from_scope<I: Span>(
             parent: &ValuePattern<MethodKind>,
             scope: LexScope<I>,
-        ) -> Result<Self, ParseErrs> {
+        ) -> Result<Self, ParseErrs0> {
             let selector = MethodScopeSelectorAndFilters::from_selector(parent, scope.selector)?;
             let block = result(pipeline(scope.block.content))?;
             Ok(Self { selector, block })
@@ -4305,11 +4305,11 @@ pub mod model {
     }
 
     impl MessageScopeSelector {
-        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs0> {
             let kind = match result(value_pattern(method_kind)(selector.name.clone())) {
                 Ok(kind) => kind,
                 Err(_) => {
-                    return Err(ParseErrs::from_loc_span(
+                    return Err(ParseErrs0::from_loc_span(
                         format!(
                             "unknown MessageKind: {} valid message kinds: Ext, Http, Cmd or *",
                             selector.name.to_string()
@@ -4352,7 +4352,7 @@ pub mod model {
         pub fn from_selector<I: Span>(
             parent: &ValuePattern<MethodKind>,
             selector: LexScopeSelector<I>,
-        ) -> Result<Self, ParseErrs> {
+        ) -> Result<Self, ParseErrs0> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = MethodScopeSelector::from_selector(parent, selector)?;
             Ok(Self { selector, filters })
@@ -4363,7 +4363,7 @@ pub mod model {
         pub fn from_selector<I: Span>(
             parent: &ValuePattern<MethodKind>,
             selector: LexScopeSelector<I>,
-        ) -> Result<Self, ParseErrs> {
+        ) -> Result<Self, ParseErrs0> {
             let name = match parent {
                 ValuePattern::Always => ValuePattern::Always,
                 ValuePattern::Never => ValuePattern::Never,
@@ -4372,7 +4372,7 @@ pub mod model {
                         match result(value_pattern(wrapped_sys_method)(selector.name.clone())) {
                             Ok(r) => r,
                             Err(_) => {
-                                return Err(ParseErrs::from_loc_span(
+                                return Err(ParseErrs0::from_loc_span(
                                     format!(
                                         "invalid Hyp method '{}'.  Hyp should be CamelCase",
                                         selector.name.to_string()
@@ -4389,7 +4389,7 @@ pub mod model {
                         match result(value_pattern(wrapped_cmd_method)(selector.name.clone())) {
                             Ok(r) => r,
                             Err(_) => {
-                                return Err(ParseErrs::from_loc_span(
+                                return Err(ParseErrs0::from_loc_span(
                                     format!(
                                         "invalid Cmd method '{}'.  Cmd should be CamelCase",
                                         selector.name.to_string()
@@ -4406,7 +4406,7 @@ pub mod model {
                         match result(value_pattern(wrapped_ext_method)(selector.name.clone())) {
                             Ok(r) => r,
                             Err(_) => {
-                                return Err(ParseErrs::from_loc_span(
+                                return Err(ParseErrs0::from_loc_span(
                                     format!(
                                         "invalid Ext method '{}'.  Ext should be CamelCase",
                                         selector.name.to_string()
@@ -4423,7 +4423,7 @@ pub mod model {
                         match result(value_pattern(wrapped_http_method)(selector.name.clone())) {
                             Ok(r) => r,
                             Err(_) => {
-                                return Err(ParseErrs::from_loc_span(format!("invalid Http Pattern '{}'.  Http should be camel case 'Get' and a valid Http method", selector.name.to_string()).as_str(), "invalid Http method", selector.name).into())
+                                return Err(ParseErrs0::from_loc_span(format!("invalid Http Pattern '{}'.  Http should be camel case 'Get' and a valid Http method", selector.name.to_string()).as_str(), "invalid Http method", selector.name).into())
                             }
                         }
                     }
@@ -4555,14 +4555,14 @@ pub mod model {
     }
 
     impl ToResolved<PipelineSegment> for PipelineSegmentVar {
-        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, ParseErrs> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, ParseErrs0> {
             let rtn: PipelineSegmentCtx = self.to_resolved(env)?;
             rtn.to_resolved(env)
         }
     }
 
     impl ToResolved<PipelineSegment> for PipelineSegmentCtx {
-        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, ParseErrs> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, ParseErrs0> {
             Ok(PipelineSegment {
                 step: self.step.to_resolved(env)?,
                 stop: self.stop.to_resolved(env)?,
@@ -4571,7 +4571,7 @@ pub mod model {
     }
 
     impl ToResolved<PipelineSegmentCtx> for PipelineSegmentVar {
-        fn to_resolved(self, env: &Env) -> Result<PipelineSegmentCtx, ParseErrs> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineSegmentCtx, ParseErrs0> {
             Ok(PipelineSegmentCtx {
                 step: self.step.to_resolved(env)?,
                 stop: self.stop.to_resolved(env)?,
@@ -4631,7 +4631,7 @@ pub mod model {
     //    pub type Pipeline = Vec<PipelineSegment>;
 
     impl<I: Span> TryFrom<LexParentScope<I>> for RouteScope {
-        type Error = ParseErrs;
+        type Error = ParseErrs0;
 
         fn try_from(scope: LexParentScope<I>) -> Result<Self, Self::Error> {
             let mut errs = vec![];
@@ -4654,7 +4654,7 @@ pub mod model {
                     block: message_scopes,
                 })
             } else {
-                Err(ParseErrs::fold(errs).into())
+                Err(ParseErrs0::fold(errs).into())
             }
         }
     }
@@ -4693,7 +4693,7 @@ pub mod model {
     pub type PipelineVar = PipelineDef<PipelineSegmentVar>;
 
     impl ToResolved<Pipeline> for PipelineCtx {
-        fn to_resolved(self, env: &Env) -> Result<Pipeline, ParseErrs> {
+        fn to_resolved(self, env: &Env) -> Result<Pipeline, ParseErrs0> {
             let mut segments = vec![];
             for segment in self.segments.into_iter() {
                 segments.push(segment.to_resolved(env)?);
@@ -4704,7 +4704,7 @@ pub mod model {
     }
 
     impl ToResolved<PipelineCtx> for PipelineVar {
-        fn to_resolved(self, env: &Env) -> Result<PipelineCtx, ParseErrs> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineCtx, ParseErrs0> {
             let mut segments = vec![];
             for segment in self.segments.into_iter() {
                 segments.push(segment.to_resolved(env)?);
@@ -5190,7 +5190,7 @@ pub mod model {
     }
 
     pub trait VarParser<O> {
-        fn parse<I: Span>(input: I) -> Result<O, ParseErrs>;
+        fn parse<I: Span>(input: I) -> Result<O, ParseErrs0>;
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -5200,7 +5200,7 @@ pub mod model {
     }
 
     impl Subst<Tw<String>> {
-        pub fn new(path: &str) -> Result<Self, ParseErrs> {
+        pub fn new(path: &str) -> Result<Self, ParseErrs0> {
             let path = result(subst_path(new_span(path)))?;
             Ok(path.stringify())
         }
@@ -5241,7 +5241,7 @@ pub mod model {
     }
 
     impl ToResolved<String> for Subst<Tw<String>> {
-        fn to_resolved(self, env: &Env) -> Result<String, ParseErrs> {
+        fn to_resolved(self, env: &Env) -> Result<String, ParseErrs0> {
             let mut rtn = String::new();
             let mut errs = vec![];
             for chunk in self.chunks {
@@ -5252,7 +5252,7 @@ pub mod model {
                             rtn.push_str(val.as_str());
                         }
                         Err(err) => {
-                            errs.push(ParseErrs::from_range(
+                            errs.push(ParseErrs0::from_range(
                                 format!("could not find variable: {}", var.to_string()).as_str(),
                                 "not found",
                                 var.trace.range,
@@ -5269,7 +5269,7 @@ pub mod model {
             if errs.is_empty() {
                 Ok(rtn)
             } else {
-                let errs = ParseErrs::fold(errs);
+                let errs = ParseErrs0::fold(errs);
                 Err(errs.into())
             }
         }
@@ -5445,7 +5445,7 @@ pub struct KindLex {
 }
 
 impl TryInto<KindParts> for KindLex {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_into(self) -> Result<KindParts, Self::Error> {
         Ok(KindParts {
@@ -5475,7 +5475,7 @@ pub mod cmd_test {
 
     use crate::command::direct::create::KindTemplate;
     use crate::command::{Command, CommandVar};
-    use crate::err::ParseErrs;
+    use crate::err::ParseErrs0;
     use crate::kind::{BaseKind, Kind};
     use crate::parse::util::{new_span, result};
     use crate::point::{PointSeg, RouteSeg};
@@ -5503,7 +5503,7 @@ pub mod cmd_test {
          */
 
     //    #[test]
-    pub fn test() -> Result<(), ParseErrs> {
+    pub fn test() -> Result<(), ParseErrs0> {
         let input = "xreate? localhost<Space>";
         match command(new_span(input)) {
             Ok(_) => {}
@@ -5519,7 +5519,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_kind() -> Result<(), ParseErrs> {
+    pub fn test_kind() -> Result<(), ParseErrs0> {
         let input = "create localhost:users<UserBase<Keycloak>>";
         let (_, command) = command(new_span(input))?;
         match command {
@@ -5537,7 +5537,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_script() -> Result<(), ParseErrs> {
+    pub fn test_script() -> Result<(), ParseErrs0> {
         let input = r#" create? localhost<Space>;
  Xcrete localhost:repo<Base<Repo>>;
  create? localhost:repo:tutorial<ArtifactBundleSeries>;
@@ -5550,14 +5550,14 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_publish() -> Result<(), ParseErrs> {
+    pub fn test_publish() -> Result<(), ParseErrs0> {
         let input = r#"publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
         publish_command(new_span(input))?;
         Ok(())
     }
 
     #[test]
-    pub fn test_upload_blocks() -> Result<(), ParseErrs> {
+    pub fn test_upload_blocks() -> Result<(), ParseErrs0> {
         let input = r#"publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
         let blocks = result(upload_blocks(new_span(input)))?;
         assert_eq!(1, blocks.len());
@@ -5578,7 +5578,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_create_kind() -> Result<(), ParseErrs> {
+    pub fn test_create_kind() -> Result<(), ParseErrs0> {
         let input = r#"create localhost:repo:tutorial:1.0.0<Repo>"#;
         let mut command = result(create_command(new_span(input)))?;
         let command = command.collapse()?;
@@ -5597,7 +5597,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_create_properties() -> Result<(), ParseErrs> {
+    pub fn test_create_properties() -> Result<(), ParseErrs0> {
         let input = r#"create localhost:repo:tutorial:1.0.0<Repo>{ +config=the:cool:property }"#;
         let mut command = result(create_command(new_span(input)))?;
         let command = command.collapse()?;
@@ -6002,7 +6002,7 @@ pub fn delim_kind_parts<I: Span>(input: I) -> Res<I, KindParts> {
     delimited(tag("<"), kind_parts, tag(">"))(input)
 }
 
-pub fn consume_kind<I: Span>(input: I) -> Result<KindParts, ParseErrs> {
+pub fn consume_kind<I: Span>(input: I) -> Result<KindParts, ParseErrs0> {
     let (_, kind_parts) = all_consuming(kind_parts)(input)?;
 
     Ok(kind_parts.try_into()?)
@@ -7225,11 +7225,11 @@ where
     .map(|(next, comment)| (next, TextType::Comment(comment)))
 }
 
-pub fn bind_config(src: &str) -> Result<BindConfig, ParseErrs> {
+pub fn bind_config(src: &str) -> Result<BindConfig, ParseErrs0> {
     let document = doc(src)?;
     match document {
         Document::BindConfig(bind_config) => Ok(bind_config),
-        _ => Err(ParseErrs::expected(
+        _ => Err(ParseErrs0::expected(
             "Document",
             DocKind::BindConfig.to_string(),
             document.kind().to_string(),
@@ -7237,11 +7237,11 @@ pub fn bind_config(src: &str) -> Result<BindConfig, ParseErrs> {
     }
 }
 
-pub fn mechtron_config(src: &str) -> Result<MechtronConfig, ParseErrs> {
+pub fn mechtron_config(src: &str) -> Result<MechtronConfig, ParseErrs0> {
     let document = doc(src)?;
     match document {
         Document::MechtronConfig(mechtron_config) => Ok(mechtron_config),
-        _ => Err(ParseErrs::expected(
+        _ => Err(ParseErrs0::expected(
             "Document",
             &DocKind::MechtronConfig,
             &document.kind(),
@@ -7249,7 +7249,7 @@ pub fn mechtron_config(src: &str) -> Result<MechtronConfig, ParseErrs> {
     }
 }
 
-pub fn doc(src: &str) -> Result<Document, ParseErrs> {
+pub fn doc(src: &str) -> Result<Document, ParseErrs0> {
     let src = src.to_string();
     let (next, stripped) = strip_comments(new_span(src.as_str()))?;
     let span = span_with_extra(stripped.as_str(), Arc::new(src.to_string()));
@@ -7278,7 +7278,7 @@ pub fn doc(src: &str) -> Result<Document, ParseErrs> {
                     .with_message("Unsupported Bind Config Version"),
                 )
                 .finish();
-            Err(ParseErrs::from_report(report, lex_root_scope.block.content.extra.clone()).into())
+            Err(ParseErrs0::from_report(report, lex_root_scope.block.content.extra.clone()).into())
         }
     } else if root_scope_selector.name.as_str() == "Bind" {
         if root_scope_selector.version == VersionSegLoc::from_str("1.0.0")? {
@@ -7302,7 +7302,7 @@ pub fn doc(src: &str) -> Result<Document, ParseErrs> {
                     .with_message("Unsupported Bind Config Version"),
                 )
                 .finish();
-            Err(ParseErrs::from_report(report, lex_root_scope.block.content.extra.clone()).into())
+            Err(ParseErrs0::from_report(report, lex_root_scope.block.content.extra.clone()).into())
         }
     } else {
         let message = format!(
@@ -7321,7 +7321,7 @@ pub fn doc(src: &str) -> Result<Document, ParseErrs> {
                 .with_message("Unrecognized Config Kind"),
             )
             .finish();
-        Err(ParseErrs::from_report(report, lex_root_scope.block.content.extra.clone()).into())
+        Err(ParseErrs0::from_report(report, lex_root_scope.block.content.extra.clone()).into())
     }
 }
 
@@ -7378,7 +7378,7 @@ pub struct Assignment {
     pub value: String,
 }
 
-fn semantic_mechtron_scope<I: Span>(scope: LexScope<I>) -> Result<MechtronScope, ParseErrs> {
+fn semantic_mechtron_scope<I: Span>(scope: LexScope<I>) -> Result<MechtronScope, ParseErrs0> {
     let selector_name = scope.selector.name.to_string();
     match selector_name.as_str() {
         "Wasm" => {
@@ -7400,12 +7400,12 @@ fn semantic_mechtron_scope<I: Span>(scope: LexScope<I>) -> Result<MechtronScope,
                     .with_message("Unrecognized Selector"),
                 )
                 .finish();
-            Err(ParseErrs::from_report(report, scope.block.content.extra().clone()).into())
+            Err(ParseErrs0::from_report(report, scope.block.content.extra().clone()).into())
         }
     }
 }
 
-fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, ParseErrs> {
+fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, ParseErrs0> {
     let lex_scopes = lex_scopes(input)?;
     let mut scopes = vec![];
     let mut errors = vec![];
@@ -7420,7 +7420,7 @@ fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, ParseErrs> {
     }
 
     if !errors.is_empty() {
-        let errors = ParseErrs::fold(errors);
+        let errors = ParseErrs0::fold(errors);
         return Err(errors.into());
     }
 
@@ -7428,7 +7428,7 @@ fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, ParseErrs> {
     Ok(config)
 }
 
-fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, ParseErrs> {
+fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, ParseErrs0> {
     let selector_name = scope.selector.name.to_string();
     match selector_name.as_str() {
         "Route" => {
@@ -7451,12 +7451,12 @@ fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, ParseEr
                     .with_message("Unrecognized Selector"),
                 )
                 .finish();
-            Err(ParseErrs::from_report(report, scope.block.content.extra().clone()).into())
+            Err(ParseErrs0::from_report(report, scope.block.content.extra().clone()).into())
         }
     }
 }
 
-fn parse_bind_pipelines_scope<I: Span>(input: I) -> Result<Spanned<I, BindScopeKind>, ParseErrs> {
+fn parse_bind_pipelines_scope<I: Span>(input: I) -> Result<Spanned<I, BindScopeKind>, ParseErrs0> {
     unimplemented!()
     /*
     let (next, lex_scopes) = lex_scopes(input.clone())?;
@@ -7677,7 +7677,7 @@ pub fn var_chunk<I: Span>(input: I) -> Res<I, Chunk<I>> {
     .map(|(next, variable_name)| (next, Chunk::Var(variable_name)))
 }
 
-pub fn route_attribute(input: &str) -> Result<RouteSelector, ParseErrs> {
+pub fn route_attribute(input: &str) -> Result<RouteSelector, ParseErrs0> {
     let input = new_span(input);
     let (_, (_, lex_route)) = result(pair(
         tag("#"),
@@ -7699,7 +7699,7 @@ pub fn route_attribute(input: &str) -> Result<RouteSelector, ParseErrs> {
     route_selector(lex_route)
 }
 
-pub fn route_attribute_value(input: &str) -> Result<RouteSelector, ParseErrs> {
+pub fn route_attribute_value(input: &str) -> Result<RouteSelector, ParseErrs0> {
     let input = new_span(input);
     let lex_route = result(unwrap_block(
         BlockKind::Delimited(DelimitedBlockKind::DoubleQuotes),
@@ -7709,7 +7709,7 @@ pub fn route_attribute_value(input: &str) -> Result<RouteSelector, ParseErrs> {
     route_selector(lex_route)
 }
 
-pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
+pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs0> {
     let (next, (topic, lex_route)) = match pair(
         opt(terminated(
             unwrap_block(
@@ -7728,7 +7728,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
     };
 
     if next.len() > 0 {
-        return Err(ParseErrs::from_loc_span(
+        return Err(ParseErrs0::from_loc_span(
             "could not consume entire route selector",
             "extra",
             next,
@@ -7740,7 +7740,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
     names.reverse();
     let method_kind_span = names
         .pop()
-        .ok_or(ParseErrs::from_loc_span(
+        .ok_or(ParseErrs0::from_loc_span(
             "expecting MethodKind [ Http, Ext ]",
             "expecting MethodKind",
             input,
@@ -7752,7 +7752,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
         ValuePattern::Never => ValuePattern::Never,
         ValuePattern::Pattern(method_kind) => match method_kind {
             MethodKind::Hyp => {
-                let method = names.pop().ok_or(ParseErrs::from_loc_span(
+                let method = names.pop().ok_or(ParseErrs0::from_loc_span(
                     "Hyp method requires a sub kind i.e. Hyp<Assign> or Ext<*>",
                     "sub kind required",
                     method_kind_span,
@@ -7761,7 +7761,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
                 ValuePattern::Pattern(MethodPattern::Hyp(method))
             }
             MethodKind::Cmd => {
-                let method = names.pop().ok_or(ParseErrs::from_loc_span(
+                let method = names.pop().ok_or(ParseErrs0::from_loc_span(
                     "Cmd method requires a sub kind i.e. Cmd<Bounce>",
                     "sub kind required",
                     method_kind_span,
@@ -7770,7 +7770,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
                 ValuePattern::Pattern(MethodPattern::Cmd(method))
             }
             MethodKind::Ext => {
-                let method = names.pop().ok_or(ParseErrs::from_loc_span(
+                let method = names.pop().ok_or(ParseErrs0::from_loc_span(
                     "Ext method requires a sub kind i.e. Ext<SomeExt> or Ext<*>",
                     "sub kind required",
                     method_kind_span,
@@ -7779,7 +7779,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
                 ValuePattern::Pattern(MethodPattern::Ext(method))
             }
             MethodKind::Http => {
-                let method = names.pop().ok_or(ParseErrs::from_loc_span(
+                let method = names.pop().ok_or(ParseErrs0::from_loc_span(
                     "Http method requires a sub kind i.e. Http<Get> or Http<*>",
                     "sub kind required",
                     method_kind_span,
@@ -7792,7 +7792,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
 
     if !names.is_empty() {
         let name = names.pop().unwrap();
-        return Err(ParseErrs::from_loc_span("Too many SubKinds: only Http/Ext supported with one subkind i.e. Http<Get>, Ext<MyMethod>", "too many subkinds", name).into());
+        return Err(ParseErrs0::from_loc_span("Too many SubKinds: only Http/Ext supported with one subkind i.e. Http<Get>, Ext<MyMethod>", "too many subkinds", name).into());
     }
 
     let path = match lex_route.path.as_ref() {
@@ -7800,7 +7800,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
         Some(i) => match Regex::new(i.to_string().as_str()) {
             Ok(path) => path,
             Err(err) => {
-                return Err(ParseErrs::from_loc_span(
+                return Err(ParseErrs0::from_loc_span(
                     format!("cannot parse Path regex: '{}'", err.to_string()).as_str(),
                     "path regex error",
                     i.clone(),
@@ -7818,7 +7818,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
     ))
 }
 
-fn find_parse_err<I: Span>(_: &Err<NomErr<I>>) -> ParseErrs {
+fn find_parse_err<I: Span>(_: &Err<NomErr<I>>) -> ParseErrs0 {
     todo!()
 }
 
@@ -7854,7 +7854,7 @@ impl<'de> Deserialize<'de> for SnakeCase {
 }
 
 impl FromStr for SnakeCase {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(snake_case)(new_span(s)))

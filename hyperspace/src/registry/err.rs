@@ -1,6 +1,6 @@
 use sqlx::Error;
 
-use starlane_space::err::{HyperSpatialError, ParseErrs, SpaceErr, SpatialError};
+use starlane_space::err::{HyperSpatialError, ParseErrs0, SpaceErr, SpatialError};
 use starlane_space::point::Point;
 use std::sync::Arc;
 use thiserror::Error;
@@ -8,7 +8,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum RegErr {
     #[error(transparent)]
-    Parse(#[from] ParseErrs),
+    Parse(#[from] ParseErrs0),
     #[error("duplicate error")]
     Dupe,
     #[error("particle not found: '{0}'")]

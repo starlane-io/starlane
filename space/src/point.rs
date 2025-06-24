@@ -1,4 +1,4 @@
-use crate::err::ParseErrs;
+use crate::err::ParseErrs0;
 use crate::loc::{
     Layer, PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Topic, VarVal,
     Variable, VersionSegLoc, CENTRAL, GLOBAL_DEPENDENCIES, GLOBAL_EXEC, GLOBAL_FOUNDATION, GLOBAL_LOGGER,
@@ -36,7 +36,7 @@ pub enum RouteTag {
 }
 
 impl FromStr for RouteTag {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let input = new_span(s);
@@ -126,7 +126,7 @@ impl RouteSegQuery for RouteSegVar {
 }
 
 impl TryInto<RouteSeg> for RouteSegVar {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_into(self) -> Result<RouteSeg, Self::Error> {
         match self {
@@ -136,7 +136,7 @@ impl TryInto<RouteSeg> for RouteSegVar {
             RouteSegVar::Domain(domain) => Ok(RouteSeg::Domain(domain)),
             RouteSegVar::Tag(tag) => Ok(RouteSeg::Tag(tag)),
             RouteSegVar::Star(star) => Ok(RouteSeg::Star(star)),
-            RouteSegVar::Var(var) => Err(ParseErrs::from_range(
+            RouteSegVar::Var(var) => Err(ParseErrs0::from_range(
                 "variables not allowed in this context",
                 "variable not allowed here",
                 var.trace.range,
@@ -184,7 +184,7 @@ impl ToString for RouteSegVar {
 }
 
 impl FromStr for RouteSeg {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = new_span(s);
@@ -464,7 +464,7 @@ impl Into<PointSegVar> for PointSegCtx {
 }
 
 impl TryInto<PointSegCtx> for PointSegVar {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_into(self) -> Result<PointSegCtx, Self::Error> {
         match self {
@@ -475,21 +475,21 @@ impl TryInto<PointSegCtx> for PointSegVar {
             PointSegVar::Dir(dir) => Ok(PointSegCtx::Dir(dir)),
             PointSegVar::File(file) => Ok(PointSegCtx::File(file)),
             PointSegVar::Version(version) => Ok(PointSegCtx::Version(version)),
-            PointSegVar::Working(trace) => Err(ParseErrs::from_range(
+            PointSegVar::Working(trace) => Err(ParseErrs0::from_range(
                 "working point not available in this context",
                 "working point not available",
                 trace.range,
                 trace.extra,
             )
             .into()),
-            PointSegVar::Pop(trace) => Err(ParseErrs::from_range(
+            PointSegVar::Pop(trace) => Err(ParseErrs0::from_range(
                 "point pop not available in this context",
                 "point pop not available",
                 trace.range,
                 trace.extra,
             )
             .into()),
-            PointSegVar::Var(var) => Err(ParseErrs::from_range(
+            PointSegVar::Var(var) => Err(ParseErrs0::from_range(
                 "variable substitution not available in this context",
                 "var subst not available",
                 var.trace.range,
@@ -501,7 +501,7 @@ impl TryInto<PointSegCtx> for PointSegVar {
 }
 
 impl TryInto<PointSeg> for PointSegCtx {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_into(self) -> Result<PointSeg, Self::Error> {
         match self {
@@ -512,14 +512,14 @@ impl TryInto<PointSeg> for PointSegCtx {
             PointSegCtx::Dir(dir) => Ok(PointSeg::Dir(dir)),
             PointSegCtx::File(file) => Ok(PointSeg::File(file)),
             PointSegCtx::Version(version) => Ok(PointSeg::Version(version)),
-            PointSegCtx::Working(trace) => Err(ParseErrs::from_range(
+            PointSegCtx::Working(trace) => Err(ParseErrs0::from_range(
                 "working point not available in this context",
                 "working point not available",
                 trace.range,
                 trace.extra,
             )
             .into()),
-            PointSegCtx::Pop(trace) => Err(ParseErrs::from_range(
+            PointSegCtx::Pop(trace) => Err(ParseErrs0::from_range(
                 "point pop not available in this context",
                 "point pop not available",
                 trace.range,
@@ -667,11 +667,11 @@ impl ToRecipients for Point {
 }
 
 impl PointVar {
-    pub fn to_point(self) -> Result<Point, ParseErrs> {
+    pub fn to_point(self) -> Result<Point, ParseErrs0> {
         self.collapse()
     }
 
-    pub fn to_point_ctx(self) -> Result<PointCtx, ParseErrs> {
+    pub fn to_point_ctx(self) -> Result<PointCtx, ParseErrs0> {
         self.collapse()
     }
 }
@@ -689,7 +689,7 @@ impl ToSurface for Point {
 }
 
 impl ToResolved<Point> for PointVar {
-    fn to_resolved(self, env: &Env) -> Result<Point, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<Point, ParseErrs0> {
         let point_ctx: PointCtx = self.to_resolved(env)?;
         point_ctx.to_resolved(env)
     }
@@ -705,13 +705,13 @@ impl Into<Selector> for Point {
 }
 
 impl PointCtx {
-    pub fn to_point(self) -> Result<Point, ParseErrs> {
+    pub fn to_point(self) -> Result<Point, ParseErrs0> {
         self.collapse()
     }
 }
 
 impl ToResolved<PointCtx> for PointVar {
-    fn collapse(self) -> Result<PointCtx, ParseErrs> {
+    fn collapse(self) -> Result<PointCtx, ParseErrs0> {
         let route = self.route.try_into()?;
         let mut segments = vec![];
         for segment in self.segments {
@@ -720,7 +720,7 @@ impl ToResolved<PointCtx> for PointVar {
         Ok(PointCtx { route, segments })
     }
 
-    fn to_resolved(self, env: &Env) -> Result<PointCtx, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<PointCtx, ParseErrs0> {
         let mut rtn = String::new();
         let mut after_fs = false;
         let mut errs = vec![];
@@ -733,7 +733,7 @@ impl ToResolved<PointCtx> for PointVar {
                 }
                 Err(err) => match err {
                     ResolverErr::NotAvailable => {
-                        errs.push(ParseErrs::from_range(
+                        errs.push(ParseErrs0::from_range(
                             format!(
                                 "variables not available in this context '{}'",
                                 var.name.clone()
@@ -745,7 +745,7 @@ impl ToResolved<PointCtx> for PointVar {
                         ));
                     }
                     ResolverErr::NotFound => {
-                        errs.push(ParseErrs::from_range(
+                        errs.push(ParseErrs0::from_range(
                             format!("variable could not be resolved '{}'", var.name.clone())
                                 .as_str(),
                             "Not Found",
@@ -797,7 +797,7 @@ impl ToResolved<PointCtx> for PointVar {
                     }
                     Err(err) => match err {
                         ResolverErr::NotAvailable => {
-                            errs.push(ParseErrs::from_range(
+                            errs.push(ParseErrs0::from_range(
                                 format!(
                                     "variables not available in this context '{}'",
                                     var.name.clone()
@@ -809,7 +809,7 @@ impl ToResolved<PointCtx> for PointVar {
                             ));
                         }
                         ResolverErr::NotFound => {
-                            errs.push(ParseErrs::from_range(
+                            errs.push(ParseErrs0::from_range(
                                 format!("variable could not be resolved '{}'", var.name.clone())
                                     .as_str(),
                                 "Not Found",
@@ -838,7 +838,7 @@ impl ToResolved<PointCtx> for PointVar {
         }
 
         if !errs.is_empty() {
-            let errs = ParseErrs::fold(errs);
+            let errs = ParseErrs0::fold(errs);
             return Err(errs.into());
         }
         consume_point_ctx(rtn.as_str())
@@ -846,7 +846,7 @@ impl ToResolved<PointCtx> for PointVar {
 }
 
 impl ToResolved<Point> for PointCtx {
-    fn collapse(self) -> Result<Point, ParseErrs> {
+    fn collapse(self) -> Result<Point, ParseErrs0> {
         let mut segments = vec![];
         for segment in self.segments {
             segments.push(segment.try_into()?);
@@ -857,7 +857,7 @@ impl ToResolved<Point> for PointCtx {
         })
     }
 
-    fn to_resolved(self, env: &Env) -> Result<Point, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<Point, ParseErrs0> {
         if self.segments.is_empty() {
             return Ok(Point {
                 route: self.route,
@@ -872,7 +872,7 @@ impl ToResolved<Point> for PointCtx {
             match segment {
                 PointSegCtx::Working(trace) => {
                     if index > 1 {
-                        return Err(ParseErrs::from_range(
+                        return Err(ParseErrs0::from_range(
                             "working point can only be referenced in the first point segment",
                             "first segment only",
                             trace.range.clone(),
@@ -883,7 +883,7 @@ impl ToResolved<Point> for PointCtx {
                     point = match env.point_or() {
                         Ok(point) => point.clone(),
                         Err(_) => {
-                            return Err(ParseErrs::from_range(
+                            return Err(ParseErrs0::from_range(
                                 "working point is not available in this context",
                                 "not available",
                                 trace.range.clone(),
@@ -898,7 +898,7 @@ impl ToResolved<Point> for PointCtx {
                         point = match env.point_or() {
                             Ok(point) => point.clone(),
                             Err(_) => {
-                                return Err(ParseErrs::from_range(
+                                return Err(ParseErrs0::from_range(
                                     "cannot pop because working point is not available in this context",
                                     "not available",
                                     trace.range.clone(),
@@ -908,7 +908,7 @@ impl ToResolved<Point> for PointCtx {
                         };
                     }
                     if point.segments.pop().is_none() {
-                        return Err(ParseErrs::from_range(
+                        return Err(ParseErrs0::from_range(
                             format!(
                                 "Too many point pops. working point was: '{}'",
                                 env.point_or().unwrap().to_string()
@@ -940,7 +940,7 @@ impl ToResolved<Point> for PointCtx {
 }
 
 impl TryInto<Point> for PointCtx {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_into(self) -> Result<Point, Self::Error> {
         let mut rtn = vec![];
@@ -955,7 +955,7 @@ impl TryInto<Point> for PointCtx {
 }
 
 impl TryFrom<String> for Point {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         consume_point(value.as_str())
@@ -963,7 +963,7 @@ impl TryFrom<String> for Point {
 }
 
 impl TryFrom<&str> for Point {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         consume_point(value)
@@ -1067,14 +1067,14 @@ impl Point {
     }
 
     /// returns the "file" path portion of this Point if there is one
-    pub fn truncate_filepath(&self, parent: &Point) -> Result<String, ParseErrs> {
+    pub fn truncate_filepath(&self, parent: &Point) -> Result<String, ParseErrs0> {
         if self.non_file_parent() == *parent {
-            self.filepath().ok_or(ParseErrs::new(format!(
+            self.filepath().ok_or(ParseErrs0::new(format!(
                 "could not get filepath for point {}",
                 self.to_string()
             )))
         } else {
-            Result::Err(ParseErrs::new(format!(
+            Result::Err(ParseErrs0::new(format!(
                 "path {} did not match with truncation parent {}",
                 self.to_string(),
                 parent.to_string()
@@ -1083,16 +1083,16 @@ impl Point {
     }
 
     /// returns the "file" path portion of this Point if there is one
-    pub fn relative_segs(&self, parent: &Point) -> Result<Vec<String>, ParseErrs> {
+    pub fn relative_segs(&self, parent: &Point) -> Result<Vec<String>, ParseErrs0> {
         if self.route != parent.route {
-            return Result::Err(ParseErrs::from(format!(
+            return Result::Err(ParseErrs0::from(format!(
                 "parent point route {} must match child point route: {}",
                 parent.route.to_string(),
                 self.route.to_string()
             )));
         }
         if self.segments.len() < parent.segments.len() {
-            return Result::Err(ParseErrs::from(format!(
+            return Result::Err(ParseErrs0::from(format!(
                 "parent point {} cannot have fewer segments than point: {}",
                 parent.to_string(),
                 self.to_string()
@@ -1100,7 +1100,7 @@ impl Point {
         } else {
             for i in 0..parent.segments.len() {
                 if parent.segments.get(i).unwrap() != self.segments.get(i).unwrap() {
-                    return Result::Err(ParseErrs::from(format!(
+                    return Result::Err(ParseErrs0::from(format!(
                         "parent point {} does not match subset: {}",
                         parent.to_string(),
                         self.to_string()
@@ -1169,7 +1169,7 @@ impl Point {
         ANONYMOUS.clone()
     }
 
-    pub fn normalize(self) -> Result<Point, ParseErrs> {
+    pub fn normalize(self) -> Result<Point, ParseErrs0> {
         if self.is_normalized() {
             return Ok(self);
         }
@@ -1231,7 +1231,7 @@ impl Point {
         true
     }
 
-    pub fn to_bundle(self) -> Result<Point, ParseErrs> {
+    pub fn to_bundle(self) -> Result<Point, ParseErrs0> {
         if self.segments.is_empty() {
             return Err("Point does not contain a bundle".into());
         }
@@ -1308,7 +1308,7 @@ impl Point {
             segments,
         }
     }
-    pub fn push<S: ToString>(&self, segment: S) -> Result<Self, ParseErrs> {
+    pub fn push<S: ToString>(&self, segment: S) -> Result<Self, ParseErrs0> {
         let segment = segment.to_string();
         if self.segments.is_empty() {
             Self::from_str(segment.as_str())
@@ -1336,7 +1336,7 @@ impl Point {
                     }
                 }
                 PointSeg::File(_) => {
-                    return Err(ParseErrs::new(&format!(
+                    return Err(ParseErrs0::new(&format!(
                         "cannot push segment to '{}' segment which is terminal",
                         PointSegKind::File
                     )))
@@ -1346,23 +1346,23 @@ impl Point {
         }
     }
 
-    pub fn push_file(&self, segment: String) -> Result<Self, ParseErrs> {
+    pub fn push_file(&self, segment: String) -> Result<Self, ParseErrs0> {
         Self::from_str(format!("{}{}", self.to_string(), segment).as_str())
     }
 
-    pub fn push_segment(&self, segment: PointSeg) -> Result<Self, ParseErrs> {
+    pub fn push_segment(&self, segment: PointSeg) -> Result<Self, ParseErrs0> {
         if (self.has_filesystem() && segment.is_filesystem_seg()) || segment.kind().is_mesh_seg() {
             let mut point = self.clone();
             point.segments.push(segment);
             Ok(point)
         } else {
             if self.has_filesystem() {
-                Err(ParseErrs::from(format!(
+                Err(ParseErrs0::from(format!(
                     "cannot push segment on terminating segment type '{}'",
                     PointSegKind::File
                 )))?
             } else {
-                Err(ParseErrs::from(format!("cannot push a non FileSystem PointSegment '{0}' onto a point until after the FileSystemRoot ':/' segment has been pushed", segment.kind())))?
+                Err(ParseErrs0::from(format!("cannot push a non FileSystem PointSegment '{0}' onto a point until after the FileSystemRoot ':/' segment has been pushed", segment.kind())))?
             }
         }
     }
@@ -1406,7 +1406,7 @@ impl Point {
         }
     }
 
-    pub fn truncate(self, kind: PointSegKind) -> Result<Point, ParseErrs> {
+    pub fn truncate(self, kind: PointSegKind) -> Result<Point, ParseErrs0> {
         let mut segments = vec![];
         for segment in &self.segments {
             segments.push(segment.clone());
@@ -1418,7 +1418,7 @@ impl Point {
             }
         }
 
-        Err(ParseErrs::from(format!(
+        Err(ParseErrs0::from(format!(
             "Point segment kind: {} not found in point: {}",
             kind.to_string(),
             self.to_string()
@@ -1432,7 +1432,7 @@ impl Point {
 }
 
 impl FromStr for Point {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         consume_point(s)
@@ -1440,7 +1440,7 @@ impl FromStr for Point {
 }
 
 impl FromStr for PointVar {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(point_var(new_span(s)))
@@ -1448,7 +1448,7 @@ impl FromStr for PointVar {
 }
 
 impl FromStr for PointCtx {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(result(point_var(new_span(s)))?.collapse()?)

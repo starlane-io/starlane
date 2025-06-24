@@ -1,4 +1,4 @@
-use crate::err::ParseErrs;
+use crate::err::ParseErrs0;
 use crate::loc::VersionSegLoc;
 use crate::parse::util::{new_span, result, Span};
 use crate::parse::{Res, SkewerCase};
@@ -91,7 +91,7 @@ impl Archetype for Segment {
 }
 
 impl FromStr for Segment {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let input = new_span(s);
@@ -153,7 +153,7 @@ impl Default for Scope {
 }
 
 impl FromStr for Scope {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(parse::scope)(new_span(s)))
@@ -260,7 +260,7 @@ pub mod parse {
     use nom_supreme::ParserExt;
     use std::str::FromStr;
 
-    pub(crate) fn parse(s: impl AsRef<str>) -> Result<Scope, err::ParseErrs> {
+    pub(crate) fn parse(s: impl AsRef<str>) -> Result<Scope, err::ParseErrs0> {
         let span = new_span(s.as_ref());
         result(scope(span))
     }

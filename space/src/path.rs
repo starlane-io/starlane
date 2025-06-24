@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::parse::util::new_span;
 
-use crate::err::ParseErrs;
+use crate::err::ParseErrs0;
 use crate::parse::consume_path;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -19,7 +19,7 @@ impl Path {
         }
     }
 
-    pub fn make_absolute(string: &str) -> Result<Self, ParseErrs> {
+    pub fn make_absolute(string: &str) -> Result<Self, ParseErrs0> {
         if string.starts_with("/") {
             Path::from_str(string)
         } else {
@@ -27,8 +27,8 @@ impl Path {
         }
     }
 
-    pub fn bin(&self) -> Result<Vec<u8>, ParseErrs> {
-        let bin = bincode::serialize(self).map_err(ParseErrs::from)?;
+    pub fn bin(&self) -> Result<Vec<u8>, ParseErrs0> {
+        let bin = bincode::serialize(self).map_err(ParseErrs0::from)?;
         Ok(bin)
     }
 
@@ -36,7 +36,7 @@ impl Path {
         self.string.starts_with("/")
     }
 
-    pub fn cat(&self, path: &Path) -> Result<Self, ParseErrs> {
+    pub fn cat(&self, path: &Path) -> Result<Self, ParseErrs0> {
         if self.string.ends_with("/") {
             Path::from_str(format!("{}{}", self.string.as_str(), path.string.as_str()).as_str())
         } else {
@@ -75,7 +75,7 @@ impl Path {
 }
 
 impl FromStr for Path {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (_, path) = consume_path(new_span(s))?;

@@ -5,7 +5,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::command::direct::delete::Delete;
 use crate::command::direct::select::Select;
-use crate::err::ParseErrs;
+use crate::err::ParseErrs0;
 use crate::parse::util::{new_span, result, Trace};
 use crate::parse::{command_line, Env};
 use crate::substance::{Bin, ChildSubstance};
@@ -26,7 +26,7 @@ pub mod common {
 
     use serde::{Deserialize, Serialize};
 
-    use crate::err::ParseErrs;
+    use crate::err::ParseErrs0;
     use crate::loc::Variable;
     use crate::substance::{Bin, Substance};
 
@@ -51,9 +51,9 @@ pub mod common {
             }
         }
 
-        pub fn get_substance(&self) -> Result<Substance, ParseErrs> {
+        pub fn get_substance(&self) -> Result<Substance, ParseErrs0> {
             match self {
-                StateSrc::None => Err(ParseErrs::from("state has no substance")),
+                StateSrc::None => Err(ParseErrs0::from("state has no substance")),
                 StateSrc::Subst(substance) => Ok(*substance.clone()),
             }
         }
@@ -186,7 +186,7 @@ pub mod direct {
     pub mod set {
         use serde::{Deserialize, Serialize};
 
-        use crate::err::ParseErrs;
+        use crate::err::ParseErrs0;
         use crate::parse::Env;
         use crate::point::{Point, PointCtx, PointVar};
         use crate::types::property::SetProperties;
@@ -203,14 +203,14 @@ pub mod direct {
         }
 
         impl ToResolved<Set> for SetVar {
-            fn to_resolved(self, env: &Env) -> Result<Set, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<Set, ParseErrs0> {
                 let set: SetCtx = self.to_resolved(env)?;
                 set.to_resolved(env)
             }
         }
 
         impl ToResolved<SetCtx> for SetVar {
-            fn to_resolved(self, env: &Env) -> Result<SetCtx, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<SetCtx, ParseErrs0> {
                 Ok(SetCtx {
                     point: self.point.to_resolved(env)?,
                     properties: self.properties,
@@ -219,7 +219,7 @@ pub mod direct {
         }
 
         impl ToResolved<Set> for SetCtx {
-            fn to_resolved(self, env: &Env) -> Result<Set, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<Set, ParseErrs0> {
                 Ok(Set {
                     point: self.point.to_resolved(env)?,
                     properties: self.properties,
@@ -231,7 +231,7 @@ pub mod direct {
     pub mod get {
         use serde::{Deserialize, Serialize};
 
-        use crate::err::ParseErrs;
+        use crate::err::ParseErrs0;
         use crate::parse::Env;
         use crate::point::{Point, PointCtx, PointVar};
         use crate::util::ToResolved;
@@ -247,14 +247,14 @@ pub mod direct {
         }
 
         impl ToResolved<Get> for GetVar {
-            fn to_resolved(self, env: &Env) -> Result<Get, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<Get, ParseErrs0> {
                 let set: GetCtx = self.to_resolved(env)?;
                 set.to_resolved(env)
             }
         }
 
         impl ToResolved<GetCtx> for GetVar {
-            fn to_resolved(self, env: &Env) -> Result<GetCtx, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<GetCtx, ParseErrs0> {
                 Ok(GetCtx {
                     point: self.point.to_resolved(env)?,
                     op: self.op,
@@ -263,7 +263,7 @@ pub mod direct {
         }
 
         impl ToResolved<Get> for GetCtx {
-            fn to_resolved(self, env: &Env) -> Result<Get, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<Get, ParseErrs0> {
                 Ok(Get {
                     point: self.point.to_resolved(env)?,
                     op: self.op,
@@ -281,7 +281,7 @@ pub mod direct {
     pub mod create {
         use crate::command::common::{StateSrc, StateSrcVar};
         use crate::command::Command;
-        use crate::err::{ParseErrs, SpaceErr};
+        use crate::err::{ParseErrs0, SpaceErr};
         use crate::kind::{BaseKind, KindParts};
         use crate::loc::{PointFactory, ToSurface};
         use crate::parse::{CamelCase, Env, ResolverErr};
@@ -327,14 +327,14 @@ pub mod direct {
         }
 
         impl ToResolved<Template> for TemplateVar {
-            fn to_resolved(self, env: &Env) -> Result<Template, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<Template, ParseErrs0> {
                 let template: TemplateCtx = self.to_resolved(env)?;
                 template.to_resolved(env)
             }
         }
 
         impl ToResolved<TemplateCtx> for TemplateVar {
-            fn to_resolved(self, env: &Env) -> Result<TemplateCtx, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<TemplateCtx, ParseErrs0> {
                 let point: PointTemplateCtx = self.point.to_resolved(env)?;
 
                 let template = TemplateCtx {
@@ -345,7 +345,7 @@ pub mod direct {
             }
         }
         impl ToResolved<Template> for TemplateCtx {
-            fn to_resolved(self, env: &Env) -> Result<Template, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<Template, ParseErrs0> {
                 let point = self.point.to_resolved(env)?;
 
                 let template = Template {
@@ -425,14 +425,14 @@ pub mod direct {
         pub type CreateCtx = CreateDef<PointCtx, StateSrc>;
 
         impl ToResolved<Create> for CreateVar {
-            fn to_resolved(self, env: &Env) -> Result<Create, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<Create, ParseErrs0> {
                 let create: CreateCtx = self.to_resolved(env)?;
                 create.to_resolved(env)
             }
         }
 
         impl ToResolved<CreateCtx> for CreateVar {
-            fn to_resolved(self, env: &Env) -> Result<CreateCtx, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<CreateCtx, ParseErrs0> {
                 let template = self.template.to_resolved(env)?;
                 let state = match &self.state {
                     StateSrcVar::None => StateSrc::None,
@@ -440,10 +440,10 @@ pub mod direct {
                         env.file(name)
                             .map_err(|e| match e {
                                 ResolverErr::NotAvailable => {
-                                    ParseErrs::from("files are not available in this context")
+                                    ParseErrs0::from("files are not available in this context")
                                 }
                                 ResolverErr::NotFound => {
-                                    ParseErrs::from(format!("cannot find file '{}'", name))
+                                    ParseErrs0::from(format!("cannot find file '{}'", name))
                                 }
                             })?
                             .content,
@@ -451,19 +451,19 @@ pub mod direct {
                     StateSrcVar::Var(var) => {
                         let val = env.val(var.name.as_str()).map_err(|e| match e {
                             ResolverErr::NotAvailable => {
-                                ParseErrs::from("variable are not available in this context")
+                                ParseErrs0::from("variable are not available in this context")
                             }
                             ResolverErr::NotFound => {
-                                ParseErrs::from(format!("cannot find variable '{}'", var.name))
+                                ParseErrs0::from(format!("cannot find variable '{}'", var.name))
                             }
                         })?;
                         StateSrc::Subst(Box::new(Substance::Bin(
                             env.file(val.clone())
                                 .map_err(|e| match e {
                                     ResolverErr::NotAvailable => {
-                                        ParseErrs::from("files are not available in this context")
+                                        ParseErrs0::from("files are not available in this context")
                                     }
-                                    ResolverErr::NotFound => ParseErrs::from(format!(
+                                    ResolverErr::NotFound => ParseErrs0::from(format!(
                                         "cannot find file '{}'",
                                         val.to_text().unwrap_or("err".to_string())
                                     )),
@@ -482,7 +482,7 @@ pub mod direct {
         }
 
         impl ToResolved<Create> for CreateCtx {
-            fn to_resolved(self, env: &Env) -> Result<Create, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<Create, ParseErrs0> {
                 let template = self.template.to_resolved(env)?;
                 Ok(Create {
                     template,
@@ -579,7 +579,7 @@ pub mod direct {
         }
 
         impl ToResolved<PointTemplateCtx> for PointTemplateVar {
-            fn to_resolved(self, env: &Env) -> Result<PointTemplateCtx, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<PointTemplateCtx, ParseErrs0> {
                 let parent = self.parent.to_resolved(env)?;
                 Ok(PointTemplateCtx {
                     parent,
@@ -589,7 +589,7 @@ pub mod direct {
         }
 
         impl ToResolved<PointTemplate> for PointTemplateCtx {
-            fn to_resolved(self, env: &Env) -> Result<PointTemplate, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<PointTemplate, ParseErrs0> {
                 let parent = self.parent.to_resolved(env)?;
                 Ok(PointTemplate {
                     parent,
@@ -599,7 +599,7 @@ pub mod direct {
         }
 
         impl ToResolved<PointTemplate> for PointTemplateVar {
-            fn to_resolved(self, env: &Env) -> Result<PointTemplate, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<PointTemplate, ParseErrs0> {
                 let ctx: PointTemplateCtx = self.to_resolved(env)?;
                 ctx.to_resolved(env)
             }
@@ -618,7 +618,7 @@ pub mod direct {
 
         use serde::{Deserialize, Serialize};
 
-        use crate::err::{ParseErrs, SpaceErr};
+        use crate::err::{ParseErrs0, SpaceErr};
         use crate::parse::Env;
         use crate::particle::Stub;
         use crate::point::Point;
@@ -660,7 +660,7 @@ pub mod direct {
         pub type SelectVar = SelectDef<PointSegKindHop>;
 
         impl ToResolved<Select> for Select {
-            fn to_resolved(self, env: &Env) -> Result<Select, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<Select, ParseErrs0> {
                 Ok(self)
             }
         }
@@ -786,7 +786,7 @@ pub mod direct {
         use serde::{Deserialize, Serialize};
 
         use crate::command::direct::select::{Select, SelectIntoSubstance};
-        use crate::err::ParseErrs;
+        use crate::err::ParseErrs0;
         use crate::parse::Env;
         use crate::selector::{PointSegKindHop, SelectorDef};
         use crate::util::ToResolved;
@@ -796,7 +796,7 @@ pub mod direct {
         pub type DeleteVar = DeleteDef<PointSegKindHop>;
 
         impl ToResolved<Delete> for Delete {
-            fn to_resolved(self, env: &Env) -> Result<Delete, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<Delete, ParseErrs0> {
                 Ok(self)
             }
         }
@@ -820,7 +820,7 @@ pub mod direct {
 
         use serde::{Deserialize, Serialize};
 
-        use crate::err::ParseErrs;
+        use crate::err::ParseErrs0;
         use crate::parse::Env;
         use crate::point::{Point, PointCtx, PointVar};
         use crate::substance::Substance;
@@ -837,7 +837,7 @@ pub mod direct {
         }
 
         impl ToResolved<WriteCtx> for WriteVar {
-            fn to_resolved(self, env: &Env) -> Result<WriteCtx, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<WriteCtx, ParseErrs0> {
                 Ok(WriteCtx {
                     point: self.point.to_resolved(env)?,
                     payload: self.payload,
@@ -846,7 +846,7 @@ pub mod direct {
         }
 
         impl ToResolved<Write> for WriteCtx {
-            fn to_resolved(self, env: &Env) -> Result<Write, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<Write, ParseErrs0> {
                 Ok(Write {
                     point: self.point.to_resolved(env)?,
                     payload: self.payload,
@@ -858,7 +858,7 @@ pub mod direct {
     pub mod read {
         use serde::{Deserialize, Serialize};
 
-        use crate::err::ParseErrs;
+        use crate::err::ParseErrs0;
         use crate::parse::Env;
         use crate::point::{Point, PointCtx, PointVar};
         use crate::substance::Substance;
@@ -875,7 +875,7 @@ pub mod direct {
         }
 
         impl ToResolved<ReadCtx> for ReadVar {
-            fn to_resolved(self, env: &Env) -> Result<ReadCtx, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<ReadCtx, ParseErrs0> {
                 Ok(ReadCtx {
                     point: self.point.to_resolved(env)?,
                     payload: self.payload,
@@ -884,7 +884,7 @@ pub mod direct {
         }
 
         impl ToResolved<Read> for ReadCtx {
-            fn to_resolved(self, env: &Env) -> Result<Read, ParseErrs> {
+            fn to_resolved(self, env: &Env) -> Result<Read, ParseErrs0> {
                 Ok(Read {
                     point: self.point.to_resolved(env)?,
                     payload: self.payload,
@@ -979,7 +979,7 @@ pub enum CommandVar {
 }
 
 impl FromStr for CommandVar {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = new_span(s);
@@ -988,14 +988,14 @@ impl FromStr for CommandVar {
 }
 
 impl ToResolved<Command> for CommandVar {
-    fn to_resolved(self, env: &Env) -> Result<Command, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<Command, ParseErrs0> {
         let command: CommandCtx = self.to_resolved(env)?;
         command.to_resolved(env)
     }
 }
 
 impl ToResolved<CommandCtx> for CommandVar {
-    fn to_resolved(self, env: &Env) -> Result<CommandCtx, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<CommandCtx, ParseErrs0> {
         Ok(match self {
             CommandVar::Create(i) => CommandCtx::Create(i.to_resolved(env)?),
             CommandVar::Select(i) => CommandCtx::Select(i.to_resolved(env)?),
@@ -1009,7 +1009,7 @@ impl ToResolved<CommandCtx> for CommandVar {
 }
 
 impl ToResolved<Command> for CommandCtx {
-    fn to_resolved(self, env: &Env) -> Result<Command, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<Command, ParseErrs0> {
         Ok(match self {
             CommandCtx::Create(i) => Command::Create(i.to_resolved(env)?),
             CommandCtx::Select(i) => Command::Select(i.to_resolved(env)?),

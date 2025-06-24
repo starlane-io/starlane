@@ -1,4 +1,4 @@
-use crate::err::ParseErrs;
+use crate::err::ParseErrs0;
 use crate::parse::mechtron_config;
 use crate::parse::model::MechtronScope;
 use crate::point::Point;
@@ -12,7 +12,7 @@ pub struct MechtronConfig {
 }
 
 impl MechtronConfig {
-    pub fn new(scopes: Vec<MechtronScope>) -> Result<Self, ParseErrs> {
+    pub fn new(scopes: Vec<MechtronScope>) -> Result<Self, ParseErrs0> {
         let mut wasm = None;
         let mut name = None;
         for scope in scopes {
@@ -40,7 +40,7 @@ impl MechtronConfig {
 }
 
 impl FromStr for MechtronConfig {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         mechtron_config(s)
@@ -48,7 +48,7 @@ impl FromStr for MechtronConfig {
 }
 
 impl TryFrom<Vec<u8>> for MechtronConfig {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_from(doc: Vec<u8>) -> Result<Self, Self::Error> {
         let doc = String::from_utf8(doc)?;

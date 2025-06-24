@@ -1,5 +1,5 @@
 
-use starlane_space::err::ParseErrs;
+use starlane_space::err::ParseErrs0;
 use starlane_space::substance::Call;
 use serde_yaml::Value;
 use std::fmt::Display;
@@ -235,7 +235,7 @@ pub enum BaseErr {
     #[error("Missing `kind:` mapping for {0}")]
     MissingKind(String),
     #[error("{0}")]
-    ParseErrs(#[from] ParseErrs),
+    ParseErrs(#[from] ParseErrs0),
     #[error("")]
     NotInstalledErr { dependency: String },
 }

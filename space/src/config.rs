@@ -11,7 +11,7 @@ use starlane_macros::Autobox;
 pub mod bind;
 pub mod mechtron;
 
-use crate::err::ParseErrs;
+use crate::err::ParseErrs0;
 use crate::parse::doc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,7 +84,7 @@ impl Document {
 }
 
 impl FromStr for Document {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         doc(s)

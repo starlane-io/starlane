@@ -1,4 +1,4 @@
-use crate::err::ParseErrs;
+use crate::err::ParseErrs0;
 use crate::parse::model::{BlockKind, LexBlock, NestedBlockKind};
 use crate::parse::util::preceded;
 use crate::parse::util::Span;
@@ -231,7 +231,7 @@ where
     T: From<Class> + From<Data> + Archetype,
     Specific: Archetype + for<'y> Deserialize<'y>
 {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_into(self) -> Result<Scaffold<Scope, T, Specific>, Self::Error> {
         let r#type = match self.disc {
@@ -248,7 +248,7 @@ where
         Ok(Scaffold {
             scope: self.r#absolute.scope,
             r#type,
-            specific: self.r#absolute.specific.ok_or(ParseErrs::expected(
+            specific: self.r#absolute.specific.ok_or(ParseErrs0::expected(
                 "TryInto<Generic>",
                 "Specific",
                 "None",
@@ -264,7 +264,7 @@ where
     Scope: Archetype + Default,
     SpecificLoc: Archetype
 {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_into(self) -> Result<Absolute, Self::Error> {
         let r#type = match self.disc {
@@ -278,7 +278,7 @@ where
             }
         };
 
-        Ok(Absolute::new(self.absolute.scope,r#type,self.absolute.specific.ok_or(ParseErrs::expected("Specific", "Some", "None"))? ))
+        Ok(Absolute::new(self.absolute.scope,r#type,self.absolute.specific.ok_or(ParseErrs0::expected("Specific", "Some", "None"))? ))
     }
 }
 
@@ -449,8 +449,8 @@ pub enum Convention {
 }
 
 impl Convention {
-    pub fn validate(&self, text: &str) -> Result<(), ParseErrs> {
-        /// transform from [Result<Whatever,ParseErrs>] -> [Result<(),ParseErrs?]
+    pub fn validate(&self, text: &str) -> Result<(), ParseErrs0> {
+        /// transform from [Result<Whatever, ParseErrs0>] -> [Result<(),ParseErrs?]
         fn strip_ok<Ok, Err>(result: Result<Ok, Err>) -> Result<(), Err> {
             result.map(|_| ())
         }

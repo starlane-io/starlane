@@ -4,7 +4,7 @@ use std::convert::TryInto;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::err::{ParseErrs, SpaceErr};
+use crate::err::{ParseErrs0, SpaceErr};
 use crate::loc::Topic;
 use crate::parse::model::{BindScope, MethodScope, PipelineSegmentDef, RouteScope, ScopeFilters};
 use crate::parse::{bind_config, Env};
@@ -68,7 +68,7 @@ impl BindConfig {
 }
 
 impl FromStr for BindConfig {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         bind_config(s)
@@ -76,10 +76,10 @@ impl FromStr for BindConfig {
 }
 
 impl TryFrom<Vec<u8>> for BindConfig {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_from(doc: Vec<u8>) -> Result<Self, Self::Error> {
-        let doc = ParseErrs::result_utf8(String::from_utf8(doc))?;
+        let doc = ParseErrs0::result_utf8(String::from_utf8(doc))?;
         bind_config(doc.as_str())
     }
 }
@@ -153,7 +153,7 @@ impl<Pnt> PipelineStepDef<Pnt> {
 }
 
 impl ToResolved<PipelineStep> for PipelineStepCtx {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStep, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStep, ParseErrs0> {
         let mut blocks = vec![];
         for block in self.blocks {
             blocks.push(block.to_resolved(env)?);
@@ -168,7 +168,7 @@ impl ToResolved<PipelineStep> for PipelineStepCtx {
 }
 
 impl ToResolved<PipelineStepCtx> for PipelineStepVar {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStepCtx, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStepCtx, ParseErrs0> {
         let mut blocks = vec![];
         for block in self.blocks {
             blocks.push(block.to_resolved(env)?);
@@ -208,14 +208,14 @@ pub enum PipelineStopDef<Pnt> {
 }
 
 impl ToResolved<PipelineStop> for PipelineStopVar {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStop, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStop, ParseErrs0> {
         let stop: PipelineStopCtx = self.to_resolved(env)?;
         stop.to_resolved(env)
     }
 }
 
 impl ToResolved<PipelineStop> for PipelineStopCtx {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStop, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStop, ParseErrs0> {
         Ok(match self {
             PipelineStopCtx::Core => PipelineStop::Core,
             PipelineStopCtx::Call(call) => PipelineStop::Call(call.to_resolved(env)?),
@@ -227,7 +227,7 @@ impl ToResolved<PipelineStop> for PipelineStopCtx {
 }
 
 impl ToResolved<PipelineStopCtx> for PipelineStopVar {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStopCtx, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStopCtx, ParseErrs0> {
         Ok(match self {
             PipelineStopVar::Core => PipelineStopCtx::Core,
             PipelineStopVar::Call(call) => PipelineStopCtx::Call(call.to_resolved(env)?),

@@ -9,7 +9,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::command::{Command, RawCommand};
-use crate::err::{ParseErrs, SpaceErr, SpatialError};
+use crate::err::{ParseErrs0, SpaceErr, SpatialError};
 use crate::hyper::{Greet, HyperSubstance, HyperSubstanceKind, Knock, ParticleLocation};
 use crate::loc::{Meta, Surface};
 use crate::log::{Log, LogSpan, PointlessLog, SpanEvent};
@@ -151,9 +151,9 @@ impl Substance {
         }
     }
 
-    pub fn expect(self, expect: SubstanceKind) -> Result<Self, ParseErrs> {
+    pub fn expect(self, expect: SubstanceKind) -> Result<Self, ParseErrs0> {
         if self.kind() != expect {
-            Err(ParseErrs::expected(
+            Err(ParseErrs0::expected(
                 "SubstanceKind",
                 &expect.to_string(),
                 &self.kind().to_string(),
@@ -165,8 +165,8 @@ impl Substance {
 }
 
 pub trait ToSubstance<S> {
-    fn to_substance(self) -> Result<S, ParseErrs>;
-    fn to_substance_ref(&self) -> Result<&S, ParseErrs>;
+    fn to_substance(self) -> Result<S, ParseErrs0>;
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs0>;
 }
 
 pub trait ChildSubstance {}
@@ -211,7 +211,7 @@ impl FromStr for Token {
 }
 
 impl TryFrom<PongCore> for Token {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_from(response: PongCore) -> Result<Self, Self::Error> {
         response.core.body.try_into()
@@ -508,7 +508,7 @@ pub enum SubstanceTypePatternDef<Pnt> {
 }
 
 impl ToResolved<SubstanceTypePatternDef<Point>> for SubstanceTypePatternDef<PointCtx> {
-    fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternDef<Point>, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternDef<Point>, ParseErrs0> {
         match self {
             SubstanceTypePatternDef::Empty => Ok(SubstanceTypePatternDef::Empty),
             SubstanceTypePatternDef::Primitive(payload_type) => {
@@ -523,7 +523,7 @@ impl ToResolved<SubstanceTypePatternDef<Point>> for SubstanceTypePatternDef<Poin
 }
 
 impl ToResolved<SubstanceTypePatternCtx> for SubstanceTypePatternVar {
-    fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternCtx, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternCtx, ParseErrs0> {
         match self {
             SubstanceTypePatternVar::Empty => Ok(SubstanceTypePatternCtx::Empty),
             SubstanceTypePatternVar::Primitive(payload_type) => {
@@ -615,7 +615,7 @@ pub struct SubstancePatternDef<Pnt> {
 }
 
 impl ToResolved<SubstancePatternCtx> for SubstancePatternVar {
-    fn to_resolved(self, env: &Env) -> Result<SubstancePatternCtx, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<SubstancePatternCtx, ParseErrs0> {
         let mut errs = vec![];
         let structure = match self.structure.to_resolved(env) {
             Ok(structure) => Some(structure),
@@ -642,13 +642,13 @@ impl ToResolved<SubstancePatternCtx> for SubstancePatternVar {
                 format: self.format,
             })
         } else {
-            Err(ParseErrs::fold(errs).into())
+            Err(ParseErrs0::fold(errs).into())
         }
     }
 }
 
 impl ToResolved<SubstancePattern> for SubstancePatternCtx {
-    fn to_resolved(self, resolver: &Env) -> Result<SubstancePattern, ParseErrs> {
+    fn to_resolved(self, resolver: &Env) -> Result<SubstancePattern, ParseErrs0> {
         let mut errs = vec![];
         let structure = match self.structure.to_resolved(resolver) {
             Ok(structure) => Some(structure),
@@ -675,7 +675,7 @@ impl ToResolved<SubstancePattern> for SubstancePatternCtx {
                 format: self.format,
             })
         } else {
-            Err(ParseErrs::fold(errs).into())
+            Err(ParseErrs0::fold(errs).into())
         }
     }
 }
@@ -700,7 +700,7 @@ pub type CallWithConfigCtx = CallWithConfigDef<PointCtx>;
 pub type CallWithConfigVar = CallWithConfigDef<PointVar>;
 
 impl ToResolved<CallWithConfigCtx> for CallWithConfigVar {
-    fn to_resolved(self, resolver: &Env) -> Result<CallWithConfigCtx, ParseErrs> {
+    fn to_resolved(self, resolver: &Env) -> Result<CallWithConfigCtx, ParseErrs0> {
         let mut errs = vec![];
         let call = match self.call.to_resolved(resolver) {
             Ok(call) => Some(call),
@@ -726,13 +726,13 @@ impl ToResolved<CallWithConfigCtx> for CallWithConfigVar {
                 config,
             })
         } else {
-            Err(ParseErrs::fold(errs).into())
+            Err(ParseErrs0::fold(errs).into())
         }
     }
 }
 
 impl ToResolved<CallWithConfig> for CallWithConfigCtx {
-    fn to_resolved(self, resolver: &Env) -> Result<CallWithConfig, ParseErrs> {
+    fn to_resolved(self, resolver: &Env) -> Result<CallWithConfig, ParseErrs0> {
         let mut errs = vec![];
         let call = match self.call.to_resolved(resolver) {
             Ok(call) => Some(call),
@@ -758,7 +758,7 @@ impl ToResolved<CallWithConfig> for CallWithConfigCtx {
                 config,
             })
         } else {
-            Err(ParseErrs::fold(errs).into())
+            Err(ParseErrs0::fold(errs).into())
         }
     }
 }
@@ -768,7 +768,7 @@ pub type CallCtx = CallDef<PointCtx>;
 pub type CallVar = CallDef<PointVar>;
 
 impl ToResolved<Call> for CallCtx {
-    fn to_resolved(self, env: &Env) -> Result<Call, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<Call, ParseErrs0> {
         Ok(Call {
             point: self.point.to_resolved(env)?,
             kind: self.kind,
@@ -777,7 +777,7 @@ impl ToResolved<Call> for CallCtx {
 }
 
 impl ToResolved<CallCtx> for CallVar {
-    fn to_resolved(self, env: &Env) -> Result<CallCtx, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<CallCtx, ParseErrs0> {
         Ok(CallCtx {
             point: self.point.to_resolved(env)?,
             kind: self.kind,
@@ -786,7 +786,7 @@ impl ToResolved<CallCtx> for CallVar {
 }
 
 impl ToResolved<Call> for CallVar {
-    fn to_resolved(self, env: &Env) -> Result<Call, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<Call, ParseErrs0> {
         let call: CallCtx = self.to_resolved(env)?;
         call.to_resolved(env)
     }

@@ -1,4 +1,4 @@
-use crate::err::{ParseErrs, PrintErr};
+use crate::err::{ParseErrs0, PrintErr};
 use crate::parse::Env;
 use crate::wasm::Timestamp;
 use crate::wave::core::http2::HttpMethod;
@@ -321,9 +321,9 @@ where
 }
 
 impl<T> ValuePattern<T> {
-    pub fn modify<X, F>(self, mut f: F) -> Result<ValuePattern<X>, ParseErrs>
+    pub fn modify<X, F>(self, mut f: F) -> Result<ValuePattern<X>, ParseErrs0>
     where
-        F: FnMut(T) -> Result<X, ParseErrs>,
+        F: FnMut(T) -> Result<X, ParseErrs0>,
     {
         Ok(match self {
             ValuePattern::Always => ValuePattern::Always,
@@ -431,14 +431,14 @@ impl ValueMatcher<String> for StringMatcher {
 }
 
 pub trait Convert<A> {
-    fn convert(self) -> Result<A, ParseErrs>;
+    fn convert(self) -> Result<A, ParseErrs0>;
 }
 
 pub trait ConvertFrom<A>
 where
     Self: Sized,
 {
-    fn convert_from(a: A) -> Result<Self, ParseErrs>;
+    fn convert_from(a: A) -> Result<Self, ParseErrs0>;
 }
 
 pub fn uuid() -> loc::Uuid {
@@ -466,11 +466,11 @@ pub trait ToResolved<R>
 where
     Self: Sized,
 {
-    fn collapse(self) -> Result<R, ParseErrs> {
+    fn collapse(self) -> Result<R, ParseErrs0> {
         self.to_resolved(&Env::no_point())
     }
 
-    fn to_resolved(self, env: &Env) -> Result<R, ParseErrs>;
+    fn to_resolved(self, env: &Env) -> Result<R, ParseErrs0>;
 }
 
 pub fn log<R, E>(result: Result<R, E>) -> Result<R, E>

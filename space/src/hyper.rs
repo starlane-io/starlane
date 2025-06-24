@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::command::common::StateSrc;
 use crate::config::mechtron::MechtronConfig;
-use crate::err::ParseErrs;
+use crate::err::ParseErrs0;
 use crate::err::SpaceErr;
 use crate::kind::{Kind, KindParts, StarSub};
 use crate::loc::{StarKey, Surface, ToSurface};

@@ -12,7 +12,7 @@ use self::core::http2::HttpMethod;
 use self::core::hyper::HypMethod;
 use self::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
 use crate::command::RawCommand;
-use crate::err::{CoreReflector, LegacyStatusErr, ParseErrs, SpaceErr, SpatialError};
+use crate::err::{CoreReflector, LegacyStatusErr, ParseErrs0, SpaceErr, SpatialError};
 use crate::loc::{Surface, ToPoint, ToSurface, Uuid};
 use crate::log::{Spanner, Trackable, TrailSpanId};
 use crate::parse::model::Subst;
@@ -554,7 +554,7 @@ impl<S> ToSubstance<S> for Wave
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, ParseErrs> {
+    fn to_substance(self) -> Result<S, ParseErrs0> {
         match self {
             Wave::Ping(ping) => ping.to_substance(),
             Wave::Pong(pong) => pong.to_substance(),
@@ -564,7 +564,7 @@ where
         }
     }
 
-    fn to_substance_ref(&self) -> Result<&S, ParseErrs> {
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs0> {
         match self {
             Wave::Ping(ping) => ping.to_substance_ref(),
             Wave::Pong(pong) => pong.to_substance_ref(),
@@ -809,11 +809,11 @@ where
     Substance: ToSubstance<S>,
     T: ToRecipients + Clone,
 {
-    fn to_substance(self) -> Result<S, ParseErrs> {
+    fn to_substance(self) -> Result<S, ParseErrs0> {
         self.core.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, ParseErrs> {
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs0> {
         self.core.to_substance_ref()
     }
 }
@@ -924,11 +924,11 @@ impl<S> ToSubstance<S> for PingCore
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, ParseErrs> {
+    fn to_substance(self) -> Result<S, ParseErrs0> {
         self.core.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, ParseErrs> {
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs0> {
         self.core.to_substance_ref()
     }
 }
@@ -1608,11 +1608,11 @@ impl<S> ToSubstance<S> for EchoCore
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, ParseErrs> {
+    fn to_substance(self) -> Result<S, ParseErrs0> {
         self.core.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, ParseErrs> {
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs0> {
         self.core.to_substance_ref()
     }
 }
@@ -1694,11 +1694,11 @@ impl<S> ToSubstance<S> for PongCore
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, ParseErrs> {
+    fn to_substance(self) -> Result<S, ParseErrs0> {
         self.core.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, ParseErrs> {
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs0> {
         self.core.to_substance_ref()
     }
 }
@@ -2249,7 +2249,7 @@ impl<S> ToSubstance<S> for DirectedWave
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, ParseErrs> {
+    fn to_substance(self) -> Result<S, ParseErrs0> {
         match self {
             DirectedWave::Ping(ping) => ping.to_substance(),
             DirectedWave::Ripple(ripple) => ripple.to_substance(),
@@ -2257,7 +2257,7 @@ where
         }
     }
 
-    fn to_substance_ref(&self) -> Result<&S, ParseErrs> {
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs0> {
         match self {
             DirectedWave::Ping(ping) => ping.to_substance_ref(),
             DirectedWave::Ripple(ripple) => ripple.to_substance_ref(),
@@ -2315,14 +2315,14 @@ impl<S> ToSubstance<S> for ReflectedWave
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, ParseErrs> {
+    fn to_substance(self) -> Result<S, ParseErrs0> {
         match self {
             ReflectedWave::Pong(pong) => pong.to_substance(),
             ReflectedWave::Echo(echo) => echo.to_substance(),
         }
     }
 
-    fn to_substance_ref(&self) -> Result<&S, ParseErrs> {
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs0> {
         match self {
             ReflectedWave::Pong(pong) => pong.to_substance_ref(),
             ReflectedWave::Echo(echo) => echo.to_substance_ref(),
@@ -2610,11 +2610,11 @@ impl<S, V> ToSubstance<S> for WaveVariantDef<V>
 where
     V: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, ParseErrs> {
+    fn to_substance(self) -> Result<S, ParseErrs0> {
         self.variant.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, ParseErrs> {
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs0> {
         self.variant.to_substance_ref()
     }
 }
@@ -2757,11 +2757,11 @@ impl<S> ToSubstance<S> for SignalCore
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, ParseErrs> {
+    fn to_substance(self) -> Result<S, ParseErrs0> {
         self.core.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, ParseErrs> {
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs0> {
         self.core.to_substance_ref()
     }
 }

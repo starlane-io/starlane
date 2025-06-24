@@ -1,4 +1,4 @@
-use crate::err::{ParseErrs, PrintErr};
+use crate::err::{ParseErrs0, PrintErr};
 use crate::loc::Variable;
 use crate::parse::{ErrCtx, NomErr, VarCase};
 use core::fmt::Display;
@@ -918,22 +918,22 @@ where
     move |input: I| delimited(multispace0, f, multispace0)(input)
 }
 
-pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<NomErr<I>>>) -> Result<R, ParseErrs> {
+pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<NomErr<I>>>) -> Result<R, ParseErrs0> {
     match result {
         Ok((_, e)) => Ok(e),
         Err(nom::Err::Error(err)) => Result::Err(err.into()),
         Err(nom::Err::Failure(err)) => Result::Err(err.into()),
-        _ => Result::Err(ParseErrs::new(&"Unidentified nom parse error")),
+        _ => Result::Err(ParseErrs0::new(&"Unidentified nom parse error")),
     }
 }
 
-pub fn parse_errs<R, E>(result: Result<R, E>) -> Result<R, ParseErrs>
+pub fn parse_errs<R, E>(result: Result<R, E>) -> Result<R, ParseErrs0>
 where
     E: Display,
 {
     match result {
         Ok(ok) => Ok(ok),
-        Err(err) => Err(ParseErrs::new(&(err.to_string()))),
+        Err(err) => Err(ParseErrs0::new(&(err.to_string()))),
     }
 }
 
@@ -1006,7 +1006,7 @@ where
                         let line = format!("\n\t\tcaused by: {}", unstack(&context));
                         message.push_str(line.as_str());
                     }
-                    ParseErrs::from_loc_span(message.as_str(), last.to_string(), location).print();
+                    ParseErrs0::from_loc_span(message.as_str(), last.to_string(), location).print();
                 }
             }
         }

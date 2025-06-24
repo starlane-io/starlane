@@ -5,7 +5,7 @@ use nom::bytes::complete::tag;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
-use crate::err::{ParseErrs, SpaceErr};
+use crate::err::{ParseErrs0, SpaceErr};
 use crate::kind::{BaseKind, Kind, KindParts};
 use crate::parse::util::{new_span, result, Span};
 use crate::parse::{parse_alpha1_str, point_and_kind, Env, Res};
@@ -305,7 +305,7 @@ pub struct PointKindDef<Pnt> {
 }
 
 impl ToResolved<PointKindCtx> for PointKindVar {
-    fn to_resolved(self, env: &Env) -> Result<PointKindCtx, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<PointKindCtx, ParseErrs0> {
         Ok(PointKindCtx {
             point: self.point.to_resolved(env)?,
             kind: self.kind,
@@ -314,7 +314,7 @@ impl ToResolved<PointKindCtx> for PointKindVar {
 }
 
 impl ToResolved<PointKind> for PointKindVar {
-    fn to_resolved(self, env: &Env) -> Result<PointKind, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<PointKind, ParseErrs0> {
         Ok(PointKind {
             point: self.point.to_resolved(env)?,
             kind: self.kind,
@@ -323,7 +323,7 @@ impl ToResolved<PointKind> for PointKindVar {
 }
 
 impl ToResolved<PointKind> for PointKindCtx {
-    fn to_resolved(self, env: &Env) -> Result<PointKind, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<PointKind, ParseErrs0> {
         Ok(PointKind {
             point: self.point.to_resolved(env)?,
             kind: self.kind,

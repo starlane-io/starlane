@@ -50,7 +50,7 @@ pub enum SpaceErr {
     #[error("Status: {0}")]
     Status2(status::Status),
     #[error(transparent)]
-    ParseErrs(#[from] ParseErrs),
+    ParseErrs(#[from] ParseErrs0),
     #[error("expected substance: '{expected}' instead found: '{found}'")]
     ExpectedSubstance {
         expected: SubstanceKind,
@@ -178,7 +178,7 @@ impl From<anyhow::Error> for SpaceErr {
     }
 }
 
-impl SpatialError for ParseErrs {
+impl SpatialError for ParseErrs0 {
     fn anyhow(self) -> Arc<anyhow::Error> {
         // first promote it to a space err...
         SpaceErr::from(self).anyhow()
@@ -582,19 +582,19 @@ impl From<io::Error> for SpaceErr {
 
 /// this is a dirty hack, but its late and I'm
 /// frustrated with this particular FromStr::from_str err...
-impl From<Report> for ParseErrs {
+impl From<Report> for ParseErrs0 {
     fn from(report: Report) -> Self {
-        ParseErrs::new(format!("{:?}", report))
+        ParseErrs0::new(format!("{:?}", report))
     }
 }
 
 #[derive(Debug, Clone, Error, Serialize, Deserialize)]
-pub struct ParseErrs {
+pub struct ParseErrs0 {
     pub report: Vec<Report>,
     pub src: String,
 }
 
-impl ParseErrs {
+impl ParseErrs0 {
     pub fn report(report: Report) -> Self {
         Self {
             report: vec![report],
@@ -626,7 +626,7 @@ impl ParseErrs {
         }
     }
 
-    pub fn utf8_encoding_err<I>(span: I, err: FromUtf8Error) -> ParseErrs
+    pub fn utf8_encoding_err<I>(span: I, err: FromUtf8Error) -> ParseErrs0
     where
         I: Span,
     {
@@ -648,66 +648,66 @@ impl ParseErrs {
     }
 }
 
-impl From<Box<bincode::ErrorKind>> for ParseErrs {
+impl From<Box<bincode::ErrorKind>> for ParseErrs0 {
     fn from(err: Box<ErrorKind>) -> Self {
         Self::new(err.to_string())
     }
 }
 
-impl From<strum::ParseError> for ParseErrs {
+impl From<strum::ParseError> for ParseErrs0 {
     fn from(err: ParseError) -> Self {
-        ParseErrs::new(err.to_string())
+        ParseErrs0::new(err.to_string())
     }
 }
 
-impl From<&str> for ParseErrs {
+impl From<&str> for ParseErrs0 {
     fn from(err: &str) -> Self {
-        ParseErrs::new(err)
+        ParseErrs0::new(err)
     }
 }
 
-impl From<&String> for ParseErrs {
+impl From<&String> for ParseErrs0 {
     fn from(err: &String) -> Self {
-        ParseErrs::new(err)
+        ParseErrs0::new(err)
     }
 }
 
-impl From<ResolverErr> for ParseErrs {
+impl From<ResolverErr> for ParseErrs0 {
     fn from(err: ResolverErr) -> Self {
-        ParseErrs::new(err.to_string())
+        ParseErrs0::new(err.to_string())
     }
 }
 
-impl From<String> for ParseErrs {
+impl From<String> for ParseErrs0 {
     fn from(err: String) -> Self {
-        ParseErrs::new(err)
+        ParseErrs0::new(err)
     }
 }
-impl From<Infallible> for ParseErrs {
+impl From<Infallible> for ParseErrs0 {
     fn from(err: Infallible) -> Self {
-        ParseErrs::new(err.to_string())
+        ParseErrs0::new(err.to_string())
     }
 }
 
-impl From<FromUtf8Error> for ParseErrs {
+impl From<FromUtf8Error> for ParseErrs0 {
     fn from(err: FromUtf8Error) -> Self {
         Self::result_utf8(Err(err)).unwrap()
     }
 }
 
-impl From<regex::Error> for ParseErrs {
+impl From<regex::Error> for ParseErrs0 {
     fn from(err: regex::Error) -> Self {
         Self::new(&err.to_string())
     }
 }
 
-impl Display for ParseErrs {
+impl Display for ParseErrs0 {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "ParseErrs -> {} errors", self.report.len())
     }
 }
 
-impl Default for ParseErrs {
+impl Default for ParseErrs0 {
     fn default() -> Self {
         Self {
             report: vec![],
@@ -716,13 +716,13 @@ impl Default for ParseErrs {
     }
 }
 
-impl From<semver::Error> for ParseErrs {
+impl From<semver::Error> for ParseErrs0 {
     fn from(err: semver::Error) -> Self {
-        ParseErrs::new(&err.to_string())
+        ParseErrs0::new(&err.to_string())
     }
 }
 
-impl PrintErr for ParseErrs {
+impl PrintErr for ParseErrs0 {
     fn print(&self) {
         println!("Report len: {}", self.report.len());
         for report in &self.report {
@@ -732,7 +732,7 @@ impl PrintErr for ParseErrs {
     }
 }
 
-impl ParseErrs {
+impl ParseErrs0 {
     pub fn from_report<S>(report: Report, source: S) -> Self
     where
         S: ToString,
@@ -744,7 +744,7 @@ impl ParseErrs {
         }
     }
 
-    pub fn from_loc_span<I, S>(message: &str, label: S, span: I) -> ParseErrs
+    pub fn from_loc_span<I, S>(message: &str, label: S, span: I) -> ParseErrs0
     where
         I: Span,
         S: ToString,
@@ -757,7 +757,7 @@ impl ParseErrs {
                     .with_message(label),
             )
             .finish();
-        return ParseErrs::from_report(report, span.extra());
+        return ParseErrs0::from_report(report, span.extra());
     }
 
     pub fn from_range(
@@ -765,16 +765,16 @@ impl ParseErrs {
         label: &str,
         range: Range<usize>,
         extra: SpanExtra,
-    ) -> ParseErrs {
+    ) -> ParseErrs0 {
         let mut builder = Report::build(ReportKind::Error, (), 23);
         let report = builder
             .with_message(message)
             .with_label(Label::new(range).with_message(label))
             .finish();
-        return ParseErrs::from_report(report, extra);
+        return ParseErrs0::from_report(report, extra);
     }
 
-    pub fn from_owned_span<I: Span>(message: &str, label: &str, span: I) -> ParseErrs {
+    pub fn from_owned_span<I: Span>(message: &str, label: &str, span: I) -> ParseErrs0 {
         let mut builder = Report::build(ReportKind::Error, (), 23);
         let report = builder
             .with_message(message)
@@ -783,11 +783,11 @@ impl ParseErrs {
                     .with_message(label),
             )
             .finish();
-        return ParseErrs::from_report(report, span.extra());
+        return ParseErrs0::from_report(report, span.extra());
     }
 
-    pub fn fold<E: Into<ParseErrs>>(errs: Vec<E>) -> ParseErrs {
-        let errs: Vec<ParseErrs> = errs.into_iter().map(|e| e.into()).collect();
+    pub fn fold<E: Into<ParseErrs0>>(errs: Vec<E>) -> ParseErrs0 {
+        let errs: Vec<ParseErrs0> = errs.into_iter().map(|e| e.into()).collect();
 
         let source = if let Some(first) = errs.first() {
             first.src.clone()
@@ -795,7 +795,7 @@ impl ParseErrs {
             Default::default()
         };
 
-        let mut rtn = ParseErrs {
+        let mut rtn = ParseErrs0 {
             report: vec![],
             src: source,
         };
@@ -828,8 +828,8 @@ impl From<SpaceErr> for ParseErrs {
 
  */
 
-impl Into<ParseErrs> for SpaceErr {
-    fn into(self) -> ParseErrs {
+impl Into<ParseErrs0> for SpaceErr {
+    fn into(self) -> ParseErrs0 {
         match self {
             SpaceErr::ParseErrs(errs) => errs,
             _ => Default::default(),

@@ -1,4 +1,4 @@
-use crate::err::{ParseErrs, SpaceErr};
+use crate::err::{ParseErrs0, SpaceErr};
 use crate::kind::BaseKind;
 use crate::log::Trackable;
 use crate::parse::util::{result, Span};
@@ -200,7 +200,7 @@ impl<'de> Deserialize<'de> for VersionSegLoc {
 }
 
 impl TryInto<semver::Version> for VersionSegLoc {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_into(self) -> Result<semver::Version, Self::Error> {
         Ok(self.version)
@@ -208,7 +208,7 @@ impl TryInto<semver::Version> for VersionSegLoc {
 }
 
 impl FromStr for VersionSegLoc {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let version = semver::Version::from_str(s)?;
@@ -249,9 +249,9 @@ impl<V> TryInto<Variable> for VarVal<V> {
 
 impl<V> ToResolved<V> for VarVal<V>
 where
-    V: FromStr<Err = ParseErrs>,
+    V: FromStr<Err =ParseErrs0>,
 {
-    fn to_resolved(self, env: &Env) -> Result<V, ParseErrs> {
+    fn to_resolved(self, env: &Env) -> Result<V, ParseErrs0> {
         match self {
             VarVal::Var(var) => match env.val(var.as_str()) {
                 Ok(val) => {
@@ -261,14 +261,14 @@ where
                 Err(err) => {
                     let trace = var.trace.clone();
                     match err {
-                        ResolverErr::NotAvailable => Err(ParseErrs::from_range(
+                        ResolverErr::NotAvailable => Err(ParseErrs0::from_range(
                             "variables not available in this context",
                             "variables not available",
                             trace.range,
                             trace.extra,
                         )
                         .into()),
-                        ResolverErr::NotFound => Err(ParseErrs::from_range(
+                        ResolverErr::NotFound => Err(ParseErrs0::from_range(
                             format!("variable '{}' not found", var.unwrap().to_string()).as_str(),
                             "not found",
                             trace.range,
@@ -594,7 +594,7 @@ impl Into<Surface> for StarKey {
 }
 
 impl TryFrom<Point> for StarKey {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_from(point: Point) -> Result<Self, Self::Error> {
         match point.route {
@@ -675,7 +675,7 @@ impl StarKey {
 }
 
 impl FromStr for StarKey {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(result(all_consuming(parse_star_key)(new_span(s)))?)

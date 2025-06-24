@@ -1,5 +1,5 @@
 use crate::command::direct::create::KindTemplate;
-use crate::err::{ParseErrs, PrintErr};
+use crate::err::{ParseErrs0, PrintErr};
 use crate::loc::{
   ProvisionAffinity, StarKey, ToBaseKind, VersionSegLoc, CONTROL_WAVE_TRAVERSAL_PLAN,
   MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
@@ -85,7 +85,7 @@ impl ToString for KindParts {
 }
 
 impl FromStr for KindParts {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (_, kind) = all_consuming(kind_parts)(new_span(s))?;
@@ -279,7 +279,7 @@ impl ToBaseKind for BaseKind {
 }
 
 impl TryFrom<CamelCase> for BaseKind {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_from(base: CamelCase) -> Result<Self, Self::Error> {
         Ok(BaseKind::from_str(base.as_str())?)
@@ -445,7 +445,7 @@ impl Kind {
 }
 
 impl TryFrom<KindParts> for Kind {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_from(value: KindParts) -> Result<Self, Self::Error> {
         Ok(match value.base {
@@ -457,7 +457,7 @@ impl TryFrom<KindParts> for Kind {
                             .ok_or("Database<Relational<?>> requires a Specific")?,
                     )),
                     what => {
-                        return Err(ParseErrs::from(format!(
+                        return Err(ParseErrs0::from(format!(
                             "unexpected Database SubKind '{}'",
                             what
                         )));
@@ -472,7 +472,7 @@ impl TryFrom<KindParts> for Kind {
                             .ok_or("UserBase<OAuth<?>> requires a Specific")?,
                     )),
                     what => {
-                        return Err(ParseErrs::from(format!(
+                        return Err(ParseErrs0::from(format!(
                             "unexpected Database SubKind '{}'",
                             what
                         )));
@@ -854,7 +854,7 @@ impl Display for Specific {
 }
 
 impl FromStr for Specific {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(specific(new_span(s)))
@@ -862,7 +862,7 @@ impl FromStr for Specific {
 }
 
 impl TryInto<SpecificSelector> for Specific {
-    type Error = ParseErrs;
+    type Error = ParseErrs0;
 
     fn try_into(self) -> Result<SpecificSelector, Self::Error> {
         Ok(SpecificSelector {
@@ -877,7 +877,7 @@ impl TryInto<SpecificSelector> for Specific {
 
 #[cfg(test)]
 pub mod test {
-    use crate::err::{ParseErrs, PrintErr};
+    use crate::err::{ParseErrs0, PrintErr};
     use crate::kind::{FileSubKind, Kind, StarSub};
     use crate::parse::util::{new_span, result};
     use crate::parse::{file_point_kind_segment, point_kind_hierarchy};
@@ -887,7 +887,7 @@ pub mod test {
     use std::str::FromStr;
 
     #[test]
-    pub fn selector() -> Result<(), ParseErrs> {
+    pub fn selector() -> Result<(), ParseErrs0> {
         let kind = Kind::Star(StarSub::Fold);
         let selector = KindSelector::from_str("<Star<Fold>>")?;
         assert!(selector.is_match(&kind).is_ok());

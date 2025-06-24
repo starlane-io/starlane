@@ -20,7 +20,7 @@ use itertools::Itertools;
 use starlane_macros::{log_span, push_loc, push_mark};
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{Create, Strategy};
-use starlane_space::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError};
+use starlane_space::err::{CoreReflector, ParseErrs0, SpaceErr, SpatialError};
 use starlane_space::hyper::{Assign, AssignmentKind, HyperSubstance, Provision, Search};
 use starlane_space::hyper::{MountKind, ParticleLocation};
 use starlane_space::kind::{Kind, StarStub, StarSub};

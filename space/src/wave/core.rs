@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::command::Command;
 use crate::err::LegacyStatusErr;
-use crate::err::{ParseErrs, SpaceErr};
+use crate::err::{ParseErrs0, SpaceErr};
 use crate::loc::{Surface, ToSurface};
 use crate::substance::{FormErrs, Substance, ToSubstance};
 use crate::util::{ValueMatcher, ValuePattern};
@@ -41,11 +41,11 @@ impl<S> ToSubstance<S> for ReflectedCore
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, ParseErrs> {
+    fn to_substance(self) -> Result<S, ParseErrs0> {
         self.body.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, ParseErrs> {
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs0> {
         self.body.to_substance_ref()
     }
 }
@@ -399,11 +399,11 @@ impl<S> ToSubstance<S> for DirectedCore
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, ParseErrs> {
+    fn to_substance(self) -> Result<S, ParseErrs0> {
         self.body.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, ParseErrs> {
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs0> {
         self.body.to_substance_ref()
     }
 }

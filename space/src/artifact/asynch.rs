@@ -2,7 +2,7 @@ use crate::artifact::builtin::BUILTIN_FETCHER;
 use crate::artifact::ArtRef;
 use crate::config::bind::BindConfig;
 use crate::config::mechtron::MechtronConfig;
-use crate::err::{ParseErrs, PrintErr};
+use crate::err::{ParseErrs0, PrintErr};
 use crate::loc::ToSurface;
 use crate::particle::Stub;
 use crate::point::Point;
@@ -60,7 +60,7 @@ pub enum ArtErr {
         found: String,
     },
     #[error(transparent)]
-    ParseErrs(#[from] ParseErrs),
+    ParseErrs(#[from] ParseErrs0),
     #[error("Err({0})")]
     Source(#[source] Arc<anyhow::Error>),
 }
@@ -193,7 +193,7 @@ impl<A> Into<Result<ArtRef<A>, ArtErr>> for ArtStatus<A> {
 
 pub struct ArtifactPipeline<A>
 where
-    A: FromStr<Err = ParseErrs>,
+    A: FromStr<Err =ParseErrs0>,
 {
     watch: watch::Receiver<ArtStatus<A>>,
 }
@@ -215,7 +215,7 @@ impl Default for ArtifactsSkel {
 
 impl<A> ArtifactPipeline<A>
 where
-    A: FromStr<Err = ParseErrs> + 'static,
+    A: FromStr<Err =ParseErrs0> + 'static,
 {
     pub fn new(point: &Point, fetcher: Arc<dyn ArtifactFetcher>) -> ArtifactPipeline<A> {
         let runner = ArtifactPipelineRunner::new(point.clone(), fetcher);
@@ -244,7 +244,7 @@ struct ArtifactPipelineRunner<A> {
 
 impl<A> ArtifactPipelineRunner<A>
 where
-    A: FromStr<Err = ParseErrs> + 'static,
+    A: FromStr<Err =ParseErrs0> + 'static,
 {
     pub fn new(point: Point, fetcher: Arc<dyn ArtifactFetcher>) -> Self {
         let (watch_tx, watch_rx) = watch::channel(ArtStatus::Unknown);
@@ -301,7 +301,7 @@ where
 
 struct ArtifactCache<A>
 where
-    A: FromStr<Err = ParseErrs>,
+    A: FromStr<Err =ParseErrs0>,
 {
     skel: ArtifactsSkel,
     artifacts: DashMap<Point, ArtRef<A>>,
@@ -312,7 +312,7 @@ where
 
 impl<A> ArtifactCache<A>
 where
-    A: FromStr<Err = ParseErrs> + 'static,
+    A: FromStr<Err =ParseErrs0> + 'static,
 {
     pub fn new(fetcher: Arc<dyn ArtifactFetcher>, skel: ArtifactsSkel) -> ArtifactCache<A> {
         ArtifactCache {

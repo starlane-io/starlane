@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::parse::util::new_span;
 
-use crate::err::ParseErrs;
+use crate::err::ParseErrs0;
 use crate::parse::util::result;
 use crate::parse::{particle_perms, permissions, permissions_mask, privilege};
 use crate::point::Point;
@@ -65,7 +65,7 @@ impl Access {
         }
     }
 
-    pub fn check_privilege(&self, privilege: &str) -> Result<(), ParseErrs> {
+    pub fn check_privilege(&self, privilege: &str) -> Result<(), ParseErrs0> {
         match self {
             Access::Super => Ok(()),
             Access::Owner => Ok(()),
@@ -217,7 +217,7 @@ impl ToString for Privilege {
 }
 
 impl FromStr for Privilege {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let span = new_span(s);
@@ -280,7 +280,7 @@ pub struct PermissionsMask {
 }
 
 impl FromStr for PermissionsMask {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = new_span(s);
@@ -304,7 +304,7 @@ pub struct Permissions {
 }
 
 impl FromStr for Permissions {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(permissions(new_span(s)))
@@ -444,7 +444,7 @@ impl ParticlePerms {
 }
 
 impl FromStr for ParticlePerms {
-    type Err = ParseErrs;
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = new_span(s);
@@ -583,13 +583,13 @@ impl Into<AccessGrant> for IndexedAccessGrant {
 }
 
 pub trait AccessProvider: Send + Sync {
-    fn access(&self, to: &Agent, on: &Point) -> Result<Access, ParseErrs>;
+    fn access(&self, to: &Agent, on: &Point) -> Result<Access, ParseErrs0>;
 }
 
 pub struct AllAccessProvider();
 
 impl AccessProvider for AllAccessProvider {
-    fn access(&self, _: &Agent, _: &Point) -> Result<Access, ParseErrs> {
+    fn access(&self, _: &Agent, _: &Point) -> Result<Access, ParseErrs0> {
         Ok(Access::SuperOwner)
     }
 }

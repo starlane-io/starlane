@@ -1,4 +1,4 @@
-use crate::err::ParseErrs;
+use crate::err::ParseErrs0;
 use crate::fetch::FetchErr;
 use async_trait::async_trait;
 use std::fmt::Display;
@@ -110,7 +110,7 @@ pub enum CacheErr {
   #[error("Fetch Error: {0}")]
   Fetch(FetchErr),
   #[error("Parse Errors: {0}")]
-  Parse(ParseErrs),
+  Parse(ParseErrs0),
   #[error("File Store Error: {0}")]
   FileStore(String)
 }
