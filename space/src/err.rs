@@ -869,7 +869,12 @@ pub mod report {
         labels: Vec<Label>,
     }
 
-    impl Into<ariadne::Report> for Report {
+    impl <'a> Into<ariadne::Report<'a>> for Report {
+
+        fn into(self) -> ariadne::Report<'a> {
+            panic!("starlane_space::err::report::Report::into() disabled for now")
+        }
+        /*
         fn into(self) -> ariadne::Report {
             let mut builder = ariadne::Report::build(self.kind.into(), (), 0);
             if let Some(msg) = self.msg {
@@ -880,6 +885,8 @@ pub mod report {
             }
             builder.finish()
         }
+        
+         */
     }
 
     impl Default for Report {
@@ -951,8 +958,8 @@ pub mod report {
         Advice,
     }
 
-    impl Into<ariadne::ReportKind> for ReportKind {
-        fn into(self) -> ariadne::ReportKind {
+    impl <'a> Into<ariadne::ReportKind<'a>> for ReportKind {
+        fn into(self) -> ariadne::ReportKind<'a> {
             match self {
                 ReportKind::Error => ariadne::ReportKind::Error,
                 ReportKind::Warning => ariadne::ReportKind::Warning,

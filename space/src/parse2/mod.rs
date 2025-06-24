@@ -1,40 +1,137 @@
-use std::mem::offset_of;
-use std::ops::Deref;
-use anyhow::__private::kind::TraitKind;
-use itertools::Itertools;
-use nom::bytes::complete::tag;
+use ariadne::{Label, Report, ReportKind, Source};
+use futures::TryStreamExt;
+use crate::parse::util::{preceded, Span};
 use nom::character::complete::alpha1;
-use nom::{ErrorConvert, Finish, IResult, Offset};
 use nom::combinator::all_consuming;
-use nom::error::{context, convert_error, VerboseError, VerboseErrorKind};
+use nom::error::{convert_error, ErrorKind, FromExternalError, ParseError, VerboseError, VerboseErrorKind};
 use nom::multi::separated_list1;
 use nom::sequence::pair;
+use nom::{Finish, IResult, Offset, Parser};
+use nom::bytes::complete::tag;
 use nom_locate::LocatedSpan;
-use nom_supreme::ParserExt;
-use thiserror::__private::AsDynError;
-use crate::parse::{NomErr};
-use crate::parse::util::{preceded, Span};
+use nom_supreme::context::ContextError;
+use nom_supreme::error::{ErrorTree, GenericErrorTree};
+use strum_macros::{Display, EnumString};
+use crate::err::ParseErrs;
+use nom_supreme::parser_ext::ParserExt;
+//use nom_supreme::tag::complete::tag;
+use nom_supreme::context;
+use nom_supreme::tag::TagError;
+use thiserror::Error;
 
-type Input<'a> = LocatedSpan<&'a str>;
+type Input<'a> = LocatedSpan<&'a str,&'a str>;
 
-pub type Res<'a,O> = IResult<Input<'a>, O,VerboseError<Input<'a>>>;
-
-
-pub fn segments(i: Input) -> Res<Vec<Input>> {
-   pair(context("segments",separated_list1(tag(":"),alpha1)),preceded(context("zoinks!",tag("^")),alpha1))(i).map(|(next,(segments,_))|(next,segments))
+pub fn new_input<'a>(src: &'a str) -> Input<'a> {
+    Input::new_extra(src,src)
 }
 
-pub fn convert(e: VerboseError<Input>) -> VerboseError<&str> {
-   let errors = e.errors.iter().map(|(input,kind)|(*input.fragment(),kind.clone())).collect();
+pub type Res<'a,O> = IResult<Input<'a>, O,VerboseError<Input<'a>>>;
+pub type StupidRes<'a,O> = IResult<Input<'a>, O,StupidErr<'a>>;
+
+
+
+#[derive(Debug)]
+struct StupidErr<'a> {
+    pub errors: Vec<(Input<'a>, ErrKind)>,
+}
+
+#[derive(Debug,Eq,PartialEq,Hash,Clone,Error)]
+pub enum ErrKind {
+    #[error("unexpected: nom::ErrorKind lacks 'Display'")]
+    Nom(ErrorKind),
+    #[error("not expecting: '{0}'")]
+    Char(char),
+    #[error("{0}")]
+    Context(ParseCtx),
+}
+
+#[derive(Debug,Eq,PartialEq,Hash,Clone,Display,EnumString,Error)]
+pub enum ParseCtx {
+    Yuk
+}
+impl <'a> ParseError<Input<'a>> for StupidErr<'a> {
+    fn from_error_kind(input: Input<'a>, kind: ErrorKind) -> Self {
+        Self{
+            errors: vec![(input, ErrKind::Nom(kind))],
+        }
+    }
+
+    fn append(input: Input<'a>, kind: ErrorKind, mut other: Self) -> Self {
+        other.errors.push((input, ErrKind::Nom(kind)));
+        other
+    }
+
+    fn from_char(input: Input<'a>, c: char) -> Self {
+        Self{
+            errors: vec![(input, ErrKind::Char(c))],
+        }
+    }
+}
+impl <'a> ContextError<Input<'a>, ParseCtx> for StupidErr<'a> {
+    fn add_context(input: Input<'a>, err: ParseCtx, mut other: Self) -> Self {
+        other.errors.push((input,ErrKind::Context(err)));
+        other
+    }
+}
+
+impl <'a> TagError<Input<'a>, ParseCtx> for StupidErr<'a> {
+    fn from_tag(input: Input<'a>, tag: ParseCtx) -> Self {
+        todo!()
+    }
+}
+
+
+pub fn segments(i: Input) -> StupidRes<Vec<Input>> {
+
+    let mut parser = pair(separated_list1(tag(":"),alpha1::<Input,StupidErr>),preceded(tag("^"),alpha1)).context(ParseCtx::Yuk);
+
+    parser.parse(i).map(|(next,(segments,extra))|(next,segments))
+
+    //pair(context("segments",separated_list1(tag(":"),alpha1)),context("yikes",preceded(tag("^"),alpha1)))(i).map(|(next,(segments,_))|(next,segments))
+//    Err(nom::Err::Failure(NomErr::from_error_kind(i,ErrorKind::Alpha)))
+}
+
+
+
+/*
+pub fn convert<'a>(e: StupidErr<'a>) -> VerboseError<&'a str> {
+   let errors = e.errors.iter().map(|(input,kind)|{
+
+       (*input.fragment(),kind.clone())}).collect();
     VerboseError { errors }
 }
 
+ */
+
+/*
+pub fn convert(e: VerboseError<Input>) -> VerboseError<&str> {
+    let errors = e.errors.iter().map(|(input,kind)|{
+
+
+        println!("Kind: {:?}",kind);
+
+
+        (*input.fragment(),kind.clone())}).collect();
+    VerboseError { errors }
+}*/
+
 #[test]
 fn test() {
-    let input = Input::new("you:are:^awesome");
+    let input = new_input("you:are:^awesome");
     let error = all_consuming(segments)(input.clone()).finish().unwrap_err();
-    let msg = convert_error(*input.fragment(), convert(error));
-    println!("{}", msg );
+    log(error);
+}
+
+fn log<'a>(err: StupidErr<'a>) {
+    for (input,err) in err.errors {
+
+            Report::build(ReportKind::Error, 0..input.extra.len())
+                .with_message(err.to_string())
+                .with_label(Label::new(input.location_offset()..input.len()).with_message("This is of type Nat"))
+                .finish()
+                .print(Source::from(input.extra))
+                .unwrap();
+    }
 }
 
 
