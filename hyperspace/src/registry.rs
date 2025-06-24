@@ -1,6 +1,6 @@
 use crate::registry::err::RegErr;
 use async_trait::async_trait;
-use starlane_space::command::common::{SetProperties, SetRegistry};
+use starlane_space::command::common::SetRegistry;
 use starlane_space::command::direct::create::Strategy;
 use starlane_space::command::direct::delete::Delete;
 use starlane_space::command::direct::query::{Query, QueryResult};
@@ -13,6 +13,7 @@ use starlane_space::security::{Access, AccessGrant, IndexedAccessGrant};
 use starlane_space::selector::Selector;
 use starlane_space::substance::SubstanceList;
 use std::sync::Arc;
+use starlane::types1::property::SetProperties;
 use crate::base::config::{BaseConfig, BaseSubConfig};
 
 pub mod err;

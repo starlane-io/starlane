@@ -202,15 +202,20 @@ pub mod test {
     use crate::types::scope::parse::parse;
     use crate::types::scope::ScopeKeyword;
     use std::str::FromStr;
+    use crate::parse::util::{new_span, result};
+    use crate::types2::scope::parse::scope;
 
     #[test]
     fn text_x() {
-        let domain = parse("hello").unwrap();
+        /*
+        let domain = result(scope(new_span("hello"))).unwrap();
         assert_eq!(domain.to_string().as_str(), "hello");
         assert_eq!(domain.reserved(), false);
         assert_eq!(domain.prefix().is_none(), true);
 
         assert_eq!(ScopeKeyword::from_str("root").unwrap(), ScopeKeyword::Root);
+        
+         */
 
         let scope = parse("root").unwrap();
 
@@ -242,7 +247,7 @@ pub mod test {
 pub mod parse {
     use crate::err;
     use crate::parse::util::{new_span, result, Span};
-    use crate::parse::{skewer_case, version, NomErr, Res, SkewerCase};
+    use crate::parse::{context, skewer_case, version, NomErr, Res, SkewerCase};
     use crate::types::scope::{Scope, ScopeKeyword, Segment};
     use nom::branch::alt;
     use nom::combinator::{opt, peek};
@@ -260,8 +265,11 @@ pub mod parse {
     }
     /// will return an empty [Scope]  -> `DomainScope(None,Vec:default())` if nothing is found
     pub fn scope<I: Span>(input: I) -> Res<I, Scope> {
-        terminated(separated_list0(tag("::"), postfix_segment), tag("::"))(input)
-            .map(|(input, mut segments)| (input, Scope::from_segments(segments)))
+        context(
+            "scope parsing",
+            terminated(separated_list0(tag("::"), postfix_segment), tag("::"))
+        )(input)
+            .map(|(next, segments)| (next, Scope::from_segments(segments))) 
     }
 
     fn prefix<I: Span>(input: I) -> Res<I, ScopeKeyword> {

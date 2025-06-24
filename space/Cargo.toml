@@ -100,6 +100,8 @@ dyn-clone = { workspace = true }
 
 [dev-dependencies]
 dummy = { workspace = true }
+mockall = { workspace = true }
+insta = { workspace = true }
 
 [build-dependencies]
 shadow-rs = { workspace = true }

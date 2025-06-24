@@ -9,10 +9,6 @@ use starlane_hyperspace::registry::{Registration, RegistryApi};
 use starlane_macros::push_loc;
 use starlane_platform_for_postgres::database::{PostgresDatabase, PostgresDatabaseHandle};
 use starlane_platform_for_postgres::service::{DbKey, PostgresService, PostgresServiceHandle};
-/// embedded postgres for local development environments is slated to be removed in favor of
-/// Postgres provided by `DockerDesktopFoundation`
-// pub mod embed;
-use starlane_space::command::common::{PropertyMod, SetProperties};
 use starlane_space::command::direct::create::Strategy;
 use starlane_space::command::direct::delete::Delete;
 use starlane_space::command::direct::get::{Get, GetOp};
@@ -48,6 +44,10 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
+/// embedded postgres for local development environments is slated to be removed in favor of
+/// Postgres provided by `DockerDesktopFoundation`
+// pub mod embed;
+use starlane::types1::property::{PropertyMod, SetProperties};
 
 pub struct PostgresRegistry {
     logger: Logger,

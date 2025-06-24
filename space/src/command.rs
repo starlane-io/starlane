@@ -21,8 +21,6 @@ use direct::write::{Write, WriteCtx, WriteVar};
 use starlane_macros::Autobox;
 
 pub mod common {
-    use std::collections::hash_map::Iter;
-    use std::collections::HashMap;
     use std::convert::{TryFrom, TryInto};
     use std::ops::{Deref, DerefMut};
 
@@ -30,7 +28,6 @@ pub mod common {
 
     use crate::err::ParseErrs;
     use crate::loc::Variable;
-    use crate::parse::{SkewerCase, SnakeCase};
     use crate::substance::{Bin, Substance};
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
@@ -72,82 +69,6 @@ pub mod common {
                     }
                 }
             }
-        }
-    }
-
-    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-    pub enum PropertyMod {
-        Set {
-            key: SnakeCase,
-            value: String,
-            lock: bool,
-        },
-        UnSet(SnakeCase),
-    }
-
-    impl PropertyMod {
-        pub fn set_or<E>(&self, err: E) -> Result<String, E> {
-            match self {
-                Self::Set { key, value, lock } => Ok(value.clone()),
-                Self::UnSet(_) => Err(err),
-            }
-        }
-
-        pub fn opt(&self) -> Option<String> {
-            match self {
-                Self::Set { key, value, lock } => Some(value.clone()),
-                Self::UnSet(_) => None,
-            }
-        }
-    }
-
-    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-    pub struct SetProperties {
-        pub map: HashMap<SnakeCase, PropertyMod>,
-    }
-
-    impl Default for SetProperties {
-        fn default() -> Self {
-            Self {
-                map: Default::default(),
-            }
-        }
-    }
-
-    impl SetProperties {
-        pub fn new() -> Self {
-            Self {
-                map: HashMap::new(),
-            }
-        }
-
-        pub fn append(&mut self, properties: SetProperties) {
-            for (_, property) in properties.map.into_iter() {
-                self.push(property);
-            }
-        }
-
-        pub fn push(&mut self, property: PropertyMod) {
-            match &property {
-                PropertyMod::Set { key, value, lock } => {
-                    self.map.insert(key.clone(), property);
-                }
-                PropertyMod::UnSet(key) => {
-                    self.map.insert(key.clone(), property);
-                }
-            }
-        }
-
-        pub fn iter(&self) -> Iter<'_, SnakeCase, PropertyMod> {
-            self.map.iter()
-        }
-    }
-
-    impl Deref for SetProperties {
-        type Target = HashMap<SnakeCase, PropertyMod>;
-
-        fn deref(&self) -> &Self::Target {
-            &self.map
         }
     }
 
@@ -265,10 +186,10 @@ pub mod direct {
     pub mod set {
         use serde::{Deserialize, Serialize};
 
-        use crate::command::common::SetProperties;
         use crate::err::ParseErrs;
         use crate::parse::Env;
         use crate::point::{Point, PointCtx, PointVar};
+        use crate::types::property::SetProperties;
         use crate::util::ToResolved;
 
         pub type Set = SetDef<Point>;
@@ -358,7 +279,7 @@ pub mod direct {
     }
 
     pub mod create {
-        use crate::command::common::{SetProperties, StateSrc, StateSrcVar};
+        use crate::command::common::{StateSrc, StateSrcVar};
         use crate::command::Command;
         use crate::err::{ParseErrs, SpaceErr};
         use crate::kind::{BaseKind, KindParts};
@@ -379,7 +300,7 @@ pub mod direct {
         use std::fmt::Display;
         use std::sync::atomic::{AtomicU64, Ordering};
         use std::sync::Arc;
-        use thiserror::__private::AsDisplay;
+        use crate::types::property::SetProperties;
 
         pub enum PointTemplateSeg {
             ExactSeg(PointSeg),

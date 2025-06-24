@@ -2,7 +2,7 @@ use crate::err::ParseErrs;
 use crate::parse::model::{BlockKind, LexBlock, NestedBlockKind};
 use crate::parse::util::preceded;
 use crate::parse::util::Span;
-use crate::parse::{camel_case, CamelCase, NomErr, SkewerCase};
+use crate::parse::{camel_case, CamelCase, NomErr, SkewerCase, SnakeCase};
 use crate::parse::{lex_block, Res};
 use crate::point::Point;
 use crate::selector::Pattern;
@@ -45,6 +45,7 @@ pub mod tag;
 pub mod test;
 pub mod archetype;
 pub mod property;
+pub mod package;
 //pub(crate) trait Typical: Display+Into<TypeKind>+Into<Type> { }
 
 /// [class::Class::Database] is an example of an [Type] because it is not an [ExactDef]
@@ -527,6 +528,7 @@ where
     }
 }
 
+pub type PropertyName = SnakeCase;
 
 
 #[cfg(test)]

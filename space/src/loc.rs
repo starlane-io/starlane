@@ -21,7 +21,6 @@ use starlane_macros::ToBase;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
-use crate::types::archetype::Archetype;
 
 pub static CENTRAL: Lazy<Point> = Lazy::new(|| StarKey::central().to_point());
 pub static GLOBAL_LOGGER: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::logger").unwrap());
@@ -134,6 +133,9 @@ pub struct VersionSegLoc {
 }
 
 
+#[cfg(feature = "types2")]
+use crate::types::archetype::Archetype;
+#[cfg(feature = "types2")]
 impl Archetype for VersionSegLoc {
     fn parser<I>(input: I) -> Res<I, Self>
     where

@@ -2,7 +2,7 @@ use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::parse::{lex_block, CamelCase, Res};
 use crate::types::class::Class;
-use crate::types::{Data, Type, TypeDisc};
+use crate::types::{Type, TypeDisc};
 use futures::FutureExt;
 use nom::branch::alt;
 use nom::combinator::{into, opt, value};
@@ -14,6 +14,7 @@ use nom::sequence::delimited;
 use nom::bytes::complete::tag;
 use std::fmt::Display;
 use crate::types::archetype::Archetype;
+use crate::types::data::Data;
 
 pub mod case {
 
@@ -81,11 +82,11 @@ pub mod delim {
     use crate::parse::{from_camel, CamelCase, Res};
     use crate::types::class::Class;
     use crate::types::parse::{class, data};
-    use crate::types::Data;
     use nom::sequence::delimited;
     use nom_supreme::tag::complete::tag;
     use crate::types::parse::Delimited;
     use std::str::FromStr;
+    use crate::types::data::Data;
 
     pub fn delim<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
     where

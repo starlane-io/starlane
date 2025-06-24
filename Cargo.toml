@@ -57,7 +57,9 @@ semver = { version="1.0.26", features=['serde'] }
 eyre = "0.6.12" # NOTE: add 'miette = "7.4.0"' for reporting later!
 miette = "7.6.0"
 itertools = "0.13.0"
-
+mockall = "0.13.1"
+insta = "1.43.1"
+tfhe = "1.2.0"
 serde = "1.0.219"
 serde_derive = "1.0.219"
 async-recursion = "1.1.1"

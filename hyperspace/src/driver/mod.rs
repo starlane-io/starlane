@@ -35,7 +35,7 @@ use starlane_macros::{handler, route, DirectedHandler, ToSpaceErr};
 use starlane_space::artifact::asynch::{ArtErr, Artifacts};
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::StateSrc::Subst;
-use starlane_space::command::common::{SetProperties, StateSrc};
+use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
@@ -73,6 +73,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
+use starlane::types1::property::SetProperties;
 
 pub struct DriversBuilder {
     factories: Vec<Arc<dyn HyperDriverFactory>>,

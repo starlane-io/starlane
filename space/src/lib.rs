@@ -3,6 +3,7 @@
 use crate::point::Point;
 use once_cell::sync::Lazy;
 use std::str::FromStr;
+use crate::particle::Property;
 
 // so macros will work
 extern crate self as starlane_space;
@@ -142,9 +143,6 @@ pub mod parse;
 pub mod particle;
 pub mod wave;
 
-#[cfg(feature = "kind2")]
-pub mod kind2;
-
 pub mod loc;
 pub mod log;
 pub mod path;
@@ -161,17 +159,28 @@ pub mod progress;
 
 pub mod status;
 
-pub mod types;
 pub mod cache;
 pub mod fetch;
-pub mod package;
 
-/// `types` mod is a work in progress for the proposed new type system
-/// its having some compile problems and isn't as-of-yet used by
-/// anything so makes sense to disable it for a while, so I can focus
-/// on getting `CI/CD` working
-//#[cfg(feature = "types2")]
-//pub mod types;
+#[cfg(not(feature = "types2"))]
+mod types1;
+#[cfg(not(feature = "types2"))]
+pub mod types {
+    pub use super::types1::*;
+}
+
+#[cfg(feature = "types2")]
+mod types2;
+
+#[cfg(feature = "types2")]
+pub mod types {
+    pub use super::types2::*;
+}
+
+pub mod test;
+
+
+
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());

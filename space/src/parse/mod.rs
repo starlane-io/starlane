@@ -5,7 +5,7 @@ pub mod util;
 //pub mod error;
 //pub mod error;
 
-use crate::command::common::{PropertyMod, SetProperties, StateSrcVar};
+use crate::command::common::StateSrcVar;
 use crate::command::direct::create::{
     CreateVar, KindTemplate, PointSegTemplate, PointTemplateSeg, PointTemplateVar, Strategy,
     TemplateVar,
@@ -103,7 +103,7 @@ use std::sync::Arc;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
-use crate::types::archetype::Archetype;
+use crate::types::property::{PropertyMod, PropertyName, SetProperties};
 
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
 pub type StarParser<I: Span, O> = dyn nom_supreme::parser_ext::ParserExt<I, O, NomErr<I>>;
@@ -1550,14 +1550,7 @@ impl FromStr for CamelCase {
     }
 }
 
-impl Archetype for CamelCase {
-    fn parser<I>(input: I) -> Res<I, Self>
-    where
-        I: Span
-    {
-        camel_case(input)
-    }
-}
+
 
 /*
 
@@ -1610,14 +1603,7 @@ pub struct Domain {
     string: String,
 }
 
-impl Archetype for Domain {
-    fn parser<I>(input: I) -> Res<I, Self>
-    where
-        I: Span
-    {
-        domain(input)
-    }
-}
+
 
 impl Serialize for Domain {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -1674,14 +1660,9 @@ pub struct SkewerCase {
     string: String,
 }
 
-impl Archetype for SkewerCase{
-    fn parser<I>(input: I) -> Res<I, Self>
-    where
-        I: Span
-    {
-        skewer_case(input)
-    }
-}
+
+
+
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct SnakeCase {
@@ -2167,12 +2148,12 @@ pub fn template<I: Span>(input: I) -> Res<I, TemplateVar> {
 }
 
 pub fn set_property_mod<I: Span>(input: I) -> Res<I, PropertyMod> {
-    tuple((tag("+"), snake_case, tag("="), property_value))(input).map(
+    tuple((tag("+"), PropertyName::parser, tag("="), property_value))(input).map(
         |(next, (_, key, _, value))| {
             (
                 next,
                 PropertyMod::Set {
-                    key: key,
+                    key,
                     value: value.to_string(),
                     lock: false,
                 },
@@ -2182,7 +2163,7 @@ pub fn set_property_mod<I: Span>(input: I) -> Res<I, PropertyMod> {
 }
 
 pub fn set_property_mod_lock<I: Span>(input: I) -> Res<I, PropertyMod> {
-    tuple((tag("+@"), snake_case, tag("="), property_value))(input).map(
+    tuple((tag("+@"), PropertyName::parser, tag("="), property_value))(input).map(
         |(next, (_, key, _, value))| {
             (
                 next,
@@ -2217,7 +2198,7 @@ pub fn property_value<I: Span>(input: I) -> Res<I, I> {
 }
 
 pub fn unset_property_mod<I: Span>(input: I) -> Res<I, PropertyMod> {
-    tuple((tag("!"), snake_case))(input)
+    tuple((tag("!"), PropertyName::parser))(input)
         .map(|(next, (_, name))| (next, PropertyMod::UnSet(name)))
 }
 
@@ -5502,24 +5483,25 @@ pub mod cmd_test {
     use crate::selector::{PointHierarchy, PointKindSeg};
     use crate::util::ToResolved;
 
-    use crate::parse::{command, create_command, point_selector, publish_command, script, upload_blocks, CamelCase, SkewerCase, SnakeCase};
+    use crate::parse::{command, create_command, point_selector, publish_command, script, upload_blocks, CamelCase, SnakeCase};
+    use crate::types::property::PropertyName;
     /*
-    #[mem]
-    pub async fn test2() -> Result<(),Error>{
-        let input = "? xreate localhost<Space>";
-        let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
-        match x {
-            Ok(_) => {}
-            Err(err) => {
-                println!("err: {}", err.to_string())
+        #[mem]
+        pub async fn test2() -> Result<(),Error>{
+            let input = "? xreate localhost<Space>";
+            let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
+            match x {
+                Ok(_) => {}
+                Err(err) => {
+                    println!("err: {}", err.to_string())
+                }
             }
+    
+    
+            Ok(())
         }
-
-
-        Ok(())
-    }
-
-     */
+    
+         */
 
     //    #[test]
     pub fn test() -> Result<(), ParseErrs> {
@@ -5621,7 +5603,7 @@ pub mod cmd_test {
         let mut command = result(create_command(new_span(input)))?;
         let command = command.collapse()?;
         if let Command::Create(create) = command {
-            let config = SnakeCase::from_str("config").unwrap();
+            let config = PropertyName::from_str("config").unwrap();
             assert!(create.properties.get(&config).is_some());
         } else {
             assert!(false);
@@ -7846,14 +7828,7 @@ fn find_parse_err<I: Span>(_: &Err<NomErr<I>>) -> ParseErrs {
 
 
 
-impl Archetype for SnakeCase {
-    fn parser<I>(input: I) -> Res<I, Self>
-    where
-        I: Span
-    {
-        snake_case(input)
-    }
-}
+
 
 impl Serialize for SnakeCase{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -7900,4 +7875,88 @@ impl Deref for SnakeCase {
         &self.string
     }
 }
+  
+#[cfg(not(feature="types2") )]
+mod archetypes {
+    use crate::parse::{camel_case, domain, skewer_case, snake_case, CamelCase, Domain, Res, SkewerCase, SnakeCase};
+    use crate::parse::util::Span;
 
+    impl CamelCase {
+        pub fn parser<I>(input: I) -> Res<I, Self>
+        where
+            I: Span
+        {
+            camel_case(input)
+        }
+    }
+    impl Domain {
+        pub fn parser<I>(input: I) -> Res<I, Self>
+        where
+            I: Span
+        {
+            domain(input)
+        }
+    }
+
+    impl SkewerCase{
+        pub fn parser<I>(input: I) -> Res<I, Self>
+        where
+            I: Span
+        {
+            skewer_case(input)
+        }
+    }
+
+    impl SnakeCase {
+        pub fn parser<I>(input: I) -> Res<I, Self>
+        where
+            I: Span
+        {
+            snake_case(input)
+        }
+    }
+}
+
+#[cfg(feature="types2")]
+mod archetypes {
+    use crate::parse::{camel_case, domain, skewer_case, snake_case, CamelCase, Domain, Res, SkewerCase, SnakeCase};
+    use crate::parse::util::Span;
+    use crate::types::archetype::Archetype;
+
+    impl Archetype for CamelCase {
+        fn parser<I>(input: I) -> Res<I, Self>
+        where
+            I: Span
+        {
+            camel_case(input)
+        }
+    }
+    impl Archetype for Domain {
+        fn parser<I>(input: I) -> Res<I, Self>
+        where
+            I: Span
+        {
+            domain(input)
+        }
+    }
+
+    impl Archetype for SkewerCase{
+        fn parser<I>(input: I) -> Res<I, Self>
+        where
+            I: Span
+        {
+            skewer_case(input)
+        }
+    }
+
+    impl Archetype for SnakeCase {
+        fn parser<I>(input: I) -> Res<I, Self>
+        where
+            I: Span
+        {
+            snake_case(input)
+        }
+    }
+}
+
+ 

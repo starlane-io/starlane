@@ -25,7 +25,6 @@ use crate::substance::{
 };
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
-use crate::types::archetype::Archetype;
 
 pub type PointSegKindHop = HopDef<PointSegSelector, KindSelector>;
 pub type PointSegKindHopCtx = HopDef<PointSegSelectorCtx, KindSelector>;
@@ -949,6 +948,10 @@ impl<P> Display for Pattern<P> where P: Display
     }
 }
 
+
+#[cfg(feature="types2")]
+use crate::types::archetype::Archetype;
+#[cfg(feature="types2")]
 impl <P> Archetype for Pattern<P> where P: Archetype + Into<Pattern<P>>  {
     fn parser<I>(input: I) -> Res<I, Self>
     where
@@ -973,7 +976,7 @@ pub fn to_string_version(self) -> Pattern<String> {
 
 impl<P> Pattern<P>
 where
-P: Archetype +Eq + PartialEq,
+P: Eq + PartialEq,
 {
     pub fn is_any(&self) -> bool {
         match self {
