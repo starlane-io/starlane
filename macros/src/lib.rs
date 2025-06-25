@@ -12,7 +12,7 @@ use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::{
     parse_macro_input, parse_quote, Attribute, Data, DeriveInput, Expr, ExprTuple, File, FnArg,
-    GenericArgument, ImplItem, ItemImpl, ItemMod, ItemTrait, LitStr, Meta, PathArguments,
+    GenericArgument, ImplItem, ItemImpl, ItemMod, ItemTrait, LitStr, Meta, PatType, PathArguments,
     PathSegment, ReturnType, Type, Visibility,
 };
 
@@ -50,7 +50,7 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 ///          /// also we can return any Substance in our Reflected wave
 ///          Ok(format!("Hello, {}", ctx.input.to_string()))
 ///      }
-/// 
+///
 ///      /// if the function returns nothing then an Empty Ok Reflected will be returned unless
 ///      /// the wave type is `Wave<Signal>`
 ///      #[route("Ext<Bye>")]
@@ -1138,6 +1138,63 @@ fn find_attr(name: &'static str, attrs: &Vec<Attribute>) -> Option<Attribute> {
         }
     }
     None
+}
+
+/*
+pub fn expect<O>(
+    f: impl FnMut(Input) -> Res<O>+Copy,
+    ctx: &'static str,
+    expected: &'static str,
+    found: &'static str,
+) -> impl FnMut(Input) -> Res<O> {
+    move |input| {
+        f.context(Ctx::Expected {
+            ctx,
+            expected,
+            found,
+        })
+            .parse(input)
+    }
+}
+ */
+
+#[proc_macro_attribute]
+pub fn push_ctx_for_input(attr: TokenStream, input: TokenStream) -> TokenStream {
+    use syn::Receiver;
+    let mut m0 = parse_macro_input!(input as syn::ImplItemFn);
+    let m1 = m0.clone();
+    let attrs = m1.attrs;
+    let vis = m1.vis;
+    let sig = m1.sig;
+    let ident = m0.sig.ident.clone();
+    let block = m1.block;
+    m0.sig.ident = format_ident!("_{}",sig.ident);
+
+    match sig.inputs.first() {
+        Some(FnArg::Typed(PatType { ty, .. })) => {
+            if "Input" == ty.to_token_stream().to_string().as_str() {
+                let expanded = quote! {
+#sig {
+   expect( |input| #block, "segment", "x", "y" )(i)
+}
+                };
+                
+                print!(
+                    r#"
+*********** push_ctx ***********
+{}
+********************************" 
+    "#,
+                    expanded
+                );
+
+                TokenStream::from(expanded)
+            } else {
+                panic!("2x")
+            }
+        }
+        what => panic!("push_ctx_for_input only works with signature: FnMut(I) -> Res<O>")
+    }
 }
 
 #[test]
