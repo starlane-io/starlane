@@ -180,7 +180,7 @@ pub fn expect<O>(
     ctx: &'static str,
     expected: &'static str,
     found: &'static str,
-) -> impl FnMut(Input) -> Res<O> {
+) -> impl FnMut(Input) -> Res<O>+Copy {
     move |input| {
         f.context(Ctx::Expected {
             ctx,
@@ -194,8 +194,43 @@ pub fn expect<O>(
 
 
 
+/*
+fn segments(ix : Input) -> Res < Vec < Input > >
+{
+    let mut f = move | ix2| 
+        {
+            let mut parser =
+                pair(separated_list1(tag(":"), alpha1 :: < Input, ParseErrs >),
+                     preceded(tag("^").context(Ctx :: Yuk), alpha1));
+            
+            parser.parse(ix2).map(| (next, (segments, extra)) | (next, segments))
+        };
+    
+    expect(f , "segment", "x", "y") (ix)
+}
 
+ */
+
+
+pub fn segments(i: Input) -> Res<Vec<Input>> {
+    let mut parser = pair(
+        separated_list1(tag(":"), alpha1::<Input, ParseErrs>),
+        preceded(tag("^"), alpha1),
+    );
+
+    parser
+        .parse(i)
+        .map(|(next, (segments, extra))| (next, segments))
+}
+
+pub fn x_seg(i: Input) -> Res<Vec<Input>> {
+    expect(segments, "ctx", "expected", "found" )(i).finish()
+}
+
+
+/*
 #[push_ctx_for_input]
+
 pub fn segments(i: Input) -> Res<Vec<Input>> {
     let mut parser = pair(
         separated_list1(tag(":"), alpha1::<Input, ParseErrs>),
@@ -205,32 +240,10 @@ pub fn segments(i: Input) -> Res<Vec<Input>> {
     parser
         .parse(i)
         .map(|(next, (segments, extra))| (next, segments))
-
-    //pair(context("segments",separated_list1(tag(":"),alpha1)),context("yikes",preceded(tag("^"),alpha1)))(i).map(|(next,(segments,_))|(next,segments))
-    //    Err(nom::Err::Failure(NomErr::from_error_kind(i,ErrorKind::Alpha)))
-}
-
-/*
-pub fn convert<'a>(e: StupidErr<'a>) -> VerboseError<&'a str> {
-   let errors = e.errors.iter().map(|(input,kind)|{
-
-       (*input.fragment(),kind.clone())}).collect();
-    VerboseError { errors }
 }
 
  */
 
-/*
-pub fn convert(e: VerboseError<Input>) -> VerboseError<&str> {
-    let errors = e.errors.iter().map(|(input,kind)|{
-
-
-        println!("Kind: {:?}",kind);
-
-
-        (*input.fragment(),kind.clone())}).collect();
-    VerboseError { errors }
-}*/
 
 #[test]
 fn test() {
@@ -253,117 +266,3 @@ fn log(err: ParseErrs) {
             .unwrap();
     }
 }
-
-/*
-pub fn convert_error<'a,I: >(
-    input: I,
-    e: VerboseError<I>,
-) -> String {
-    use std::fmt::Write;
-    use nom::Offset;
-
-    let mut result = String::new();
-
-    for (i, (substring, kind)) in e.errors.iter().enumerate() {
-        let offset = input.offset(substring);
-
-        if input.is_empty() {
-            match kind {
-                VerboseErrorKind::Char(c) => {
-                    write!(&mut result, "{}: expected '{}', got empty input\n\n", i, c)
-                }
-                VerboseErrorKind::Context(s) => write!(&mut result, "{}: in {}, got empty input\n\n", i, s),
-                VerboseErrorKind::Nom(e) => write!(&mut result, "{}: in {:?}, got empty input\n\n", i, e),
-            }
-        } else {
-            let prefix = &input.as_bytes()[..offset];
-
-            // Count the number of newlines in the first `offset` bytes of input
-            let line_number = prefix.iter().filter(|&&b| b == b'\n').count() + 1;
-
-            // Find the line that includes the subslice:
-            // Find the *last* newline before the substring starts
-            let line_begin = prefix
-                .iter()
-                .rev()
-                .position(|&b| b == b'\n')
-                .map(|pos| offset - pos)
-                .unwrap_or(0);
-
-            // Find the full line after that newline
-            let line = input[line_begin..]
-                .lines()
-                .next()
-                .unwrap_or(&input[line_begin..])
-                .trim_end();
-
-            // The (1-indexed) column number is the offset of our substring into that line
-            let column_number = line.offset(substring) + 1;
-
-            match kind {
-                VerboseErrorKind::Char(c) => {
-                    if let Some(actual) = substring.chars().next() {
-                        write!(
-                            &mut result,
-                            "{i}: at line {line_number}:\n\
-               {line}\n\
-               {caret:>column$}\n\
-               expected '{expected}', found {actual}\n\n",
-                            i = i,
-                            line_number = line_number,
-                            line = line,
-                            caret = '^',
-                            column = column_number,
-                            expected = c,
-                            actual = actual,
-                        )
-                    } else {
-                        write!(
-                            &mut result,
-                            "{i}: at line {line_number}:\n\
-               {line}\n\
-               {caret:>column$}\n\
-               expected '{expected}', got end of input\n\n",
-                            i = i,
-                            line_number = line_number,
-                            line = line,
-                            caret = '^',
-                            column = column_number,
-                            expected = c,
-                        )
-                    }
-                }
-                VerboseErrorKind::Context(s) => write!(
-                    &mut result,
-                    "{i}: at line {line_number}, in {context}:\n\
-             {line}\n\
-             {caret:>column$}\n\n",
-                    i = i,
-                    line_number = line_number,
-                    context = s,
-                    line = line,
-                    caret = '^',
-                    column = column_number,
-                ),
-                VerboseErrorKind::Nom(e) => write!(
-                    &mut result,
-                    "{i}: at line {line_number}, in {nom_err:?}:\n\
-             {line}\n\
-             {caret:>column$}\n\n",
-                    i = i,
-                    line_number = line_number,
-                    nom_err = e,
-                    line = line,
-                    caret = '^',
-                    column = column_number,
-                ),
-            }
-        }
-            // Because `write!` to a `String` is infallible, this `unwrap` is fine.
-            .unwrap();
-    }
-
-    result
-}
-
- */

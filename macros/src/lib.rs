@@ -1160,7 +1160,6 @@ pub fn expect<O>(
 
 #[proc_macro_attribute]
 pub fn push_ctx_for_input(attr: TokenStream, input: TokenStream) -> TokenStream {
-    use syn::Receiver;
     let mut m0 = parse_macro_input!(input as syn::ImplItemFn);
     let m1 = m0.clone();
     let attrs = m1.attrs;
@@ -1175,7 +1174,7 @@ pub fn push_ctx_for_input(attr: TokenStream, input: TokenStream) -> TokenStream 
             if "Input" == ty.to_token_stream().to_string().as_str() {
                 let expanded = quote! {
 #sig {
-   expect( |input| #block, "segment", "x", "y" )(i)
+   expect( move |input| #block, "segment", "x", "y" )(i)
 }
                 };
                 
