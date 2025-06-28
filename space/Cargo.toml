@@ -41,7 +41,8 @@ repository.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default=["std","types2"]
+default=["std","chumsky","types2"]
+chumsky=[]
 types2=["parse2"]
 parse2=[]
 std=[]
@@ -71,6 +72,7 @@ dashmap = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true }
 
+chumsky= { workspace = true }
 ariadne = { workspace = true }
 nom = { workspace = true }
 nom-supreme = { workspace = true }
@@ -90,6 +92,7 @@ cliclack = { workspace = true }
 derive_builder = { workspace = true }
 derive-name = { workspace = true }
 md5 = { workspace = true }
+regex = "1.11.1"
 
 [dev-dependencies]
 #dummy = { workspace = true }
