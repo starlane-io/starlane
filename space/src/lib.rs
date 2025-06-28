@@ -130,6 +130,7 @@ pub(crate) mod lib {
     #[cfg(not(no_core_num_saturating))]
     pub use self::core::num::Saturating;
 }
+
 pub mod artifact;
 pub mod asynch;
 pub mod command;
@@ -140,6 +141,9 @@ pub mod frame;
 pub mod hyper;
 pub mod kind;
 pub mod parse;
+
+pub mod pest;
+
 pub mod particle;
 pub mod wave;
 
@@ -161,6 +165,7 @@ pub mod status;
 
 pub mod cache;
 pub mod fetch;
+
 
 #[cfg(not(feature = "types2"))]
 mod types1;

@@ -41,9 +41,9 @@ repository.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
+default=["std","types2"]
 types2=["parse2"]
 parse2=[]
-default=["std"]
 std=[]
 test=[]
 
@@ -64,6 +64,8 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
+pest = { workspace = true }
+pest_derive = { workspace = true }
 ascii = { workspace = true }
 url = { workspace = true, features = ["serde"] }
 serde_with_macros = { workspace = true }

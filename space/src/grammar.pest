@@ -1,0 +1,13 @@
+
+
+
+upper = { 'A'..'Z' }
+lower = { 'a'..'z' }
+
+camel_case = { upper{1} ~ ASCII_ALPHANUMERIC+ }
+skewer_case= { lower{1} ~ lower+ }
+
+
+
+my = { SOI ~ camel_case~ EOI }
+
