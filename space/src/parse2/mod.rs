@@ -223,9 +223,7 @@ pub fn segments(i: Input) -> Res<Vec<Input>> {
         .map(|(next, (segments, extra))| (next, segments))
 }
 
-pub fn x_seg(i: Input) -> Res<Vec<Input>> {
-    expect(segments, "ctx", "expected", "found" )(i).finish()
-}
+
 
 
 /*

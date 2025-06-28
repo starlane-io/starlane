@@ -182,6 +182,9 @@ pub mod parse2;
 
 pub mod test;
 
+#[cfg(feature = "chumsky")]
+mod chumsky;
+
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
 
