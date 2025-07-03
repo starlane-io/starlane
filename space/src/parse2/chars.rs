@@ -54,6 +54,10 @@ mod recognize {
         recognize(tag("-"))(input)
     }
 
+    pub fn newline(input: Input) -> Res<Input> {
+        recognize(tag("\n"))(input)
+    }
+
     pub fn underscore(input: Input) -> Res<Input> {
         recognize(tag("_"))(input)
     }
