@@ -1,10 +1,15 @@
+mod chars;
+mod primitive;
+mod scaffold;
+mod token;
+mod err;
+
 use crate::parse::util::{preceded, Span};
 use ariadne::{Label, Report, ReportKind, Source};
-use cliclack::input;
 use nom::character::complete::alpha1;
 use nom::combinator::all_consuming;
 use nom::error::{
-    convert_error, ErrorKind, FromExternalError, ParseError, VerboseError, VerboseErrorKind,
+    ErrorKind, FromExternalError, ParseError,
 };
 use nom::multi::separated_list1;
 use nom::sequence::pair;
@@ -16,14 +21,12 @@ use std::fmt::{Debug, Formatter};
 use std::ops::Range;
 use nom::bytes::complete::tag;
 use strum_macros::{Display, EnumString};
-//use nom_supreme::tag::complete::tag;
-use nom_supreme::context;
 use nom_supreme::final_parser::ExtractContext;
 use nom_supreme::tag::TagError;
 use thiserror::Error;
-use starlane_macros::{push_ctx_for_input};
 
 type Input<'a> = LocatedSpan<&'a str, ParseOpRef<'a>>;
+
 
 /// `op` is a helpful name of this parse operation i.e. `BindConf`,`PackConf` ...
 pub fn new(op: impl ToString, data: &str) -> ParseOp {
@@ -133,17 +136,26 @@ pub enum ErrKind {
     Context(Ctx),
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone, EnumString, Error)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone, EnumString, Display)]
 pub enum Ctx {
-    #[error("Yuk")]
-    Yuk,
-    #[error("parsing expected '{ctx}' ")]
-    Expected {
-        ctx: &'static str,
-        expected: &'static str,
-        found: &'static str,
-    },
+    #[strum(to_string="upper case alphabetic character")]
+    UpperCaseChar,
+    #[strum(to_string="lower case alphabetic character")]
+    LowerCaseChar,   
+    #[strum(to_string="Camel Case")]
+    CamelCase,
+    #[strum(to_string="Skewer Case")]
+    SkewerCase,
+    #[strum(to_string="Snake Case")]
+    SnakeCase,
+    #[strum(to_string="Type")]
+    Type,
+    #[strum(to_string="Class")]
+    Class,
+    #[strum(to_string="Data")]
+    Data 
 }
+
 impl<'a> ParseError<Input<'a>> for ParseErrs<'a> {
     fn from_error_kind(input: Input<'a>, kind: ErrorKind) -> Self {
         Self {
@@ -175,25 +187,6 @@ impl<'a> TagError<Input<'a>, Ctx> for ParseErrs<'a> {
     }
 }
 
-pub fn expect<O>(
-    f: impl FnMut(Input) -> Res<O>+Copy,
-    ctx: &'static str,
-    expected: &'static str,
-    found: &'static str,
-) -> impl FnMut(Input) -> Res<O>+Copy {
-    move |input| {
-        f.context(Ctx::Expected {
-            ctx,
-            expected,
-            found,
-        })
-        .parse(input)
-    }
-}
-
-
-
-
 /*
 fn segments(ix : Input) -> Res < Vec < Input > >
 {
@@ -223,8 +216,8 @@ pub fn segments(i: Input) -> Res<Vec<Input>> {
         .map(|(next, (segments, extra))| (next, segments))
 }
 
-pub fn x_seg(i: Input) -> Res<Vec<Input>> {
-    expect(segments, "ctx", "expected", "found" )(i).finish()
+pub fn camel(input: Input) -> Res<String> {
+    chars::camel(input).map(|(next,rtn)|(next, rtn.to_string()))
 }
 
 
@@ -243,6 +236,7 @@ pub fn segments(i: Input) -> Res<Vec<Input>> {
 }
 
  */
+
 
 
 #[test]

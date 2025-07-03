@@ -7,7 +7,7 @@ use crate::parse::{lex_block, Res};
 use crate::point::Point;
 use crate::selector::Pattern;
 use crate::types::class::Class;
-use crate::types::data::Data;
+use crate::types::data::DataType;
 use crate::types::scope::Scope;
 use crate::types::specific::{SpecificLoc, SpecificSelector};
 use archetype::Archetype;
@@ -61,7 +61,7 @@ pub mod package;
 ))]
 pub enum Type {
     Class(Class),
-    Data(Data),
+    Data(DataType),
 }
 
 impl Type {
@@ -113,7 +113,7 @@ impl TypeDisc {
     {
         match self {
             TypeDisc::Class => |i| Class::parser(i).map(|(next, r#type)| (next, r#type.into())),
-            TypeDisc::Data => |i| Data::parser(i).map(|(next, r#type)| (next, r#type.into())),
+            TypeDisc::Data => |i| DataType::parser(i).map(|(next, r#type)| (next, r#type.into())),
         }
     }
 }
@@ -124,8 +124,8 @@ impl From<Class> for Type {
     }
 }
 
-impl From<Data> for Type {
-    fn from(value: Data) -> Self {
+impl From<DataType> for Type {
+    fn from(value: DataType) -> Self {
         Type::Data(value)
     }
 }
@@ -228,7 +228,7 @@ impl<Scope, T, Specific> TryInto<Scaffold<Scope, T, Specific>>
     for AbsoluteLex<Scope, Specific>
 where
     Scope: Archetype + Default,
-    T: From<Class> + From<Data> + Archetype,
+    T: From<Class> + From<DataType> + Archetype,
     Specific: Archetype + for<'y> Deserialize<'y>
 {
     type Error = ParseErrs0;
@@ -240,7 +240,7 @@ where
                 class.into()
             }
             TypeDisc::Data => {
-                let data: Data = self.r#absolute.r#type.into();
+                let data: DataType = self.r#absolute.r#type.into();
                 data.into()
             }
         };
@@ -273,7 +273,7 @@ where
                 class.into()
             }
             TypeDisc::Data => {
-                let data: Data = self.r#absolute.r#type.into();
+                let data: DataType = self.r#absolute.r#type.into();
                 data.into()
             }
         };
@@ -286,7 +286,7 @@ where
 impl<Scope, T, Specific> Into<CategoryGeneric<Scope, T>> for AbsoluteLex<Scope, Specific>
 where
     Scope: Archetype + Default,
-    T: From<Class> + From<Data> + Clone,
+    T: From<Class> + From<DataType> + Clone,
     Specific: Archetype + Clone,
 {
     fn into(self) -> CategoryGeneric<Scope, T> {
@@ -296,7 +296,7 @@ where
                 class.into()
             }
             TypeDisc::Data => {
-                let data: Data = self.r#absolute.r#type.into();
+                let data: DataType = self.r#absolute.r#type.into();
                 data.into()
             }
         };
@@ -417,7 +417,7 @@ where
     }
 }
 
-impl<Scope, Specific> Scaffold<Scope, Data, Specific>
+impl<Scope, Specific> Scaffold<Scope, DataType, Specific>
 where
     Scope: Archetype + Default,
     Specific: Archetype,
@@ -477,7 +477,7 @@ struct SrcDef<Point, Kind> {
 
 pub type PointKindDefSrc<Kind> = SrcDef<Point, Kind>;
 
-pub type DataPoint = PointTypeDef<Point, Data>;
+pub type DataPoint = PointTypeDef<Point, DataType>;
 
 /// meaning where does this Type definition come from
 /// * [DefSrc::Builtin] indicates a definition native to Starlane
@@ -503,7 +503,7 @@ pub enum TagWrap<S, T> {
 
 
 pub type ClassPointRef = Ref<Point, Class>;
-pub type SchemaPointRef = Ref<Point, Data>;
+pub type SchemaPointRef = Ref<Point, DataType>;
 pub type ParsePointRef<G: Archetype> = Ref<Point, G>;
 pub type ExactPointRef = Ref<Point, Absolute>;
 
@@ -542,7 +542,7 @@ pub mod test2 {
     use crate::types::specific::SpecificLoc;
     use crate::types::{Absolute, AbsoluteLex, CategoryGeneric, Type};
     use nom::Parser;
-    use starlane_space::types::data::Data;
+    use starlane_space::types::data::DataType;
     use std::str::FromStr;
 
     #[test]
@@ -592,7 +592,7 @@ pub mod test2 {
         let i = new_span("[BindConfig]");
         let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
         let cat: CategoryGeneric<Scope, Type> = lex.try_into().unwrap();
-        assert_eq!(cat.r#type, Type::Data(Data::BindConfig));
+        assert_eq!(cat.r#type, Type::Data(DataType::BindConfig));
     }
 
     #[test]
@@ -607,7 +607,7 @@ pub mod test2 {
         let i = new_span("[BindConfig@contrib:package:1.0.0]");
         let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
         let full: Absolute = lex.try_into().unwrap();
-        assert_eq!(full.r#type, Type::Data(Data::BindConfig));
+        assert_eq!(full.r#type, Type::Data(DataType::BindConfig));
         assert_eq!(full.scope, Scope::default());
         assert_eq!(full.specific.to_string().as_str(), "contrib:package:1.0.0");
     }
@@ -624,7 +624,7 @@ pub mod test2 {
         let i = new_span("[my::BindConfig@contrib:package:1.0.0]");
         let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
         let full: Absolute = lex.try_into().unwrap();
-        assert_eq!(full.r#type, Type::Data(Data::BindConfig));
+        assert_eq!(full.r#type, Type::Data(DataType::BindConfig));
         assert_eq!(full.scope.to_string().as_str(), "my");
         assert_eq!(full.specific.to_string().as_str(), "contrib:package:1.0.0");
     }

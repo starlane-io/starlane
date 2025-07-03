@@ -41,9 +41,9 @@ repository.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
+default=["std","types2"]
 types2=["parse2"]
 parse2=[]
-default=["std"]
 std=[]
 test=[]
 
