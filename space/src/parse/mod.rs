@@ -1776,7 +1776,7 @@ impl Deref for SkewerCase {
     type Target = String;
 
     fn deref(&self) -> &Self::Target {
-        &self.string
+        &self.0
     }
 }
 
@@ -5014,6 +5014,7 @@ pub mod model {
         #[error("angle")]
         Angle,
     }
+    
 
     impl NestedBlockKind {
         pub fn is_block_terminator(c: char) -> bool {
@@ -7835,7 +7836,7 @@ impl Serialize for SnakeCase{
     where
         S: Serializer,
     {
-        serializer.serialize_str(self.string.as_str())
+        serializer.serialize_str(self.0.as_str())
     }
 }
 
@@ -7864,7 +7865,7 @@ impl FromStr for SnakeCase {
 
 impl Display for SnakeCase {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.string.as_str())
+        f.write_str(self.0.as_str())
     }
 }
 
@@ -7872,7 +7873,7 @@ impl Deref for SnakeCase {
     type Target = String;
 
     fn deref(&self) -> &Self::Target {
-        &self.string
+        &self.0
     }
 }
 
