@@ -27,13 +27,17 @@ use thiserror::Error;
 
 type Input<'a> = LocatedSpan<&'a str, ParseOpRef<'a>>;
 
+pub fn range(input: Input) -> Range<usize> {
+    input.location_offset()..input.fragment().len() 
+}
+
 
 /// `op` is a helpful name of this parse operation i.e. `BindConf`,`PackConf` ...
 pub fn new(op: impl ToString, data: &str) -> ParseOp {
     ParseOp::new(op.to_string(), data)
 }
 
-pub type Res<'a, O> = IResult<Input<'a>, O, ParseErrs<'a>>;
+pub type Res<'a, O> = IResult<Input<'a>, O, ParseErrs>;
 
 pub trait Operation {}
 pub struct ParseOperationDef<'a, N, S> {
@@ -113,14 +117,19 @@ impl<'a> Clone for ParseOpRef<'a> {
     }
 }
 
-struct ParseErrs<'a> {
-    pub errors: Vec<(Input<'a>, ErrKind)>,
+struct ParseErrsFinal {
+    pub string: String,
+    pub errors: Vec<(Range<usize>, ErrKind)>,
 }
 
-impl Debug for ParseErrs<'_> {
+struct ParseErrs {
+    pub errors: Vec<(Range<usize>, ErrKind)>,
+}
+
+impl Debug for ParseErrs {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for (input, error) in &self.errors {
-            write!(f, "{} in {}", error, input)?;
+            write!(f, "{} in {}..{}", error, input.start, input.end)?;
         }
         Ok(())
     }
@@ -156,32 +165,32 @@ pub enum Ctx {
     Data 
 }
 
-impl<'a> ParseError<Input<'a>> for ParseErrs<'a> {
+impl<'a> ParseError<Input<'a>> for ParseErrs {
     fn from_error_kind(input: Input<'a>, kind: ErrorKind) -> Self {
         Self {
-            errors: vec![(input, ErrKind::Nom(kind))],
+            errors: vec![(range(input), ErrKind::Nom(kind))],
         }
     }
 
     fn append(input: Input<'a>, kind: ErrorKind, mut other: Self) -> Self {
-        other.errors.push((input, ErrKind::Nom(kind)));
+        other.errors.push((range(input), ErrKind::Nom(kind)));
         other
     }
 
     fn from_char(input: Input<'a>, c: char) -> Self {
         Self {
-            errors: vec![(input, ErrKind::Char(c))],
+            errors: vec![(range(input), ErrKind::Char(c))],
         }
     }
 }
-impl<'a> ContextError<Input<'a>, Ctx> for ParseErrs<'a> {
+impl<'a> ContextError<Input<'a>, Ctx> for ParseErrs {
     fn add_context(input: Input<'a>, err: Ctx, mut other: Self) -> Self {
-        other.errors.push((input, ErrKind::Context(err)));
+        other.errors.push((range(input), ErrKind::Context(err)));
         other
     }
 }
 
-impl<'a> TagError<Input<'a>, Ctx> for ParseErrs<'a> {
+impl<'a> TagError<Input<'a>, Ctx> for ParseErrs {
     fn from_tag(input: Input<'a>, tag: Ctx) -> Self {
         todo!()
     }
@@ -248,15 +257,18 @@ fn test() {
 }
 
 fn log(err: ParseErrs) {
-    for (input, err) in err.errors {
-        Report::build(ReportKind::Error, 0..input.extra.data().len())
+    todo!()
+    /*
+    for (range, err) in err.errors {
+        Report::build(ReportKind::Error, range.clone())
             .with_message(err.to_string())
             .with_label(
-                Label::new(input.location_offset()..input.len())
+                Label::new(range)
                     .with_message("This is of type Nat"),
             )
             .finish()
-            .print(Source::from(input.extra.data()))
+            .print(Source::from(range.extra.data()))
             .unwrap();
-    }
+     */
+    
 }

@@ -544,6 +544,7 @@ pub mod test2 {
     use nom::Parser;
     use starlane_space::types::data::DataType;
     use std::str::FromStr;
+    use crate::types::data::Config;
 
     #[test]
     pub fn test_specific() {
@@ -592,7 +593,7 @@ pub mod test2 {
         let i = new_span("[BindConfig]");
         let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
         let cat: CategoryGeneric<Scope, Type> = lex.try_into().unwrap();
-        assert_eq!(cat.r#type, Type::Data(DataType::BindConfig));
+        assert_eq!(cat.r#type, Type::Data(DataType::Config));
     }
 
     #[test]
@@ -607,7 +608,7 @@ pub mod test2 {
         let i = new_span("[BindConfig@contrib:package:1.0.0]");
         let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
         let full: Absolute = lex.try_into().unwrap();
-        assert_eq!(full.r#type, Type::Data(DataType::BindConfig));
+        assert_eq!(full.r#type, Type::Data(DataType::Config));
         assert_eq!(full.scope, Scope::default());
         assert_eq!(full.specific.to_string().as_str(), "contrib:package:1.0.0");
     }
@@ -624,7 +625,7 @@ pub mod test2 {
         let i = new_span("[my::BindConfig@contrib:package:1.0.0]");
         let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
         let full: Absolute = lex.try_into().unwrap();
-        assert_eq!(full.r#type, Type::Data(DataType::BindConfig));
+        assert_eq!(full.r#type, Type::Data(DataType::Config));
         assert_eq!(full.scope.to_string().as_str(), "my");
         assert_eq!(full.specific.to_string().as_str(), "contrib:package:1.0.0");
     }
