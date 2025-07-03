@@ -14,7 +14,7 @@ use nom::sequence::delimited;
 use nom::bytes::complete::tag;
 use std::fmt::Display;
 use crate::types::archetype::Archetype;
-use crate::types::data::Data;
+use crate::types::data::DataType;
 
 pub mod case {
 
@@ -63,7 +63,7 @@ pub fn unwrap_abstract<I>(input: I) -> Res<I, Type> where I: Span {
     let (next,r#abstract) = identify_abstract_disc(input.clone())?;
     match r#abstract {
         TypeDisc::Class => into(Class::delimited_parser(Class::parser))(input),
-        TypeDisc::Data => into(Data::delimited_parser(Data::parser))(input)
+        TypeDisc::Data => into(DataType::delimited_parser(DataType::parser))(input)
     }
 }
 
@@ -72,7 +72,7 @@ pub fn class<I: Span>(input: I) -> Res<I, Class> {
     from_camel(input)
 }
 
-pub fn data<I: Span>(input: I) -> Res<I, Data> {
+pub fn data<I: Span>(input: I) -> Res<I, DataType> {
     from_camel(input)
 }
 
@@ -86,7 +86,7 @@ pub mod delim {
     use nom_supreme::tag::complete::tag;
     use crate::types::parse::Delimited;
     use std::str::FromStr;
-    use crate::types::data::Data;
+    use crate::types::data::DataType;
 
     pub fn delim<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
     where
@@ -134,7 +134,7 @@ pub mod delim {
         let s = "[Text]";
         let i = new_span(s);
         let text = result(delim(data)(i)).unwrap();
-        assert_eq!(text, Data::Text);
+        assert_eq!(text, DataType::Text);
     }
 
     #[test]

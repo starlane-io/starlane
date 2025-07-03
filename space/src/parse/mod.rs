@@ -97,6 +97,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
+use cliclack::Validate;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
@@ -1531,13 +1532,15 @@ pub fn consume_path<I: Span>(input: I) -> Res<I, I> {
 #[derive(
     Debug, Clone, Eq, PartialEq, Hash, SerializeDisplay, DeserializeFromStr, derive_name::Name,
 )]
-pub struct CamelCase {
-    string: String,
-}
+pub struct CamelCase(pub(crate) String);
 
 impl CamelCase {
+    pub(crate) fn new(string: String) -> Self {
+        Self(string)
+    }
+    
     pub fn as_str(&self) -> &str {
-        self.string.as_str()
+        self.0.as_str()
     }
 }
 
@@ -1581,7 +1584,7 @@ impl<'de> Deserialize<'de> for CamelCase {
 
 impl Display for CamelCase {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.string.as_str())
+        f.write_str(self.0.as_str())
     }
 }
 
@@ -1589,7 +1592,7 @@ impl Deref for CamelCase {
     type Target = String;
 
     fn deref(&self) -> &Self::Target {
-        &self.string
+        &self.0
     }
 }
 
@@ -1655,17 +1658,24 @@ impl Deref for Domain {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct SkewerCase {
-    string: String,
+pub struct SkewerCase(String);
+
+impl SkewerCase {
+    pub(crate) fn new(string: String) -> Self {
+        Self(string)
+    }
 }
 
 
 
 
-
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct SnakeCase {
-    string: String,
+pub struct SnakeCase(String);
+
+impl SnakeCase {
+    pub(crate) fn new(string: String) -> Self {
+        Self(string)
+    }
 }
 
 pub type DbCase = VarCase;
@@ -1729,7 +1739,7 @@ impl Serialize for SkewerCase {
     where
         S: Serializer,
     {
-        serializer.serialize_str(self.string.as_str())
+        serializer.serialize_str(self.0.as_str())
     }
 }
 
@@ -1758,7 +1768,7 @@ impl FromStr for SkewerCase {
 
 impl Display for SkewerCase {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.string.as_str())
+        f.write_str(self.0.as_str())
     }
 }
 
@@ -1790,23 +1800,17 @@ pub fn from_skewer<I,O>(input:I) -> Res<I,O> where I: Span, O: From<SkewerCase>{
 }
 
 pub fn camel_case<I: Span>(input: I) -> Res<I, CamelCase> {
+    
     context("expect-camel-case", camel_case_chars)(input).map(|(next, camel_case_chars)| {
-        (
-            next,
-            CamelCase {
-                string: camel_case_chars.to_string(),
-            },
-        )
-    })
+        ( next, CamelCase(camel_case_chars.to_string()))
+        })
 }
 
 pub fn skewer_case<I: Span>(input: I) -> Res<I, SkewerCase> {
     context("expect-skewer-case", skewer_case_chars)(input).map(|(next, skewer_case_chars)| {
         (
             next,
-            SkewerCase {
-                string: skewer_case_chars.to_string(),
-            },
+            SkewerCase(skewer_case_chars.to_string())
         )
     })
 }
@@ -1815,10 +1819,7 @@ pub fn snake_case<I: Span>(input: I) -> Res<I, SnakeCase> {
     context("expect-snake-case", skewer_case_chars)(input).map(|(next, chars)| {
         (
             next,
-            SnakeCase{
-                string: chars.to_string(),
-            },
-        )
+            SnakeCase(chars.to_string()))
     })
 }
 
