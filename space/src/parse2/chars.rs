@@ -1,44 +1,37 @@
+use crate::parse::util::recognize;
+use crate::parse::{CamelCase, SkewerCase, SnakeCase};
+use crate::parse2::chars::recognize::{
+    lower1, lower_alphanumeric_plus_dash0, lower_alphanumeric_plus_underscore0, upper1,
+};
+use crate::parse2::token::Ident;
+use crate::parse2::{Ctx, Input, Res};
 use nom::branch::alt;
 use nom::character::complete::alphanumeric0;
 use nom::character::streaming::alphanumeric1;
-use nom::combinator::into;
+use nom::combinator::{into, value};
 use nom::multi::many1;
 use nom::sequence::pair;
-use crate::parse2::{Ctx, Input, Res};
-use crate::parse2::chars::recognize::{lower1, lower_alphanumeric_plus_dash0, lower_alphanumeric_plus_underscore0, upper1};
-use crate::parse::{CamelCase, SkewerCase, SnakeCase};
-use crate::parse2::token::Ident;
-use crate::parse::util::recognize;
 
 pub fn camel(input: Input) -> Res<CamelCase> {
-    recognize::camel(input).map( |(next,rtn)|
-                                     (next,CamelCase::new(rtn.to_string()))
-    )
+    recognize::camel(input).map(|(next, rtn)| (next, CamelCase::new(rtn.to_string())))
 }
 
 pub fn skewer(input: Input) -> Res<SkewerCase> {
-    recognize::skewer(input).map( |(next,rtn)|
-        (next,SkewerCase::new(rtn.to_string()))
-    )
+    recognize::skewer(input).map(|(next, rtn)| (next, SkewerCase::new(rtn.to_string())))
 }
 
 pub fn snake(input: Input) -> Res<SnakeCase> {
-    recognize::camel(input).map( |(next,rtn)|
-        (next,SnakeCase::new(rtn.to_string()))
-    )
+    recognize::camel(input).map(|(next, rtn)| (next, SnakeCase::new(rtn.to_string())))
 }
-
-
 
 fn undefined(input: Input) -> Res<Input> {
     use recognize::*;
-    recognize(many1(alt((alphanumeric1,dash,underscore))))(input)
+    recognize(many1(alt((alphanumeric1, dash, underscore))))(input)
 }
 
-pub fn ident(input: Input ) -> Res<Ident> {
-    alt((into(camel),into(skewer),into(snake),into(undefined)))(input)
+pub fn ident(input: Input) -> Res<Ident> {
+    alt((into(camel), into(skewer), into(snake)))(input)
 }
-
 
 mod recognize {
     use crate::parse::util::recognize;
@@ -78,7 +71,6 @@ mod recognize {
         recognize(alt((lower1, tag("-"))))(input)
     }
 
-
     pub fn lower_alphanumeric_plus_underscore0(input: Input) -> Res<Input> {
         recognize(opt(alt((lower1, tag("_")))))(input)
     }
@@ -98,6 +90,4 @@ mod recognize {
     pub fn snake(input: Input) -> Res<Input> {
         recognize(pair(lower1, lower_alphanumeric_plus_underscore0).context(Ctx::SkewerCase))(input)
     }
-    
-
 }

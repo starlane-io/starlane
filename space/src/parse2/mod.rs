@@ -1,62 +1,178 @@
-<<<<<<< HEAD
-=======
 mod chars;
+mod err;
 mod primitive;
 mod scaffold;
 mod token;
-mod err;
 
-use std::error::Error;
->>>>>>> dbdd566f (fixing context errors)
-use crate::parse::util::{preceded, Span};
+use crate::parse2::token::{Token, TokenKind};
+use anyhow::__private::kind::AdhocKind;
 use ariadne::{Label, Report, ReportKind, Source};
-use cliclack::input;
-use nom::character::complete::alpha1;
-use nom::combinator::all_consuming;
-use nom::error::{
-    convert_error, ErrorKind, FromExternalError, ParseError, VerboseError, VerboseErrorKind,
-};
-use nom::multi::separated_list1;
-use nom::sequence::pair;
+use ascii::AsciiStr;
+use itertools::Itertools;
+use nom::error::{ErrorKind, FromExternalError, ParseError};
 use nom::{Compare, Finish, IResult, InputLength, InputTake, Offset, Parser};
 use nom_locate::LocatedSpan;
 use nom_supreme::context::ContextError;
-use nom_supreme::parser_ext::ParserExt;
-use std::fmt::{Debug, Display, Formatter};
-use std::ops::Range;
-use nom::bytes::complete::tag;
-use strum_macros::{Display, EnumString};
-//use nom_supreme::tag::complete::tag;
-use nom_supreme::context;
+use nom_supreme::error::{BaseErrorKind, GenericErrorTree};
 use nom_supreme::final_parser::ExtractContext;
+use nom_supreme::parser_ext::ParserExt;
 use nom_supreme::tag::TagError;
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut, Range};
+use strum_macros::{Display, EnumString};
 use thiserror::Error;
-<<<<<<< HEAD
-use starlane_macros::{push_ctx_for_input};
 
 type Input<'a> = LocatedSpan<&'a str, ParseOpRef<'a>>;
 
-=======
-use nom_supreme::error::{ErrorTree, BaseErrorKind, Expectation, GenericErrorTree};
-type Input<'a> = LocatedSpan<&'a str, ParseOpRef<'a>>;
-
-pub fn range(input: &Input) -> Range<usize> {
-    input.location_offset()..input.fragment().len() 
+/*
+/// a wrapper for [LocatedSpan] with some convenience methods like [Self::range]
+#[derive( Debug, Clone )]
+pub struct Input<'a> {
+    span: Span<'a>,
 }
 
+ */
 
->>>>>>> dbdd566f (fixing context errors)
+pub fn range<'a>(input: &'a Input<'a>) -> Range<usize> {
+    let offset = Input::location_offset(input);
+    let len = Input::fragment(input).len();
+    offset..(offset + len)
+}
+
 /// `op` is a helpful name of this parse operation i.e. `BindConf`,`PackConf` ...
 pub fn parse_operation(op: impl ToString, data: &str) -> ParseOp {
     ParseOp::new(op.to_string(), data)
 }
 
-<<<<<<< HEAD
-=======
+pub type ErrTree<'a> =
+    GenericErrorTree<Input<'a>, &'static str, Ctx, Box<dyn Error + Send + Sync + 'static>>;
 
-pub type ParseErrs<'a> = GenericErrorTree<Input<'a>, &'static str, Ctx, Box<dyn Error + Send + Sync + 'static>>;
->>>>>>> dbdd566f (fixing context errors)
-pub type Res<'a, O> = IResult<Input<'a>, O, ParseErrs<'a>>;
+fn to_err(input: Input, message: impl ToString) -> nom::Err<ErrTree> {
+    nom::Err::Failure(ErrTree::from_external_error(
+        input,
+        ErrorKind::Alpha,
+        message.to_string(),
+    ))
+}
+
+pub type Res<'a, O> = IResult<Input<'a>, O, ErrTree<'a>>;
+pub type TokenRes<'a> = Res<'a, Token<'a>>;
+
+pub type ParseErrsTree<'a> = ParseErrsDef<&'a str, ErrTree<'a>>;
+pub type ParseErrs<'a> = ParseErrsDef<&'a str, Vec<UnitErrDef<Input<'a>, ErrKind>>>;
+pub type ParseErrsOwned = ParseErrsDef<String, Vec<UnitErrDef<Range<usize>, ErrKind>>>;
+
+#[derive(Debug, Clone)]
+pub struct ParseErrsDef<D, E> {
+    data: D,
+    errors: E,
+}
+
+impl<D, E> ParseErrsDef<D, E>
+where
+    E: Default,
+{
+    pub fn new(data: D) -> Self {
+        Self {
+            data,
+            errors: Default::default(),
+        }
+    }
+}
+
+impl<D, E> Display for ParseErrsDef<D, E> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl<'a, D, K> From<UnitErrDef<D, K>> for ErrRange
+where
+    D: Debug + Clone + Into<Range<usize>>,
+    K: Into<ErrKind> + Debug + Clone,
+{
+    fn from(err: UnitErrDef<D, K>) -> Self {
+        Self {
+            range: err.span.into(),
+            kind: err.kind.into(),
+        }
+    }
+}
+
+impl<'a> From<ParseErrs<'a>> for ParseErrsOwned {
+    fn from(errs: ParseErrs<'a>) -> Self {
+        let data = errs.data.into();
+        let errors = errs
+            .errors
+            .into_iter()
+            .map(|e| UnitErrDef {
+                span: range(&e.span),
+                kind: e.kind,
+            })
+            .collect_vec();
+        Self { data, errors }
+    }
+}
+
+pub type TokenErrKindRef<'a> = TokenErrKindDef<Input<'a>>;
+pub type TokenErrKind = TokenErrKindDef<ErrRange>;
+
+#[derive(Error, Debug, Clone)]
+pub enum TokenErrKindDef<S>
+where
+    S: Debug + Clone,
+{
+    #[error("Illegal cast. '{from}' cannot be cast into: '{to}'")]
+    IllegalCast { from: TokenKind, to: TokenKind },
+    #[error("PhantomData to make generics work on TokenErrsDef<S> Enum. nothing to see here... ")]
+    _Phantom(PhantomData<S>),
+}
+
+pub type UnitErrRef<'a> = UnitErrDef<Input<'a>, TokenErrKindRef<'a>>;
+
+#[derive(Debug, Clone)]
+pub struct UnitErrDef<I, K> {
+    span: I,
+    kind: K,
+}
+
+#[derive(Debug, Clone)]
+pub struct ErrRangeDef<K>
+where
+    K: Debug + Clone,
+{
+    pub range: Range<usize>,
+    pub kind: K,
+}
+
+impl<K> ErrRangeDef<K>
+where
+    K: Debug + Clone,
+{
+    pub fn new(range: Range<usize>, kind: K) -> Self {
+        Self { range, kind }
+    }
+}
+
+pub type ErrRange = ErrRangeDef<ErrKind>;
+
+pub type TokenErr<'a> = UnitErrDef<Input<'a>, TokenErrKindRef<'a>>;
+
+impl<'a> Deref for ParseErrsTree<'a> {
+    type Target = ErrTree<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.errors
+    }
+}
+
+impl<'a> DerefMut for ParseErrsTree<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.errors
+    }
+}
 
 pub trait Operation {}
 pub struct ParseOperationDef<'a, N, S> {
@@ -120,8 +236,8 @@ impl<'a> ParseOpRef<'a> {
     /// become robust over time.  Since the [ParseOpRef] is integral
     /// in managing parse errors it's a little hard to do proper error
     /// [Result] on the error system!
-    fn slice(& self, range: Range<usize>) -> Self {
-        let stack = & self.stack[range];
+    fn slice(&self, range: Range<usize>) -> Self {
+        let stack = &self.stack[range];
         Self {
             name: self.name,
             stack,
@@ -136,13 +252,6 @@ impl<'a> Clone for ParseOpRef<'a> {
     }
 }
 
-struct ParseErrs<'a> {
-    pub errors: Vec<(Input<'a>, ErrKind)>,
-}
-
-<<<<<<< HEAD
-impl Debug for ParseErrs<'_> {
-=======
 /*
 struct ParseErrs {
     pub errors: Vec<(Range<usize>, ErrKind)>,
@@ -161,10 +270,9 @@ impl ParseErrs {
 }
 
 impl Debug for ParseErrs {
->>>>>>> dbdd566f (fixing context errors)
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for (input, error) in &self.errors {
-            write!(f, "{} in {}", error, input)?;
+            write!(f, "{} in {}..{}", error, input.start, input.end)?;
         }
         Ok(())
     }
@@ -194,131 +302,92 @@ impl Display for ErrorKindWrap {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone, EnumString, Error)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone, EnumString, Display)]
 pub enum Ctx {
-<<<<<<< HEAD
-    #[error("Yuk")]
-    Yuk,
-    #[error("parsing expected '{ctx}' ")]
-    Expected {
-        ctx: &'static str,
-        expected: &'static str,
-        found: &'static str,
-    },
-}
-impl<'a> ParseError<Input<'a>> for ParseErrs<'a> {
-=======
     Token,
-    #[strum(to_string="upper case alphabetic character")]
+    #[strum(to_string = "upper case alphabetic character")]
     UpperCaseChar,
-    #[strum(to_string="lower case alphabetic character")]
-    LowerCaseChar,   
-    #[strum(to_string="Camel Case")]
+    #[strum(to_string = "lower case alphabetic character")]
+    LowerCaseChar,
+    #[strum(to_string = "Camel Case")]
     CamelCase,
-    #[strum(to_string="Skewer Case")]
+    #[strum(to_string = "Skewer Case")]
     SkewerCase,
-    #[strum(to_string="Snake Case")]
+    #[strum(to_string = "Snake Case")]
     SnakeCase,
-    #[strum(to_string="Type")]
+    #[strum(to_string = "Type")]
     Type,
-    #[strum(to_string="Class")]
+    #[strum(to_string = "Class")]
     Class,
-    #[strum(to_string="Data")]
-    Data 
+    #[strum(to_string = "Data")]
+    Data,
 }
 
-/*
-impl<'a> ParseError<Input<'a>> for ParseErrs {
->>>>>>> dbdd566f (fixing context errors)
-    fn from_error_kind(input: Input<'a>, kind: ErrorKind) -> Self {
+impl<'a, E> ParseError<Input<'a>> for ParseErrsDef<Input<'a>, E>
+where
+    E: ParseError<Input<'a>>,
+{
+    fn from_error_kind(data: Input<'a>, kind: ErrorKind) -> Self {
         Self {
-            errors: vec![(input, ErrKind::Nom(kind))],
+            errors: E::from_error_kind(data.clone(), kind),
+            data,
         }
     }
 
     fn append(input: Input<'a>, kind: ErrorKind, mut other: Self) -> Self {
-        other.errors.push((input, ErrKind::Nom(kind)));
+        let errors = E::append(input, kind, other.errors);
+        other.errors = errors;
         other
     }
 
-    fn from_char(input: Input<'a>, c: char) -> Self {
+    fn from_char(data: Input<'a>, c: char) -> Self {
+        let errors = E::from_char(data.clone(), c);
+        Self { errors, data }
+    }
+}
+
+impl<'a, E> ContextError<Input<'a>, Ctx> for ParseErrsDef<Input<'a>, E>
+where
+    E: ContextError<Input<'a>, Ctx>,
+{
+    fn add_context(location: Input<'a>, ctx: Ctx, other: Self) -> Self {
+        let errors = E::add_context(location.clone(), ctx, other.errors);
         Self {
-            errors: vec![(input, ErrKind::Char(c))],
+            data: location,
+            errors,
         }
     }
 }
-<<<<<<< HEAD
-impl<'a> ContextError<Input<'a>, Ctx> for ParseErrs<'a> {
-    fn add_context(input: Input<'a>, err: Ctx, mut other: Self) -> Self {
-        other.errors.push((input, ErrKind::Context(err)));
-=======
 
- */
-/*
-impl<'a> ContextError<Input<'a>, Ctx> for ParseErrs {
-    fn add_context(input: Input<'a>, ctx: Ctx, mut other: Self) -> Self {
-        other.errors.push((range(input), ErrKind::Context(ctx)));
->>>>>>> dbdd566f (fixing context errors)
-        other
+impl<'a, E> TagError<Input<'a>, Ctx> for ParseErrsDef<Input<'a>, E>
+where
+    E: TagError<Input<'a>, Ctx>,
+{
+    fn from_tag(data: Input<'a>, tag: Ctx) -> Self {
+        let errors = E::from_tag(data.clone(), tag);
+        Self { data, errors }
     }
 }
-
-<<<<<<< HEAD
-impl<'a> TagError<Input<'a>, Ctx> for ParseErrs<'a> {
-    fn from_tag(input: Input<'a>, tag: Ctx) -> Self {
-        todo!()
-    }
-}
-
-pub fn expect<O>(
-    f: impl FnMut(Input) -> Res<O>+Copy,
-    ctx: &'static str,
-    expected: &'static str,
-    found: &'static str,
-) -> impl FnMut(Input) -> Res<O>+Copy {
-    move |input| {
-        f.context(Ctx::Expected {
-            ctx,
-            expected,
-            found,
-        })
-        .parse(input)
-    }
-}
-
-
-
-=======
-impl <'a> TagError<Input<'a>, &'static str> for ParseErrs {
-    fn from_tag(input: Input, tag: &'static str) -> Self {
-        let mut errs = ParseErrs::default();
-        errs.errors.push((range(input), ErrKind::Tag(tag)));
-        errs
-    }
-}
-
- */
->>>>>>> dbdd566f (fixing context errors)
 
 /*
 fn segments(ix : Input) -> Res < Vec < Input > >
 {
-    let mut f = move | ix2| 
+    let mut f = move | ix2|
         {
             let mut parser =
                 pair(separated_list1(tag(":"), alpha1 :: < Input, ParseErrs >),
                      preceded(tag("^").context(Ctx :: Yuk), alpha1));
-            
+
             parser.parse(ix2).map(| (next, (segments, extra)) | (next, segments))
         };
-    
+
     expect(f , "segment", "x", "y") (ix)
 }
 
  */
 
-
 pub fn segments(i: Input) -> Res<Vec<Input>> {
+    /*
     let mut parser = pair(
         separated_list1(tag(":"), alpha1::<Input, ParseErrs>),
         preceded(tag("^"), alpha1),
@@ -327,10 +396,10 @@ pub fn segments(i: Input) -> Res<Vec<Input>> {
     parser
         .parse(i)
         .map(|(next, (segments, extra))| (next, segments))
+
+     */
+    todo!()
 }
-
-
-
 
 /*
 #[push_ctx_for_input]
@@ -348,7 +417,7 @@ pub fn segments(i: Input) -> Res<Vec<Input>> {
 
  */
 
-
+/*
 #[test]
 fn test() {
     let op = parse_operation("test", "you:are:^awesome");
@@ -357,48 +426,38 @@ fn test() {
     log(op.data,error);
 }
 
-<<<<<<< HEAD
-fn log(err: ParseErrs) {
-    for (input, err) in err.errors {
-        Report::build(ReportKind::Error, 0..input.extra.data().len())
-            .with_message(err.to_string())
-            .with_label(
-                Label::new(input.location_offset()..input.len())
-                    .with_message("This is of type Nat"),
-            )
-            .finish()
-            .print(Source::from(input.extra.data()))
-            .unwrap();
-    }
-=======
-fn log(data: impl AsRef<str>, err: ParseErrs) {
+ */
+
+fn log(data: impl AsRef<str>, err: ErrTree) {
     match &err {
-        ParseErrs::Base { location, ref kind } => {
-            
+        ErrTree::Base { location, ref kind } => {
             let range = range(&location);
 
             let mut builder = Report::build(ReportKind::Error, range.clone());
             match kind {
                 BaseErrorKind::Expected(expect) => {
-                    let report = builder.with_message(format!("Expected: '{}' found: {}", expect, location)).with_label(
-                        Label::new(range)
-                            .with_message(format!("{}",err)),
-                    ).finish();
+                    let report = builder
+                        .with_message(format!("Expected: '{}' found: {}", expect, location))
+                        .with_label(Label::new(range).with_message(format!("{}", err)))
+                        .finish();
                     report.print(Source::from(data.as_ref())).ok();
                 }
-                BaseErrorKind::Kind(kind) => {}
-                BaseErrorKind::External(external) => {}
+                BaseErrorKind::Kind(kind) => {
+                    panic!()
+                }
+                BaseErrorKind::External(external) => {
+                    panic!()
+                }
             }
         }
-        ParseErrs::Stack { base, contexts } => {
-            panic!();
+        ErrTree::Stack { base, contexts } => {
+            panic!("\n\nERR !STACK\n\n");
         }
-        ParseErrs::Alt(_) => {
-
+        ErrTree::Alt(_) => {
+            panic!("\n\nERR !ALT\n\n");
             panic!();
         }
     }
-    todo!()
     /*
     for (range, err) in err.errors {
         Report::build(ReportKind::Error, range.clone())
@@ -411,7 +470,6 @@ fn log(data: impl AsRef<str>, err: ParseErrs) {
             .print(Source::from(data.as_ref()))
             .unwrap();
     }
-    
+
      */
->>>>>>> dbdd566f (fixing context errors)
 }
