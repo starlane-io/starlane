@@ -1,21 +1,22 @@
 use crate::parse::model::NestedBlockKind;
 use crate::parse::util::Span;
-use crate::parse::{CamelCase, Domain, SkewerCase, SnakeCase};
+use crate::parse::{CamelCase, Domain, NomErr, SkewerCase, SnakeCase};
 use crate::parse2::chars::ident;
 use crate::parse2::token::block::block;
 use crate::parse2::token::punctuation::punctuation;
-use crate::parse2::{Input, Res};
+use crate::parse2::{Ctx, Input, ParseErrs, Res};
 use derive_builder::Builder;
 use nom::branch::alt;
 use nom::error::ParseError;
 use nom::multi::many0;
-use nom::{Offset, Parser, Slice};
+use nom::{Needed, Offset, Parser, Slice};
 use nom_supreme::ParserExt;
 use semver::Version;
 use std::collections::HashMap;
 use std::ops::Range;
 use std::str::FromStr;
 use strum_macros::{Display, EnumDiscriminants};
+use crate::err::ParseErrs0;
 
 #[derive(Clone, Debug)]
 pub struct Token {
@@ -146,9 +147,10 @@ pub(super) mod block {
         use crate::parse::model::NestedBlockKind;
         use crate::parse2::token::block::close::open;
         use crate::parse2::token::TokenKindDef;
-        use crate::parse2::{Input, Res};
-        use nom::bytes::complete::tag;
+        use crate::parse2::{Ctx, Input, Res};
         use nom::Parser;
+        use nom_supreme::ParserExt;
+        use nom_supreme::tag::complete::tag;
 
         pub fn angle(input: Input) -> Res<NestedBlockKind> {
             tag("<")(input).map(|(next, _)| (next, NestedBlockKind::Angle))
@@ -179,8 +181,8 @@ pub(super) mod block {
         use crate::parse2::token::TokenKindDef;
         use crate::parse2::{Input, Res};
         use nom::branch::alt;
-        use nom::bytes::complete::tag;
         use nom::Parser;
+        use nom_supreme::tag::complete::tag;
 
         pub fn angle(input: Input) -> Res<NestedBlockKind> {
             tag(">")(input).map(|(next, _)| (next, NestedBlockKind::Angle))
@@ -241,9 +243,9 @@ pub(super) mod whitespace {
 }
 
 pub(super) mod punctuation {
+    use nom::branch::alt;
     use crate::parse2::token::TokenKindDef;
     use crate::parse2::{Input, Res};
-    use nom::branch::alt;
     use nom::bytes::complete::tag;
     use nom::combinator::value;
 
@@ -297,7 +299,7 @@ where
 {
     move |input| {
         let (next, output) = kind(f)(input.clone())?;
-        let len = (input.location_offset() - next.location_offset());
+        let len = (next.location_offset() - input.location_offset());
         let span = input.location_offset()..(input.location_offset() + len);
         let kind = output.into();
         let token = Token { span, token: kind };
@@ -334,7 +336,38 @@ pub mod err {
     }
 }
 
+pub fn result<R>(result: Res<R>) -> Result<R, ParseErrs> {
+    match result {
+        Ok((_, e)) => Ok(e),
+        Err(nom::Err::Error(err)) => Result::Err(err),
+        Err(nom::Err::Failure(err)) => Result::Err(err),
+        Err(nom::Err::Incomplete(_)) => panic!("nom::Err::Incomplete not implemented "),
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
+    use nom::combinator::all_consuming;
+    use crate::parse2::{log, parse_operation, Input, ParseErrs};
+    use crate::parse2::token::{result, token, tokenize, Token};
+
+    #[test]
+    pub fn tokenz() {
+        let op= parse_operation("tokenz", 
+r#"
+PackConf(version=1.3.7) {
+  + <SomeClass>;
+}       
+        "#);
+        
+       match result(all_consuming(tokenize)(op.input())) {
+           Ok(_) => {}
+           Err(errs) => {
+               log(op.data, errs);
+           }
+       }
+
+        assert_eq!(op.stack.len(), 0)
+    }
     
 }
