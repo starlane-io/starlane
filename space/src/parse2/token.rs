@@ -15,6 +15,8 @@ use semver::Version;
 use std::collections::HashMap;
 use std::ops::Range;
 use std::str::FromStr;
+use nom::combinator::eof;
+use nom::sequence::pair;
 use strum_macros::{Display, EnumDiscriminants};
 use crate::err::ParseErrs0;
 
@@ -313,7 +315,7 @@ fn token(input: Input) -> Res<Token> {
 }
 
 fn tokenize(input: Input) -> Res<Vec<Token>> {
-    many0(token)(input)
+    pair(many0(token),eof)(input).map(|(next,(tokens,_))|(next,tokens))
 }
 
 pub mod err {
