@@ -310,8 +310,8 @@ fn log(data: impl AsRef<str>, err: ParseErrs) {
                     ).finish();
                     report.print(Source::from(data.as_ref())).ok();
                 }
-                BaseErrorKind::Kind(kind) => {}
-                BaseErrorKind::External(external) => {}
+                BaseErrorKind::Kind(kind) => {panic!()}
+                BaseErrorKind::External(external) => {panic!()}
             }
         }
         ParseErrs::Stack { base, contexts } => {
@@ -322,7 +322,6 @@ fn log(data: impl AsRef<str>, err: ParseErrs) {
             panic!();
         }
     }
-    todo!()
     /*
     for (range, err) in err.errors {
         Report::build(ReportKind::Error, range.clone())
