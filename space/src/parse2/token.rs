@@ -8,7 +8,7 @@ use crate::parse2::{Ctx, Input, ParseErrs, Res};
 use derive_builder::Builder;
 use nom::branch::alt;
 use nom::error::ParseError;
-use nom::multi::many0;
+use nom::multi::{many0, many1};
 use nom::{Needed, Offset, Parser, Slice};
 use nom_supreme::ParserExt;
 use semver::Version;
@@ -19,6 +19,26 @@ use nom::combinator::eof;
 use nom::sequence::pair;
 use strum_macros::{Display, EnumDiscriminants};
 use crate::err::ParseErrs0;
+
+
+
+fn token(input: Input) -> Res<Token> {
+    use whitespace::whitespace;
+    alt((tok(whitespace),tok(punctuation), tok(ident), tok(block)))(input)
+}
+
+fn tokenize(input: Input) -> Res<Vec<Token>> {
+    many1(token)(input).map(|(next,tokens)|{
+        println!("**********************");
+        println!("tokens.len(): {}", tokens.len());
+        for token in &tokens {
+            println!("{}", token.token);
+        }
+        println!("**********************");
+        
+        (next,tokens)})
+}
+
 
 #[derive(Clone, Debug)]
 pub struct Token {
@@ -31,8 +51,11 @@ pub struct Token {
 #[strum_discriminants(name(TokenKind))]
 #[strum_discriminants(derive(Hash))]
 enum TokenKindDef {
+    #[strum(to_string="Ident({0})")]
     Ident(Ident),
+    #[strum(to_string="BlockOpen({0})")]
     Open(NestedBlockKind),
+    #[strum(to_string="BlockClose({0})")]
     Close(NestedBlockKind),
     /// `+` symbol
     Plus,
@@ -74,11 +97,17 @@ impl TokenKindDef {
 #[strum_discriminants(name(IdentKind))]
 #[strum_discriminants(derive(Hash))]
 pub(crate) enum Ident {
+    #[strum(to_string="Camel({0})")]
     Camel(CamelCase),
+    #[strum(to_string="Skewer({0})")]
     Skewer(SkewerCase),
+    #[strum(to_string="Snake({0})")]
     Snake(SnakeCase),
+    #[strum(to_string="Domain({0})")]
     Domain(Domain),
+    #[strum(to_string="Version({0})")]
     Version(Version),
+    #[strum(to_string="Undefined({0})")]
     /// [Ident::Undefined] represents a semi plausible ident ... maybe camel case with underscores & dashes
     Undefined(String),
 }
@@ -146,8 +175,8 @@ pub(super) mod block {
     }
 
     pub(super) mod open {
+        use nom::branch::alt;
         use crate::parse::model::NestedBlockKind;
-        use crate::parse2::token::block::close::open;
         use crate::parse2::token::TokenKindDef;
         use crate::parse2::{Ctx, Input, Res};
         use nom::Parser;
@@ -167,12 +196,16 @@ pub(super) mod block {
         }
 
         pub fn curly(input: Input) -> Res<NestedBlockKind> {
-            tag("}")(input).map(|(next, _)| (next, NestedBlockKind::Curly))
+            tag("{")(input).map(|(next, _)| (next, NestedBlockKind::Curly))
+        }
+
+        pub fn open(input: Input) -> Res<NestedBlockKind> {
+            alt((angle, square, parenthesis, curly))(input)
         }
 
         pub fn token(input: Input) -> Res<TokenKindDef> {
             open(input).map(|(next, kind)| {
-                let kind = TokenKindDef::Close(kind);
+                let kind = TokenKindDef::Open(kind);
                 (next, kind)
             })
         }
@@ -202,12 +235,12 @@ pub(super) mod block {
             tag("}")(input).map(|(next, _)| (next, NestedBlockKind::Curly))
         }
 
-        pub fn open(input: Input) -> Res<NestedBlockKind> {
+        pub fn close(input: Input) -> Res<NestedBlockKind> {
             alt((angle, square, parenthesis, curly))(input)
         }
         pub fn token(input: Input) -> Res<TokenKindDef> {
-            open(input).map(|(next, kind)| {
-                let kind = TokenKindDef::Open(kind);
+            close(input).map(|(next, kind)| {
+                let kind = TokenKindDef::Close(kind);
                 (next, kind)
             })
         }
@@ -309,15 +342,6 @@ where
     }
 }
 
-fn token(input: Input) -> Res<Token> {
-    use whitespace::whitespace;
-    alt((tok(whitespace),tok(punctuation), tok(ident), tok(block)))(input)
-}
-
-fn tokenize(input: Input) -> Res<Vec<Token>> {
-    pair(many0(token),eof)(input).map(|(next,(tokens,_))|(next,tokens))
-}
-
 pub mod err {
     use crate::parse2::Input;
     use strum_macros::Display;
@@ -362,7 +386,7 @@ PackConf(version=1.3.7) {
 }       
         "#);
         
-       match result(all_consuming(tokenize)(op.input())) {
+       match result(tokenize(op.input())) {
            Ok(_) => {}
            Err(errs) => {
                log(op.data, errs);
