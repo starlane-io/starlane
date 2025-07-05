@@ -27,8 +27,15 @@ use thiserror::Error;
 type Span<'a> = LocatedSpan<&'a str, ParseOpRef<'a>>;
 
 /// a wrapper for [LocatedSpan] with some convenience methods like [Self::range]
+#[derive( Debug, Clone )]
 pub struct Input<'a> {
     span: Span<'a>,
+}
+
+impl <'a> Display for Input<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.span, f)
+    }
 }
 
 impl <'a> Input<'a> {
@@ -38,11 +45,11 @@ impl <'a> Input<'a> {
             span
         }
     }
-    
+
     pub fn range(&self) -> Range<usize> {
         self.span.location_offset()..(self.span.location_offset()+self.fragment().len())
     }
-    
+
 }
 
 
@@ -85,12 +92,13 @@ pub struct ParseErrsDef <R,E> {
     errors: E
 }
 
-impl <'a> From<Input<'a>> for ErrRange {
-    fn from(input: Input<'a>) -> Self {
-        let range = input.location_offset()..(input.location_offset()+input.fragment().len());
-        ErrRange {
-            
+impl <I,K> From<UnitErrDef<I,K>> for ErrRange where I: Debug+Clone, K: Into<ErrKind>+Debug+Clone{ 
+    fn from(err: UnitErrDef<I, K>) -> Self {
+        Self {
+            range: err.span.range(),
+            kind: err.error.into(),
         }
+    }
     }
 }
 
@@ -128,7 +136,7 @@ pub struct UnitErrDef<I,K> where I: Debug+Clone, K: Debug+Clone{
 #[derive(Debug,Clone)]
 pub struct ErrRangeDef<K> where K: Debug+Clone {
     pub range: Range<usize>,
-    pub kind: K 
+    pub kind: K
 }
 
 impl <K> ErrRangeDef<K> where K: Debug+Clone{
@@ -373,7 +381,7 @@ pub fn segments(i: Input) -> Res<Vec<Input>> {
     parser
         .parse(i)
         .map(|(next, (segments, extra))| (next, segments))
-        
+
      */
     todo!()
 }
