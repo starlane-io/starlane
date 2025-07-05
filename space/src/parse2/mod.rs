@@ -20,6 +20,8 @@ use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Range};
+use anyhow::__private::kind::AdhocKind;
+use itertools::Itertools;
 use strum_macros::{Display, EnumString};
 use thiserror::Error;
 
@@ -31,6 +33,8 @@ type Span<'a> = LocatedSpan<&'a str, ParseOpRef<'a>>;
 pub struct Input<'a> {
     span: Span<'a>,
 }
+
+
 
 impl <'a> Display for Input<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -49,7 +53,13 @@ impl <'a> Input<'a> {
     pub fn range(&self) -> Range<usize> {
         self.span.location_offset()..(self.span.location_offset()+self.fragment().len())
     }
+}
 
+
+impl <'a> Into<Range<usize>> for Input<'a> {
+    fn into(self) -> Range<usize> {
+        self.range()
+    }
 }
 
 
@@ -86,28 +96,40 @@ pub type Res<'a, O> = IResult<Input<'a>, O, ParseErrsTree<'a>>;
 
 pub type ParseErrsTree<'a> = ParseErrsDef<&'a str,ErrTree<'a>>;
 pub type ParseErrs<'a> = ParseErrsDef<&'a str,Vec<UnitErrDef<Input<'a>,ErrKind>>>;
-pub type ParseErrsOwned = ParseErrsDef<String,Vec<UnitErrDef<ErrRange,ErrKind>>>;
-pub struct ParseErrsDef <R,E> {
-    range: R,
+pub type ParseErrsOwned = ParseErrsDef<String,Vec<UnitErrDef<Range<usize>,ErrKind>>>;
+
+
+#[derive( Debug, Clone )]
+pub struct ParseErrsDef <D,E> {
+    data: D,
     errors: E
 }
 
-impl <I,K> From<UnitErrDef<I,K>> for ErrRange where I: Debug+Clone, K: Into<ErrKind>+Debug+Clone{ 
-    fn from(err: UnitErrDef<I, K>) -> Self {
-        Self {
-            range: err.span.range(),
-            kind: err.error.into(),
-        }
-    }
+impl <D,E> Display for ParseErrsDef<D, E> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        todo!()
     }
 }
 
+impl <'a, D,K> From<UnitErrDef<D,K>> for ErrRange where D: Debug+Clone+Into<Range<usize>>, K: Into<ErrKind>+Debug+Clone{ 
+    fn from(err: UnitErrDef<D, K>) -> Self {
+        Self {
+            range: err.span.into(),
+            kind: err.kind.into()
+        }
+    }
+}
+
+
+
+
 impl <'a> From<ParseErrs<'a>> for ParseErrsOwned  {
     fn from(errs: ParseErrs<'a>) -> Self {
-        let v = errs.errors.iter().map(|e| UnitErrDef{ span: e.span.to_string(), error: ErrRange::new(e.span.clone().into(), e.error) }).collect();
+        let data = errs.data.into();
+        let errors = errs.errors.into_iter().map(|e| UnitErrDef {span:e.span.into(),kind:e.kind} ).collect_vec();
         Self {
-            range: errs.range.to_string(),
-            errors: v
+            data,
+            errors
         }
     }
 }
@@ -128,9 +150,9 @@ pub enum TokenErrKindDef<S> where S: Debug+Clone {
 pub type UnitErrRef<'a> = UnitErrDef<Input<'a>, TokenErrKindRef<'a>>;
 
 #[derive(Debug,Clone)]
-pub struct UnitErrDef<I,K> where I: Debug+Clone, K: Debug+Clone{
+pub struct UnitErrDef<I,K> {
     span: I,
-    error: K
+    kind: K
 }
 
 #[derive(Debug,Clone)]

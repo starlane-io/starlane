@@ -45,7 +45,7 @@ pub struct Token {
 #[derive(Clone, Debug, EnumDiscriminants, Display)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(TokenKind))]
-#[strum_discriminants(derive(Hash,Display,Debug))]
+#[strum_discriminants(derive(Hash,Display))]
 enum TokenKindDef {
     #[strum(to_string="Ident({0})")]
     Ident(Ident),
