@@ -4,29 +4,62 @@ mod scaffold;
 mod token;
 mod err;
 
-use std::error::Error;
-use crate::parse::util::{preceded, Span};
+use crate::parse2::token::TokenKind;
 use ariadne::{Label, Report, ReportKind, Source};
-use nom::character::complete::alpha1;
-use nom::combinator::all_consuming;
 use nom::error::{
     ErrorKind, FromExternalError, ParseError,
 };
-use nom::multi::separated_list1;
-use nom::sequence::pair;
 use nom::{Compare, Finish, IResult, InputLength, InputTake, Offset, Parser};
 use nom_locate::LocatedSpan;
 use nom_supreme::context::ContextError;
-use nom_supreme::parser_ext::ParserExt;
-use std::fmt::{Debug, Display, Formatter};
-use std::ops::Range;
-use nom::bytes::complete::tag;
-use strum_macros::{Display, EnumString};
+use nom_supreme::error::{BaseErrorKind, GenericErrorTree};
 use nom_supreme::final_parser::ExtractContext;
+use nom_supreme::parser_ext::ParserExt;
 use nom_supreme::tag::TagError;
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut, Range};
+use strum_macros::{Display, EnumString};
 use thiserror::Error;
-use nom_supreme::error::{ErrorTree, BaseErrorKind, Expectation, GenericErrorTree};
-type Input<'a> = LocatedSpan<&'a str, ParseOpRef<'a>>;
+
+
+type Span<'a> = LocatedSpan<&'a str, ParseOpRef<'a>>;
+
+/// a wrapper for [LocatedSpan] with some convenience methods like [Self::range]
+pub struct Input<'a> {
+    span: Span<'a>,
+}
+
+impl <'a> Input<'a> {
+    pub fn new_extra(data: &'a str, extra: ParseOpRef<'a>) -> Self {
+        let span = Span::new_extra(data,extra);
+        Self {
+            span
+        }
+    }
+    
+    pub fn range(&self) -> Range<usize> {
+        self.span.location_offset()..(self.span.location_offset()+self.fragment().len())
+    }
+    
+}
+
+
+impl <'a> Deref for Input<'a> {
+    type Target = Span<'a> ;
+
+    fn deref(&self) -> &Self::Target {
+        & self.span
+    }
+}
+
+impl <'a> DerefMut for Input<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        & mut self.span
+    }
+}
+
 
 pub fn range(input: &Input) -> Range<usize> {
     input.location_offset()..input.fragment().len() 
@@ -39,8 +72,89 @@ pub fn parse_operation(op: impl ToString, data: &str) -> ParseOp {
 }
 
 
-pub type ParseErrs<'a> = GenericErrorTree<Input<'a>, &'static str, Ctx, Box<dyn Error + Send + Sync + 'static>>;
-pub type Res<'a, O> = IResult<Input<'a>, O, ParseErrs<'a>>;
+pub type ErrTree<'a> = GenericErrorTree<Input<'a>, &'static str, Ctx, Box<dyn Error + Send + Sync + 'static>>;
+
+
+pub type Res<'a, O> = IResult<Input<'a>, O, ParseErrsTree<'a>>;
+
+pub type ParseErrsTree<'a> = ParseErrsDef<&'a str,ErrTree<'a>>;
+pub type ParseErrs<'a> = ParseErrsDef<&'a str,Vec<UnitErrDef<Input<'a>,ErrKind>>>;
+pub type ParseErrsOwned = ParseErrsDef<String,Vec<UnitErrDef<ErrRange,ErrKind>>>;
+pub struct ParseErrsDef <R,E> {
+    range: R,
+    errors: E
+}
+
+impl <'a> From<Input<'a>> for ErrRange {
+    fn from(input: Input<'a>) -> Self {
+        let range = input.location_offset()..(input.location_offset()+input.fragment().len());
+        ErrRange {
+            
+        }
+    }
+}
+
+impl <'a> From<ParseErrs<'a>> for ParseErrsOwned  {
+    fn from(errs: ParseErrs<'a>) -> Self {
+        let v = errs.errors.iter().map(|e| UnitErrDef{ span: e.span.to_string(), error: ErrRange::new(e.span.clone().into(), e.error) }).collect();
+        Self {
+            range: errs.range.to_string(),
+            errors: v
+        }
+    }
+}
+
+
+
+pub type TokenErrKindRef<'a> = TokenErrKindDef<Input<'a>>;
+pub type TokenErrKind = TokenErrKindDef<ErrRange>;
+
+#[derive(Error,Debug,Clone)]
+pub enum TokenErrKindDef<S> where S: Debug+Clone {
+    #[error("Illegal cast. '{from}' cannot be cast into: '{to}'")]
+    IllegalCast { from: TokenKind, to: TokenKind},
+    #[error("PhantomData to make generics work on TokenErrsDef<S> Enum. nothing to see here... ")]
+    _Phantom(PhantomData<S>)
+}
+
+pub type UnitErrRef<'a> = UnitErrDef<Input<'a>, TokenErrKindRef<'a>>;
+
+#[derive(Debug,Clone)]
+pub struct UnitErrDef<I,K> where I: Debug+Clone, K: Debug+Clone{
+    span: I,
+    error: K
+}
+
+#[derive(Debug,Clone)]
+pub struct ErrRangeDef<K> where K: Debug+Clone {
+    pub range: Range<usize>,
+    pub kind: K 
+}
+
+impl <K> ErrRangeDef<K> where K: Debug+Clone{
+    pub fn new(range: Range<usize>, kind: K) -> Self {
+        Self { range, kind}
+    }
+}
+
+pub type ErrRange = ErrRangeDef<ErrKind>;
+
+pub type TokenErr<'a> = UnitErrDef<Input<'a>, TokenErrKindRef<'a>>;
+
+
+impl <'a> Deref for ParseErrsTree<'a> {
+    type Target = ErrTree<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        & self.errors
+    }
+}
+
+impl <'a> DerefMut for ParseErrsTree<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        & mut self.errors
+    }
+}
 
 pub trait Operation {}
 pub struct ParseOperationDef<'a, N, S> {
@@ -120,10 +234,6 @@ impl<'a> Clone for ParseOpRef<'a> {
     }
 }
 
-struct ParseErrsFinal {
-    pub string: String,
-    pub errors: Vec<(Range<usize>, ErrKind)>,
-}
 
 /*
 struct ParseErrs {
@@ -227,7 +337,7 @@ impl<'a> ContextError<Input<'a>, Ctx> for ParseErrs {
 
 impl <'a> TagError<Input<'a>, &'static str> for ParseErrs {
     fn from_tag(input: Input, tag: &'static str) -> Self {
-        let mut errs = ParseErrs::default();
+        let mut errs = ErrTree::default();
         errs.errors.push((range(input), ErrKind::Tag(tag)));
         errs
     }
@@ -254,6 +364,7 @@ fn segments(ix : Input) -> Res < Vec < Input > >
 
 
 pub fn segments(i: Input) -> Res<Vec<Input>> {
+    /*
     let mut parser = pair(
         separated_list1(tag(":"), alpha1::<Input, ParseErrs>),
         preceded(tag("^"), alpha1),
@@ -262,6 +373,9 @@ pub fn segments(i: Input) -> Res<Vec<Input>> {
     parser
         .parse(i)
         .map(|(next, (segments, extra))| (next, segments))
+        
+     */
+    todo!()
 }
 
 pub fn camel(input: Input) -> Res<String> {
@@ -287,6 +401,7 @@ pub fn segments(i: Input) -> Res<Vec<Input>> {
 
 
 
+/*
 #[test]
 fn test() {
     let op = parse_operation("test", "you:are:^awesome");
@@ -295,9 +410,11 @@ fn test() {
     log(op.data,error);
 }
 
-fn log(data: impl AsRef<str>, err: ParseErrs) {
-    match &err {
-        ParseErrs::Base { location, ref kind } => {
+ */
+
+fn log(data: impl AsRef<str>, err: ParseErrsTree) {
+    match &err.errors {
+        ErrTree::Base { location, ref kind } => {
             
             let range = range(&location);
 
@@ -314,10 +431,10 @@ fn log(data: impl AsRef<str>, err: ParseErrs) {
                 BaseErrorKind::External(external) => {panic!()}
             }
         }
-        ParseErrs::Stack { base, contexts } => {
+        ErrTree::Stack { base, contexts } => {
             panic!();
         }
-        ParseErrs::Alt(_) => {
+        ErrTree::Alt(_) => {
 
             panic!();
         }

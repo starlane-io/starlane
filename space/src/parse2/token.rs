@@ -1,25 +1,21 @@
 use crate::parse::model::NestedBlockKind;
 use crate::parse::util::Span;
-use crate::parse::{CamelCase, Domain, NomErr, SkewerCase, SnakeCase};
+use crate::parse::{CamelCase, Domain, SkewerCase, SnakeCase};
 use crate::parse2::chars::ident;
 use crate::parse2::token::block::block;
 use crate::parse2::token::punctuation::punctuation;
-use crate::parse2::{Ctx, Input, ParseErrs, Res};
+use crate::parse2::{Input, ParseErrsTree, Res};
 use derive_builder::Builder;
 use nom::branch::alt;
 use nom::error::ParseError;
-use nom::multi::{many0, many1};
-use nom::{Needed, Offset, Parser, Slice};
+use nom::multi::many1;
+use nom::{Offset, Parser, Slice};
 use nom_supreme::ParserExt;
 use semver::Version;
 use std::collections::HashMap;
 use std::ops::Range;
 use std::str::FromStr;
-use nom::combinator::eof;
-use nom::sequence::pair;
 use strum_macros::{Display, EnumDiscriminants};
-use crate::err::ParseErrs0;
-
 
 
 fn token(input: Input) -> Res<Token> {
@@ -49,7 +45,7 @@ pub struct Token {
 #[derive(Clone, Debug, EnumDiscriminants, Display)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(TokenKind))]
-#[strum_discriminants(derive(Hash))]
+#[strum_discriminants(derive(Hash,Display,Debug))]
 enum TokenKindDef {
     #[strum(to_string="Ident({0})")]
     Ident(Ident),
@@ -175,13 +171,13 @@ pub(super) mod block {
     }
 
     pub(super) mod open {
-        use nom::branch::alt;
         use crate::parse::model::NestedBlockKind;
         use crate::parse2::token::TokenKindDef;
-        use crate::parse2::{Ctx, Input, Res};
+        use crate::parse2::{Input, Res};
+        use nom::branch::alt;
         use nom::Parser;
-        use nom_supreme::ParserExt;
         use nom_supreme::tag::complete::tag;
+        use nom_supreme::ParserExt;
 
         pub fn angle(input: Input) -> Res<NestedBlockKind> {
             tag("<")(input).map(|(next, _)| (next, NestedBlockKind::Angle))
@@ -278,9 +274,9 @@ pub(super) mod whitespace {
 }
 
 pub(super) mod punctuation {
-    use nom::branch::alt;
     use crate::parse2::token::TokenKindDef;
     use crate::parse2::{Input, Res};
+    use nom::branch::alt;
     use nom::bytes::complete::tag;
     use nom::combinator::value;
 
@@ -362,7 +358,7 @@ pub mod err {
     }
 }
 
-pub fn result<R>(result: Res<R>) -> Result<R, ParseErrs> {
+pub fn result<R>(result: Res<R>) -> Result<R, ParseErrsTree> {
     match result {
         Ok((_, e)) => Ok(e),
         Err(nom::Err::Error(err)) => Result::Err(err),
@@ -373,15 +369,14 @@ pub fn result<R>(result: Res<R>) -> Result<R, ParseErrs> {
 
 #[cfg(test)]
 pub mod tests {
-    use nom::combinator::all_consuming;
-    use crate::parse2::{log, parse_operation, Input, ParseErrs};
-    use crate::parse2::token::{result, token, tokenize, Token};
+    use crate::parse2::token::{result, tokenize};
+    use crate::parse2::{log, parse_operation};
 
     #[test]
     pub fn tokenz() {
         let op= parse_operation("tokenz", 
 r#"
-PackConf(version=1.3.7) {
+Release(version=1.3.7) {
   + <SomeClass>;
 }       
         "#);
