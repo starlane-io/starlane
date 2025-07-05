@@ -4,7 +4,7 @@ use crate::parse::{CamelCase, Domain, SkewerCase, SnakeCase};
 use crate::parse2::chars::ident;
 use crate::parse2::token::block::block;
 use crate::parse2::token::punctuation::punctuation;
-use crate::parse2::{Input, ParseErrsTree, Res};
+use crate::parse2::{ErrTree, Input, ParseErrsTree, Res};
 use derive_builder::Builder;
 use nom::branch::alt;
 use nom::error::ParseError;
@@ -358,7 +358,7 @@ pub mod err {
     }
 }
 
-pub fn result<R>(result: Res<R>) -> Result<R, ParseErrsTree> {
+pub fn result<R>(result: Res<R>) -> Result<R, ErrTree> {
     match result {
         Ok((_, e)) => Ok(e),
         Err(nom::Err::Error(err)) => Result::Err(err),
