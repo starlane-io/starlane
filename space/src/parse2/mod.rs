@@ -21,65 +21,34 @@ use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Range};
 use anyhow::__private::kind::AdhocKind;
+use ascii::AsciiStr;
 use itertools::Itertools;
 use strum_macros::{Display, EnumString};
 use thiserror::Error;
 
 
-type Span<'a> = LocatedSpan<&'a str, ParseOpRef<'a>>;
+type Input<'a> = LocatedSpan<&'a str, ParseOpRef<'a>>;
 
+/*
 /// a wrapper for [LocatedSpan] with some convenience methods like [Self::range]
 #[derive( Debug, Clone )]
 pub struct Input<'a> {
     span: Span<'a>,
 }
 
+ */
 
 
-impl <'a> Display for Input<'a> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.span, f)
-    }
-}
-
-impl <'a> Input<'a> {
-    pub fn new_extra(data: &'a str, extra: ParseOpRef<'a>) -> Self {
-        let span = Span::new_extra(data,extra);
-        Self {
-            span
-        }
-    }
-
-    pub fn range(&self) -> Range<usize> {
-        self.span.location_offset()..(self.span.location_offset()+self.fragment().len())
-    }
-}
 
 
-impl <'a> Into<Range<usize>> for Input<'a> {
-    fn into(self) -> Range<usize> {
-        self.range()
-    }
-}
 
 
-impl <'a> Deref for Input<'a> {
-    type Target = Span<'a> ;
-
-    fn deref(&self) -> &Self::Target {
-        & self.span
-    }
-}
-
-impl <'a> DerefMut for Input<'a> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        & mut self.span
-    }
-}
 
 
-pub fn range(input: &Input) -> Range<usize> {
-    input.location_offset()..input.fragment().len() 
+pub fn range<'a>(input: &'a Input<'a>) -> Range<usize> {
+    let offset = Input::location_offset(input);
+    let len = Input::fragment(input).len();
+    offset..(offset+len)
 }
 
 
@@ -92,7 +61,7 @@ pub fn parse_operation(op: impl ToString, data: &str) -> ParseOp {
 pub type ErrTree<'a> = GenericErrorTree<Input<'a>, &'static str, Ctx, Box<dyn Error + Send + Sync + 'static>>;
 
 
-pub type Res<'a, O> = IResult<Input<'a>, O, ParseErrsTree<'a>>;
+pub type Res<'a, O> = IResult<Input<'a>, O, ErrTree<'a>>;
 
 pub type ParseErrsTree<'a> = ParseErrsDef<&'a str,ErrTree<'a>>;
 pub type ParseErrs<'a> = ParseErrsDef<&'a str,Vec<UnitErrDef<Input<'a>,ErrKind>>>;
@@ -105,13 +74,24 @@ pub struct ParseErrsDef <D,E> {
     errors: E
 }
 
+impl <D,E> ParseErrsDef<D,E> where E: Default{
+    pub fn new(data: D) -> Self {
+        Self {
+            data,
+            errors: Default::default()
+        }
+    }
+}
+
+
+
 impl <D,E> Display for ParseErrsDef<D, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
 
-impl <'a, D,K> From<UnitErrDef<D,K>> for ErrRange where D: Debug+Clone+Into<Range<usize>>, K: Into<ErrKind>+Debug+Clone{ 
+impl <'a, D,K> From<UnitErrDef<D,K>> for ErrRange where D: Debug+Clone+Into<Range<usize>>, K: Into<ErrKind>+Debug+Clone{
     fn from(err: UnitErrDef<D, K>) -> Self {
         Self {
             range: err.span.into(),
@@ -126,7 +106,7 @@ impl <'a, D,K> From<UnitErrDef<D,K>> for ErrRange where D: Debug+Clone+Into<Rang
 impl <'a> From<ParseErrs<'a>> for ParseErrsOwned  {
     fn from(errs: ParseErrs<'a>) -> Self {
         let data = errs.data.into();
-        let errors = errs.errors.into_iter().map(|e| UnitErrDef {span:e.span.into(),kind:e.kind} ).collect_vec();
+        let errors = errs.errors.into_iter().map(|e| UnitErrDef {span:range(&e.span),kind:e.kind} ).collect_vec();
         Self {
             data,
             errors
@@ -336,44 +316,50 @@ pub enum Ctx {
     Data 
 }
 
-/*
-impl<'a> ParseError<Input<'a>> for ParseErrs {
-    fn from_error_kind(input: Input<'a>, kind: ErrorKind) -> Self {
+impl<'a,E> ParseError<Input<'a>> for ParseErrsDef<Input<'a>,E> where E: ParseError<Input<'a>> {
+    fn from_error_kind(data: Input<'a>, kind: ErrorKind) -> Self {
         Self {
-            errors: vec![(range(input), ErrKind::Nom(kind))],
+            errors: E::from_error_kind(data.clone(), kind),
+            data,
         }
     }
 
     fn append(input: Input<'a>, kind: ErrorKind, mut other: Self) -> Self {
-        other.errors.push((range(input), ErrKind::Nom(kind)));
+        let errors = E::append(input, kind, other.errors);
+        other.errors = errors;
         other
     }
 
-    fn from_char(input: Input<'a>, c: char) -> Self {
+    fn from_char(data: Input<'a>, c: char) -> Self {
+        let errors = E::from_char(data.clone(), c);
         Self {
-            errors: vec![(range(input), ErrKind::Char(c))],
+            errors,
+            data
         }
     }
 }
 
- */
-/*
-impl<'a> ContextError<Input<'a>, Ctx> for ParseErrs {
-    fn add_context(input: Input<'a>, ctx: Ctx, mut other: Self) -> Self {
-        other.errors.push((range(input), ErrKind::Context(ctx)));
-        other
+impl<'a,E> ContextError<Input<'a>,Ctx> for ParseErrsDef<Input<'a>,E> where E: ContextError<Input<'a>,Ctx> {
+    fn add_context(location: Input<'a>, ctx: Ctx, other: Self) -> Self {
+        let errors = E::add_context(location.clone(), ctx, other.errors);
+        Self {
+            data: location,
+            errors
+        }
     }
 }
 
-impl <'a> TagError<Input<'a>, &'static str> for ParseErrs {
-    fn from_tag(input: Input, tag: &'static str) -> Self {
-        let mut errs = ErrTree::default();
-        errs.errors.push((range(input), ErrKind::Tag(tag)));
-        errs
+
+impl<'a,E> TagError<Input<'a>,Ctx> for ParseErrsDef<Input<'a>,E> where E: TagError<Input<'a>,Ctx> {
+    fn from_tag(data: Input<'a>, tag: Ctx) -> Self {
+        let errors = E::from_tag(data.clone(), tag);
+        Self {
+            data,
+            errors
+        }
     }
 }
 
- */
 
 /*
 fn segments(ix : Input) -> Res < Vec < Input > >
@@ -442,8 +428,8 @@ fn test() {
 
  */
 
-fn log(data: impl AsRef<str>, err: ParseErrsTree) {
-    match &err.errors {
+fn log(data: impl AsRef<str>, err: ErrTree) {
+    match &err {
         ErrTree::Base { location, ref kind } => {
             
             let range = range(&location);
