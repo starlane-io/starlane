@@ -36,7 +36,7 @@ fn undefined(input: Input) -> Res<Input> {
 }
 
 pub fn ident(input: Input ) -> Res<Ident> {
-    alt((into(camel),into(skewer),into(snake),into(undefined)))(input)
+    alt((into(camel),into(skewer),into(snake)))(input)
 }
 
 
