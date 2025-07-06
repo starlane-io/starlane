@@ -1,9 +1,11 @@
 use crate::err::{ParseErrs0, SpaceErr};
 use crate::kind::BaseKind;
 use crate::log::Trackable;
-use crate::parse::util::{result, Span};
 use crate::parse::util::{new_span, Trace, Tw};
-use crate::parse::{parse_star_key, skewer_case, version, Env, Res, ResolverErr, SkewerCase, VarCase};
+use crate::parse::util::{result, Span};
+use crate::parse::{
+    parse_star_key, skewer_case, version, Env, Res, ResolverErr, SkewerCase, VarCase,
+};
 use crate::particle::traversal::TraversalPlan;
 use crate::point::{Point, PointSeg, PointSegKind, PointSegPairDef, RouteSeg};
 use crate::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
@@ -132,14 +134,13 @@ pub struct VersionSegLoc {
     pub version: semver::Version,
 }
 
-
 #[cfg(feature = "types2")]
 use crate::types::archetype::Archetype;
 #[cfg(feature = "types2")]
 impl Archetype for VersionSegLoc {
     fn parser<I>(input: I) -> Res<I, Self>
     where
-        I: Span
+        I: Span,
     {
         version(input)
     }
@@ -249,7 +250,7 @@ impl<V> TryInto<Variable> for VarVal<V> {
 
 impl<V> ToResolved<V> for VarVal<V>
 where
-    V: FromStr<Err =ParseErrs0>,
+    V: FromStr<Err = ParseErrs0>,
 {
     fn to_resolved(self, env: &Env) -> Result<V, ParseErrs0> {
         match self {

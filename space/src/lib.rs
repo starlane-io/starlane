@@ -1,8 +1,8 @@
 #![allow(warnings)]
 
 // so macros will work
-extern crate self as starlane_space;
 extern crate core;
+extern crate self as starlane_space;
 
 use crate::point::Point;
 use once_cell::sync::Lazy;

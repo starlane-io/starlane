@@ -4,7 +4,7 @@ use crate::parse::{CamelCase, Domain, SkewerCase, SnakeCase};
 use crate::parse2::chars::ident;
 use crate::parse2::token::symbol::symbol;
 use crate::parse2::token::whitespace::whitespace;
-use crate::parse2::{range, to_err, ErrTree, Input, Res};
+use crate::parse2::{to_err, ErrTree, Input, Res};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::digit1;
@@ -21,22 +21,22 @@ use std::str::FromStr;
 use strum_macros::{Display, EnumDiscriminants, EnumString, EnumTryAs};
 
 fn token<'a>(input: Input<'a>) -> Res<Token<'a>> {
-    let (next, (kind,len)) = loc(alt((defined, undefined)))(input.clone())?;
+    let (next, (kind, len)) = loc(alt((defined, undefined)))(input.clone())?;
     let token = Token::new(input.slice(..len), kind);
     Ok((next, token))
 }
 
-/// returns tuple `Ok(Output,Range<usize>)` 
-fn loc<'a,O>(mut f:impl FnMut(Input<'a>) -> Res<O> ) -> impl FnMut(Input<'a>) -> Res<(O,usize)> {
+/// returns tuple `Ok(Output,Range<usize>)`
+fn loc<'a, O>(mut f: impl FnMut(Input<'a>) -> Res<O>) -> impl FnMut(Input<'a>) -> Res<(O, usize)> {
     move |input| {
-       let (next, output) = f(input.clone())?;
-       let len = input.len() - next.len();
-       Ok((next, (output,len)))
+        let (next, output) = f(input.clone())?;
+        let len = input.len() - next.len();
+        Ok((next, (output, len)))
     }
 }
 
 fn defined(input: Input) -> Res<TokenKind> {
-    alt((whitespace, symbol, into(ident),into(version)))(input)
+    alt((whitespace, symbol, into(ident), into(version)))(input)
 }
 fn undefined(input: Input) -> Res<TokenKind> {
     recognize(many1(preceded(not(defined), take(1usize))))(input)
@@ -73,9 +73,9 @@ fn parse_u64(input: Input) -> Res<u64> {
 }
 
 fn version(input: Input) -> Res<Version> {
-    let (next,version) = recognize(separated_list1(tag("."), parse_u64))(input.clone())?;
+    let (next, version) = recognize(separated_list1(tag("."), parse_u64))(input.clone())?;
     let version = version.to_string();
-    let version = semver::Version::from_str(version.as_str()).map_err(|err|to_err(input,err))?; 
+    let version = semver::Version::from_str(version.as_str()).map_err(|err| to_err(input, err))?;
     Ok((next, version))
 }
 
@@ -560,13 +560,13 @@ pub mod util {
 
 #[cfg(test)]
 pub mod tests {
-    use insta::_macro_support::assert_snapshot;
-    use insta::assert_snapshot;
     use crate::parse2::parse_operation;
     use crate::parse2::token::symbol::symbol;
-    use crate::parse2::token::{result, tokenize, undefined, Token, TokenKind};
-    use nom::combinator::all_consuming;
     use crate::parse2::token::util::diagnose;
+    use crate::parse2::token::{result, tokenize, undefined, Token, TokenKind};
+    use insta::_macro_support::assert_snapshot;
+    use insta::assert_snapshot;
+    use nom::combinator::all_consuming;
 
     #[test]
     pub fn symbols() {
@@ -579,7 +579,7 @@ pub mod tests {
     #[test]
     pub fn test_undefined() {
         let op = parse_operation("undefined", "^%%skewer");
-        let (input,kind) = diagnose(undefined)(op.input()).unwrap();
+        let (input, kind) = diagnose(undefined)(op.input()).unwrap();
         assert_snapshot!(input);
         assert_snapshot!(kind);
     }
@@ -596,7 +596,7 @@ Release(version=1.3.7){
         );
 
         let tokens = result(tokenize(op.input())).unwrap();
-        assert_snapshot!(format!("{:?}",tokens));
+        assert_snapshot!(format!("{:?}", tokens));
 
         assert_eq!(op.stack.len(), 0)
     }

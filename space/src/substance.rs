@@ -74,15 +74,7 @@ pub enum SubstanceKind {
 }
 
 #[derive(
-    Debug,
-    Clone,
-    Serialize,
-    Deserialize,
-    Eq,
-    PartialEq,
-    strum_macros::Display,
-    Autobox,
-    ToSubstance,
+    Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox, ToSubstance,
 )]
 #[non_exhaustive]
 pub enum Substance {

@@ -1,18 +1,15 @@
-use std::sync::Arc;
 use crate::types::registry::err::RegErr;
-use async_trait::async_trait;
 use crate::types::selector::TypeSelector;
+use async_trait::async_trait;
+use std::sync::Arc;
 
 pub type Registry = Arc<dyn TypeRegistry>;
-
-
 
 /// A Registry component interface for accessing Metadata about types including: [BindConfig] ...
 #[async_trait]
 pub trait TypeRegistry: Send + Sync {
-   async fn select_specific<'a>(&'a self, selector: &'a TypeSelector) -> Result<Cursor,RegErr>;
+    async fn select_specific<'a>(&'a self, selector: &'a TypeSelector) -> Result<Cursor, RegErr>;
 }
-
 
 pub struct Cursor;
 
@@ -25,12 +22,6 @@ impl RegistryWrapper {
         Self { registry }
     }
 }
-
-
-
-
-
-
 
 pub mod err {
     use crate::point::Point;
@@ -57,7 +48,7 @@ pub mod err {
         ExpectedEmbeddedRegistry,
     }
 
-   impl From<&str> for RegErr {
+    impl From<&str> for RegErr {
         fn from(err: &str) -> Self {
             Self::Msg(err.to_string())
         }
@@ -73,7 +64,6 @@ pub mod err {
         pub fn dupe() -> Self {
             Self::Dupe
         }
-
 
         pub fn expected_parent(point: &Point) -> Self {
             Self::ExpectedParent(point.clone())

@@ -3,7 +3,7 @@ use crate::point;
 use crate::types::specific::SpecificLoc;
 
 #[non_exhaustive]
-pub enum VersionTag{
+pub enum VersionTag {
     /// magically derive the version in this order:
     /// 1. [VersionTag::Using] (if set)
     /// 2. [VersionTag::Latest] use the latest
@@ -14,11 +14,11 @@ pub enum VersionTag{
     Latest,
 
     /// custom [VersionTag] defined in the registry
-    _Ext(SkewerCase)
+    _Ext(SkewerCase),
 }
 
 #[non_exhaustive]
-pub enum RouteTag{
+pub enum RouteTag {
     /// references the default hub `hub.starlane.io` by default
     Hub,
 }

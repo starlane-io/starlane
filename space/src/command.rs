@@ -289,6 +289,7 @@ pub mod direct {
         use crate::selector::SpecificSelector;
         use crate::substance::Bin;
         use crate::substance::Substance;
+        use crate::types::property::SetProperties;
         use crate::util::ToResolved;
         use crate::wave::core::cmd::CmdMethod;
         use crate::wave::core::ext::ExtMethod;
@@ -300,7 +301,6 @@ pub mod direct {
         use std::fmt::Display;
         use std::sync::atomic::{AtomicU64, Ordering};
         use std::sync::Arc;
-        use crate::types::property::SetProperties;
 
         pub enum PointTemplateSeg {
             ExactSeg(PointSeg),

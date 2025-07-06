@@ -4,12 +4,12 @@ use std::ops::Deref;
 
 use crate::err::SpaceErr;
 use crate::kind::Kind;
+use crate::parse::SkewerCase;
 use crate::point::Point;
 use serde::Deserialize;
 use serde::Serialize;
-use validator::ValidateEmail;
 use std::collections::hash_map::Iter;
-use crate::parse::SkewerCase;
+use validator::ValidateEmail;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PropertyDef {

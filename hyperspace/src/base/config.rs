@@ -18,8 +18,7 @@ pub trait BaseConfig: Send + Sync {
 }
 
 //
-pub trait BaseSubConfig: Send + Sync {
-}
+pub trait BaseSubConfig: Send + Sync {}
 
 pub trait FoundationConfig: BaseSubConfig {
     fn required(&self) -> HashSet<ProviderKindDisc>;
@@ -28,12 +27,12 @@ pub trait FoundationConfig: BaseSubConfig {
 
     /*
     fn provider<P>(&self, kind: <Self as BaseSubConfig>::Kind) -> Option<&P> where P: Provider+BaseSub<Config: BaseSubConfig>;
-    
+
      */
 }
 
-pub trait ProviderConfig: provider::config::ProviderConfig { }
+pub trait ProviderConfig: provider::config::ProviderConfig {}
 
-pub trait PlatformConfig: crate::base::PlatformConfig { }
+pub trait PlatformConfig: crate::base::PlatformConfig {}
 
-pub trait RegistryConfig: registry::RegistryConfig { }
+pub trait RegistryConfig: registry::RegistryConfig {}

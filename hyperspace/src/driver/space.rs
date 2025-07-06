@@ -1,8 +1,8 @@
+use crate::base::Platform;
 use crate::driver::{
     Driver, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleSphere,
     StdParticleErr,
 };
-use crate::base::Platform;
 use crate::star::HyperStarSkel;
 use async_trait::async_trait;
 use starlane_macros::{handler, DirectedHandler};

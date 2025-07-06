@@ -1,3 +1,4 @@
+use crate::base::Platform;
 use crate::driver::DriverErr;
 use crate::err::{err, HyperErr2};
 use crate::hyperlane::{
@@ -5,9 +6,10 @@ use crate::hyperlane::{
     HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
     SimpleGreeter,
 };
-use crate::base::Platform;
 use crate::registry::Registry;
-use crate::service::{service_conf, Service, ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate};
+use crate::service::{
+    service_conf, Service, ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate,
+};
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 use crate::template::Templates;
 use async_trait::async_trait;
@@ -22,12 +24,12 @@ use starlane_space::hyper::{InterchangeKind, Knock};
 use starlane_space::kind::{BaseKind, Kind, StarSub};
 use starlane_space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface};
 use starlane_space::log::Logger;
-use starlane_space::types::property::PropertiesConfig;
 use starlane_space::particle::{Property, Status, Stub};
 use starlane_space::point::Point;
 use starlane_space::selector::{KindSelector, Selector};
 use starlane_space::settings::Timeouts;
 use starlane_space::substance::{Bin, Substance};
+use starlane_space::types::property::PropertiesConfig;
 use starlane_space::util::{OptSelector, ValuePattern};
 use starlane_space::wave::core::cmd::CmdMethod;
 use starlane_space::wave::exchange::asynch::Exchanger;
@@ -785,7 +787,6 @@ impl ArtifactFetcher for ClientArtifactFetcher {
             .map_err(anyhow::Error::from)?
             .build();
 
-
         let mut wave = DirectedProto::ping();
         wave.method(CmdMethod::Read);
         wave.to(point.clone().to_surface().with_layer(Layer::Core));
@@ -793,7 +794,6 @@ impl ArtifactFetcher for ClientArtifactFetcher {
             .direct(wave)
             .await
             .map_err(anyhow::Error::from)?;
-
 
         pong.ok_or().err();
 

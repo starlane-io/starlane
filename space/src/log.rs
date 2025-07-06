@@ -68,11 +68,10 @@ impl LoggerStack {
     }
 }
 
-
 pub fn logger() -> Logger {
-    STACK.try_with(|logger| logger.clone()).unwrap_or_else(|_| {
-        Logger::default()
-    })
+    STACK
+        .try_with(|logger| logger.clone())
+        .unwrap_or_else(|_| Logger::default())
 }
 
 macro_rules! enter {

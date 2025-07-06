@@ -1,3 +1,1 @@
-
-
-pub type BaseErr=eyre::Error;
+pub type BaseErr = eyre::Error;

@@ -24,9 +24,9 @@ impl Package {
             }
         }
     }
-  
+
     pub fn add_slice(&mut self, slice: Slice) {
-      self.slices.push(slice);
+        self.slices.push(slice);
     }
 }
 
@@ -34,27 +34,25 @@ impl Package {
 pub struct Slice {
     segment: Segment,
     children: Box<Vec<Slice>>,
-    defs: HashMap<Type, Defs>
+    defs: HashMap<Type, Defs>,
 }
 
 impl Slice {
-  pub fn new(segment: Segment) -> Self {
-    Self {
-      segment,
-      children: Box::new(Default::default()),
-      defs: Default::default(),
+    pub fn new(segment: Segment) -> Self {
+        Self {
+            segment,
+            children: Box::new(Default::default()),
+            defs: Default::default(),
+        }
     }
-  }
-  
-  pub fn add_child(&mut self, child: Slice) {
-    self.children.push(child);
-  }
 
-  pub fn add_def(&mut self, r#type: Type, def: Defs) {
-    self.defs.insert(r#type,def);
-  }
+    pub fn add_child(&mut self, child: Slice) {
+        self.children.push(child);
+    }
+
+    pub fn add_def(&mut self, r#type: Type, def: Defs) {
+        self.defs.insert(r#type, def);
+    }
 }
 
-pub mod parse {
-    
-}
+pub mod parse {}

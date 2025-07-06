@@ -12,10 +12,10 @@ use std::ops::Deref;
 use strum_macros::{EnumDiscriminants, EnumString};
 use validator::ValidateRequired;
 
+use crate::types::archetype::Archetype;
 use crate::types::scope::parse::scope;
 use crate::types::specific::SpecificLoc;
 use once_cell::sync::Lazy;
-use crate::types::archetype::Archetype;
 
 pub static ROOT_SCOPE: Lazy<Scope> = Lazy::new(|| Scope(Some(ScopeKeyword::Root), vec![]));
 
@@ -199,16 +199,14 @@ impl Scope {
 
 #[cfg(test)]
 pub mod test {
+    use crate::parse::util::{new_span, result};
     use crate::types::scope::parse::parse;
     use crate::types::scope::ScopeKeyword;
-    use std::str::FromStr;
-    use crate::parse::util::{new_span, result};
     use crate::types2::scope::parse::scope;
-    
-    
+    use std::str::FromStr;
+
     #[test]
     fn text_x() {
-
         assert_eq!(ScopeKeyword::from_str("root").unwrap(), ScopeKeyword::Root);
         let domain = result(scope(new_span("hello"))).unwrap();
         assert_eq!(domain.to_string().as_str(), "hello");
@@ -216,7 +214,7 @@ pub mod test {
         assert_eq!(domain.prefix().is_none(), true);
     }
 
-/*
+    /*
 
         let scope = parse("root").unwrap();
         println!("{:?}", scope);
@@ -268,9 +266,9 @@ pub mod parse {
     pub fn scope<I: Span>(input: I) -> Res<I, Scope> {
         context(
             "scope parsing",
-            terminated(separated_list0(tag("::"), postfix_segment), tag("::"))
+            terminated(separated_list0(tag("::"), postfix_segment), tag("::")),
         )(input)
-            .map(|(next, segments)| (next, Scope::from_segments(segments))) 
+        .map(|(next, segments)| (next, Scope::from_segments(segments)))
     }
 
     fn prefix<I: Span>(input: I) -> Res<I, ScopeKeyword> {

@@ -2,12 +2,16 @@ pub mod config;
 pub mod err;
 pub mod provider;
 
+use crate::base::config::{BaseConfig, BaseSubConfig, FoundationConfig, ProviderConfig};
+use crate::base::provider::context::FoundationContext;
+use crate::base::provider::{Provider, ProviderKind, ProviderKindDisc};
 use crate::driver::DriversBuilder;
 use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 use crate::registry::{Registry, RegistryConfig};
 use anyhow::anyhow;
 use async_trait::async_trait;
+use err::BaseErr;
 use starlane_macros::logger;
 use starlane_space::artifact::asynch::Artifacts;
 use starlane_space::command::direct::create::KindTemplate;
@@ -18,34 +22,30 @@ use starlane_space::kind::{
 };
 use starlane_space::loc::{MachineName, StarKey, ToBaseKind};
 use starlane_space::log::Logger;
-use starlane_space::types::property::{PropertiesConfig, PropertiesConfigBuilder};
+use starlane_space::progress::Progress;
 use starlane_space::settings::Timeouts;
+use starlane_space::status;
+use starlane_space::status::{
+    Entity, EntityReadier, Status, StatusProbe, StatusReporter, StatusResult, StatusWatcher,
+};
+use starlane_space::types::property::{PropertiesConfig, PropertiesConfigBuilder};
 use std::str::FromStr;
 use std::sync::Arc;
-use starlane_space::progress::Progress;
-use starlane_space::status;
-use starlane_space::status::{Entity, EntityReadier, Status, StatusProbe, StatusReporter, StatusResult, StatusWatcher};
-use err::BaseErr;
-use crate::base::config::{BaseConfig, BaseSubConfig, FoundationConfig, ProviderConfig};
-use crate::base::provider::context::FoundationContext;
-use crate::base::provider::{Provider, ProviderKindDisc, ProviderKind};
 
-pub trait BaseSub: Send + Sync {
-
-}
+pub trait BaseSub: Send + Sync {}
 
 #[async_trait]
 pub trait Platform: BaseSub + Sized + Clone
-where Self: 'static,
+where
+    Self: 'static,
 {
-    
     type Config;
-    
-    type Err: std::error::Error + Send + Sync + From<anyhow::Error>+?Sized;
-    type StarAuth: HyperAuthenticator+?Sized;
-    type RemoteStarConnectionFactory: HyperwayEndpointFactory+Sized;
-    
-    fn config(&self) -> & Self::Config;
+
+    type Err: std::error::Error + Send + Sync + From<anyhow::Error> + ?Sized;
+    type StarAuth: HyperAuthenticator + ?Sized;
+    type RemoteStarConnectionFactory: HyperwayEndpointFactory + Sized;
+
+    fn config(&self) -> &Self::Config;
 
     async fn machine(&self) -> Result<MachineApi, Self::Err> {
         Ok(Machine::new_api(self.clone()).await?)
@@ -223,9 +223,8 @@ impl Default for Settings {
     }
 }
 
-pub trait PlatformConfig: BaseSubConfig
-{
-    type RegistryConfig: RegistryConfig+?Sized;
+pub trait PlatformConfig: BaseSubConfig {
+    type RegistryConfig: RegistryConfig + ?Sized;
 
     fn can_scorch(&self) -> bool;
     fn can_nuke(&self) -> bool;
@@ -237,9 +236,7 @@ pub trait PlatformConfig: BaseSubConfig
     fn enviro(&self) -> &String;
 }
 
-
-
-#[async_trait ]
+#[async_trait]
 pub trait Foundation: BaseSub {
     fn status(&self) -> StatusResult {
         self.status_watcher().borrow().clone()
@@ -258,9 +255,7 @@ pub trait Foundation: BaseSub {
     async fn ready(&self, progress: Progress) -> StatusResult;
 
     /// Returns a [Provider] by this [Foundation]
-    fn provider<P>(&self, kind: &ProviderKind) -> Result<Option<& P>, BaseErr> where P: Provider+EntityReadier;
+    fn provider<P>(&self, kind: &ProviderKind) -> Result<Option<&P>, BaseErr>
+    where
+        P: Provider + EntityReadier;
 }
-
-
-
-

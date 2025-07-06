@@ -1,8 +1,8 @@
+use crate::base::Platform;
 use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory,
     Particle, ParticleSphere, ParticleSphereInner, ParticleStarErr,
 };
-use crate::base::Platform;
 use crate::registry::Registration;
 use crate::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
 use async_trait::async_trait;

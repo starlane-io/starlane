@@ -44,9 +44,13 @@ use lerp::Lerp;
 use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
 use shadow_rs::shadow;
-use starlane_base::env;
-use starlane_base::env::{enviro_dir, ensure_global_settings, save_global_settings, set_enviro, STARLANE_HOME, config_exists, enviro};
 use starlane::starlane::Starlane;
+use starlane_base::env;
+use starlane_base::env::{
+    config_exists, ensure_global_settings, enviro, enviro_dir, save_global_settings, set_enviro,
+    STARLANE_HOME,
+};
+use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
 pub use starlane_hyperspace::base::Platform;
 use starlane_hyperspace::shutdown::shutdown;
 use starlane_macros::{create_mark, ToBase};
@@ -69,7 +73,6 @@ use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::{FileOptionExtension, FileOptions};
-use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
 /*
 let config = Default::default();
 
@@ -511,7 +514,7 @@ pub fn zip_dir<T>(
 where
     T: Write + Seek,
 {
- todo!()
+    todo!()
 }
 /*
 *
@@ -525,7 +528,7 @@ where
     T: Write + Seek,
 {
     let mut zip = zip::ZipWriter::new(writer);
-    
+
     let options: FileOptions<'_, _> = FileOptions::default()
         .compression_method(method)
         .unix_permissions(0o755);

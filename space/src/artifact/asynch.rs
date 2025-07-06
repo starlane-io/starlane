@@ -193,7 +193,7 @@ impl<A> Into<Result<ArtRef<A>, ArtErr>> for ArtStatus<A> {
 
 pub struct ArtifactPipeline<A>
 where
-    A: FromStr<Err =ParseErrs0>,
+    A: FromStr<Err = ParseErrs0>,
 {
     watch: watch::Receiver<ArtStatus<A>>,
 }
@@ -215,7 +215,7 @@ impl Default for ArtifactsSkel {
 
 impl<A> ArtifactPipeline<A>
 where
-    A: FromStr<Err =ParseErrs0> + 'static,
+    A: FromStr<Err = ParseErrs0> + 'static,
 {
     pub fn new(point: &Point, fetcher: Arc<dyn ArtifactFetcher>) -> ArtifactPipeline<A> {
         let runner = ArtifactPipelineRunner::new(point.clone(), fetcher);
@@ -244,7 +244,7 @@ struct ArtifactPipelineRunner<A> {
 
 impl<A> ArtifactPipelineRunner<A>
 where
-    A: FromStr<Err =ParseErrs0> + 'static,
+    A: FromStr<Err = ParseErrs0> + 'static,
 {
     pub fn new(point: Point, fetcher: Arc<dyn ArtifactFetcher>) -> Self {
         let (watch_tx, watch_rx) = watch::channel(ArtStatus::Unknown);
@@ -301,7 +301,7 @@ where
 
 struct ArtifactCache<A>
 where
-    A: FromStr<Err =ParseErrs0>,
+    A: FromStr<Err = ParseErrs0>,
 {
     skel: ArtifactsSkel,
     artifacts: DashMap<Point, ArtRef<A>>,
@@ -312,7 +312,7 @@ where
 
 impl<A> ArtifactCache<A>
 where
-    A: FromStr<Err =ParseErrs0> + 'static,
+    A: FromStr<Err = ParseErrs0> + 'static,
 {
     pub fn new(fetcher: Arc<dyn ArtifactFetcher>, skel: ArtifactsSkel) -> ArtifactCache<A> {
         ArtifactCache {
