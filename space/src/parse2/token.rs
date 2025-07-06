@@ -4,11 +4,11 @@ use crate::parse::{CamelCase, Domain, SkewerCase, SnakeCase};
 use crate::parse2::chars::ident;
 use crate::parse2::token::symbol::symbol;
 use crate::parse2::token::whitespace::whitespace;
-use crate::parse2::{ErrTree, Input, Res};
+use crate::parse2::{range, to_err, ErrTree, Input, Res};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::digit1;
-use nom::combinator::{all_consuming, eof, into, not, value};
+use nom::combinator::{all_consuming, eof, into, not};
 use nom::error::ParseError;
 use nom::multi::{many0, many1, separated_list1};
 use nom::sequence::terminated;
@@ -21,34 +21,25 @@ use std::str::FromStr;
 use strum_macros::{Display, EnumDiscriminants, EnumString, EnumTryAs};
 
 fn token<'a>(input: Input<'a>) -> Res<Token<'a>> {
-    let (next, kind) = alt((defined, undefined))(input.clone())?;
-    let len = input.len() - next.len();
+    let (next, (kind,len)) = loc(alt((defined, undefined)))(input.clone())?;
     let token = Token::new(input.slice(..len), kind);
     Ok((next, token))
 }
 
-fn diagnose<O>(mut f: impl FnMut(Input) -> Res<O>) -> impl FnMut(Input) -> Res<O>
-where
-    O: Debug + ToString,
-{
+/// returns tuple `Ok(Output,Range<usize>)` 
+fn loc<'a,O>(mut f:impl FnMut(Input<'a>) -> Res<O> ) -> impl FnMut(Input<'a>) -> Res<(O,usize)> {
     move |input| {
-        f(input)
-            .map(|(next, output)| {
-                println!("{:?}", output);
-                (next, output)
-            })
-            .map_err(|err| {
-                println!("Err: {:?}", err);
-                err
-            })
+       let (next, output) = f(input.clone())?;
+       let len = input.len() - next.len();
+       Ok((next, (output,len)))
     }
 }
 
 fn defined(input: Input) -> Res<TokenKind> {
-    alt((whitespace, symbol, into(ident)))(input)
+    alt((whitespace, symbol, into(ident),into(version)))(input)
 }
 fn undefined(input: Input) -> Res<TokenKind> {
-    recognize(many1(preceded(not(defined),take(1usize))))(input)
+    recognize(many1(preceded(not(defined), take(1usize))))(input)
         .map(|(next, undef)| (next, TokenKind::Undefined(undef.to_string())))
 }
 
@@ -67,9 +58,12 @@ fn tokenize(input: Input) -> Res<Vec<Token>> {
     all_consuming(terminated(tokens, eof))(input)
 }
 
+/*
 fn version_decl(input: Input) -> Res<TokenKind> {
     preceded(tag("version="), into(version))(input)
 }
+
+ */
 
 fn parse_u64(input: Input) -> Res<u64> {
     let (next, digits) = digit1(input)?;
@@ -79,14 +73,10 @@ fn parse_u64(input: Input) -> Res<u64> {
 }
 
 fn version(input: Input) -> Res<Version> {
-    separated_list1(tag(":"), parse_u64)(input).map(|(next, mut digits)| {
-        digits.reverse();
-        let mut i = digits.into_iter();
-        let major = i.next().unwrap();
-        let minor = i.next().unwrap();
-        let patch = i.next().unwrap();
-        (next, Version::new(major, minor, patch))
-    })
+    let (next,version) = recognize(separated_list1(tag("."), parse_u64))(input.clone())?;
+    let version = version.to_string();
+    let version = semver::Version::from_str(version.as_str()).map_err(|err|to_err(input,err))?; 
+    Ok((next, version))
 }
 
 #[derive(Clone, Debug)]
@@ -198,9 +188,10 @@ pub enum TokenKind {
     /// any cluster of whitespace: `space`, `tab` and `newline`
     Newline,
     /// anything that is not recognized by the parser
+    #[strum(to_string = "Undefined({0})")]
     Undefined(String),
     /// End of File
-    EOF, 
+    EOF,
     /// an erroneous token...
     Err(Range<usize>),
 }
@@ -528,12 +519,29 @@ pub fn result<R>(result: Res<R>) -> Result<R, ErrTree> {
     }
 }
 
-/*
 pub mod util {
-    use nom::error::{ErrorKind, ParseError};
+    use crate::parse2::{Input, Res};
     use nom::Parser;
-    use crate::parse2::{ErrTree, Input, Res};
+    use std::fmt::Debug;
 
+    pub fn diagnose<O>(mut f: impl FnMut(Input) -> Res<O>) -> impl FnMut(Input) -> Res<O>
+    where
+        O: Debug + ToString,
+    {
+        move |input| {
+            f(input)
+                .map(|(next, output)| {
+                    println!("{:?}", output);
+                    (next, output)
+                })
+                .map_err(|err| {
+                    println!("Err: {:?}", err);
+                    err
+                })
+        }
+    }
+
+    /*
     pub fn not<O, F>(mut check: impl FnMut(Input) -> Res<O>) -> impl FnMut(Input) -> Res<O>
     where
         F: FnMut(Input) -> Res<O>,
@@ -546,16 +554,17 @@ pub mod util {
             }
         }
     }
-}
 
- */
+     */
+}
 
 #[cfg(test)]
 pub mod tests {
-    use crate::parse2::token::symbol::symbol;
-    use crate::parse2::token::{diagnose, result, tokenize, undefined, Token, TokenKind};
     use crate::parse2::parse_operation;
+    use crate::parse2::token::symbol::symbol;
+    use crate::parse2::token::{result, tokenize, undefined, Token, TokenKind};
     use nom::combinator::all_consuming;
+    use crate::parse2::token::util::diagnose;
 
     #[test]
     pub fn symbols() {
@@ -568,7 +577,7 @@ pub mod tests {
     pub fn test_undefined() {
         let op = parse_operation("undefined", "^%%skewer");
         match diagnose(undefined)(op.input()) {
-            Ok(_) => { }
+            Ok(_) => {}
             Err(err) => {
                 panic!();
             }
