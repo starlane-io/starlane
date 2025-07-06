@@ -477,7 +477,7 @@ mod test {
 /// }
 ///
 /// impl TryInto<Child> for Parent {
-///   type Err=ParseErrs0;
+///   type Err=crate::err:AutoboxErr;
 ///
 ///   fn try_into(self) -> Result<Child,Self::Err> {
 ///     if let Self::Child(child) = self {
@@ -521,12 +521,12 @@ pub fn autobox(item: TokenStream) -> TokenStream {
 
                             xforms.push(quote! {
                                 impl TryInto<#ty> for #ident {
-                                    type Error=ParseErrs0;
+                                    type Error=crate::err:AutoboxErr;
 
                                     fn try_into(self) -> Result<#ty,Self::Error> {
                                         match self {
                                         Self::#variant_ident(val) => Ok(*val),
-                                        _ => Err(ParseErrs0::new(format!("expected {}",#ty_str)))
+                                        _ => Err(crate::err:AutoboxErr::new(format!("expected {}",#ty_str)))
                                         }
                                     }
                                 }
@@ -543,12 +543,12 @@ pub fn autobox(item: TokenStream) -> TokenStream {
                             let ty_str = ty.to_token_stream().to_string();
                             xforms.push(quote! {
                                 impl TryInto<#ty> for #ident {
-                                    type Error=ParseErrs0;
+                                    type Error=crate::err:AutoboxErr;
 
                                     fn try_into(self) -> Result<#ty,Self::Error> {
                                         match self {
                                             Self::#variant_ident(val) => Ok(val),
-                                            _ => Err(ParseErrs0::new(format!("expected {}",#ty_str)))
+                                            _ => Err(crate::err:AutoboxErr::new(format!("expected {}",#ty_str)))
                                         }
                                     }
                                 }
