@@ -1092,9 +1092,15 @@ pub enum AutoboxErr {
         from: String,
         to: String,
     },
+    #[error("{0}")]
+    Message(String),
 }
 
 impl AutoboxErr {
+    
+    pub fn new( message: impl ToString) -> Self {
+         Self::Message(message.to_string())
+    }
     pub fn no_into<A, B, C>(thing: A, from: B, to: C) -> Self
     where
         A: AsRef<str>,
