@@ -560,6 +560,7 @@ pub mod util {
 
 #[cfg(test)]
 pub mod tests {
+    use insta::assert_snapshot;
     use crate::parse2::parse_operation;
     use crate::parse2::token::symbol::symbol;
     use crate::parse2::token::{result, tokenize, undefined, Token, TokenKind};
@@ -571,6 +572,7 @@ pub mod tests {
         let op = parse_operation("equals", "=");
         let token = result(all_consuming(symbol)(op.input())).unwrap();
         assert_eq!(token, TokenKind::Equals);
+        assert_snapshot!(token);
     }
 
     #[test]
