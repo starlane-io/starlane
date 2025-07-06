@@ -7,7 +7,6 @@ mod token;
 use crate::parse2::token::{Token, TokenKind};
 use anyhow::__private::kind::AdhocKind;
 use ariadne::{Label, Report, ReportKind, Source};
-use ascii::AsciiStr;
 use itertools::Itertools;
 use nom::error::{ErrorKind, FromExternalError, ParseError};
 use nom::{Compare, Finish, IResult, InputLength, InputTake, Offset, Parser};

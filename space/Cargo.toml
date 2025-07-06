@@ -55,7 +55,6 @@ thiserror = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 chrono = { workspace = true, features = ["serde"] }
 tokio = { workspace = true, features = ["full"] }
-eyre = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
 getset= { workspace = true }
 
@@ -65,7 +64,6 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
-ascii = { workspace = true }
 url = { workspace = true, features = ["serde"] }
 serde_with_macros = { workspace = true }
 # hyper requirements
@@ -79,7 +77,6 @@ ariadne = { workspace = true }
 nom = { workspace = true }
 nom-supreme = { workspace = true }
 nom_locate = { workspace = true }
-regex = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true }
 serde_urlencoded = { workspace = true }
@@ -89,7 +86,6 @@ convert_case = { workspace = true }
 validator = { workspace = true }
 
 
-miette = {workspace = true}
 
 anyhow = { workspace = true }
 cliclack = { workspace = true }
@@ -98,13 +94,9 @@ derive-name = { workspace = true }
 md5 = { workspace = true }
 regex = "1.11.1"
 
-#tracing = { workspace = true, features=["std","log","attributes","tracing-attributes","max_level_trace"]}
-tracing = { workspace = true, features = ["std", "log", "attributes", "tracing-attributes", "async-await"] }
-dyn-clone = { workspace = true }
-
 [dev-dependencies]
-dummy = { workspace = true }
-mockall = { workspace = true }
+#dummy = { workspace = true }
+#mockall = { workspace = true }
 insta = { workspace = true }
 
 [build-dependencies]
