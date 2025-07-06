@@ -20,7 +20,12 @@ use std::ops::Range;
 use std::str::FromStr;
 use strum_macros::{Display, EnumDiscriminants, EnumString, EnumTryAs};
 
-fn token<'a>(input: Input<'a>) -> Res<Token<'a>> {
+pub fn tokenize(input: Input) -> Res<Vec<Token>> {
+    all_consuming(terminated(tokens, eof))(input)
+}
+
+
+pub(crate) fn token<'a>(input: Input<'a>) -> Res<Token<'a>> {
     let (next, (kind, len)) = loc(alt((defined, undefined)))(input.clone())?;
     let token = Token::new(input.slice(..len), kind);
     Ok((next, token))
@@ -54,9 +59,7 @@ fn tokens(input: Input) -> Res<Vec<Token>> {
     many0(token)(input)
 }
 
-fn tokenize(input: Input) -> Res<Vec<Token>> {
-    all_consuming(terminated(tokens, eof))(input)
-}
+
 
 /*
 fn version_decl(input: Input) -> Res<TokenKind> {
@@ -81,12 +84,13 @@ fn version(input: Input) -> Res<Version> {
 
 #[derive(Clone, Debug)]
 pub struct TokenDef<'a, K> {
-    span: Input<'a>,
-    kind: K,
+    pub span: Input<'a>,
+    pub kind: K,
 }
 
 pub type Token<'a> = TokenDef<'a, TokenKind>;
 pub type IdentToken<'a> = TokenDef<'a, Ident>;
+
 
 impl<'a, T> TokenDef<'a, T> {
     fn new(span: Input<'a>, kind: T) -> Self {
@@ -125,6 +129,12 @@ pub enum DocType {
     Package,
 }
 
+impl Into<CamelCase> for DocType {
+    fn into(self) -> CamelCase {
+        CamelCase(self.to_string())
+    }
+}
+
 #[derive(Clone, Debug)]
 struct Header {
     kind: DocType,
@@ -148,10 +158,7 @@ impl Header {
 #[strum_discriminants(name(TokenKindDisc))]
 #[strum_discriminants(derive(Hash, Display))]
 pub enum TokenKind {
-    /*    #[strum(to_string="Header({0})")]
-       Header(Header),
 
-    */
     #[strum(to_string = "Ident({0})")]
     Ident(Ident),
     #[strum(to_string = "BlockOpen({0})")]
@@ -194,6 +201,45 @@ pub enum TokenKind {
     EOF,
     /// an erroneous token...
     Err(Range<usize>),
+}
+
+impl TokenKind {
+    pub fn whitespace(&self) -> &'static WhiteSpace {
+        match self {
+            TokenKind::Space => & WhiteSpace::Space,
+            TokenKind::Newline => & WhiteSpace::Newline,
+            _ => & WhiteSpace::None
+        }
+    }
+}
+
+#[derive(Clone, Debug,Eq, PartialEq,Hash)]
+pub enum WhiteSpace {
+    None,
+    Space,
+    Newline,
+    Either 
+}
+
+impl TokenKind {
+    
+    pub fn is_whitespace(&self, whitespace: &'static WhiteSpace) -> bool {
+        match whitespace {
+            WhiteSpace::None => false,
+            WhiteSpace::Space => self.is_space(),
+            WhiteSpace::Newline => self.is_newline(),
+            WhiteSpace::Either => self.is_space() || self.is_newline()
+        }
+    }
+
+    pub fn is_space(&self) -> bool {
+        *self == Self::Space
+    }
+    
+    pub fn is_newline(&self) -> bool {
+         *self == Self::Newline
+    }
+    
 }
 
 impl<'a> From<Version> for TokenKind {
@@ -560,7 +606,7 @@ pub mod util {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::parse2::parse_operation;
+    use crate::parse2::parse;
     use crate::parse2::token::symbol::symbol;
     use crate::parse2::token::util::diagnose;
     use crate::parse2::token::{result, tokenize, undefined, Token, TokenKind};
@@ -570,7 +616,7 @@ pub mod tests {
 
     #[test]
     pub fn symbols() {
-        let op = parse_operation("equals", "=");
+        let op = parse("equals", "=");
         let token = result(all_consuming(symbol)(op.input())).unwrap();
         assert_eq!(token, TokenKind::Equals);
         assert_snapshot!(token);
@@ -578,7 +624,7 @@ pub mod tests {
 
     #[test]
     pub fn test_undefined() {
-        let op = parse_operation("undefined", "^%%skewer");
+        let op = parse("undefined", "^%%skewer");
         let (input, kind) = diagnose(undefined)(op.input()).unwrap();
         assert_snapshot!(input);
         assert_snapshot!(kind);
@@ -586,12 +632,41 @@ pub mod tests {
 
     #[test]
     pub fn tokenz() {
-        let op = parse_operation(
+        let op = parse(
             "tokenz",
             r#"
 Release(version=1.3.7){
   + <SomeClass>;
 }       
+        "#,
+        );
+
+        let tokens = result(tokenize(op.input())).unwrap();
+        assert_snapshot!(format!("{:?}", tokens));
+
+        assert_eq!(op.stack.len(), 0)
+    }
+
+
+    #[test]
+    pub fn more_tokens() {
+        let op = parse(
+            "more_tokens",
+            r#"
+Package(version=1.3.7){
+  + <SomeClass> {
+    
+  }
+  + 1.0.3<Slice> { 
+  
+  }
+  
+}       
+
+
+
+
+  
         "#,
         );
 

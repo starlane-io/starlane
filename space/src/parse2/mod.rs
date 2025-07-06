@@ -3,8 +3,9 @@ mod err;
 mod primitive;
 mod scaffold;
 mod token;
+mod ast;
 
-use crate::parse2::token::{Token, TokenKind};
+use crate::parse2::token::{tokenize, Token, TokenKind};
 use anyhow::__private::kind::AdhocKind;
 use ariadne::{Label, Report, ReportKind, Source};
 use itertools::Itertools;
@@ -22,6 +23,8 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, Range};
 use strum_macros::{Display, EnumString};
 use thiserror::Error;
+use crate::config::Document;
+use crate::parse2::ast::{ast, Tokens};
 
 type Input<'a> = LocatedSpan<&'a str, ParseOpRef<'a>>;
 
@@ -41,8 +44,9 @@ pub fn range<'a>(input: &'a Input<'a>) -> Range<usize> {
 }
 
 /// `op` is a helpful name of this parse operation i.e. `BindConf`,`PackConf` ...
-pub fn parse_operation(op: impl ToString, data: &str) -> ParseOp {
-    ParseOp::new(op.to_string(), data)
+pub fn parse(op: impl ToString, data: &str) -> ParseOp {
+    let op = ParseOp::new(op.to_string(), data);
+    op
 }
 
 pub type ErrTree<'a> =
@@ -225,6 +229,13 @@ impl<'a> ParseOp<'a> {
     fn input(&'a self) -> Input<'a> {
         Input::new_extra(self.data, self.to_ref())
     }
+    
+    /// returns nothing for now... just reporting errors while i figure out how this will work
+    pub fn parse(&'a self) {
+        let (_,tokens) = tokenize(self.input()).unwrap();
+        let tokens = Tokens::new(self,tokens);
+        ast(tokens)
+    } 
 }
 
 pub type ParseOpRef<'a> = ParseOperationDef<'a, &'a str, &'a [Ctx]>;
