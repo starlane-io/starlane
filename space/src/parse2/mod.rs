@@ -449,10 +449,11 @@ fn log(data: impl AsRef<str>, err: ErrTree) {
             }
         }
         ErrTree::Stack { base, contexts } => {
-            panic!();
+            panic!("\n\nERR !STACK\n\n");
         }
         ErrTree::Alt(_) => {
 
+            panic!("\n\nERR !ALT\n\n");
             panic!();
         }
     }
