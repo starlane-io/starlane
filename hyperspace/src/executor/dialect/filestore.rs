@@ -85,10 +85,10 @@ impl FileStore {
             FileStore::Cli(executor) => {
                 let kind: FileStoreInKind = (&input).into();
                 let mut input = input.into();
-println!("pre cliout");                
+                println!("pre cliout");
                 let mut out = executor.execute(input).await?;
 
-println!("post cliout...");
+                println!("post cliout...");
                 let rtn = match kind {
                     FileStoreInKind::Init => FileStoreOut::Init,
                     FileStoreInKind::Write { .. } => FileStoreOut::Write,

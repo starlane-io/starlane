@@ -1,3 +1,4 @@
+use crate::base::Platform;
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{DriverErr, DriverStatus, DriversApi, DriversBuilder, DriversCall};
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
@@ -7,7 +8,6 @@ use crate::hyperlane::{
 use crate::layer::field::Field;
 use crate::layer::shell::{Shell, ShellState};
 use crate::machine::{MachineApi, MachineErr, MachineSkel};
-use crate::base::Platform;
 use crate::registry::err::RegErr;
 use crate::registry::{Registration, Registry};
 use crate::service::ServiceTemplate;

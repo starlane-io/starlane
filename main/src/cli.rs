@@ -1,5 +1,6 @@
 use clap::clap_derive::{Args, Subcommand};
 use clap::Parser;
+use macros::logger;
 use starlane_base::env::STARLANE_HOME;
 use starlane_hyperspace::driver::control::{ControlCliSession, ControlClient};
 use starlane_hyperspace::hyperlane::tcp::HyperlaneTcpClient;
@@ -22,7 +23,6 @@ use strum_macros::EnumString;
 use tokio::io::AsyncWriteExt;
 use walkdir::{DirEntry, WalkDir};
 use zip::write::{FileOptions, FullFileOptions};
-use macros::logger;
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -272,7 +272,6 @@ fn zip_dir<T>(
 where
     T: Write + Seek,
 {
-
     todo!()
 }
 /*

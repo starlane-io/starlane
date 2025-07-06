@@ -1,7 +1,9 @@
 use crate::parse::util::Span;
 use crate::parse::{CamelCase, Res};
+use crate::types::archetype::Archetype;
 use crate::types::class::service::Service;
 use crate::types::parse;
+use crate::types::parse::Delimited;
 use core::str::FromStr;
 use derive_name::Name;
 use nom::Parser;
@@ -9,10 +11,20 @@ use serde_derive::{Deserialize, Serialize};
 use starlane_space::parse::from_camel;
 use std::borrow::Borrow;
 use strum_macros::EnumDiscriminants;
-use crate::types::archetype::Archetype;
-use crate::types::parse::Delimited;
 
-#[derive(Clone, Eq,PartialEq,Hash,Debug, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize,Name, strum_macros::EnumString )]
+#[derive(
+    Clone,
+    Eq,
+    PartialEq,
+    Hash,
+    Debug,
+    EnumDiscriminants,
+    strum_macros::Display,
+    Serialize,
+    Deserialize,
+    Name,
+    strum_macros::EnumString,
+)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ClassDiscriminant))]
 #[strum_discriminants(derive(
@@ -74,8 +86,6 @@ pub enum Class {
     _Ext(CamelCase),
 }
 
-
-
 pub mod service {
     use crate::parse::CamelCase;
     use crate::types::class::Class;
@@ -95,15 +105,11 @@ pub mod service {
         strum_macros::Display,
         Serialize,
         Deserialize,
-        Name
+        Name,
     )]
     #[strum_discriminants(vis(pub))]
     #[strum_discriminants(name(Discriminant))]
-    #[strum_discriminants(derive(
-        Hash,
-        strum_macros::EnumString,
-        strum_macros::ToString,
-    ))]
+    #[strum_discriminants(derive(Hash, strum_macros::EnumString, strum_macros::ToString,))]
     #[non_exhaustive]
     pub enum Service {
         /// an external facing web service such as `Nginx`
@@ -115,56 +121,50 @@ pub mod service {
         UserBase,
         #[strum(disabled)]
         #[strum(to_string = "{0}")]
-        _Ext(CamelCase)
+        _Ext(CamelCase),
     }
 
     impl Into<Class> for Service {
-        fn into(self) -> Class{
+        fn into(self) -> Class {
             Class::Service(self)
         }
     }
 
     pub trait Variant {
         type Root;
-        
     }
 
     impl Variant for Service {
         type Root = Class;
     }
-
 }
 
 impl Delimited for Class {
     fn delimiters() -> (&'static str, &'static str) {
-        ("<",">")
+        ("<", ">")
     }
 }
 
 impl Archetype for Class {
-
     fn parser<I>(input: I) -> Res<I, Self>
     where
-        I: Span
+        I: Span,
     {
         from_camel(input)
     }
 }
 
-
 impl From<CamelCase> for Class {
     fn from(camel: CamelCase) -> Self {
-
         match ClassDiscriminant::from_str(camel.as_str()) {
             /// this Ok match is actually an Error
-            Ok(ClassDiscriminant::_Ext) => panic!("ClassDiscriminant: not CamelCase '{}'",camel),
+            Ok(ClassDiscriminant::_Ext) => panic!("ClassDiscriminant: not CamelCase '{}'", camel),
             Ok(discriminant) => Self::try_from(discriminant.to_string().as_str()).unwrap(),
             /// if no match then it is an extension: [Class::_Ext]
             Err(_) => Class::_Ext(camel),
         }
     }
 }
-
 
 /*
 impl TryFrom<ClassDiscriminant> for Class{
@@ -185,12 +185,6 @@ impl TryFrom<ClassDiscriminant> for Class{
 
  */
 
-
-
-
-
-
-
 impl From<CamelCase> for ClassDiscriminant {
     fn from(src: CamelCase) -> Self {
         /// it should not be possible for this to fail
@@ -198,25 +192,14 @@ impl From<CamelCase> for ClassDiscriminant {
     }
 }
 
-
 impl Into<CamelCase> for ClassDiscriminant {
     fn into(self) -> CamelCase {
         CamelCase::from_str(self.to_string().as_str()).unwrap()
     }
 }
 
-
-
-
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ClassDef;
-
-
-
-
-
-
-
 
 /*
 mod parse {

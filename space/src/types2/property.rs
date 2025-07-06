@@ -1,18 +1,18 @@
-use core::str::FromStr;
-use std::collections::hash_map::Iter;
-use std::collections::HashMap;
-use std::ops::Deref;
-use getset::Getters;
 use crate::err::SpaceErr;
 use crate::parse::{SkewerCase, SnakeCase};
 use crate::point::Point;
+use crate::types::Absolute;
+use core::str::FromStr;
+use getset::Getters;
 use serde::Deserialize;
 use serde::Serialize;
+use std::collections::hash_map::Iter;
+use std::collections::HashMap;
+use std::ops::Deref;
 use thiserror::__private::AsDisplay;
 use validator::ValidateEmail;
-use crate::types::Absolute;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Getters)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Getters)]
 #[get = "pub"]
 pub struct PropertyDef {
     name: SnakeCase,
@@ -56,7 +56,6 @@ impl PropertyDef {
 impl PropertyDef {
     pub fn mock_less() -> Self {
         Self {
-            
             name: SnakeCase::from_str("less").unwrap(),
             required: false,
             mutable: false,
@@ -69,7 +68,6 @@ impl PropertyDef {
 
     pub fn mock_fae() -> Self {
         Self {
-
             name: SnakeCase::from_str("fae").unwrap(),
             required: false,
             mutable: false,
@@ -82,7 +80,6 @@ impl PropertyDef {
 
     pub fn mock_modus() -> Self {
         Self {
-
             name: SnakeCase::from_str("modus").unwrap(),
             required: false,
             mutable: false,
@@ -175,7 +172,7 @@ pub enum PropertySource {
     CoreSecret,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Getters)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Getters)]
 #[get = "pub"]
 pub struct PropertiesConfig {
     absolute: Absolute,
@@ -191,7 +188,6 @@ impl Deref for PropertiesConfig {
 }
 
 impl PropertiesConfig {
-
     pub fn builder(absolute: Absolute) -> PropertiesConfigBuilder {
         PropertiesConfigBuilder {
             absolute,
@@ -218,7 +214,6 @@ impl PropertiesConfig {
         }
         rtn
     }
-    
 
     pub fn check_create(&self, set: &SetProperties) -> Result<(), SpaceErr> {
         for req in &self.required() {
@@ -358,7 +353,7 @@ impl PropertiesConfigBuilder {
             properties: HashMap::new(),
         };
         /// disabled for now while properties are getting better sorted out
-//        rtn.add_property(SnakeCase::from_str("bind").unwrap(), false, true).unwrap();
+        //        rtn.add_property(SnakeCase::from_str("bind").unwrap(), false, true).unwrap();
         rtn
     }
 
@@ -380,26 +375,46 @@ impl PropertiesConfigBuilder {
         constant: bool,
         permits: Vec<PropertyPermit>,
     ) -> Result<(), SpaceErr> {
-        self.push(PropertyDef::new(name.clone(), required, mutable, source, default, constant, permits)?);
+        self.push(PropertyDef::new(
+            name.clone(),
+            required,
+            mutable,
+            source,
+            default,
+            constant,
+            permits,
+        )?);
         Ok(())
     }
-    
-    pub fn push( &mut self, def: PropertyDef){
+
+    pub fn push(&mut self, def: PropertyDef) {
         self.properties.insert(def.name.clone(), def);
     }
-    
-    
-    pub fn remove(&mut self, name: & SnakeCase)  {
+
+    pub fn remove(&mut self, name: &SnakeCase) {
         self.properties.remove(name);
     }
 
     pub fn add_string(&mut self, name: SnakeCase) -> Result<(), SpaceErr> {
-        let def = PropertyDef::new(name.clone(),false, true, PropertySource::Shell, None, false, vec![])?;
+        let def = PropertyDef::new(
+            name.clone(),
+            false,
+            true,
+            PropertySource::Shell,
+            None,
+            false,
+            vec![],
+        )?;
         self.properties.insert(name, def);
         Ok(())
     }
 
-    pub fn add_property(&mut self, name: SnakeCase, required: bool, mutable: bool) -> Result<(), SpaceErr> {
+    pub fn add_property(
+        &mut self,
+        name: SnakeCase,
+        required: bool,
+        mutable: bool,
+    ) -> Result<(), SpaceErr> {
         let prop_name = name.clone();
         let def = PropertyDef::new(
             name,

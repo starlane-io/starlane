@@ -1683,9 +1683,12 @@ impl FromReflectedAggregate for WaveVariantDef<PongCore> {
                 _ => Err(SpaceErr::bad_request("expected a Pong Reflected")),
             },
 
-            ReflectedAggregate::None => Err(SpaceErr::bad_request("expected a Single Reflected, encountered: None")),
-            ReflectedAggregate::Multi(_) =>Err(SpaceErr::bad_request("expected a Single Reflected, encountered: Multi"))
-
+            ReflectedAggregate::None => Err(SpaceErr::bad_request(
+                "expected a Single Reflected, encountered: None",
+            )),
+            ReflectedAggregate::Multi(_) => Err(SpaceErr::bad_request(
+                "expected a Single Reflected, encountered: Multi",
+            )),
         }
     }
 }

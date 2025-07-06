@@ -1,17 +1,19 @@
-use core::str::FromStr;
-use derive_name::Name;
-use serde_derive::{Deserialize, Serialize};
-use strum_macros::{Display, EnumDiscriminants};
-use starlane_space::parse::from_camel;
-use starlane_space::types::PointKindDefSrc;
-use crate::parse::{CamelCase, Res};
 use crate::parse::util::Span;
+use crate::parse::{CamelCase, Res};
 use crate::types::archetype::Archetype;
 use crate::types::class::Class;
 use crate::types::parse::Delimited;
 use crate::types::TypeDisc;
+use core::str::FromStr;
+use derive_name::Name;
+use serde_derive::{Deserialize, Serialize};
+use starlane_space::parse::from_camel;
+use starlane_space::types::PointKindDefSrc;
+use strum_macros::{Display, EnumDiscriminants};
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants,  Serialize,Deserialize,Name,Display)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, Serialize, Deserialize, Name, Display,
+)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(DataType))]
 #[strum_discriminants(derive(
@@ -35,7 +37,19 @@ pub enum Data {
     _Ext(CamelCase),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::EnumString, strum_macros::Display, Serialize,Deserialize,Name)]
+#[derive(
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    EnumDiscriminants,
+    strum_macros::EnumString,
+    strum_macros::Display,
+    Serialize,
+    Deserialize,
+    Name,
+)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ConfigKind))]
 #[strum_discriminants(derive(
@@ -52,7 +66,7 @@ pub enum Config {
     Pack,
     /// [Config::Slice] config (child of a [ConfigKind::Pack])
     Slice,
-    /// [Config::Bind] config describes how a [Type] plugs into Starlane 
+    /// [Config::Bind] config describes how a [Type] plugs into Starlane
     Bind,
     #[strum(disabled)]
     #[strum(to_string = "{0}")]
@@ -62,11 +76,8 @@ pub enum Config {
 pub enum StringType {
     Camel,
     Skewer,
-    Snake
+    Snake,
 }
-
-
-
 
 /*
 impl Into<TypeKind> for SchemaKind {
@@ -79,19 +90,17 @@ impl Into<TypeKind> for SchemaKind {
 
 impl Delimited for DataType {
     fn delimiters() -> (&'static str, &'static str) {
-        ("[","]")
+        ("[", "]")
     }
 }
 
 impl Archetype for DataType {
-
     fn parser<I>(input: I) -> Res<I, Self>
     where
-        I: Span
+        I: Span,
     {
         from_camel(input)
     }
-
 }
 
 /*
@@ -103,25 +112,18 @@ impl Into<TypeKind>  for SchemaKind {
 
  */
 
-
 impl From<CamelCase> for DataType {
-   fn from(camel: CamelCase) -> Self {
+    fn from(camel: CamelCase) -> Self {
         ///
         match DataType::from_str(camel.as_str()) {
             /// this Ok match is actually an Error
-            Ok(DataType::_Ext) => panic!("DataDisc : not CamelCase '{}'",camel),
+            Ok(DataType::_Ext) => panic!("DataDisc : not CamelCase '{}'", camel),
             Ok(discriminant) => Self::try_from(discriminant.to_string().as_str()).unwrap(),
             /// if no match then it is an extension: [Class::_Ext]
-            Err(_) => DataType::_Ext
+            Err(_) => DataType::_Ext,
         }
     }
 }
-
-
-
-
-
-
 
 /*
 impl Into<TypeKind> for SchemaKind {
@@ -132,8 +134,6 @@ impl Into<TypeKind> for SchemaKind {
 
  */
 
-
-
 impl Into<CamelCase> for DataType {
     fn into(self) -> CamelCase {
         CamelCase::from_str(self.to_string().as_str()).unwrap()
@@ -141,13 +141,12 @@ impl Into<CamelCase> for DataType {
 }
 
 impl Into<TypeDisc> for DataType {
-    fn into(self) -> TypeDisc{
+    fn into(self) -> TypeDisc {
         TypeDisc::Data
     }
 }
 
 pub type BindConfigSrc = PointKindDefSrc<DataType>;
-
 
 /*
 

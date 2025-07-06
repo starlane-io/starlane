@@ -1166,16 +1166,16 @@ pub fn token(attr: TokenStream, input: TokenStream) -> TokenStream {
     let sig = m1.sig;
     let ident = m0.sig.ident.clone();
     let block = m1.block;
-    m0.sig.ident = format_ident!("_{}",sig.ident);
+    m0.sig.ident = format_ident!("_{}", sig.ident);
 
     match sig.inputs.first() {
         Some(FnArg::Typed(PatType { ty, .. })) => {
             if "Input" == ty.to_token_stream().to_string().as_str() {
                 let expanded = quote! {
-#sig {
-   expect( move |input| #block, "segment", "x", "y" )(i)
-}
-                };
+                #sig {
+                   expect( move |input| #block, "segment", "x", "y" )(i)
+                }
+                                };
 
                 print!(
                     r#"
@@ -1191,7 +1191,7 @@ pub fn token(attr: TokenStream, input: TokenStream) -> TokenStream {
                 panic!("2x")
             }
         }
-        what => panic!("push_ctx_for_input only works with signature: FnMut(I) -> Res<O>")
+        what => panic!("push_ctx_for_input only works with signature: FnMut(I) -> Res<O>"),
     }
 }
 #[proc_macro_attribute]
@@ -1203,17 +1203,17 @@ pub fn push_ctx_for_input(attr: TokenStream, input: TokenStream) -> TokenStream 
     let sig = m1.sig;
     let ident = m0.sig.ident.clone();
     let block = m1.block;
-    m0.sig.ident = format_ident!("_{}",sig.ident);
+    m0.sig.ident = format_ident!("_{}", sig.ident);
 
     match sig.inputs.first() {
         Some(FnArg::Typed(PatType { ty, .. })) => {
             if "Input" == ty.to_token_stream().to_string().as_str() {
                 let expanded = quote! {
-#sig {
-   expect( move |input| #block, "segment", "x", "y" )(i)
-}
-                };
-                
+                #sig {
+                   expect( move |input| #block, "segment", "x", "y" )(i)
+                }
+                                };
+
                 print!(
                     r#"
 *********** push_ctx ***********
@@ -1228,7 +1228,7 @@ pub fn push_ctx_for_input(attr: TokenStream, input: TokenStream) -> TokenStream 
                 panic!("2x")
             }
         }
-        what => panic!("push_ctx_for_input only works with signature: FnMut(I) -> Res<O>")
+        what => panic!("push_ctx_for_input only works with signature: FnMut(I) -> Res<O>"),
     }
 }
 

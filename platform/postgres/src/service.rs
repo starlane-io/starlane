@@ -78,7 +78,10 @@ pub trait Provider: provider::Provider {
 
 /// trait implementation [Provider::Entity]
 #[async_trait]
-pub trait PostgresService: status::Entity + StatusProbe + Send + Sync + PostgresConnectionProvider { }
+pub trait PostgresService:
+    status::Entity + StatusProbe + Send + Sync + PostgresConnectionProvider
+{
+}
 
 pub type PostgresServiceHandle = Handle<dyn PostgresService>;
 

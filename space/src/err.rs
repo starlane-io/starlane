@@ -2,8 +2,6 @@
 //! I started this project I was new to Rust.  It needs to be refactored at some point
 //! --Scott
 
-
-
 use anyhow::anyhow;
 use bincode::ErrorKind;
 use nom::error::{FromExternalError, VerboseError};
@@ -600,7 +598,6 @@ pub struct ParseErrs0 {
     pub src: String,
 }
 
-
 impl Into<AutoboxErr> for ParseErrs0 {
     fn into(self) -> AutoboxErr {
         AutoboxErr::ParseErrs0(self)
@@ -882,8 +879,7 @@ pub mod report {
         labels: Vec<Label>,
     }
 
-    impl <'a> Into<ariadne::Report<'a>> for Report {
-
+    impl<'a> Into<ariadne::Report<'a>> for Report {
         fn into(self) -> ariadne::Report<'a> {
             panic!("starlane_space::err::report::Report::into() disabled for now")
         }
@@ -898,7 +894,7 @@ pub mod report {
             }
             builder.finish()
         }
-        
+
          */
     }
 
@@ -971,7 +967,7 @@ pub mod report {
         Advice,
     }
 
-    impl <'a> Into<ariadne::ReportKind<'a>> for ReportKind {
+    impl<'a> Into<ariadne::ReportKind<'a>> for ReportKind {
         fn into(self) -> ariadne::ReportKind<'a> {
             match self {
                 ReportKind::Error => ariadne::ReportKind::Error,
@@ -1107,18 +1103,14 @@ pub enum AutoboxErr {
     },
     #[error("{0}")]
     Message(String),
-    /// todo: get rid of ParseErrs0 in favor of a common cast err 
+    /// todo: get rid of ParseErrs0 in favor of a common cast err
     #[error("{0}")]
     ParseErrs0(ParseErrs0),
 }
 
-
-
-
 impl AutoboxErr {
-
-    pub fn new( message: impl ToString) -> Self {
-         Self::Message(message.to_string())
+    pub fn new(message: impl ToString) -> Self {
+        Self::Message(message.to_string())
     }
     pub fn no_into<A, B, C>(thing: A, from: B, to: C) -> Self
     where
@@ -1136,7 +1128,7 @@ impl AutoboxErr {
 
 impl Into<ParseErrs0> for AutoboxErr {
     fn into(self) -> ParseErrs0 {
-        ParseErrs0::new( self.to_string())
+        ParseErrs0::new(self.to_string())
     }
 }
 

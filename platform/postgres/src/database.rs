@@ -1,12 +1,12 @@
 use crate::database::partial::pool::PostgresDatabaseConnectionPoolProvider;
 /// these reexports must come from [crate::service] since they are mocks when `#[cfg(test)]`
 use crate::service;
+use crate::service::Pool;
 use async_trait::async_trait;
 use base::status::{Entity, Handle, StatusProbe};
 use starlane_base as base;
 use std::future::Future;
 use std::ops::Deref;
-use crate::service::Pool;
 
 pub type PostgresDatabaseHandle = Handle<PostgresDatabase>;
 
@@ -24,10 +24,10 @@ pub type PostgresDatabaseHandle = Handle<PostgresDatabase>;
 ///     }
 /// }
 /// ```
-/// 
-/// 
+///
+///
 pub struct PostgresDatabase {
-    pool: Pool
+    pool: Pool,
 }
 impl Entity for PostgresDatabase {}
 
@@ -35,21 +35,19 @@ impl Deref for PostgresDatabase {
     type Target = Pool;
 
     fn deref(&self) -> &Self::Target {
-        & self.pool
+        &self.pool
     }
 }
 
-impl PostgresDatabaseConnectionPoolProvider  for PostgresDatabase {
+impl PostgresDatabaseConnectionPoolProvider for PostgresDatabase {
     fn pool(&self) -> &Pool {
-        & self.pool
+        &self.pool
     }
 }
-
 
 /// final [starlane::config::ProviderConfig] trait definitions for [concrete::PostgresProviderConfig]
 #[async_trait]
-pub trait ProviderConfig: service::ProviderConfig {
-}
+pub trait ProviderConfig: service::ProviderConfig {}
 
 mod concrete {
     use std::future::Future;
@@ -96,11 +94,11 @@ mod concrete {
         }
     }
 
-    impl provider::config::ProviderConfig for Config { }
+    impl provider::config::ProviderConfig for Config {}
 
-    impl BaseSubConfig for Config { }
+    impl BaseSubConfig for Config {}
 
-    impl starlane_hyperspace::base::config::ProviderConfig for Config { }
+    impl starlane_hyperspace::base::config::ProviderConfig for Config {}
 
     impl ProviderConfig for Config {}
 
@@ -130,7 +128,7 @@ mod concrete {
         type Target = Pool;
 
         fn deref(&self) -> &Self::Target {
-            & self.pool
+            &self.pool
         }
     }
 
@@ -139,7 +137,6 @@ mod concrete {
             &self.pool
         }
     }
-
 
     #[async_trait]
     impl EntityReadier for PostgresDatabaseProvider {
@@ -150,10 +147,10 @@ mod concrete {
         }
     }
 
-    impl BaseSub for PostgresDatabaseProvider { }
+    impl BaseSub for PostgresDatabaseProvider {}
 
     #[async_trait]
-    impl Provider for PostgresDatabaseProvider { }
+    impl Provider for PostgresDatabaseProvider {}
 
     #[async_trait]
     impl StatusProbe for PostgresDatabaseProvider {
@@ -165,7 +162,7 @@ mod concrete {
     pub struct PostgresDatabase {
         config: Config,
         service: PostgresServiceHandle,
-        pool: Pool
+        pool: Pool,
     }
 
     impl PostgresDatabase {
@@ -188,13 +185,13 @@ mod concrete {
             let pool: MockPool<sqlx::Postgres> = Pool::default();
             Self {
                 config,
-                service, pool,
+                service,
+                pool,
             }
         }
     }
 
-    impl Entity for PostgresDatabase { }
-    
+    impl Entity for PostgresDatabase {}
 
     #[async_trait]
     impl StatusProbe for PostgresDatabase {
@@ -222,9 +219,9 @@ pub mod partial {
 
     /// connection pool support
     pub mod pool {
-        use std::ops::Deref;
-        use sqlx::PgPool;
         use crate::service::Pool;
+        use sqlx::PgPool;
+        use std::ops::Deref;
         pub trait PostgresDatabaseConnectionPoolProvider: Deref<Target = Pool> {
             fn pool(&self) -> &Pool;
         }
@@ -234,7 +231,5 @@ pub mod partial {
 #[cfg(test)]
 pub mod tests {
     #[tokio::test]
-    pub async fn test_handle_deref() {
-
-    }
+    pub async fn test_handle_deref() {}
 }
