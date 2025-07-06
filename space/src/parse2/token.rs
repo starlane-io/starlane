@@ -560,6 +560,7 @@ pub mod util {
 
 #[cfg(test)]
 pub mod tests {
+    use insta::_macro_support::assert_snapshot;
     use insta::assert_snapshot;
     use crate::parse2::parse_operation;
     use crate::parse2::token::symbol::symbol;
@@ -578,12 +579,9 @@ pub mod tests {
     #[test]
     pub fn test_undefined() {
         let op = parse_operation("undefined", "^%%skewer");
-        match diagnose(undefined)(op.input()) {
-            Ok(_) => {}
-            Err(err) => {
-                panic!();
-            }
-        }
+        let (input,kind) = diagnose(undefined)(op.input()).unwrap();
+        assert_snapshot!(input);
+        assert_snapshot!(kind);
     }
 
     #[test]
@@ -598,7 +596,7 @@ Release(version=1.3.7){
         );
 
         let tokens = result(tokenize(op.input())).unwrap();
-        diag(&tokens);
+        assert_snapshot!(format!("{:?}",tokens));
 
         assert_eq!(op.stack.len(), 0)
     }
