@@ -1,31 +1,33 @@
 use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::{preceded, Span};
-use crate::parse::{rec_version, CamelCase, Domain, SkewerCase, SnakeCase};
+use crate::parse::{CamelCase, Domain, SkewerCase, SnakeCase};
 use crate::parse2::chars::ident;
-use crate::parse2::token::block::block;
 use crate::parse2::token::punctuation::punctuation;
-use crate::parse2::{to_err, ErrTree, Input, Res};
-use derive_builder::Builder;
+use crate::parse2::{ErrTree, Input, Res};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::multispace0;
+use nom::character::complete::digit1;
 use nom::combinator::into;
-use nom::error::{ErrorKind, ParseError};
-use nom::multi::many0;
-use nom::sequence::tuple;
+use nom::error::ParseError;
+use nom::multi::{many0, separated_list1};
 use nom::{Offset, Parser, Slice};
 use nom_supreme::ParserExt;
 use semver::Version;
-use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::Range;
 use std::str::FromStr;
-use ascii::AsciiChar::P;
-use strum_macros::{Display, EnumDiscriminants, EnumString, EnumTryAs, FromRepr};
+use strum_macros::{Display, EnumDiscriminants, EnumString, EnumTryAs};
 
-fn token(input: Input) -> Res<Token> {
+fn token<'a>(input: Input<'a>) -> Res<Token<'a>> {
     use whitespace::whitespace;
-    alt((tok(block),tok(whitespace),tok(punctuation), tok(ident)))(input)
+    let (next,kind)= alt((whitespace,punctuation, into(ident)))(input.clone())?;
+    let len = input.len() - next.len();
+    let token = Token::new(input.slice(..len), kind);
+    Ok((next, token))
+}
+
+fn into_token<'a,O>(f: impl FnMut(Input) -> Res<O>+Copy) -> impl FnMut(Input) -> Res<Token<'a>> where O: Into<Token<'a>>{
+    move |input| into(f)(input)
 }
 
 fn tokens(input: Input) -> Res<Vec<Token>> {
@@ -34,81 +36,60 @@ fn tokens(input: Input) -> Res<Vec<Token>> {
 
 
 fn tokenize(input: Input) -> Res<Vec<Token>> {
-  
-    
-    todo!()
-
+    tokens(input)
 }
 
 
-fn header(input: Input) -> Res<Header> {
-    
-    
-    let (next,(ident,_,block))= tuple((input_token(ident),multispace0,input_token(block::parenthesis(version_decl))))(input.clone())?;
-    let ident_str = ident.to_string();
-    let kind = DocType::from_str(ident_str.as_str()).map_err(|e| to_err(input,e)) ?;
-    
-    let header = Header::new(kind,version);
 
-    (next,tokens)})
-
+fn version_decl(input: Input) -> Res<TokenKind> {
+    preceded(tag("version="),into(version))(input)
 }
 
-fn version_decl(input: Input) -> Res<InputToken> {
-    preceded(tag("version="),input_token(into(version)))(input)
+fn parse_u64(input: Input) -> Res<u64> {
+    let (next,digits) = digit1(input)?;
+    let digits = digits.to_string();
+    let digits : u64= digits.parse().map_or_else(|_| u64::MAX, |r|r);
+    Ok((next,digits))
 }
 
 fn version(input: Input) -> Res<Version> {
-    let (next, version) = rec_version(input.clone())?;
-    let version = version.to_string();
-    let str_input = version.as_str();
-    let rtn = semver::Version::parse(str_input);
-    match rtn {
-        Ok(version) => Ok((next,version)),
-        Err(err) => Err(nom::Err::Error(ErrTree::from_error_kind(input, ErrorKind::Fail)))
-    }
-
+    separated_list1(tag(":"),parse_u64)(input).map(|(next,mut digits)|{
+        digits.reverse();
+        let mut i = digits.into_iter();
+        let major = i.next().unwrap();
+        let minor = i.next().unwrap();
+        let patch = i.next().unwrap();
+        (next,Version::new(major,minor,patch))
+    })
 }
 
 #[derive(Clone, Debug)]
-pub struct TokLocDef<S,T>{
-    span: S,
-    kind: T,
+pub struct TokenDef<'a,K>{
+    span: Input<'a>,
+    kind: K,
 }
 
-pub type TokLoc<T> = TokLocDef<Range<usize>,TokenKindDef>;
+pub type Token<'a> = TokenDef<'a, TokenKind>;
+pub type IdentToken<'a> = TokenDef<'a,Ident>;
 
-pub type Token = TokLoc<TokenKindDef>;
-pub type InputToken<'a> = TokLocDef<Input<'a>, TokenKindDef>;
-pub type IdentToken = TokLoc<Ident>;
 
-impl <S,T> TokLocDef<S,T> {
-    fn new(span: S, kind: T) -> TokLocDef<S,T> {
+
+impl <'a,T> TokenDef<'a,T> {
+    fn new(span: Input<'a>, kind: T) -> Self {
         Self {
             span,
             kind
         }
     }
 
-    fn with<T2>(self, kind: T2) -> TokLocDef<S,T2> {
-        let span = self.span;
-        Self {
-            span,
+    fn with<T2>(self, kind: T2) -> TokenDef<'a,T2> {
+        TokenDef {
+            span: self.span,
             kind
         }
     }
 }
 
-impl <T> TokLoc<T> {
-    pub fn with_span<'a,S2>(self, input: Input ) -> TokLocDef<S2, T> {
-        let span = Input::new_extra(input.extra.data,input.extra.clone()).slice(&self.span);
-        let kind = self.kind;
-        TokLocDef {
-            span,
-            kind
-        }
-    }
-}
 
 
 #[derive(Debug, Clone )]
@@ -118,12 +99,6 @@ struct Block<T> {
 }
 
 
-
-impl Into<TokenKindDef> for Block<Token> {
-    fn into(self) -> TokenKindDef {
-        TokenKindDef::Block(self)
-    }
-}
 
 impl <T> Block<T> {
     fn new( kind: impl Into<BlockKind>, tokens: Vec<T> ) -> Self {
@@ -152,6 +127,12 @@ struct Header {
     version: Version
 }
 
+impl Display for Header {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}(version={})", self.kind,self.version)
+    }
+}
+
 impl Header {
     pub fn new(kind: DocType, version: Version) -> Self {
         Self {
@@ -163,9 +144,9 @@ impl Header {
 
 #[derive(Clone, Debug, EnumDiscriminants, Display,EnumTryAs)]
 #[strum_discriminants(vis(pub))]
-#[strum_discriminants(name(TokenKind))]
+#[strum_discriminants(name(TokenKindDisc))]
 #[strum_discriminants(derive(Hash,Display))]
-enum TokenKindDef {
+pub enum TokenKind {
     #[strum(to_string="Header({0})")]
     Header(Header),
     #[strum(to_string="Ident({0})")]
@@ -175,8 +156,8 @@ enum TokenKindDef {
     #[strum(to_string="BlockClose({0})")]
     Close(NestedBlockKind),
 
-    #[strum(to_string="BlockOpen({0})")]
-    Block(Block<Token>),
+    //#[strum(to_string="BlockOpen({0})")]
+    //Block(Block<Token<'a>>),
     /// `+` symbol
     Plus,
     /// `@` symbol
@@ -205,24 +186,15 @@ enum TokenKindDef {
     Err(Range<usize>),
 }
 
-impl TryInto<IdentToken> for InputToken {
-    type Error = nom::Err(ErrTree);
 
-    fn try_into(self) -> Result<IdentToken, Self::Error> {
-        match &self.kind {
-            TokenKindDef::Ident(ident) => Ok(self.with(ident.clone())),
-            what => to_err(self.span,format!("Illegal cast. '{}' cannot be casted into: 'Ident'", self.kind ))
-        }
-    }
-} 
 
-impl From<Version> for TokenKindDef {
+impl <'a> From<Version> for TokenKind {
     fn from(version: Version) -> Self {
         Self::Version(version)
     }
 }
 
-impl TokenKindDef {
+impl TokenKind {
     fn open(block: NestedBlockKind) -> Self {
         Self::Open(block)
     }
@@ -253,9 +225,9 @@ pub(crate) enum Ident {
 
 
 
-impl From<Ident> for TokenKindDef {
+impl From<Ident> for TokenKind {
     fn from(ident: Ident) -> Self {
-        TokenKindDef::Ident(ident)
+        TokenKind::Ident(ident)
     }
 }
 
@@ -291,6 +263,7 @@ impl From<Version> for Ident {
     }
 }
 
+/*
 #[derive(Clone, Builder)]
 pub struct DocTokenized {
     pub kind: Token,
@@ -298,27 +271,26 @@ pub struct DocTokenized {
     pub defs: HashMap<Ident, Vec<Token>>,
 }
 
-#[derive(Clone, Builder)]
-pub struct DocLayer {
-    pub kind: Token,
-    pub defs: HashMap<Ident, Vec<Token>>,
-}
+
+ */
+
 
 pub(super) mod block {
     use crate::parse::model::NestedBlockKind;
-    use crate::parse2::token::{tokens, Block, TokenKindDef};
-    use crate::parse2::{ErrTree, Input, Res};
+    use crate::parse2::token::{tokens, Block, TokenKind};
+    use crate::parse2::{Input, Res};
     use nom::branch::alt;
     use nom::error::FromExternalError;
     use nom::sequence::delimited;
-    use nom_supreme::error::Expectation;
 
+    /*
     pub fn block_with<O>(tokens: impl FnMut(Input) -> Res<Vec<O>>+Copy) -> impl FnMut(Input) -> Res<Vec<O>> {
         |input| alt((angle(tokens), square(tokens), parenthesis(tokens), curly(tokens)))(input)
     }
+    
 
 
-    pub fn block(input: Input) -> Res<TokenKindDef> {
+    pub fn block(input: Input) -> Res<TokenKind> {
         alt((angle(tokens),square(tokens),parenthesis(tokens),curly(tokens)))(input)
     }
 
@@ -339,9 +311,10 @@ pub(super) mod block {
     }
 
 
+     */
     pub(super) mod open {
         use crate::parse::model::NestedBlockKind;
-        use crate::parse2::token::TokenKindDef;
+        use crate::parse2::token::TokenKind;
         use crate::parse2::{Input, Res};
         use nom::branch::alt;
         use nom::Parser;
@@ -368,9 +341,9 @@ pub(super) mod block {
             alt((angle, square, parenthesis, curly))(input)
         }
 
-        pub fn token(input: Input) -> Res<TokenKindDef> {
+        pub fn token(input: Input) -> Res<TokenKind> {
             open(input).map(|(next, kind)| {
-                let kind = TokenKindDef::Open(kind);
+                let kind = TokenKind::Open(kind);
                 (next, kind)
             })
         }
@@ -378,11 +351,10 @@ pub(super) mod block {
 
     pub(super) mod close {
         use crate::parse::model::NestedBlockKind;
-        use crate::parse2::token::TokenKindDef;
-        use crate::parse2::{to_err, ErrTree, Input, Res};
+        use crate::parse2::token::TokenKind;
+        use crate::parse2::{Input, Res};
         use nom::branch::alt;
-        use nom::{Parser, Slice};
-        use nom_supreme::error::{BaseErrorKind, Expectation};
+        use nom::Parser;
         use nom_supreme::tag::complete::tag;
 
         pub fn angle(input: Input) -> Res<NestedBlockKind> {
@@ -394,13 +366,7 @@ pub(super) mod block {
         }
 
         pub fn parenthesis(input: Input) -> Res<NestedBlockKind> {
-            tag(")")(input.clone()).map(|(next, _)| (next, NestedBlockKind::Parens)).map_err(|err| {
-                let kind = BaseErrorKind::Expected(Expectation::Char(')');
-                let slice = input.slice(..1);
-                ErrTree::from_error_kind()
-                to_err(slice,)
-                todo!();
-            })
+            tag(")")(input.clone()).map(|(next, _)| (next, NestedBlockKind::Parens))
         }
 
         pub fn curly(input: Input) -> Res<NestedBlockKind> {
@@ -410,9 +376,9 @@ pub(super) mod block {
         pub fn close(input: Input) -> Res<NestedBlockKind> {
             alt((angle, square, parenthesis, curly))(input)
         }
-        pub fn token(input: Input) -> Res<TokenKindDef> {
+        pub fn token(input: Input) -> Res<TokenKind> {
             close(input).map(|(next, kind)| {
-                let kind = TokenKindDef::Close(kind);
+                let kind = TokenKind::Close(kind);
                 (next, kind)
             })
         }
@@ -420,7 +386,7 @@ pub(super) mod block {
 }
 
 pub(super) mod whitespace {
-    use crate::parse2::token::TokenKindDef;
+    use crate::parse2::token::TokenKind;
     use crate::parse2::{Input, Res};
     use nom::branch::alt;
     use nom::bytes::complete::tag;
@@ -428,70 +394,70 @@ pub(super) mod whitespace {
     use nom::combinator::value;
     use nom::multi::many0;
 
-    pub fn space(input: Input) -> Res<TokenKindDef> {
-        value(TokenKindDef::Space, space1)(input)
+    pub fn space(input: Input) -> Res<TokenKind> {
+        value(TokenKind::Space, space1)(input)
     }
 
-    pub fn newline(input: Input) -> Res<TokenKindDef> {
-        value(TokenKindDef::Newline, tag("\n"))(input)
+    pub fn newline(input: Input) -> Res<TokenKind> {
+        value(TokenKind::Newline, tag("\n"))(input)
     }
     
-    pub fn whitespace(input: Input) -> Res<TokenKindDef> {
+    pub fn whitespace(input: Input) -> Res<TokenKind> {
         alt((space,newline))(input)
     }
 
-    pub fn multi0(input: Input) -> Res<Vec<TokenKindDef>> {
+    pub fn multi0(input: Input) -> Res<Vec<TokenKind>> {
         many0(alt((space, newline)))(input)
     }
 
-    pub fn multi1(input: Input) -> Res<Vec<TokenKindDef>> {
+    pub fn multi1(input: Input) -> Res<Vec<TokenKind>> {
         many0(alt((space, newline)))(input)
     }
 }
 
 pub(super) mod punctuation {
-    use crate::parse2::token::TokenKindDef;
+    use crate::parse2::token::TokenKind;
     use crate::parse2::{Input, Res};
     use nom::branch::alt;
     use nom::bytes::complete::tag;
     use nom::combinator::value;
 
-    fn at(input: Input) -> Res<TokenKindDef> {
-        value(TokenKindDef::At, tag("@"))(input)
+    fn at(input: Input) -> Res<TokenKind> {
+        value(TokenKind::At, tag("@"))(input)
     }
 
-    fn plus(input: Input) -> Res<TokenKindDef> {
-        value(TokenKindDef::Plus, tag("+"))(input)
+    fn plus(input: Input) -> Res<TokenKind> {
+        value(TokenKind::Plus, tag("+"))(input)
     }
 
-    fn segment_sep(input: Input) -> Res<TokenKindDef> {
-        value(TokenKindDef::SegmentSep, tag(":"))(input)
+    fn segment_sep(input: Input) -> Res<TokenKind> {
+        value(TokenKind::SegmentSep, tag(":"))(input)
     }
 
-    fn scope(input: Input) -> Res<TokenKindDef> {
-        value(TokenKindDef::Scope, tag("::"))(input)
+    fn scope(input: Input) -> Res<TokenKind> {
+        value(TokenKind::Scope, tag("::"))(input)
     }
 
-    fn dot(input: Input) -> Res<TokenKindDef> {
-        value(TokenKindDef::Dot, tag("."))(input)
+    fn dot(input: Input) -> Res<TokenKind> {
+        value(TokenKind::Dot, tag("."))(input)
     }
 
-    fn terminator(input: Input) -> Res<TokenKindDef> {
-        value(TokenKindDef::Terminator, tag(";"))(input)
+    fn terminator(input: Input) -> Res<TokenKind> {
+        value(TokenKind::Terminator, tag(";"))(input)
     }
 
-    fn r#return(input: Input) -> Res<TokenKindDef> {
-        value(TokenKindDef::Return, tag("&"))(input)
+    fn r#return(input: Input) -> Res<TokenKind> {
+        value(TokenKind::Return, tag("&"))(input)
     }
 
-    pub(super) fn punctuation(input: Input) -> Res<TokenKindDef> {
+    pub(super) fn punctuation(input: Input) -> Res<TokenKind> {
         alt((scope, segment_sep, dot, plus, at, terminator, r#return))(input)
     }
 }
 
-fn kind<O>(mut f: impl FnMut(Input) -> Res<O>) -> impl FnMut(Input) -> Res<TokenKindDef>
+fn kind<O>(mut f: impl FnMut(Input) -> Res<O>) -> impl FnMut(Input) -> Res<TokenKind>
 where
-    O: Into<TokenKindDef>,
+    O: Into<TokenKind>,
 {
     move |input| {
         let (next, output) = f(input)?;
@@ -500,31 +466,8 @@ where
     }
 }
 
-fn tok<O>(mut f: impl FnMut(Input) -> Res<O>+Copy) -> impl FnMut(Input) -> Res<Token>
-where
-    O: Into<TokenKindDef>,
-{
-    move |input| {
-        let (next, output) = kind(f)(input.clone())?;
-        let len = (next.location_offset() - input.location_offset());
-        let span = input.location_offset()..(input.location_offset() + len);
-        let kind = output.into();
-        let token = Token { span, kind: kind };
-        Ok((next, token))
-    }
-}
 
-fn input_token<O>(mut f: impl FnMut(Input) -> Res<O>+Copy) -> impl FnMut(Input) -> Res<InputToken>
-where
-    O: Into<TokenKindDef>,
-{
-    move |input| {
-        let (next, output) = kind(f)(input.clone())?;
-        let kind = output.into();
-        let token = InputToken::new( input, kind);
-        Ok((next, token))
-    }
-}
+
 
 
 pub mod err {
