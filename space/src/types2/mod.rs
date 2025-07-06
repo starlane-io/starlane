@@ -21,11 +21,11 @@ use nom::error::{ErrorKind, FromExternalError, ParseError};
 use nom::sequence::{tuple, Tuple};
 use nom_supreme::context::ContextError;
 use parse::Delimited;
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::str::FromStr;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::DeserializeOwned;
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
 
@@ -36,31 +36,21 @@ pub mod err;
 pub mod registry;
 pub mod specific;
 
-pub mod archetype;
 pub mod def;
-pub mod package;
 pub mod parse;
-pub mod property;
 pub mod scope;
 pub mod selector;
 pub mod tag;
 #[cfg(test)]
 pub mod test;
+pub mod archetype;
+pub mod property;
+pub mod package;
 //pub(crate) trait Typical: Display+Into<TypeKind>+Into<Type> { }
 
 /// [class::Class::Database] is an example of an [Type] because it is not an [ExactDef]
 /// which references a definition in [SpecificLoc]
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    EnumDiscriminants,
-    strum_macros::Display,
-    Serialize,
-    Deserialize,
-)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(TypeDisc))]
 #[strum_discriminants(derive(
@@ -147,14 +137,11 @@ pub type AbsoluteAbsoluteGeneric<Type: Archetype> = Scaffold<Scope, Type, Specif
 
 pub type Absolute = Scaffold<Scope, Type, SpecificLoc>;
 
+
 #[cfg(test)]
 impl Absolute {
     pub fn mock_default() -> Self {
-        Self::new(
-            Default::default(),
-            Type::Class(Class::Root),
-            SpecificLoc::mock_default(),
-        )
+        Self::new(Default::default(),Type::Class(Class::Root),SpecificLoc::mock_default() )
     }
 
     pub fn mock_root() -> Self {
@@ -167,16 +154,18 @@ impl Absolute {
 impl Serialize for Absolute {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: Serializer
     {
         todo!()
     }
 }
 
-impl<'de> Deserialize<'de> for Absolute {
+
+
+impl <'de> Deserialize<'de> for Absolute {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: Deserializer<'de>
     {
         todo!()
     }
@@ -184,59 +173,63 @@ impl<'de> Deserialize<'de> for Absolute {
 
 pub type AbsoluteSelector = Scaffold<Pattern<Scope>, Pattern<Type>, SpecificSelector>;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Getters)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash,Getters)]
 #[get = "pub"]
 pub struct Scaffold<Scope, T, SpecificLoc>
 where
-    Scope: Archetype + Default,
-    SpecificLoc: Clone + Eq + PartialEq + Hash,
+    Scope: Archetype+Default,
+    SpecificLoc: Clone + Eq + PartialEq + Hash
 {
     scope: Scope,
     r#type: T,
     specific: SpecificLoc,
 }
 
-impl<Scope, T, SpecificLoc> Display for Scaffold<Scope, T, SpecificLoc>
+impl <Scope, T, SpecificLoc> Display for Scaffold<Scope, T, SpecificLoc>
 where
-    Scope: Archetype + Default,
-    SpecificLoc: Clone + Eq + PartialEq + Hash + Display,
-    T: Display,
+
+    Scope: Archetype+Default,
+    SpecificLoc: Clone + Eq + PartialEq + Hash+ Display,
+    T: Display
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}@{}", self.r#type, self.specific)
     }
 }
 
-impl<Scope, T, SpecificLoc> Scaffold<Scope, T, SpecificLoc>
+impl <Scope, T, SpecificLoc> Scaffold<Scope, T, SpecificLoc>
 where
-    Scope: Archetype + Default,
+
+    Scope: Archetype+Default,
     SpecificLoc: Clone + Eq + PartialEq + Hash,
-    T: Display,
+    T: Display
 {
     pub fn new(scope: Scope, r#type: T, specific: SpecificLoc) -> Self {
-        Self {
-            scope,
-            r#type,
-            specific,
+        Self {scope,
+        r#type,
+            specific
         }
     }
 }
 
+
 #[derive(Clone)]
 pub struct AbsoluteLex<Scope, Specific>
 where
-    Scope: Archetype + Default,
-    Specific: Clone + Eq + PartialEq + Hash,
+Scope: Archetype+Default,
+Specific: Clone + Eq + PartialEq + Hash,
+
 {
     r#absolute: Scaffold<Scope, CamelCase, Option<Specific>>,
     disc: TypeDisc,
 }
 
-impl<Scope, T, Specific> TryInto<Scaffold<Scope, T, Specific>> for AbsoluteLex<Scope, Specific>
+impl<Scope, T, Specific> TryInto<Scaffold<Scope, T, Specific>>
+    for AbsoluteLex<Scope, Specific>
 where
     Scope: Archetype + Default,
     T: From<Class> + From<DataType> + Archetype,
-    Specific: Archetype + for<'y> Deserialize<'y>,
+    Specific: Archetype + for<'y> Deserialize<'y>
 {
     type Error = ParseErrs0;
 
@@ -264,10 +257,12 @@ where
     }
 }
 
-impl TryInto<Absolute> for AbsoluteLex<Scope, SpecificLoc>
+
+impl  TryInto<Absolute>
+for AbsoluteLex<Scope, SpecificLoc>
 where
     Scope: Archetype + Default,
-    SpecificLoc: Archetype,
+    SpecificLoc: Archetype
 {
     type Error = ParseErrs0;
 
@@ -283,15 +278,10 @@ where
             }
         };
 
-        Ok(Absolute::new(
-            self.absolute.scope,
-            r#type,
-            self.absolute
-                .specific
-                .ok_or(ParseErrs0::expected("Specific", "Some", "None"))?,
-        ))
+        Ok(Absolute::new(self.absolute.scope,r#type,self.absolute.specific.ok_or(ParseErrs0::expected("Specific", "Some", "None"))? ))
     }
 }
+
 
 impl<Scope, T, Specific> Into<CategoryGeneric<Scope, T>> for AbsoluteLex<Scope, Specific>
 where
@@ -362,10 +352,7 @@ where
                 specific,
             };
 
-            let lex = Self {
-                r#absolute: generic,
-                disc,
-            };
+            let lex = Self { r#absolute: generic, disc };
 
             (next, lex)
         })
@@ -513,6 +500,8 @@ pub enum TagWrap<S, T> {
     Segment(S),
 }
 
+
+
 pub type ClassPointRef = Ref<Point, Class>;
 pub type SchemaPointRef = Ref<Point, DataType>;
 pub type ParsePointRef<G: Archetype> = Ref<Point, G>;
@@ -541,13 +530,13 @@ where
 
 pub type PropertyName = SnakeCase;
 
+
 #[cfg(test)]
 pub mod test2 {
     use crate::parse::util::{new_span, result};
     use crate::parse::SkewerCase;
     use crate::types::archetype::Archetype;
     use crate::types::class::Class;
-    use crate::types::data::Config;
     use crate::types::scope::parse::scope;
     use crate::types::scope::{Scope, ScopeKeyword, Segment};
     use crate::types::specific::SpecificLoc;
@@ -566,42 +555,26 @@ pub mod test2 {
         assert!(specific.slices().is_empty())
     }
 
+
     #[test]
     pub fn test_specific_slice_segments() {
-        let specific = result(SpecificLoc::parser(new_span(
-            "contrib:package:1.0.0::slice",
-        )))
-        .unwrap();
+        let specific = result(SpecificLoc::parser(new_span("contrib:package:1.0.0::slice"))).unwrap();
 
-        assert_eq!(1, specific.slices().len());
-        assert_eq!(
-            "slice",
-            specific
-                .slices()
-                .first()
-                .unwrap()
-                .clone()
-                .to_string()
-                .as_str()
-        );
+        assert_eq!(1,specific.slices().len());
+        assert_eq!("slice", specific.slices().first().unwrap().clone().to_string().as_str());
 
-        let specific = result(SpecificLoc::parser(new_span(
-            "contrib:package:1.0.0::one:two",
-        )))
-        .unwrap();
 
-        assert_eq!(2, specific.slices().len());
+        let specific = result(SpecificLoc::parser(new_span("contrib:package:1.0.0::one:two"))).unwrap();
+
+        assert_eq!(2,specific.slices().len());
         let segments = specific.slices().clone();
         let mut i = segments.iter();
         assert_eq!("one", i.next().unwrap().clone().to_string().as_str());
         assert_eq!("two", i.next().unwrap().clone().to_string().as_str());
-
+        
         /// test [Segment::Version]
-        let specific = result(SpecificLoc::parser(new_span(
-            "contrib:package:1.0.0::1.2.3:two",
-        )))
-        .unwrap();
-        assert_eq!(2, specific.slices().len());
+        let specific = result(SpecificLoc::parser(new_span("contrib:package:1.0.0::1.2.3:two"))).unwrap();
+        assert_eq!(2,specific.slices().len());
 
         let segments = specific.slices().clone();
         let mut i = segments.iter();
@@ -619,7 +592,7 @@ pub mod test2 {
         let i = new_span("[BindConfig]");
         let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
         let cat: CategoryGeneric<Scope, Type> = lex.try_into().unwrap();
-        assert_eq!(cat.r#type, Type::Data(DataType::Config));
+        assert_eq!(cat.r#type, Type::Data(DataType::BindConfig));
     }
 
     #[test]
@@ -629,15 +602,12 @@ pub mod test2 {
         let r#absolute: Absolute = lex.try_into().unwrap();
         assert_eq!(r#absolute.r#type, Type::Class(Class::File));
         assert_eq!(r#absolute.scope, Scope::default());
-        assert_eq!(
-            r#absolute.specific.to_string().as_str(),
-            "contrib:package:1.0.0"
-        );
+        assert_eq!(r#absolute.specific.to_string().as_str(), "contrib:package:1.0.0");
 
         let i = new_span("[BindConfig@contrib:package:1.0.0]");
         let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
         let full: Absolute = lex.try_into().unwrap();
-        assert_eq!(full.r#type, Type::Data(DataType::Config));
+        assert_eq!(full.r#type, Type::Data(DataType::BindConfig));
         assert_eq!(full.scope, Scope::default());
         assert_eq!(full.specific.to_string().as_str(), "contrib:package:1.0.0");
     }
@@ -654,7 +624,7 @@ pub mod test2 {
         let i = new_span("[my::BindConfig@contrib:package:1.0.0]");
         let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
         let full: Absolute = lex.try_into().unwrap();
-        assert_eq!(full.r#type, Type::Data(DataType::Config));
+        assert_eq!(full.r#type, Type::Data(DataType::BindConfig));
         assert_eq!(full.scope.to_string().as_str(), "my");
         assert_eq!(full.specific.to_string().as_str(), "contrib:package:1.0.0");
     }
