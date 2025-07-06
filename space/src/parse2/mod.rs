@@ -60,9 +60,11 @@ pub fn parse_operation(op: impl ToString, data: &str) -> ParseOp {
 
 pub type ErrTree<'a> = GenericErrorTree<Input<'a>, &'static str, Ctx, Box<dyn Error + Send + Sync + 'static>>;
 
-fn to_err(input: Input, message: impl ToString) -> Result<(), nom::Err<ErrTree>> {
-    Err(nom::Err::Failure(ErrTree::from_external_error(input, ErrorKind::Alpha, message.to_string())))
+fn to_err(input: Input, message: impl ToString) -> nom::Err<ErrTree> {
+    nom::Err::Failure(ErrTree::from_external_error(input, ErrorKind::Alpha, message.to_string()))
 }
+
+
 
 pub type Res<'a,O> = IResult<Input<'a>, O, ErrTree<'a>>;
 pub type TokenRes<'a> = Res<'a,Token<'a>>;
