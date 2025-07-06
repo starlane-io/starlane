@@ -97,7 +97,7 @@ regex = "1.11.1"
 [dev-dependencies]
 #dummy = { workspace = true }
 #mockall = { workspace = true }
-#insta = { workspace = true }
+insta = { workspace = true }
 
 [build-dependencies]
 shadow-rs = { workspace = true }

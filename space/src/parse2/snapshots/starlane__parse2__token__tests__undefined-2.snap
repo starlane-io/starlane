@@ -1,0 +1,5 @@
+---
+source: space/src/parse2/token.rs
+expression: kind
+---
+Undefined(^%%)
