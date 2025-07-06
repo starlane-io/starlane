@@ -1157,7 +1157,43 @@ pub fn expect<O>(
     }
 }
  */
+#[proc_macro_attribute]
+pub fn token(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let mut m0 = parse_macro_input!(input as syn::ImplItemFn);
+    let m1 = m0.clone();
+    let attrs = m1.attrs;
+    let vis = m1.vis;
+    let sig = m1.sig;
+    let ident = m0.sig.ident.clone();
+    let block = m1.block;
+    m0.sig.ident = format_ident!("_{}",sig.ident);
 
+    match sig.inputs.first() {
+        Some(FnArg::Typed(PatType { ty, .. })) => {
+            if "Input" == ty.to_token_stream().to_string().as_str() {
+                let expanded = quote! {
+#sig {
+   expect( move |input| #block, "segment", "x", "y" )(i)
+}
+                };
+
+                print!(
+                    r#"
+*********** push_ctx ***********
+{}
+********************************" 
+    "#,
+                    expanded
+                );
+
+                TokenStream::from(expanded)
+            } else {
+                panic!("2x")
+            }
+        }
+        what => panic!("push_ctx_for_input only works with signature: FnMut(I) -> Res<O>")
+    }
+}
 #[proc_macro_attribute]
 pub fn push_ctx_for_input(attr: TokenStream, input: TokenStream) -> TokenStream {
     let mut m0 = parse_macro_input!(input as syn::ImplItemFn);

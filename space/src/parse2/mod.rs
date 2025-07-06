@@ -4,7 +4,7 @@ mod scaffold;
 mod token;
 mod err;
 
-use crate::parse2::token::TokenKind;
+use crate::parse2::token::{Token, TokenKind};
 use ariadne::{Label, Report, ReportKind, Source};
 use nom::error::{
     ErrorKind, FromExternalError, ParseError,
@@ -60,11 +60,12 @@ pub fn parse_operation(op: impl ToString, data: &str) -> ParseOp {
 
 pub type ErrTree<'a> = GenericErrorTree<Input<'a>, &'static str, Ctx, Box<dyn Error + Send + Sync + 'static>>;
 
-fn to_err(input: impl AsRef<Input>, message: impl ToString) -> Result<(), nom::Err<ErrTree>> {
+fn to_err(input: Input, message: impl ToString) -> Result<(), nom::Err<ErrTree>> {
     Err(nom::Err::Failure(ErrTree::from_external_error(input, ErrorKind::Alpha, message.to_string())))
 }
 
-pub type Res<'a, O> = IResult<Input<'a>, O, ErrTree<'a>>;
+pub type Res<'a,O> = IResult<Input<'a>, O, ErrTree<'a>>;
+pub type TokenRes<'a> = Res<'a,Token<'a>>;
 
 pub type ParseErrsTree<'a> = ParseErrsDef<&'a str,ErrTree<'a>>;
 pub type ParseErrs<'a> = ParseErrsDef<&'a str,Vec<UnitErrDef<Input<'a>,ErrKind>>>;
@@ -397,9 +398,6 @@ pub fn segments(i: Input) -> Res<Vec<Input>> {
     todo!()
 }
 
-pub fn camel(input: Input) -> Res<String> {
-    chars::camel(input).map(|(next,rtn)|(next, rtn.to_string()))
-}
 
 
 /*
