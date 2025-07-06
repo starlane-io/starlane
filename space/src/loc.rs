@@ -255,7 +255,7 @@ where
         match self {
             VarVal::Var(var) => match env.val(var.as_str()) {
                 Ok(val) => {
-                    let val: String = val.clone().try_into()?;
+                    let val: String = val.to_string();
                     Ok(V::from_str(val.as_str())?)
                 }
                 Err(err) => {

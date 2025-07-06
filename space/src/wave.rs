@@ -1010,7 +1010,7 @@ impl TryFrom<PingCore> for RawCommand {
     type Error = SpaceErr;
 
     fn try_from(request: PingCore) -> Result<Self, Self::Error> {
-        Ok(request.core.body.try_into()?)
+        Ok(request.core.body.to_substance()?)
     }
 }
 

@@ -81,8 +81,8 @@ pub enum SubstanceKind {
     Eq,
     PartialEq,
     strum_macros::Display,
-    starlane_macros::Autobox,
-    starlane_macros::ToSubstance,
+    Autobox,
+    ToSubstance,
 )]
 #[non_exhaustive]
 pub enum Substance {
@@ -210,6 +210,7 @@ impl FromStr for Token {
     }
 }
 
+/*
 impl TryFrom<PongCore> for Token {
     type Error = ParseErrs0;
 
@@ -217,6 +218,8 @@ impl TryFrom<PongCore> for Token {
         response.core.body.try_into()
     }
 }
+
+ */
 
 pub trait ToRequestCore {
     type Method;

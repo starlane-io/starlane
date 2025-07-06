@@ -5250,7 +5250,7 @@ pub mod model {
                 match chunk {
                     Chunk::Var(var) => match env.val(var.to_string().as_str()) {
                         Ok(val) => {
-                            let val: String = val.clone().try_into()?;
+                            let val: String = val.clone().to_string();
                             rtn.push_str(val.as_str());
                         }
                         Err(err) => {
