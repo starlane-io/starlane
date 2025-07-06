@@ -728,7 +728,7 @@ impl ToResolved<PointCtx> for PointVar {
         match &self.route {
             RouteSegVar::Var(var) => match env.val(var.name.clone().as_str()) {
                 Ok(val) => {
-                    let val: String = val.clone().try_into()?;
+                    let val: String = val.to_string();
                     rtn.push_str(format!("{}::", val.as_str()).as_str());
                 }
                 Err(err) => match err {
@@ -792,7 +792,7 @@ impl ToResolved<PointCtx> for PointVar {
                                 rtn.push_str(":");
                             }
                         }
-                        let val: String = val.clone().try_into()?;
+                        let val: String = val.to_string();
                         rtn.push_str(val.as_str());
                     }
                     Err(err) => match err {

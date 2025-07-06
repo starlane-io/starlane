@@ -1,3 +1,9 @@
+//! the current error system is a bit of a mess owing to the fact that when
+//! I started this project I was new to Rust.  It needs to be refactored at some point
+//! --Scott
+
+
+
 use anyhow::anyhow;
 use bincode::ErrorKind;
 use nom::error::{FromExternalError, VerboseError};
@@ -594,6 +600,13 @@ pub struct ParseErrs0 {
     pub src: String,
 }
 
+
+impl Into<AutoboxErr> for ParseErrs0 {
+    fn into(self) -> AutoboxErr {
+        AutoboxErr::ParseErrs0(self)
+    }
+}
+
 impl ParseErrs0 {
     pub fn report(report: Report) -> Self {
         Self {
@@ -1094,10 +1107,16 @@ pub enum AutoboxErr {
     },
     #[error("{0}")]
     Message(String),
+    /// todo: get rid of ParseErrs0 in favor of a common cast err 
+    #[error("{0}")]
+    ParseErrs0(ParseErrs0),
 }
 
+
+
+
 impl AutoboxErr {
-    
+
     pub fn new( message: impl ToString) -> Self {
          Self::Message(message.to_string())
     }
@@ -1112,6 +1131,12 @@ impl AutoboxErr {
             from: from.as_ref().to_string(),
             to: to.as_ref().to_string(),
         }
+    }
+}
+
+impl Into<ParseErrs0> for AutoboxErr {
+    fn into(self) -> ParseErrs0 {
+        ParseErrs0::new( self.to_string())
     }
 }
 
