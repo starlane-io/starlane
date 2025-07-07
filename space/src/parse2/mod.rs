@@ -25,6 +25,7 @@ use strum_macros::{Display, EnumString};
 use thiserror::Error;
 use crate::config::Document;
 use crate::parse2::ast::{ast, Tokens};
+use crate::parse2::ast::err::Errs;
 
 type Input<'a> = LocatedSpan<&'a str, ParseOpRef<'a>>;
 
@@ -182,11 +183,12 @@ pub struct ParseOperationDef<'a, N, S> {
     name: N,
     stack: S,
     data: &'a str,
+    errs: Errs<'a>
 }
 
 impl<'a, N, S> ParseOperationDef<'a, N, S> {
     fn from(name: N, stack: S, data: &'a str) -> Self {
-        Self { name, stack, data }
+        Self { name, stack, data, errs: Default::default() }
     }
     pub fn data(&self) -> &'a str {
         self.data
@@ -239,6 +241,7 @@ impl<'a> ParseOp<'a> {
 }
 
 pub type ParseOpRef<'a> = ParseOperationDef<'a, &'a str, &'a [Ctx]>;
+/*
 impl<'a> ParseOpRef<'a> {
     /// returning [Self] from [Range] instead of [Result<Self,()>]
     /// goes against `rust's` principles, however, since this `unsafe`
@@ -246,15 +249,21 @@ impl<'a> ParseOpRef<'a> {
     /// become robust over time.  Since the [ParseOpRef] is integral
     /// in managing parse errors it's a little hard to do proper error
     /// [Result] on the error system!
+    /*
     fn slice(&self, range: Range<usize>) -> Self {
         let stack = &self.stack[range];
         Self {
             name: self.name,
             stack,
             data: self.data,
+            errs: Default::default(),
         }
     }
+    
+     */
 }
+
+ */
 
 impl<'a> Clone for ParseOpRef<'a> {
     fn clone(&self) -> Self {

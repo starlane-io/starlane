@@ -1,3 +1,4 @@
+use std::error::Error;
 use crate::parse::model::{BlockKind, NestedBlockKind};
 use crate::parse::util::{preceded, recognize, Span};
 use crate::parse::{CamelCase, Domain, SkewerCase, SnakeCase};
@@ -159,7 +160,7 @@ impl Header {
 #[strum_discriminants(derive(Hash, Display))]
 pub enum TokenKind {
 
-    #[strum(to_string = "Ident({0})")]
+    #[strum(to_string = "{0}")]
     Ident(Ident),
     #[strum(to_string = "BlockOpen({0})")]
     Open(NestedBlockKind),
@@ -187,7 +188,7 @@ pub enum TokenKind {
     /// `&` good old ampersand
     Return,
     /// `version=` i.e.: Def(`version=`1.1.5) ... tells which parser version to use
-    VersionPrelude,
+    VersionLiteral,
     /// version=`1.2.3`
     Version(Version),
     /// a `space` or a `tab`
@@ -204,6 +205,44 @@ pub enum TokenKind {
 }
 
 impl TokenKind {
+    pub fn describe_format(&self) -> &'static str{
+       match &self {
+           TokenKind::Ident(ident) => ident.description(),
+           TokenKind::Open(symbol) => {
+               match symbol {
+                   NestedBlockKind::Curly => "block open '{'",
+                   NestedBlockKind::Parens => "block open '('",
+                   NestedBlockKind::Square => "block open '['",
+                   NestedBlockKind::Angle => "block open '<'",
+               }
+           }
+           TokenKind::Close(symbol) => {
+               match symbol {
+                   NestedBlockKind::Curly => "block close '}'",
+                   NestedBlockKind::Parens => "block close')'",
+                   NestedBlockKind::Square => "block close']'",
+                   NestedBlockKind::Angle => "block close '>'",
+               }
+           }
+           TokenKind::Plus => "'+' symbol",
+           TokenKind::At => "'@' symbol",
+           TokenKind::SegmentSep => "':' symbol",
+           TokenKind::Scope => "'::' scope symbol",
+           TokenKind::Variant => "::>' variant symbol",
+           TokenKind::Dot => "'.' dot symbol",
+           TokenKind::Equals =>"'=' equals symbol", 
+           TokenKind::Terminator => "';' terminator symbol (semicolon)",
+           TokenKind::Return => "'&' return symbol",
+           TokenKind::VersionLiteral => "'version=' literal",
+           TokenKind::Version(_) => IdentKind::Version.description(),
+           TokenKind::Space => "' ' space (whitespace)",
+           TokenKind::Newline => "'\\n' newline (whitespace)",
+           TokenKind::Undefined(_) => "undefined",
+           TokenKind::EOF => "End of File",
+           TokenKind::Err(_) => "Err"
+       } 
+    }
+    
     pub fn whitespace(&self) -> &'static WhiteSpace {
         match self {
             TokenKind::Space => & WhiteSpace::Space,
@@ -262,20 +301,45 @@ impl TokenKind {
 #[strum_discriminants(name(IdentKind))]
 #[strum_discriminants(derive(Hash))]
 pub(crate) enum Ident {
-    #[strum(to_string = "Camel({0})")]
+    #[strum(to_string = "{0}")]
     Camel(CamelCase),
-    #[strum(to_string = "Skewer({0})")]
+    #[strum(to_string = "{0}")]
     Skewer(SkewerCase),
-    #[strum(to_string = "Snake({0})")]
+    #[strum(to_string = "{0}")]
     Snake(SnakeCase),
-    #[strum(to_string = "Domain({0})")]
+    #[strum(to_string = "{0}")]
     Domain(Domain),
-    #[strum(to_string = "Version({0})")]
+    #[strum(to_string = "{0}")]
     Version(Version),
     //#[strum(to_string = "Undefined({0})")]
     // [Ident::Undefined] represents a semi plausible ident ... maybe camel case with underscores & dashes
     // Undefined(String),
 }
+
+impl Ident {
+
+    pub fn description(&self) -> &'static str {
+        let kind: IdentKind = self.clone().into();
+        kind.description()
+    }
+}
+
+impl IdentKind {
+    pub fn description(&self) -> &'static str {
+        match self {
+            IdentKind::Camel => "'CamelCase' mixed case alphanumeric characters (must start with a capitol letter)",
+            IdentKind::Skewer => "'skewer-case' lowercase alphanumeric plus dash '-' (must start with lowercase letter)",
+            IdentKind::Snake =>  "'snake-case' lowercase alphanumeric plus underscore '_' (must start with lowercase letter)",
+            IdentKind::Domain => "'domain-case.com' lowercase alphanumeric plus dash and dot '.' (must start with lowercase letter) AND consecutive dots are not allowed: 'domain..com' == no!'",
+            IdentKind::Version => "'major.minor.patch-prerelease.1+build-metadata' standard semver  i.e.: '1.3.5'  Also supports prerelease and build metadata:  '0.1.13-alpha.3+deprecated'"
+        }
+        
+    }
+}
+
+
+
+
 
 impl From<Ident> for TokenKind {
     fn from(ident: Ident) -> Self {

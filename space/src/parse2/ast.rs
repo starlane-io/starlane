@@ -24,7 +24,7 @@ mod package {
 
     pub fn header<'a>(iter: &'a mut AstTokenIter<'a>) -> Result<Header, AstErr> {
         /// if it succe
-        iter.expect(&TokenKind::Ident(Ident::Camel(DocType::Package.into())))?;
+        iter.expect("Document Type",&TokenKind::Ident(Ident::Camel(DocType::Package.into())))?;
         let doc_type = DocType::Package;
         todo!();
     }
@@ -44,8 +44,42 @@ pub mod err {
     use crate::parse2::{range, ParseOp};
     use ariadne::{Label, Report, ReportKind, Source};
     use std::fmt::{Display, Formatter};
-    use std::slice::Iter;
+    use std::ops::{Deref, DerefMut};
     use thiserror::Error;
+
+    #[derive(Clone)]
+    pub struct Errs<'a> {
+        errs: Vec<AstErr<'a>>,
+    }
+    
+    impl <'a> Default for Errs<'a> {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+    impl <'a> Errs<'a> {
+        
+        pub fn new() -> Self {
+            Self {
+                errs: Default::default()
+            }
+        } 
+    }
+    
+    impl <'a> Deref for Errs<'a> {
+        type Target = Vec<AstErr<'a>>;
+
+        fn deref(&self) -> &Self::Target {
+            & self.errs
+        }
+    }
+    
+    impl <'a> DerefMut for Errs<'a> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+           & mut self.errs
+        }
+    }
+        
 
     #[derive(Debug, Clone, Error)]
     pub enum AstErr<'a> {
@@ -80,8 +114,10 @@ pub mod err {
     pub enum AstErrKind {
         #[error("Document type not recognized: '{0}'")]
         DocumentTypeNotRecognized(CamelCase),
-        #[error("Expected token type: '{kind}' found: '{found}'")]
-        Expected { kind: TokenKind, found: TokenKind },
+        #[error("Expected: {id} {kind}' found: '{found}'")]
+        ExpectedKind { id: &'static str, kind: TokenKind, found: TokenKind },
+        #[error("Expected '{literal}' found: '{found}'")]
+        ExpectedLiteral{ literal: String, found: TokenKind },
         #[error("Expected token type: '{0}' but instead reach EOF (End of File)")]
         UnexpectedEof(TokenKind),
         #[error("Expected whitespace. Found: '{0}'")]
@@ -147,12 +183,12 @@ impl <'a> AstTokenIter<'a> {
         None
     }
     
-    pub fn expect(&'a mut self, expect: &TokenKind) -> Result<&'a Token<'a>, AstErr<'a>> {
+    pub fn expect(&'a mut self, id: &'static str, expect: &TokenKind) -> Result<&'a Token<'a>, AstErr<'a>> {
         let token = self.skip_ws().ok_or_else(move || AstErr::Err(AstErrKind::UnexpectedEof(expect.clone())))?;
         if token.kind == *expect {
             Ok(token)
         } else {
-            Err(AstErr::token_err(token.clone(),AstErrKind::Expected { kind: expect.clone(), found: token.kind.clone() } ))
+            Err(AstErr::token_err(token.clone(),AstErrKind::ExpectedKind { id, kind: expect.clone(), found: token.kind.clone() } ))
         }
     }
 
