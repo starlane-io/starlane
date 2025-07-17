@@ -1,6 +1,5 @@
-use crate::parse::Ctx;
 use crate::parse2::ast::err::{AstErr, AstErrKind};
-use crate::parse2::{range, Input};
+use crate::parse2::{range, Ctx, Input};
 use ariadne::{Report, ReportKind};
 use nom_supreme::error::{BaseErrorKind, GenericErrorTree};
 use std::ops::Deref;
@@ -38,11 +37,26 @@ impl <'a> ParseErrs2Proto<'a> {
         }
     }
 
-    pub fn promote( self, source: Arc<String>) -> ParseErrs2{
+    pub fn promote( self, source: Arc<String>) -> ParseErrs2<'a>{
         ParseErrs2 {
             source,
             errs: self.errs,
         }
+    }
+}
+
+impl<'a> From<ErrTree<'a>> for ParseErrs2Proto<'a> {
+    fn from(err: ErrTree<'a>) -> Self {
+        let mut proto = Self::new();
+        match &err {
+            ErrTree::Base { location , kind } => {
+                if let BaseErrorKind::External(external) = kind {
+                    proto.err(external.clone().with(location.clone()));
+                }
+            }
+            _ => {}
+        }
+        proto
     }
 }
 
@@ -70,7 +84,8 @@ impl <'a> From<&'a ErrTree<'a>> for ParseErrs2Proto<'a> {
                         panic!()
                     }
                     BaseErrorKind::External(external) => {
-                        rtn.push(external.clone());
+                        let err = external.clone().with(location.clone());
+                        rtn.push(err);
                     }
                 }
             }

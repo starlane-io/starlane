@@ -1,6 +1,6 @@
 use crate::parse::model::{BlockSymbol, NestedSymbols};
 use crate::parse::util::{new_span, preceded, recognize, Span};
-use crate::parse::{CamelCase, Domain, SkewerCase, SnakeCase};
+use crate::parse::{CamelCase, Ctx, Domain, SkewerCase, SnakeCase};
 use crate::parse2::ast::err::{AstErr, AstErrKind};
 use crate::parse2::chars::ident;
 use crate::parse2::document::Unit;
@@ -23,6 +23,7 @@ use std::ops::Range;
 use std::slice::Iter;
 use std::str::FromStr;
 use std::sync::Arc;
+use nom_locate::LocatedSpan;
 use nom_supreme::error::GenericErrorTree;
 use strum_macros::{Display, EnumDiscriminants, EnumString, EnumTryAs};
 
@@ -92,7 +93,7 @@ fn version(input: Input) -> Res<Version> {
     }
 }
 
-pub type TokenDef<'a, K> = Unit<'a, TokenKind>;
+pub type TokenDef<'a,K> = Unit<'a, K>;
 
 pub type Token<'a> = TokenDef<'a, TokenKind>;
 pub type IdentToken<'a> = TokenDef<'a, Ident>;
@@ -597,7 +598,7 @@ pub mod err {
     }
 }
 
-pub fn result<'a, R>(result: Res<R>) -> Result<R, ParseErrs2Proto<'a>> {
+pub fn result<'a, R>(result: Result<(LocatedSpan<&'a str, &'a Arc<std::string::String>>, R), nom::Err<GenericErrorTree<LocatedSpan<&'a str, &'a Arc<std::string::String>>, &'static str, Ctx, AstErrKind>>>) -> Result<R, ParseErrs2Proto<'a>> {
     match result {
         Ok((_, e)) => Ok(e),
         Err(nom::Err::Error(err)) => Result::Err(err.into()),
@@ -744,7 +745,7 @@ impl<'a> Tokens<'a> {
         Self { data, tokens }
     }
 
-    pub fn iter(&'a self) -> AstTokenIter<'a> {
+    pub fn iter(self) -> AstTokenIter<'a> {
         let iter = self.tokens.iter();
         AstTokenIter::new(self.data, iter)
     }
@@ -753,7 +754,7 @@ impl<'a> Tokens<'a> {
 pub struct AstTokenIter<'a> {
     data: &'a Arc<String>,
     iter: Iter<'a, Token<'a>>,
-    /// ridiculous! but needed in case of EOF. 
+    /// ridiculous! but needed in case of EOF.
     /// otherwise would have to create a new empty every time
     /// `Self::expect` and others were executed do to arcane borrowing rules
     empty:  Input<'a>
@@ -761,7 +762,7 @@ pub struct AstTokenIter<'a> {
 
 impl<'a> AstTokenIter<'a> {
 
-   
+
     fn new(data: &'a Arc<String>, iter: Iter<'a, Token<'a>>) -> Self {
         let string = data.as_str().slice( (data.len()-1)..data.len());
         let empty = Input::new_extra(string,data);
@@ -784,10 +785,11 @@ impl<'a> AstTokenIter<'a> {
         id: &'static str,
         expect: &TokenKind,
     ) -> Result<&'a Token<'a>, AstErr<'a>> {
-        let token = self.skip_ws(); 
+        let empty = self.empty.clone();
+        let token = self.skip_ws();
         let token = match token {
             Some(token) => token,
-            None => Err(AstErr::new(self.empty.clone(), AstErrKind::UnexpectedEof(expect.clone())))?,
+            None => Err(AstErr::new(empty, AstErrKind::UnexpectedEof(expect.clone())))?,
         };
 
         if token.kind == *expect {
@@ -818,9 +820,10 @@ impl<'a> AstTokenIter<'a> {
         &'a mut self,
         whitespace: &'static WhiteSpace,
     ) -> Result<&'a Token<'a>, AstErr<'a>> {
+        let empty = self.empty.clone();
         let token = self.skip_ws();
         let token = match token {
-            None => Err(AstErr::new( self.empty.clone(), AstErrKind::UnexpectedEof(TokenKind::Whitespace)))?,
+            None => Err(AstErr::new( empty, AstErrKind::UnexpectedEof(TokenKind::Whitespace)))?,
             Some(token) => token
         };
 

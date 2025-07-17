@@ -1,16 +1,11 @@
 use crate::parse::util::recognize;
 use crate::parse::{CamelCase, SkewerCase, SnakeCase};
-use crate::parse2::chars::recognize::{
-    lower1, lower_alphanumeric_plus_dash0, lower_alphanumeric_plus_underscore0, upper1,
-};
 use crate::parse2::token::Ident;
-use crate::parse2::{Ctx, Input, Res};
+use crate::parse2::{Input, Res};
 use nom::branch::alt;
-use nom::character::complete::alphanumeric0;
 use nom::character::streaming::alphanumeric1;
-use nom::combinator::{into, value};
+use nom::combinator::into;
 use nom::multi::many1;
-use nom::sequence::pair;
 
 pub fn camel(input: Input) -> Res<CamelCase> {
     recognize::camel(input).map(|(next, rtn)| (next, CamelCase::new(rtn.to_string())))
@@ -38,7 +33,7 @@ mod recognize {
     use crate::parse2::{Ctx, Input, Res};
     use nom::branch::alt;
     use nom::bytes::complete::{is_a, tag};
-    use nom::character::complete::{alpha1, alphanumeric0, alphanumeric1};
+    use nom::character::complete::alphanumeric0;
     use nom::combinator::opt;
     use nom::sequence::pair;
     use nom_supreme::ParserExt;
@@ -80,14 +75,14 @@ mod recognize {
     }
 
     pub fn camel(input: Input) -> Res<Input> {
-        recognize(pair(upper1, alphanumeric0).context(Ctx::CamelCase))(input)
+        recognize(pair(upper1, alphanumeric0).context(Ctx::default()))(input)
     }
 
     pub fn skewer(input: Input) -> Res<Input> {
-        recognize(pair(lower1, lower_alphanumeric_plus_dash0).context(Ctx::SkewerCase))(input)
+        recognize(pair(lower1, lower_alphanumeric_plus_dash0).context(Ctx::default()))(input)
     }
 
     pub fn snake(input: Input) -> Res<Input> {
-        recognize(pair(lower1, lower_alphanumeric_plus_underscore0).context(Ctx::SkewerCase))(input)
+        recognize(pair(lower1, lower_alphanumeric_plus_underscore0).context(Ctx::default()))(input)
     }
 }

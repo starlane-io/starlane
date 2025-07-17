@@ -1,4 +1,5 @@
 use crate::parse2::ast::ast;
+use crate::parse2::document::{Document, DocumentDef, DocumentProto};
 use crate::parse2::err::{ParseErrs2, ParseErrs2Def, ParseErrs2Proto};
 use crate::parse2::token::{result, tokens, Tokens};
 use ariadne::{Label, Report, ReportKind, Source};
@@ -18,15 +19,14 @@ use std::error::Error;
 use std::fmt::{Debug, Display};
 use std::ops::{Deref, DerefMut, Range};
 use std::sync::Arc;
-use crate::parse2::document::{Document, DocumentDef, DocumentProto};
 
+mod ast;
 mod chars;
+pub mod document;
 mod err;
 mod primitive;
 mod scaffold;
 mod token;
-mod ast;
-pub mod document;
 
 /*
 #[derive(Debug)]
@@ -35,13 +35,13 @@ pub struct Op {
 }
 
 impl Op {
-    
+
     pub fn new(data: Arc<String>) -> Op {
         Self { data }
     }
-    
 
-    
+
+
     pub fn parse(&self) -> Result<Doc,ParseErrs2> {
         let input = Input::new_extra(self.data.as_str(),self);
         let (_,tokens) = self.tokenize(input)?;
@@ -49,31 +49,40 @@ impl Op {
     }
 
 }
- 
- 
+
+
  */
 
+#[derive(Debug, Clone )]
+pub enum Ctx {
+    Def
+}
 
+impl Default for Ctx {
+    fn default() -> Self {
+        Self::Def
+    }
+}
 
-pub fn parse<'a>(source: &Arc<String>) -> Result<Document<'a>, ParseErrs2Proto<'a>> {
-    let input = Input::new_extra(source.as_str(), & source);
-    let tokens = tokenize(& source, input)?;
+pub fn parse<'a>(source: &'a Arc<std::string::String>) -> ParseResultProto<'a> {
+    let input = Input::new_extra(source.as_str(), &source);
+    let tokens = tokenize(&source, input)?;
     let doc = ast(tokens)?;
     Ok(doc)
 }
 
-fn tokenize<'a>(source: &'a Arc<String>,input: Input<'a>) -> Result<Tokens<'a>, ParseErrs2Def<'a>> {
-    let (_,tokens)= result(tokens(input))?;
-    let tokens = Tokens::new( source, tokens );
+fn tokenize<'a>(
+    source: &'a Arc<String>,
+    input: Input<'a>,
+) -> Result<Tokens<'a>, ParseErrs2Proto<'a>> {
+    let tokens  = result(tokens(input))?;
+    let tokens = Tokens::new(source, tokens);
     Ok(tokens)
 }
 
 type Input<'a> = LocatedSpan<&'a str, &'a Arc<String>>;
 
-
-
 pub type Res<'a, O> = IResult<Input<'a>, O, ErrTree<'a>>;
-
 
 pub fn range<'a>(input: &'a Input<'a>) -> Range<usize> {
     let offset = Input::location_offset(input);
@@ -81,21 +90,15 @@ pub fn range<'a>(input: &'a Input<'a>) -> Range<usize> {
     offset..(offset + len)
 }
 
+pub type ParseResultDef<'a, S> = Result<DocumentDef<'a, S>, ParseErrs2Def<'a, S>>;
 
-pub enum ParseResultDef<'a,S> {
-    Ok(DocumentDef<'a,S>),
-    Err(ParseErrs2Def<'a,S>)
+pub type ParseResultProto<'a> = ParseResultDef<'a, ()>;
+pub fn promote(result: ParseResultProto, source: Arc<String>) -> Result<Document, ParseErrs2> {
+    match result {
+        ParseResultProto::Ok(ok) => Ok(ok.promote(source)),
+        ParseResultProto::Err(err) => Err(err.promote(source)),
+    }
 }
-pub type ParseResultProto<'a> = ParseResultDef<'a,()>;
-impl <'a> ParseResultProto<'a>{
-   pub fn promote( self, source: Arc<String>) -> Result<Document<'a>,ParseErrs2<'a>> {
-       match self {
-           ParseResultProto::Ok(ok) => Ok(ok.promote(source)),
-           ParseResultProto::Err(err) => Err(err.promote(source))
-       }
-   }
-}
-
 
 fn log(data: impl AsRef<str>, err: ErrTree) {
     match &err {

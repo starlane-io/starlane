@@ -136,7 +136,7 @@ impl <'a,I> Unit<'a,I> {
     }
 
     fn with<T2>(self, kind: T2) -> Unit<'a, T2> {
-        Self {
+        Unit {
             span: self.span,
             kind,
         }

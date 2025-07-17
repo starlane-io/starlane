@@ -12,10 +12,10 @@ use crate::parse2::err::{ParseErrs2, ParseErrs2Def, ParseErrs2Proto};
 use crate::parse2::{Input, ParseResultProto};
 use crate::parse::model::{BlockSymbol, LexBlock, NestedSymbols};
 
-pub(crate) fn ast<'a>(tokens: Tokens<'a>) -> ParseResultProto {
+pub(crate) fn ast<'a>(tokens: Tokens<'a>) -> ParseResultProto<'a> {
     let errs = ParseErrs2Def::new();
     let mut iter = tokens.iter();
-    let header = header_decl(& mut iter)?;
+    todo!();
 }
 
 
@@ -49,7 +49,7 @@ struct Header {
 pub mod err {
     use crate::parse::CamelCase;
     use crate::parse2::token::{Token, TokenKind, TokenKindDisc};
-    use crate::parse2::{range, Op};
+    use crate::parse2::{range, Input, Op};
     use ariadne::{Label, Report, ReportKind, Source};
     use std::fmt::{Display, Formatter};
     use std::ops::{Deref, DerefMut};
@@ -121,6 +121,12 @@ pub mod err {
         Whitespace(TokenKind),
         #[error("Version Format Error. Expecting format: 'major.minor.patch-release+label' i.e.: '3.7.8', '2.0.5-rc', '1.2.1-beta+preview'")]
         VersionFormat,
+    }
+    
+    impl AstErrKind {
+        pub fn with(self, span: Input) -> AstErr {
+            AstErr::new(span,self)
+        }
     }
     
     impl ParseErrs2Def {
