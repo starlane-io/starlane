@@ -1,28 +1,36 @@
-use std::slice::Iter;
-use crate::parse2::token::{DocType, Token, TokenKind, WhiteSpace};
+use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::sync::Arc;
+use indexmap::IndexMap;
+use crate::parse2::token::{AstTokenIter, DocType, Token, TokenKind, Tokens};
 use semver::Version;
-use crate::parse2::ast::err::{AstErr, AstErrKind};
-use crate::parse2::ParseOp;
+use strum_macros::{Display, EnumString};
+use crate::parse2::ast::err::AstErr;
+use crate::parse2::ast::package::header_decl;
+use crate::parse2::document::{Declarations, Definitions, DocumentDef, Unit};
+use crate::parse2::err::{ParseErrs2, ParseErrs2Def, ParseErrs2Proto};
+use crate::parse2::{Input, ParseResultProto};
+use crate::parse::model::{BlockSymbol, LexBlock, NestedBlockKind};
 
-pub(crate) fn ast(tokens: Tokens) {
+pub(crate) fn ast<'a>(tokens: Tokens<'a>) -> ParseResultProto {
+    let errs = ParseErrs2Def::new();
     let mut iter = tokens.iter();
-    match package::header(& mut iter) {
-        Ok(_) => {
-            panic!("don't know how to take success yet!")
-        }
-        Err(err) => {
-            let errs =vec![err];
-            tokens.op.report(&errs);
-        }
-    }
-} 
+    let header = header_decl(& mut iter)?;
+}
+
+
+pub enum Ast<'a> {
+    Definitions(Block<'a,Definitions<'a>>),
+    Err(ParseErrs2<'a>)
+}
 
 mod package {
-    use crate::parse2::ast::err::{AstErr};
-    use crate::parse2::ast::{AstTokenIter, Header};
-    use crate::parse2::token::{DocType, Ident, TokenKind};
+    use crate::parse2::ast::err::AstErr;
+    use crate::parse2::ast::Header;
+    use crate::parse2::err::ParseErrs2Def;
+    use crate::parse2::token::{AstTokenIter, DocType, Ident, TokenKind};
 
-    pub fn header<'a>(iter: &'a mut AstTokenIter<'a>) -> Result<Header, AstErr> {
+    pub fn header_decl<'a>(iter: &'a mut AstTokenIter<'a>) -> Result<Header, ParseErrs2Def> {
         /// if it succe
         iter.expect("Document Type",&TokenKind::Ident(Ident::Camel(DocType::Package.into())))?;
         let doc_type = DocType::Package;
@@ -40,12 +48,14 @@ struct Header {
 
 pub mod err {
     use crate::parse::CamelCase;
-    use crate::parse2::token::{Token, TokenKind, WhiteSpace};
-    use crate::parse2::{range, ParseOp};
+    use crate::parse2::token::{Token, TokenKind, TokenKindDisc};
+    use crate::parse2::{range, Op};
     use ariadne::{Label, Report, ReportKind, Source};
     use std::fmt::{Display, Formatter};
     use std::ops::{Deref, DerefMut};
     use thiserror::Error;
+    use crate::parse2::document::Unit;
+    use crate::parse2::err::{ParseErrs2Def, ParseErrs2Proto};
 
     #[derive(Clone)]
     pub struct Errs<'a> {
@@ -81,32 +91,19 @@ pub mod err {
     }
         
 
-    #[derive(Debug, Clone, Error)]
-    pub enum AstErr<'a> {
-        Token { token: Token<'a>, err: AstErrKind },
-        Err(AstErrKind),
+    pub type AstErr<'a> = Unit<'a,AstErrKind>;
+   
+    impl <'a> Into<ParseErrs2Proto<'a>> for AstErr<'a> {
+        fn into(self) -> ParseErrs2Proto<'a> {
+            let mut errs = ParseErrs2Proto::new();
+            errs.add(self);
+            errs
+        }
     }
 
     impl<'a> Display for AstErr<'a> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            match self {
-                AstErr::Token { token, err } => {
-                    write!(f, "{err} -- range: [{}..{}]", token.span.location_offset(), (token.span.location_offset() + token.span.fragment().len()))
-                }
-                AstErr::Err(kind) => {
-                    write!(f, "{kind}")
-                }
-            }
-        }
-    }
-
-    impl<'a> AstErr<'a> {
-        pub fn token_err(token: Token<'a>, err: AstErrKind) -> AstErr<'a> {
-            Self::Token { token, err }
-        }
-
-        pub fn err(err: AstErrKind) -> AstErr<'a> {
-            AstErr::Err(err)
+                write!(f, "{err} -- range: [{}..{}]: {}", self.span.location_offset(), (self.span.location_offset() + self.span.fragment().len()),self.kind)
         }
     }
 
@@ -117,14 +114,17 @@ pub mod err {
         #[error("Expected: {id} {kind}' found: '{found}'")]
         ExpectedKind { id: &'static str, kind: TokenKind, found: TokenKind },
         #[error("Expected '{literal}' found: '{found}'")]
-        ExpectedLiteral{ literal: String, found: TokenKind },
+        ExpectedLiteral{ literal: &'static str, found: TokenKind },
         #[error("Expected token type: '{0}' but instead reach EOF (End of File)")]
         UnexpectedEof(TokenKind),
         #[error("Expected whitespace. Found: '{0}'")]
         Whitespace(TokenKind),
+        #[error("Version Format Error. Expecting format: 'major.minor.patch-release+label' i.e.: '3.7.8', '2.0.5-rc', '1.2.1-beta+preview'")]
+        VersionFormat,
     }
-    impl<'a> ParseOp<'a> {
-        pub fn report(&'a self, errs: &'a Vec<AstErr>) {
+    
+    impl ParseErrs2Def {
+        pub fn report(&self, errs: &Vec<AstErr>) {
             let r = 0..self.data.len();
             let mut builder = Report::build(ReportKind::Error, r.clone());
             //for err in errs {
@@ -136,7 +136,7 @@ pub mod err {
                         .with_label(Label::new(range(&token.span)).with_message(err.to_string()))
                         .finish();
 
-                    report.print(Source::from(self.data)).ok();
+                    report.print(Source::from(self.data.as_str())).ok();
                 }
                 AstErr::Err(_) => {
                     panic!();
@@ -147,105 +147,152 @@ pub mod err {
     }
 }
 
-pub struct Tokens<'a> {
-    pub op: &'a ParseOp<'a>,
-    pub tokens: Vec<Token<'a>>,
+
+pub struct Alt<P,O> {
+    branch: Vec<Branch<P,O>>
 }
 
-impl <'a> Tokens<'a> {
-    pub fn new( op: &'a ParseOp<'a>, tokens: Vec<Token<'a>> ) -> Self {
-        Self{ op, tokens }
-    }
-    
-    pub fn iter(&'a self) -> AstTokenIter<'a> {
-        let iter = self.tokens.iter();
-        AstTokenIter::new(iter)
+impl <P,O> Alt<P,O> {
+    pub fn add( & mut self, alt: Branch<P,O> ) {
+        self.branch.push(alt)
     }
 }
 
-pub struct AstTokenIter<'a> {
-    iter: Iter<'a,Token<'a>>,
+struct Branch<P,O> where P: AstParser, O: Into<Ast> {
+    /// preparser peeks ahead for pattern
+    pub pre: P,
+    /// inside the block 
+    pub block: Box<dyn AstParser<Output=O>>,
 }
 
-impl <'a> AstTokenIter<'a> {
-    pub fn new(iter:Iter<'a,Token<'a>>) -> Self {
-        AstTokenIter { iter }
-    }
-    
-    /// return the next token that is not whitespace: [TokenKind::Space] || [TokenKind::Newline]
-    pub fn skip_ws(&'a mut self) -> Option<&'a Token<'a>> {
-        while let Some(token) = self.iter.next()  {
-             if !token.kind.is_whitespace(&WhiteSpace::Either) {
-                 return Some(token)
-             }
+impl <P,O> Branch<P,O> where P: AstParser, O: Into<Ast> {
+    pub fn new(pre: P, block: impl AstParser<Output=O>) -> Self {
+        Self {
+            pre,
+            block: Box::new(block)
         }
-        /// out of tokens
-        None
     }
-    
-    pub fn expect(&'a mut self, id: &'static str, expect: &TokenKind) -> Result<&'a Token<'a>, AstErr<'a>> {
-        let token = self.skip_ws().ok_or_else(move || AstErr::Err(AstErrKind::UnexpectedEof(expect.clone())))?;
-        if token.kind == *expect {
+}
+
+
+pub trait AstParser {
+  type Output: Into<Ast>;
+  fn parse<'a>( &self, tokens: &'a mut AstTokenIter<'a>) -> Result<Self::Output,ParseErrs2Proto<'a>>;
+}
+
+
+#[derive(Debug,Clone,EnumString,Display,PartialEq,Eq,Hash)]
+pub enum BlockKind {
+    /// `Defs`(version=1.0.1)  { ... }
+    Header,
+
+    /// + `arg` {  ... }
+    #[strum(serialize = "arg")]
+    Arg,
+    /// + `env` { ... }
+    #[strum(serialize = "env")]
+    Env,
+    /// + `properties`
+    #[strum(serialize = "properties")]
+    PropertyDefs,
+    /// a line block is terminated by a semi-colon `;`
+    /// `some-param[str] = something`;
+    Line,
+}
+
+
+#[derive(Debug,Clone)]
+struct Block<'a,C> where C: Debug+Clone {
+    kind: BlockKind,
+    symbol: BlockSymbol,
+    open: Unit<'a,&'static str>,
+    close: Unit<'a,&'static str>,
+    content: Unit<'a,C>
+}
+
+pub struct DelimitedParser<'a,O> {
+    pre: Box<dyn AstParser<Output=_>>,
+    content: Box<dyn AstParser<Output=O>>,
+    post: Box<dyn AstParser<Output=_>>,
+}
+
+struct LiteralParser(TokenKind);
+
+impl LiteralParser {
+    pub fn new(kind: TokenKind) -> Self {
+        Self(kind)
+    }
+}
+
+impl <'a> AstParser for LiteralParser {
+    type Output = &'a Token<'a>;
+
+    fn parse<'a>(&self,tokens: &'a mut AstTokenIter<'a>) -> Result<Self::Output, ParseErrs2Proto<'a>> {
+        if let Some(token) = tokens.expect("literal", self.0.clone().into() ) && self.0 == token.kind {
             Ok(token)
         } else {
-            Err(AstErr::token_err(token.clone(),AstErrKind::ExpectedKind { id, kind: expect.clone(), found: token.kind.clone() } ))
+            let mut errs = ParseErrs2Proto::new();
+            let err = AstErr::
+            errs.add( )
+            
         }
     }
+}
 
-    pub fn space(&'a mut self) -> Result<&'a Token<'a>, AstErr<'a>> {
-        self.whitespace_kind(& WhiteSpace::Space)
+
+
+impl <'a,O> DelimitedParser<'a,O> {
+    pub fn new(kind: BlockSymbol) -> Self {
+        
+    }  
+}
+
+
+
+impl <'a,I> AstParser for BlockParser<'a,I> where I: AstParser {
+    type Output = Block<'a,I>;
+    fn parse<'a>(tokens: &'a mut AstTokenIter<'a>) -> Result<Self::Output, ParseErrs2Proto<'a>> {
+        
     }
+}
 
-    pub fn newline(&'a mut self) -> Result<&'a Token<'a>, AstErr<'a>> {
-        self.whitespace_kind(& WhiteSpace::Newline)
-    }
 
-    pub fn whitespace(&'a mut self) -> Result<&'a Token<'a>, AstErr<'a>> {
-        self.whitespace_kind(& WhiteSpace::Either)
-    }
-    fn whitespace_kind(&'a mut self, whitespace: &'static WhiteSpace) -> Result<&'a Token<'a>, AstErr<'a>> {
-        let token = self.next().ok_or_else(move || AstErr::Err(AstErrKind::UnexpectedEof(TokenKind::Space)))?;
-
-        if token.kind.is_whitespace(whitespace) {
-            Ok(token)
-        } else {
-            Err(AstErr::token_err(token.clone(),AstErrKind::Whitespace(token.kind.clone())))
+impl <'a,P> BlockParser<P> where P: AstParser<Output=Ast<'a>> {
+    pub fn new(kind: BlockSymbol) -> Self {
+        LexBlock
+        Self {
+            kind,
+            inner: PhantomData::default()
         }
-    }
-
-
-
+    } 
 }
 
-impl <'a> Iterator for AstTokenIter<'a> {
-    type Item = &'a Token<'a>;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next()
-    }
-}
-    
+
+
+
+
+
+
 #[cfg(test)]
 pub mod test {
-    use insta::assert_snapshot;
-    use crate::parse2::parse;
-    use crate::parse2::token::result;
+    use crate::parse2::Op;
 
     #[test]
    fn test() {
         let doc = "Blah";
-   }
 
-    #[test]
-    pub fn tokenz() {
-        let op = parse(
-            "tokenz",
-            r#"
-Release(version=1.3.7){
+        #[test]
+        pub fn tokenz() {
+            let data =
+                r#"
+Release(version   }
+=1.3.7){
   + <SomeClass>;
 }       
-        "#,
-        );
+        "#;
+
+        let op = Op::new("tokenz", data.to_string() );
 
         op.parse();
         

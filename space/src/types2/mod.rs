@@ -1,5 +1,5 @@
 use crate::err::ParseErrs0;
-use crate::parse::model::{BlockKind, LexBlock, NestedBlockKind};
+use crate::parse::model::{BlockSymbol, LexBlock, NestedBlockKind};
 use crate::parse::util::preceded;
 use crate::parse::util::Span;
 use crate::parse::{camel_case, CamelCase, NomErr, SkewerCase, SnakeCase};
@@ -80,8 +80,8 @@ impl Type {
         I: Span,
     {
         alt((
-            lex_block(BlockKind::Nested(NestedBlockKind::Angle)),
-            lex_block(BlockKind::Nested(NestedBlockKind::Square)),
+            lex_block(BlockSymbol::Nested(NestedBlockKind::Angle)),
+            lex_block(BlockSymbol::Nested(NestedBlockKind::Square)),
         ))(input)
     }
 }
@@ -341,8 +341,8 @@ where
         let (next, block) = Type::parse_lex_block(input.clone())?;
 
         let disc = match block.kind {
-            BlockKind::Nested(NestedBlockKind::Angle) => TypeDisc::Class,
-            BlockKind::Nested(NestedBlockKind::Square) => TypeDisc::Data,
+            BlockSymbol::Nested(NestedBlockKind::Angle) => TypeDisc::Class,
+            BlockSymbol::Nested(NestedBlockKind::Square) => TypeDisc::Data,
             kind => {
                 let tree = nom::Err::Error(NomErr::from_error_kind(input, ErrorKind::Fail));
                 return Err(tree);
@@ -547,7 +547,6 @@ pub mod test2 {
     use crate::parse::SkewerCase;
     use crate::types::archetype::Archetype;
     use crate::types::class::Class;
-    use crate::types::data::Config;
     use crate::types::scope::parse::scope;
     use crate::types::scope::{Scope, ScopeKeyword, Segment};
     use crate::types::specific::SpecificLoc;
@@ -706,4 +705,36 @@ pub mod test2 {
         let cat: CategoryGeneric<Scope, Type> = lex.try_into().unwrap();
         assert_eq!(cat.r#type, Type::Class(Class::File));
     }
+}
+
+#[derive(
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    EnumDiscriminants,
+    strum_macros::Display,
+    Serialize,
+    Deserialize,
+)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(PrimitiveType))]
+#[strum_discriminants(derive(
+    Hash,
+    strum_macros::EnumString,
+    strum_macros::ToString,
+    strum_macros::IntoStaticStr
+))]
+#[strum(serialize_all= "lowercase")]
+
+pub enum Primitive {
+    String(String),
+    Bool(bool),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    I8(i8),
+    I16(i16),
+    I32(i32),
 }

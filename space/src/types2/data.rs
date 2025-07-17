@@ -10,6 +10,9 @@ use serde_derive::{Deserialize, Serialize};
 use starlane_space::parse::from_camel;
 use starlane_space::types::PointKindDefSrc;
 use strum_macros::{Display, EnumDiscriminants};
+use crate::parse2;
+use crate::point::Point;
+use crate::types2::Primitive;
 
 #[derive(
     Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, Serialize, Deserialize, Name, Display,
@@ -26,10 +29,12 @@ use strum_macros::{Display, EnumDiscriminants};
 ))]
 #[non_exhaustive]
 pub enum Data {
+    #[strum(to_string = "{0}")]
+    Primitive(Primitive),
+    #[strum(to_string = "{0}")]
+    Point(Point),
     #[strum(to_string = "[u8,???]")]
     Bytes(Vec<u8>),
-    #[strum(to_string = "{0}")]
-    Text(String),
     #[strum(to_string = "{0}")]
     Config(Config),
     #[strum(disabled)]

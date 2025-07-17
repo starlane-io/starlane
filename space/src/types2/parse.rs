@@ -1,4 +1,4 @@
-use crate::parse::model::{BlockKind, NestedBlockKind};
+use crate::parse::model::{BlockSymbol, NestedBlockKind};
 use crate::parse::util::Span;
 use crate::parse::{lex_block, CamelCase, Res};
 use crate::types::archetype::Archetype;
@@ -57,11 +57,11 @@ where
     alt((
         value(
             TypeDisc::Class,
-            lex_block(BlockKind::Nested(NestedBlockKind::Angle)),
+            lex_block(BlockSymbol::Nested(NestedBlockKind::Angle)),
         ),
         value(
             TypeDisc::Data,
-            lex_block(BlockKind::Nested(NestedBlockKind::Square)),
+            lex_block(BlockSymbol::Nested(NestedBlockKind::Square)),
         ),
     ))(input)
 }
@@ -140,13 +140,6 @@ pub mod delim {
         assert_eq!(database, Class::Database);
     }
 
-    #[test]
-    pub fn test_schema() {
-        let s = "[Text]";
-        let i = new_span(s);
-        let text = result(delim(data)(i)).unwrap();
-        assert_eq!(text, DataType::Text);
-    }
 
     #[test]
     pub fn class_from_camel() {

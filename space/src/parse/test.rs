@@ -3,7 +3,7 @@ use crate::command::Command;
 use crate::config::Document;
 use crate::err::PrintErr;
 use crate::parse::context;
-use crate::parse::model::{BlockKind, DelimitedBlockKind, NestedBlockKind, TerminatedBlockKind};
+use crate::parse::model::{BlockSymbol, DelimitedBlockKind, NestedBlockKind, TerminatedBlockKind};
 use crate::parse::util::{new_span, result, span_with_extra};
 use crate::parse::{
     assignment, base_point_segment, base_seg, command_line, doc,
@@ -356,23 +356,23 @@ pub fn test_simple_point_var() {
 pub fn test_lex_block() {
     let esc = result(escaped(anychar, '\\', anychar)(new_span("\\}"))).unwrap();
     //println!("esc: {}", esc);
-    util::log(result(all_consuming(lex_block(BlockKind::Nested(
+    util::log(result(all_consuming(lex_block(BlockSymbol::Nested(
         NestedBlockKind::Curly,
     )))(new_span("{}"))))
     .unwrap();
-    util::log(result(all_consuming(lex_block(BlockKind::Nested(
+    util::log(result(all_consuming(lex_block(BlockSymbol::Nested(
         NestedBlockKind::Curly,
     )))(new_span("{x}"))))
     .unwrap();
-    util::log(result(all_consuming(lex_block(BlockKind::Nested(
+    util::log(result(all_consuming(lex_block(BlockSymbol::Nested(
         NestedBlockKind::Curly,
     )))(new_span("{\\}}"))))
     .unwrap();
-    util::log(result(all_consuming(lex_block(BlockKind::Delimited(
+    util::log(result(all_consuming(lex_block(BlockSymbol::Delimited(
         DelimitedBlockKind::SingleQuotes,
     )))(new_span("'hello'"))))
     .unwrap();
-    util::log(result(all_consuming(lex_block(BlockKind::Delimited(
+    util::log(result(all_consuming(lex_block(BlockSymbol::Delimited(
         DelimitedBlockKind::SingleQuotes,
     )))(new_span("'ain\\'t it cool.unwrap()'"))))
     .unwrap();
@@ -846,7 +846,7 @@ pub fn test_lex_scope() {
     //        let pipes = log(result(lex_scope(create_span("Pipes {}"))));
 
     assert_eq!(pipes.selector.name.to_string().as_str(), "Pipes");
-    assert_eq!(pipes.block.kind, BlockKind::Nested(NestedBlockKind::Curly));
+    assert_eq!(pipes.block.kind, BlockSymbol::Nested(NestedBlockKind::Curly));
     assert_eq!(pipes.block.content.len(), 0);
     assert!(pipes.selector.filters.is_empty());
     assert!(pipes.pipeline_step.is_some());
@@ -858,7 +858,7 @@ pub fn test_lex_scope() {
     assert_eq!(pipes.block.content.to_string().as_str(), "-> 12345");
     assert_eq!(
         pipes.block.kind,
-        BlockKind::Terminated(TerminatedBlockKind::Semicolon)
+        BlockSymbol::Terminated(TerminatedBlockKind::Semicolon)
     );
     assert_eq!(pipes.selector.filters.len(), 0);
     assert!(pipes.pipeline_step.is_none());
@@ -871,7 +871,7 @@ pub fn test_lex_scope() {
     assert_eq!(pipes.block.content.to_string().as_str(), "->  12345");
     assert_eq!(
         pipes.block.kind,
-        BlockKind::Terminated(TerminatedBlockKind::Semicolon)
+        BlockSymbol::Terminated(TerminatedBlockKind::Semicolon)
     );
     assert_eq!(pipes.selector.filters.len(), 0);
     assert!(pipes.pipeline_step.is_none());
@@ -880,7 +880,7 @@ pub fn test_lex_scope() {
 
     assert_eq!(pipes.selector.name.to_string().as_str(), "Pipes");
     assert_eq!(pipes.block.content.len(), 0);
-    assert_eq!(pipes.block.kind, BlockKind::Nested(NestedBlockKind::Curly));
+    assert_eq!(pipes.block.kind, BlockSymbol::Nested(NestedBlockKind::Curly));
     assert_eq!(pipes.selector.filters.len(), 1);
     assert!(pipes.pipeline_step.is_some());
 
@@ -901,7 +901,7 @@ pub fn test_lex_scope() {
     );
 
     assert_eq!(pipes.block.content.to_string().as_str(), "");
-    assert_eq!(pipes.block.kind, BlockKind::Nested(NestedBlockKind::Curly));
+    assert_eq!(pipes.block.kind, BlockSymbol::Nested(NestedBlockKind::Curly));
     assert_eq!(pipes.selector.filters.len(), 0);
     assert!(pipes.pipeline_step.is_some());
 
@@ -923,7 +923,7 @@ pub fn test_lex_scope() {
         Some("<Http>")
     );
     assert_eq!(pipes.block.content.to_string().as_str(), "zoink!{}");
-    assert_eq!(pipes.block.kind, BlockKind::Nested(NestedBlockKind::Curly));
+    assert_eq!(pipes.block.kind, BlockSymbol::Nested(NestedBlockKind::Curly));
     assert_eq!(pipes.selector.filters.len(), 1);
     //        assert_eq!(Some(pipes.pipeline_step.unwrap().to_string().as_str()),Some("->") );
 
@@ -938,7 +938,7 @@ pub fn test_lex_scope() {
     );
     assert_eq!(
         pipes.block.kind,
-        BlockKind::Terminated(TerminatedBlockKind::Semicolon)
+        BlockSymbol::Terminated(TerminatedBlockKind::Semicolon)
     );
     assert_eq!(pipes.selector.filters.len(), 0);
     assert!(pipes.pipeline_step.is_none());
@@ -973,7 +973,7 @@ pub fn test_lex_scope() {
         ),
         Some("<Http<Get>>")
     );
-    assert_eq!(pipes.block.kind, BlockKind::Nested(NestedBlockKind::Curly));
+    assert_eq!(pipes.block.kind, BlockSymbol::Nested(NestedBlockKind::Curly));
     assert_eq!(pipes.selector.filters.len(), 0);
     assert_eq!(
         pipes.pipeline_step.as_ref().unwrap().to_string().as_str(),
@@ -997,7 +997,7 @@ pub fn test_lex_scope() {
         ),
         Some("<Http<Get>>")
     );
-    assert_eq!(pipes.block.kind, BlockKind::Nested(NestedBlockKind::Curly));
+    assert_eq!(pipes.block.kind, BlockSymbol::Nested(NestedBlockKind::Curly));
     assert_eq!(pipes.selector.filters.len(), 1);
     assert_eq!(
         pipes.pipeline_step.as_ref().unwrap().to_string().as_str(),
@@ -1021,7 +1021,7 @@ pub fn test_lex_scope() {
         ),
         Some("<Http<Get>>")
     );
-    assert_eq!(pipes.block.kind, BlockKind::Nested(NestedBlockKind::Curly));
+    assert_eq!(pipes.block.kind, BlockSymbol::Nested(NestedBlockKind::Curly));
     assert_eq!(pipes.selector.filters.len(), 2);
     assert_eq!(
         pipes.pipeline_step.as_ref().unwrap().to_string().as_str(),

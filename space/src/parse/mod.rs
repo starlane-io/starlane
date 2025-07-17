@@ -66,7 +66,7 @@ use core::fmt;
 use core::fmt::Display;
 use derive_name::Name;
 use model::{
-    BindScope, BindScopeKind, Block, BlockKind, Chunk, DelimitedBlockKind, LexBlock,
+    BindScope, BindScopeKind, Block, BlockSymbol, Chunk, DelimitedBlockKind, LexBlock,
     LexParentScope, LexRootScope, LexScope, LexScopeSelector, MechtronScope, NestedBlockKind,
     PipelineSegmentVar, PipelineVar, RootScopeSelector, RouteScope, ScopeFilterDef,
     ScopeFiltersDef, Spanned, Subst, TerminatedBlockKind, TextType, VarParser,
@@ -3180,7 +3180,7 @@ where
     }
 }
 
-pub fn lex_block_alt<I: Span>(kinds: Vec<BlockKind>) -> impl FnMut(I) -> Res<I, LexBlock<I>>
+pub fn lex_block_alt<I: Span>(kinds: Vec<BlockSymbol>) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
         + InputLength
@@ -3219,7 +3219,7 @@ where
     }
 }
 
-pub fn lex_block<I: Span>(kind: BlockKind) -> impl FnMut(I) -> Res<I, LexBlock<I>>
+pub fn lex_block<I: Span>(kind: BlockSymbol) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
         + InputLength
@@ -3235,10 +3235,10 @@ where
     <I as InputIter>::Item: AsChar + Copy,
 {
     move |input: I| match kind {
-        BlockKind::Nested(kind) => lex_nested_block(kind).parse(input),
-        BlockKind::Terminated(kind) => lex_terminated_block(kind).parse(input),
-        BlockKind::Delimited(kind) => lex_delimited_block(kind).parse(input),
-        BlockKind::Partial => Err(nom::Err::Failure(NomErr::from_error_kind(
+        BlockSymbol::Nested(kind) => lex_nested_block(kind).parse(input),
+        BlockSymbol::Terminated(kind) => lex_terminated_block(kind).parse(input),
+        BlockSymbol::Delimited(kind) => lex_delimited_block(kind).parse(input),
+        BlockSymbol::Partial => Err(nom::Err::Failure(NomErr::from_error_kind(
             input,
             ErrorKind::IsNot,
         ))),
@@ -3269,7 +3269,7 @@ where
         )(input)
         .map(|(next, content)| {
             let block = LexBlock {
-                kind: BlockKind::Terminated(kind),
+                kind: BlockSymbol::Terminated(kind),
                 content,
                 data: (),
             };
@@ -3311,7 +3311,7 @@ where
                 context(kind.close_context(), cut(tag(kind.close()))),
             ),
         )(input)?;
-        let block = Block::parse(BlockKind::Nested(kind), content);
+        let block = Block::parse(BlockSymbol::Nested(kind), content);
         Ok((next, block))
     }
 }
@@ -3342,7 +3342,7 @@ pub fn nested_block<I: Span>(kind: NestedBlockKind) -> impl FnMut(I) -> Res<I, B
                 context(kind.close_context(), cut(tag(kind.close()))),
             ),
         )(input)?;
-        let block = Block::parse(BlockKind::Nested(kind), content);
+        let block = Block::parse(BlockSymbol::Nested(kind), content);
         Ok((next, block))
     }
 }
@@ -3376,7 +3376,7 @@ where
                 context(kind.missing_close_context(), cut(tag(kind.delim()))),
             ),
         )(input)?;
-        let block = Block::parse(BlockKind::Delimited(kind), content);
+        let block = Block::parse(BlockSymbol::Delimited(kind), content);
         Ok((next, block))
     }
 }
@@ -3481,7 +3481,7 @@ pub fn lex_hierarchy_scope<'a>(
     Ok(LexHierarchyScope::new(scope.selector.clone(), children))
 }*/
 
-pub fn unwrap_block<I: Span, F, O>(kind: BlockKind, mut f: F) -> impl FnMut(I) -> Res<I, O>
+pub fn unwrap_block<I: Span, F, O>(kind: BlockSymbol, mut f: F) -> impl FnMut(I) -> Res<I, O>
 where
     F: FnMut(I) -> Res<I, O>,
 {
@@ -3542,22 +3542,22 @@ pub fn lex_scope<I: Span>(input: I) -> Res<I, LexScope<I>> {
     })
 }
 
-pub fn lex_scoped_block_kind<I: Span>(input: I) -> Res<I, BlockKind> {
+pub fn lex_scoped_block_kind<I: Span>(input: I) -> Res<I, BlockSymbol> {
     alt((
         value(
-            BlockKind::Nested(NestedBlockKind::Curly),
+            BlockSymbol::Nested(NestedBlockKind::Curly),
             recognize(tuple((
                 multispace0,
                 rough_pipeline_step,
                 multispace0,
-                lex_block(BlockKind::Nested(NestedBlockKind::Curly)),
+                lex_block(BlockSymbol::Nested(NestedBlockKind::Curly)),
             ))),
         ),
         value(
-            BlockKind::Terminated(TerminatedBlockKind::Semicolon),
+            BlockSymbol::Terminated(TerminatedBlockKind::Semicolon),
             recognize(pair(
                 rough_pipeline_step,
-                lex_block(BlockKind::Terminated(TerminatedBlockKind::Semicolon)),
+                lex_block(BlockSymbol::Terminated(TerminatedBlockKind::Semicolon)),
             )),
         ),
     ))(input)
@@ -3566,14 +3566,14 @@ pub fn lex_scoped_block_kind<I: Span>(input: I) -> Res<I, BlockKind> {
 pub fn lex_scope_pipeline_step_and_block<I: Span>(input: I) -> Res<I, (Option<I>, LexBlock<I>)> {
     let (_, block_kind) = peek(lex_scoped_block_kind)(input.clone())?;
     match block_kind {
-        BlockKind::Nested(_) => tuple((
+        BlockSymbol::Nested(_) => tuple((
             rough_pipeline_step,
             multispace1,
-            lex_block(BlockKind::Nested(NestedBlockKind::Curly)),
+            lex_block(BlockSymbol::Nested(NestedBlockKind::Curly)),
         ))(input)
         .map(|(next, (step, _, block))| (next, (Some(step), block))),
-        BlockKind::Terminated(_) => {
-            lex_block(BlockKind::Terminated(TerminatedBlockKind::Semicolon))(input)
+        BlockSymbol::Terminated(_) => {
+            lex_block(BlockSymbol::Terminated(TerminatedBlockKind::Semicolon))(input)
                 .map(|(next, block)| (next, (None, block)))
         }
         _ => unimplemented!(),
@@ -3589,8 +3589,8 @@ pub fn lex_sub_scope_selectors_and_filters_and_block<I: Span>(input: I) -> Res<I
             opt(rough_pipeline_step),
             multispace0,
             lex_block_alt(vec![
-                BlockKind::Nested(NestedBlockKind::Curly),
-                BlockKind::Terminated(TerminatedBlockKind::Semicolon),
+                BlockSymbol::Nested(NestedBlockKind::Curly),
+                BlockSymbol::Terminated(TerminatedBlockKind::Semicolon),
             ]),
         )),
     ))(input)
@@ -3598,7 +3598,7 @@ pub fn lex_sub_scope_selectors_and_filters_and_block<I: Span>(input: I) -> Res<I
         (
             next,
             LexBlock {
-                kind: BlockKind::Partial,
+                kind: BlockSymbol::Partial,
                 content,
                 data: (),
             },
@@ -4910,13 +4910,13 @@ pub mod model {
 
     #[derive(Clone)]
     pub struct Block<I, D> {
-        pub kind: BlockKind,
+        pub kind: BlockSymbol,
         pub content: I,
         pub data: D,
     }
 
     impl<I> Block<I, ()> {
-        pub fn parse(kind: BlockKind, content: I) -> Block<I, ()> {
+        pub fn parse(kind: BlockSymbol, content: I) -> Block<I, ()> {
             Block {
                 kind,
                 content,
@@ -4926,7 +4926,7 @@ pub mod model {
     }
 
     #[derive(Debug, Copy, Clone, Error, Eq, PartialEq)]
-    pub enum BlockKind {
+    pub enum BlockSymbol {
         #[error("nexted block")]
         Nested(#[from] NestedBlockKind),
         #[error("terminated")]
@@ -5988,7 +5988,7 @@ pub fn kind_parts<I: Span>(input: I) -> Res<I, KindParts> {
 }
 
 pub fn delim_kind<I: Span>(input: I) -> Res<I, Kind> {
-    unwrap_block(BlockKind::Nested(NestedBlockKind::Angle), kind)(input)
+    unwrap_block(BlockSymbol::Nested(NestedBlockKind::Angle), kind)(input)
 }
 
 pub fn delim_kind_lex<I: Span>(input: I) -> Res<I, KindLex> {
@@ -7333,7 +7333,7 @@ fn parse_mechtron_config<I: Span>(input: I) -> Res<I, Vec<MechtronScope>> {
                 alt((
                     tuple((
                         multispace0,
-                        unwrap_block(BlockKind::Nested(NestedBlockKind::Curly), many0(assignment)),
+                        unwrap_block(BlockSymbol::Nested(NestedBlockKind::Curly), many0(assignment)),
                     )),
                     fail,
                 )),
@@ -7680,13 +7680,13 @@ pub fn route_attribute(input: &str) -> Result<RouteSelector, ParseErrs0> {
     let (_, (_, lex_route)) = result(pair(
         tag("#"),
         unwrap_block(
-            BlockKind::Nested(NestedBlockKind::Square),
+            BlockSymbol::Nested(NestedBlockKind::Square),
             pair(
                 tag("route"),
                 unwrap_block(
-                    BlockKind::Nested(NestedBlockKind::Parens),
+                    BlockSymbol::Nested(NestedBlockKind::Parens),
                     unwrap_block(
-                        BlockKind::Delimited(DelimitedBlockKind::DoubleQuotes),
+                        BlockSymbol::Delimited(DelimitedBlockKind::DoubleQuotes),
                         nospace0,
                     ),
                 ),
@@ -7700,7 +7700,7 @@ pub fn route_attribute(input: &str) -> Result<RouteSelector, ParseErrs0> {
 pub fn route_attribute_value(input: &str) -> Result<RouteSelector, ParseErrs0> {
     let input = new_span(input);
     let lex_route = result(unwrap_block(
-        BlockKind::Delimited(DelimitedBlockKind::DoubleQuotes),
+        BlockSymbol::Delimited(DelimitedBlockKind::DoubleQuotes),
         trim(nospace0),
     )(input.clone()))?;
 
@@ -7711,7 +7711,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs0> {
     let (next, (topic, lex_route)) = match pair(
         opt(terminated(
             unwrap_block(
-                BlockKind::Nested(NestedBlockKind::Square),
+                BlockSymbol::Nested(NestedBlockKind::Square),
                 value_pattern(topic),
             ),
             tag("::"),

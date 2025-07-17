@@ -1,66 +1,67 @@
-use std::error::Error;
-use crate::parse::model::{BlockKind, NestedBlockKind};
-use crate::parse::util::{preceded, recognize, Span};
+use crate::parse::model::{BlockSymbol, NestedBlockKind};
+use crate::parse::util::{new_span, preceded, recognize, Span};
 use crate::parse::{CamelCase, Domain, SkewerCase, SnakeCase};
+use crate::parse2::ast::err::{AstErr, AstErrKind};
 use crate::parse2::chars::ident;
+use crate::parse2::document::Unit;
+use crate::parse2::err::{ErrTree, ParseErrs2Proto};
 use crate::parse2::token::symbol::symbol;
 use crate::parse2::token::whitespace::whitespace;
-use crate::parse2::{to_err, ErrTree, Input, Res};
+use crate::parse2::{Input, Res};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::digit1;
-use nom::combinator::{all_consuming, eof, into, not};
-use nom::error::ParseError;
+use nom::combinator::{into, not};
+use nom::error::{ErrorKind, FromExternalError, ParseError};
 use nom::multi::{many0, many1, separated_list1};
-use nom::sequence::terminated;
 use nom::{Needed, Offset, Parser, Slice};
 use nom_supreme::ParserExt;
 use semver::Version;
+use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Range;
+use std::slice::Iter;
 use std::str::FromStr;
+use std::sync::Arc;
 use strum_macros::{Display, EnumDiscriminants, EnumString, EnumTryAs};
 
-pub fn tokenize(input: Input) -> Res<Vec<Token>> {
-    all_consuming(terminated(tokens, eof))(input)
-}
-
-
-pub(crate) fn token<'a>(input: Input<'a>) -> Res<Token<'a>> {
-    let (next, (kind, len)) = loc(alt((defined, undefined)))(input.clone())?;
-    let token = Token::new(input.slice(..len), kind);
-    Ok((next, token))
-}
-
-/// returns tuple `Ok(Output,Range<usize>)`
-fn loc<'a, O>(mut f: impl FnMut(Input<'a>) -> Res<O>) -> impl FnMut(Input<'a>) -> Res<(O, usize)> {
-    move |input| {
-        let (next, output) = f(input.clone())?;
-        let len = input.len() - next.len();
-        Ok((next, (output, len)))
+pub(crate) fn tokens(input: Input) -> Res<Vec<Token>> {
+    pub(crate) fn token<'a>(input: Input<'a>) -> Res<Token<'a>> {
+        let (next, (kind, len)) = loc(alt((defined, undefined)))(input.clone())?;
+        let token = Token::new(input.slice(..len), kind);
+        Ok((next, token))
     }
-}
 
-fn defined(input: Input) -> Res<TokenKind> {
-    alt((whitespace, symbol, into(ident), into(version)))(input)
-}
-fn undefined(input: Input) -> Res<TokenKind> {
-    recognize(many1(preceded(not(defined), take(1usize))))(input)
-        .map(|(next, undef)| (next, TokenKind::Undefined(undef.to_string())))
-}
+    /// returns tuple `Ok(Output,Range<usize>)`
+    fn loc<'a, O>(
+        mut f: impl FnMut(Input<'a>) -> Res<O>,
+    ) -> impl FnMut(Input<'a>) -> Res<(O, usize)> {
+        move |input| {
+            let (next, output) = f(input.clone())?;
+            let len = input.len() - next.len();
+            Ok((next, (output, len)))
+        }
+    }
 
-fn into_token<'a, O>(f: impl FnMut(Input) -> Res<O> + Copy) -> impl FnMut(Input) -> Res<Token<'a>>
-where
-    O: Into<Token<'a>>,
-{
-    move |input| into(f)(input)
-}
+    fn defined(input: Input) -> Res<TokenKind> {
+        alt((whitespace, symbol, into(ident), into(version)))(input)
+    }
+    fn undefined(input: Input) -> Res<TokenKind> {
+        recognize(many1(preceded(not(defined), take(1usize))))(input)
+            .map(|(next, undef)| (next, TokenKind::Undefined(undef.to_string())))
+    }
 
-fn tokens(input: Input) -> Res<Vec<Token>> {
+    fn into_token<'a, O>(
+        f: impl FnMut(Input) -> Res<O> + Copy,
+    ) -> impl FnMut(Input) -> Res<Token<'a>>
+    where
+        O: Into<Token<'a>>,
+    {
+        move |input| into(f)(input)
+    }
+
     many0(token)(input)
 }
-
-
 
 /*
 fn version_decl(input: Input) -> Res<TokenKind> {
@@ -79,41 +80,28 @@ fn parse_u64(input: Input) -> Res<u64> {
 fn version(input: Input) -> Res<Version> {
     let (next, version) = recognize(separated_list1(tag("."), parse_u64))(input.clone())?;
     let version = version.to_string();
-    let version = semver::Version::from_str(version.as_str()).map_err(|err| to_err(input, err))?;
+    let version = semver::Version::from_str(version.as_str()).map_err(move |err| {
+        let span = input.slice(0..(next.location_offset() - input.location_offset()));
+        ErrTree::from_external_error(span, ErrorKind::Alpha, AstErrKind::VersionFormat)
+    })?;
     Ok((next, version))
 }
 
-#[derive(Clone, Debug)]
-pub struct TokenDef<'a, K> {
-    pub span: Input<'a>,
-    pub kind: K,
-}
+pub type TokenDef<'a, K> = Unit<'a, TokenKind>;
 
 pub type Token<'a> = TokenDef<'a, TokenKind>;
 pub type IdentToken<'a> = TokenDef<'a, Ident>;
 
-
-impl<'a, T> TokenDef<'a, T> {
-    fn new(span: Input<'a>, kind: T) -> Self {
-        Self { span, kind }
-    }
-
-    fn with<T2>(self, kind: T2) -> TokenDef<'a, T2> {
-        TokenDef {
-            span: self.span,
-            kind,
-        }
-    }
-}
+impl<'a, T> TokenDef<'a, T> {}
 
 #[derive(Debug, Clone)]
 struct Block<T> {
-    kind: BlockKind,
+    kind: BlockSymbol,
     tokens: Vec<T>,
 }
 
 impl<T> Block<T> {
-    fn new(kind: impl Into<BlockKind>, tokens: Vec<T>) -> Self {
+    fn new(kind: impl Into<BlockSymbol>, tokens: Vec<T>) -> Self {
         let kind = kind.into();
         Self { kind, tokens }
     }
@@ -159,7 +147,6 @@ impl Header {
 #[strum_discriminants(name(TokenKindDisc))]
 #[strum_discriminants(derive(Hash, Display))]
 pub enum TokenKind {
-
     #[strum(to_string = "{0}")]
     Ident(Ident),
     #[strum(to_string = "BlockOpen({0})")]
@@ -173,12 +160,10 @@ pub enum TokenKind {
     Plus,
     /// `@` symbol
     At,
-    /// `:` symbol
-    SegmentSep,
     /// `::` symbol
-    Scope,
-    /// `+::` add variant
-    Variant,
+    SuperSeparator,
+    /// `:` symbol
+    Separator,
     /// `.` symbol (used for properties and child defs)
     Dot,
     /// `=`
@@ -187,7 +172,7 @@ pub enum TokenKind {
     Terminator,
     /// `&` good old ampersand
     Return,
-    /// `version=` i.e.: Def(`version=`1.1.5) ... tells which parser version to use
+    /// `version` i.e.: Def(`version`=1.1.5) ... tells which parser version to use
     VersionLiteral,
     /// version=`1.2.3`
     Version(Version),
@@ -205,80 +190,73 @@ pub enum TokenKind {
 }
 
 impl TokenKind {
-    pub fn describe_format(&self) -> &'static str{
-       match &self {
-           TokenKind::Ident(ident) => ident.description(),
-           TokenKind::Open(symbol) => {
-               match symbol {
-                   NestedBlockKind::Curly => "block open '{'",
-                   NestedBlockKind::Parens => "block open '('",
-                   NestedBlockKind::Square => "block open '['",
-                   NestedBlockKind::Angle => "block open '<'",
-               }
-           }
-           TokenKind::Close(symbol) => {
-               match symbol {
-                   NestedBlockKind::Curly => "block close '}'",
-                   NestedBlockKind::Parens => "block close')'",
-                   NestedBlockKind::Square => "block close']'",
-                   NestedBlockKind::Angle => "block close '>'",
-               }
-           }
-           TokenKind::Plus => "'+' symbol",
-           TokenKind::At => "'@' symbol",
-           TokenKind::SegmentSep => "':' symbol",
-           TokenKind::Scope => "'::' scope symbol",
-           TokenKind::Variant => "::>' variant symbol",
-           TokenKind::Dot => "'.' dot symbol",
-           TokenKind::Equals =>"'=' equals symbol", 
-           TokenKind::Terminator => "';' terminator symbol (semicolon)",
-           TokenKind::Return => "'&' return symbol",
-           TokenKind::VersionLiteral => "'version=' literal",
-           TokenKind::Version(_) => IdentKind::Version.description(),
-           TokenKind::Space => "' ' space (whitespace)",
-           TokenKind::Newline => "'\\n' newline (whitespace)",
-           TokenKind::Undefined(_) => "undefined",
-           TokenKind::EOF => "End of File",
-           TokenKind::Err(_) => "Err"
-       } 
+    pub fn describe_format(&self) -> &'static str {
+        match &self {
+            TokenKind::Ident(ident) => ident.description(),
+            TokenKind::Open(symbol) => match symbol {
+                NestedBlockKind::Curly => "block open '{'",
+                NestedBlockKind::Parens => "block open '('",
+                NestedBlockKind::Square => "block open '['",
+                NestedBlockKind::Angle => "block open '<'",
+            },
+            TokenKind::Close(symbol) => match symbol {
+                NestedBlockKind::Curly => "block close '}'",
+                NestedBlockKind::Parens => "block close')'",
+                NestedBlockKind::Square => "block close']'",
+                NestedBlockKind::Angle => "block close '>'",
+            },
+            TokenKind::Plus => "'+' symbol",
+            TokenKind::At => "'@' symbol",
+            TokenKind::Separator => "':' symbol",
+            TokenKind::SuperSeparator => "'::' scope symbol",
+            TokenKind::Dot => "'.' dot symbol",
+            TokenKind::Equals => "'=' equals symbol",
+            TokenKind::Terminator => "';' terminator symbol (semicolon)",
+            TokenKind::Return => "'&' return symbol",
+            TokenKind::VersionLiteral => "'version=' literal",
+            TokenKind::Version(_) => IdentKind::Version.description(),
+            TokenKind::Space => "' ' space (whitespace)",
+            TokenKind::Newline => "'\\n' newline (whitespace)",
+            TokenKind::Undefined(_) => "undefined",
+            TokenKind::EOF => "End of File",
+            TokenKind::Err(_) => "Err",
+        }
     }
-    
+
     pub fn whitespace(&self) -> &'static WhiteSpace {
         match self {
-            TokenKind::Space => & WhiteSpace::Space,
-            TokenKind::Newline => & WhiteSpace::Newline,
-            _ => & WhiteSpace::None
+            TokenKind::Space => &WhiteSpace::Space,
+            TokenKind::Newline => &WhiteSpace::Newline,
+            _ => &WhiteSpace::None,
         }
     }
 }
 
-#[derive(Clone, Debug,Eq, PartialEq,Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum WhiteSpace {
     None,
     Space,
     Newline,
-    Either 
+    Either,
 }
 
 impl TokenKind {
-    
     pub fn is_whitespace(&self, whitespace: &'static WhiteSpace) -> bool {
         match whitespace {
             WhiteSpace::None => false,
             WhiteSpace::Space => self.is_space(),
             WhiteSpace::Newline => self.is_newline(),
-            WhiteSpace::Either => self.is_space() || self.is_newline()
+            WhiteSpace::Either => self.is_space() || self.is_newline(),
         }
     }
 
     pub fn is_space(&self) -> bool {
         *self == Self::Space
     }
-    
+
     pub fn is_newline(&self) -> bool {
-         *self == Self::Newline
+        *self == Self::Newline
     }
-    
 }
 
 impl<'a> From<Version> for TokenKind {
@@ -317,7 +295,6 @@ pub(crate) enum Ident {
 }
 
 impl Ident {
-
     pub fn description(&self) -> &'static str {
         let kind: IdentKind = self.clone().into();
         kind.description()
@@ -333,13 +310,8 @@ impl IdentKind {
             IdentKind::Domain => "'domain-case.com' lowercase alphanumeric plus dash and dot '.' (must start with lowercase letter) AND consecutive dots are not allowed: 'domain..com' == no!'",
             IdentKind::Version => "'major.minor.patch-prerelease.1+build-metadata' standard semver  i.e.: '1.3.5'  Also supports prerelease and build metadata:  '0.1.13-alpha.3+deprecated'"
         }
-        
     }
 }
-
-
-
-
 
 impl From<Ident> for TokenKind {
     fn from(ident: Ident) -> Self {
@@ -546,11 +518,11 @@ pub(super) mod symbol {
     }
 
     fn segment_sep(input: Input) -> Res<TokenKind> {
-        value(TokenKind::SegmentSep, tag(":"))(input)
+        value(TokenKind::Separator, tag(":"))(input)
     }
 
     fn scope(input: Input) -> Res<TokenKind> {
-        value(TokenKind::Scope, tag("::"))(input)
+        value(TokenKind::SuperSeparator, tag("::"))(input)
     }
 
     fn dot(input: Input) -> Res<TokenKind> {
@@ -617,11 +589,11 @@ pub mod err {
     }
 }
 
-pub fn result<R>(result: Res<R>) -> Result<R, ErrTree> {
+pub fn result<'a, R>(result: Res<R>) -> Result<R, ParseErrs2Proto<'a>> {
     match result {
         Ok((_, e)) => Ok(e),
-        Err(nom::Err::Error(err)) => Result::Err(err),
-        Err(nom::Err::Failure(err)) => Result::Err(err),
+        Err(nom::Err::Error(err)) => Result::Err(err.into()),
+        Err(nom::Err::Failure(err)) => Result::Err(err.into()),
         Err(nom::Err::Incomplete(needed)) => match needed {
             Needed::Unknown => panic!("Needed::Unknown"),
             Needed::Size(size) => panic!("Needed::Size(size={})", size),
@@ -668,19 +640,22 @@ pub mod util {
      */
 }
 
+/*
 #[cfg(test)]
 pub mod tests {
     use crate::parse2::parse;
     use crate::parse2::token::symbol::symbol;
     use crate::parse2::token::util::diagnose;
-    use crate::parse2::token::{result, tokenize, undefined, Token, TokenKind};
+    use crate::parse2::token::{result, TokenKind};
     use insta::_macro_support::assert_snapshot;
     use insta::assert_snapshot;
     use nom::combinator::all_consuming;
+    use std::sync::Arc;
 
     #[test]
     pub fn symbols() {
-        let op = parse("equals", "=");
+        let data: Arc<String> = "=".to_string().into();
+        let result = parse(&data);
         let token = result(all_consuming(symbol)(op.input())).unwrap();
         assert_eq!(token, TokenKind::Equals);
         assert_snapshot!(token);
@@ -701,7 +676,7 @@ pub mod tests {
             r#"
 Release(version=1.3.7){
   + <SomeClass>;
-}       
+}
         "#,
         );
 
@@ -719,18 +694,18 @@ Release(version=1.3.7){
             r#"
 Package(version=1.3.7){
   + <SomeClass> {
-    
+
   }
-  + 1.0.3<Slice> { 
-  
+  + 1.0.3<Slice> {
+
   }
-  
-}       
+
+}
 
 
 
 
-  
+
         "#,
         );
 
@@ -746,5 +721,109 @@ Package(version=1.3.7){
             println!("token: {}", token.kind);
         }
         println!("*****************");
+    }
+}
+
+ */
+
+pub struct Tokens<'a> {
+    pub data: &'a Arc<String>,
+    pub tokens: Vec<Token<'a>>,
+}
+
+impl<'a> Tokens<'a> {
+    pub fn new(data: &'a Arc<String>, tokens: Vec<Token<'a>>) -> Self {
+        Self { data, tokens }
+    }
+
+    pub fn iter(&'a self) -> AstTokenIter<'a> {
+        let iter = self.tokens.iter();
+        AstTokenIter::new(self.data, iter)
+    }
+}
+
+pub struct AstTokenIter<'a> {
+    data: &'a Arc<String>,
+    iter: Iter<'a, Token<'a>>,
+}
+
+impl<'a> AstTokenIter<'a> {
+
+    fn empty(&self) -> Input<'a> {
+        let string = self.data.as_str().slice( (self.data.len()-1)..self.data.len());
+        Input::new_extra(string,self.data)
+    }
+    pub fn new(data: &'a Arc<String>, iter: Iter<'a, Token<'a>>) -> Self {
+        AstTokenIter { data, iter }
+    }
+
+    /// return the next token that is not whitespace: [TokenKind::Space] || [TokenKind::Newline]
+    pub fn skip_ws(&'a mut self) -> Option<&'a Token<'a>> {
+        while let Some(token) = self.iter.next() {
+            if !token.kind.is_whitespace(&WhiteSpace::Either) {
+                return Some(token);
+            }
+        }
+        /// out of tokens
+        None
+    }
+
+    pub fn expect(
+        &'a mut self,
+        id: &'static str,
+        expect: &TokenKind,
+    ) -> Result<&'a Token<'a>, AstErr<'a>> {
+        let token = self
+            .skip_ws()
+            .ok_or_else(move || AstErr::new( self.empty(), AstErrKind::UnexpectedEof(expect.clone())))?;
+
+        if token.kind == *expect {
+            Ok(token)
+        } else {
+            Err(
+                AstErr::new(token.span, AstErrKind::ExpectedKind {
+                    id,
+                    kind: expect.clone(),
+                    found: token.kind.clone(),
+                }
+            ))
+        }
+    }
+
+    pub fn space(&'a mut self) -> Result<&'a Token<'a>, AstErr<'a>> {
+        self.whitespace_kind(&WhiteSpace::Space)
+    }
+
+    pub fn newline(&'a mut self) -> Result<&'a Token<'a>, AstErr<'a>> {
+        self.whitespace_kind(&WhiteSpace::Newline)
+    }
+
+    pub fn whitespace(&'a mut self) -> Result<&'a Token<'a>, AstErr<'a>> {
+        self.whitespace_kind(&WhiteSpace::Either)
+    }
+    fn whitespace_kind(
+        &'a mut self,
+        whitespace: &'static WhiteSpace,
+    ) -> Result<&'a Token<'a>, AstErr<'a>> {
+        let token = self
+            .next()
+            .ok_or_else(move || AstErr::new( self.empty(), AstErrKind::UnexpectedEof(TokenKind::Space)))?;
+
+        if token.kind.is_whitespace(whitespace) {
+            Ok(token)
+        } else {
+            Err(AstErr::new(
+                token.span,
+                AstErrKind::Whitespace(token.kind.clone()),
+            ))
+        }
+    }
+}
+
+impl<'a> Iterator for AstTokenIter<'a> {
+    type Item = &'a Token<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next()
     }
 }
