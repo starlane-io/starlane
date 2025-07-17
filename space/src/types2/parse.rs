@@ -1,4 +1,4 @@
-use crate::parse::model::{BlockSymbol, NestedBlockKind};
+use crate::parse::model::{BlockSymbol, NestedSymbols};
 use crate::parse::util::Span;
 use crate::parse::{lex_block, CamelCase, Res};
 use crate::types::archetype::Archetype;
@@ -57,11 +57,11 @@ where
     alt((
         value(
             TypeDisc::Class,
-            lex_block(BlockSymbol::Nested(NestedBlockKind::Angle)),
+            lex_block(BlockSymbol::Nested(NestedSymbols::Angle)),
         ),
         value(
             TypeDisc::Data,
-            lex_block(BlockSymbol::Nested(NestedBlockKind::Square)),
+            lex_block(BlockSymbol::Nested(NestedSymbols::Square)),
         ),
     ))(input)
 }

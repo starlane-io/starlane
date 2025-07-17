@@ -66,10 +66,10 @@ use core::fmt;
 use core::fmt::Display;
 use derive_name::Name;
 use model::{
-    BindScope, BindScopeKind, Block, BlockSymbol, Chunk, DelimitedBlockKind, LexBlock,
-    LexParentScope, LexRootScope, LexScope, LexScopeSelector, MechtronScope, NestedBlockKind,
+    BindScope, BindScopeKind, Block, BlockSymbol, Chunk, DelimitedSymbol, LexBlock,
+    LexParentScope, LexRootScope, LexScope, LexScopeSelector, MechtronScope, NestedSymbols,
     PipelineSegmentVar, PipelineVar, RootScopeSelector, RouteScope, ScopeFilterDef,
-    ScopeFiltersDef, Spanned, Subst, TerminatedBlockKind, TextType, VarParser,
+    ScopeFiltersDef, Spanned, Subst, TerminateSymbol, TextType, VarParser,
 };
 use nom::branch::alt;
 use nom::bytes::complete::{is_a, is_not};
@@ -3246,7 +3246,7 @@ where
 }
 
 pub fn lex_terminated_block<I: Span>(
-    kind: TerminatedBlockKind,
+    kind: TerminateSymbol,
 ) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
@@ -3281,7 +3281,7 @@ where
 
 /// rough block simply makes sure that the opening and closing symbols match
 /// it accounts for multiple embedded blocks of the same kind but NOT of differing kinds
-pub fn lex_nested_block<I: Span>(kind: NestedBlockKind) -> impl FnMut(I) -> Res<I, LexBlock<I>>
+pub fn lex_nested_block<I: Span>(kind: NestedSymbols) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
         + InputLength
@@ -3316,11 +3316,11 @@ where
     }
 }
 
-pub fn nested_block_content<I: Span>(kind: NestedBlockKind) -> impl FnMut(I) -> Res<I, I> {
+pub fn nested_block_content<I: Span>(kind: NestedSymbols) -> impl FnMut(I) -> Res<I, I> {
     move |input: I| nested_block(kind)(input).map(|(next, block)| (next, block.content))
 }
 
-pub fn nested_block<I: Span>(kind: NestedBlockKind) -> impl FnMut(I) -> Res<I, Block<I, ()>> {
+pub fn nested_block<I: Span>(kind: NestedSymbols) -> impl FnMut(I) -> Res<I, Block<I, ()>> {
     move |input: I| {
         let (next, content) = context(
             kind.context(),
@@ -3348,7 +3348,7 @@ pub fn nested_block<I: Span>(kind: NestedBlockKind) -> impl FnMut(I) -> Res<I, B
 }
 
 pub fn lex_delimited_block<I: Span>(
-    kind: DelimitedBlockKind,
+    kind: DelimitedSymbol,
 ) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
@@ -3381,12 +3381,12 @@ where
     }
 }
 
-fn block_open<I: Span>(input: I) -> Res<I, NestedBlockKind> {
+fn block_open<I: Span>(input: I) -> Res<I, NestedSymbols> {
     alt((
-        value(NestedBlockKind::Curly, tag(NestedBlockKind::Curly.open())),
-        value(NestedBlockKind::Angle, tag(NestedBlockKind::Angle.open())),
-        value(NestedBlockKind::Parens, tag(NestedBlockKind::Parens.open())),
-        value(NestedBlockKind::Square, tag(NestedBlockKind::Square.open())),
+        value(NestedSymbols::Curly, tag(NestedSymbols::Curly.open())),
+        value(NestedSymbols::Angle, tag(NestedSymbols::Angle.open())),
+        value(NestedSymbols::Parens, tag(NestedSymbols::Parens.open())),
+        value(NestedSymbols::Square, tag(NestedSymbols::Square.open())),
     ))(input)
 }
 
@@ -3406,28 +3406,28 @@ where
     <I as InputIter>::Item: AsChar + Copy,
 {
     alt((
-        lex_nested_block(NestedBlockKind::Curly),
-        lex_nested_block(NestedBlockKind::Angle),
-        lex_nested_block(NestedBlockKind::Parens),
-        lex_nested_block(NestedBlockKind::Square),
-        lex_delimited_block(DelimitedBlockKind::DoubleQuotes),
-        lex_delimited_block(DelimitedBlockKind::SingleQuotes),
+        lex_nested_block(NestedSymbols::Curly),
+        lex_nested_block(NestedSymbols::Angle),
+        lex_nested_block(NestedSymbols::Parens),
+        lex_nested_block(NestedSymbols::Square),
+        lex_delimited_block(DelimitedSymbol::DoubleQuotes),
+        lex_delimited_block(DelimitedSymbol::SingleQuotes),
     ))(input)
 }
 
 fn any_block<I: Span>(input: I) -> Res<I, LexBlock<I>> {
     alt((
-        nested_block(NestedBlockKind::Curly),
-        nested_block(NestedBlockKind::Angle),
-        nested_block(NestedBlockKind::Parens),
-        nested_block(NestedBlockKind::Square),
-        lex_delimited_block(DelimitedBlockKind::DoubleQuotes),
-        lex_delimited_block(DelimitedBlockKind::SingleQuotes),
+        nested_block(NestedSymbols::Curly),
+        nested_block(NestedSymbols::Angle),
+        nested_block(NestedSymbols::Parens),
+        nested_block(NestedSymbols::Square),
+        lex_delimited_block(DelimitedSymbol::DoubleQuotes),
+        lex_delimited_block(DelimitedSymbol::SingleQuotes),
     ))(input)
 }
 
 pub fn expected_block_terminator_or_non_terminator<I: Span>(
-    expect: NestedBlockKind,
+    expect: NestedSymbols,
 ) -> impl FnMut(I) -> Res<I, ()>
 where
     I: InputIter + InputLength + Slice<RangeFrom<usize>>,
@@ -3436,7 +3436,7 @@ where
 {
     move |input: I| -> Res<I, ()> {
         verify(anychar, move |c| {
-            if NestedBlockKind::is_block_terminator(*c) {
+            if NestedSymbols::is_block_terminator(*c) {
                 *c == expect.close_as_char()
             } else {
                 true
@@ -3545,19 +3545,19 @@ pub fn lex_scope<I: Span>(input: I) -> Res<I, LexScope<I>> {
 pub fn lex_scoped_block_kind<I: Span>(input: I) -> Res<I, BlockSymbol> {
     alt((
         value(
-            BlockSymbol::Nested(NestedBlockKind::Curly),
+            BlockSymbol::Nested(NestedSymbols::Curly),
             recognize(tuple((
                 multispace0,
                 rough_pipeline_step,
                 multispace0,
-                lex_block(BlockSymbol::Nested(NestedBlockKind::Curly)),
+                lex_block(BlockSymbol::Nested(NestedSymbols::Curly)),
             ))),
         ),
         value(
-            BlockSymbol::Terminated(TerminatedBlockKind::Semicolon),
+            BlockSymbol::Terminated(TerminateSymbol::Semicolon),
             recognize(pair(
                 rough_pipeline_step,
-                lex_block(BlockSymbol::Terminated(TerminatedBlockKind::Semicolon)),
+                lex_block(BlockSymbol::Terminated(TerminateSymbol::Semicolon)),
             )),
         ),
     ))(input)
@@ -3569,11 +3569,11 @@ pub fn lex_scope_pipeline_step_and_block<I: Span>(input: I) -> Res<I, (Option<I>
         BlockSymbol::Nested(_) => tuple((
             rough_pipeline_step,
             multispace1,
-            lex_block(BlockSymbol::Nested(NestedBlockKind::Curly)),
+            lex_block(BlockSymbol::Nested(NestedSymbols::Curly)),
         ))(input)
         .map(|(next, (step, _, block))| (next, (Some(step), block))),
         BlockSymbol::Terminated(_) => {
-            lex_block(BlockSymbol::Terminated(TerminatedBlockKind::Semicolon))(input)
+            lex_block(BlockSymbol::Terminated(TerminateSymbol::Semicolon))(input)
                 .map(|(next, block)| (next, (None, block)))
         }
         _ => unimplemented!(),
@@ -3582,15 +3582,15 @@ pub fn lex_scope_pipeline_step_and_block<I: Span>(input: I) -> Res<I, (Option<I>
 
 pub fn lex_sub_scope_selectors_and_filters_and_block<I: Span>(input: I) -> Res<I, LexBlock<I>> {
     recognize(pair(
-        nested_block_content(NestedBlockKind::Angle),
+        nested_block_content(NestedSymbols::Angle),
         tuple((
             opt(scope_filters),
             multispace0,
             opt(rough_pipeline_step),
             multispace0,
             lex_block_alt(vec![
-                BlockSymbol::Nested(NestedBlockKind::Curly),
-                BlockSymbol::Terminated(TerminatedBlockKind::Semicolon),
+                BlockSymbol::Nested(NestedSymbols::Curly),
+                BlockSymbol::Terminated(TerminateSymbol::Semicolon),
             ]),
         )),
     ))(input)
@@ -3615,7 +3615,7 @@ pub fn root_scope<I: Span>(input: I) -> Res<I, LexRootScope<I>> {
             context("root-scope:block", cut(peek(tag("{")))),
             context(
                 "root-scope:block",
-                cut(lex_nested_block(NestedBlockKind::Curly)),
+                cut(lex_nested_block(NestedSymbols::Curly)),
             ),
         )),
     )(input)
@@ -3679,7 +3679,7 @@ pub fn next_stacked_name<I: Span>(input: I) -> Res<I, (I, Option<I>)> {
                 tag("<"),
                 pair(
                     context("scope-selector", alt((alphanumeric1, tag("*")))),
-                    opt(recognize(nested_block(NestedBlockKind::Angle))),
+                    opt(recognize(nested_block(NestedSymbols::Angle))),
                 ),
                 tag(">"),
             )),
@@ -3692,7 +3692,7 @@ pub fn next_stacked_name<I: Span>(input: I) -> Res<I, (I, Option<I>)> {
     }
     pair(
         context("scope-selector", cut(alt((alphanumeric1, tag("*"))))),
-        opt(recognize(nested_block(NestedBlockKind::Angle))),
+        opt(recognize(nested_block(NestedSymbols::Angle))),
     )(input)
 }
 
@@ -3752,7 +3752,7 @@ where
     f.parse(input)
 }
 
-pub fn parse_inner_block<I, F>(kind: NestedBlockKind, mut f: &F) -> impl FnMut(I) -> Res<I, I> + '_
+pub fn parse_inner_block<I, F>(kind: NestedSymbols, mut f: &F) -> impl FnMut(I) -> Res<I, I> + '_
 where
     I: Span,
     &'static str: FindToken<<I as InputTakeAtPosition>::Item>,
@@ -3792,7 +3792,7 @@ where
     }
 }
 
-pub fn parse_include_blocks<I, O2, F>(kind: NestedBlockKind, mut f: F) -> impl FnMut(I) -> Res<I, I>
+pub fn parse_include_blocks<I, O2, F>(kind: NestedSymbols, mut f: F) -> impl FnMut(I) -> Res<I, I>
 where
     I: Span,
     &'static str: FindToken<<I as InputTakeAtPosition>::Item>,
@@ -3849,7 +3849,7 @@ pub fn scope_filter<I: Span>(input: I) -> Res<I, ScopeFilterDef<I>> {
                     "filter-arguments",
                     preceded(
                         multispace1,
-                        parse_include_blocks(NestedBlockKind::Parens, args),
+                        parse_include_blocks(NestedSymbols::Parens, args),
                     ),
                 )),
             ))),
@@ -4927,76 +4927,76 @@ pub mod model {
 
     #[derive(Debug, Copy, Clone, Error, Eq, PartialEq)]
     pub enum BlockSymbol {
-        #[error("nexted block")]
-        Nested(#[from] NestedBlockKind),
-        #[error("terminated")]
-        Terminated(#[from] TerminatedBlockKind),
-        #[error("delimited")]
-        Delimited(#[from] DelimitedBlockKind),
+        #[error("nexted block {0}")]
+        Nested(#[from] NestedSymbols),
+        #[error("terminated {0}")]
+        Terminated(#[from] TerminateSymbol),
+        #[error("delimited {0}")]
+        Delimited(#[from] DelimitedSymbol),
         #[error("partial")]
         Partial,
     }
 
     #[derive(Debug, Copy, Clone, Error, Eq, PartialEq)]
-    pub enum TerminatedBlockKind {
+    pub enum TerminateSymbol {
         #[error("semicolon")]
         Semicolon,
     }
 
-    impl TerminatedBlockKind {
+    impl TerminateSymbol {
         pub fn tag(&self) -> &'static str {
             match self {
-                TerminatedBlockKind::Semicolon => ";",
+                TerminateSymbol::Semicolon => ";",
             }
         }
 
         pub fn as_char(&self) -> char {
             match self {
-                TerminatedBlockKind::Semicolon => ';',
+                TerminateSymbol::Semicolon => ';',
             }
         }
     }
 
     #[derive(Debug, Copy, Clone, Error, Eq, PartialEq)]
-    pub enum DelimitedBlockKind {
+    pub enum DelimitedSymbol {
         #[error("single quotes")]
         SingleQuotes,
         #[error("double quotes")]
         DoubleQuotes,
     }
 
-    impl DelimitedBlockKind {
+    impl DelimitedSymbol {
         pub fn delim(&self) -> &'static str {
             match self {
-                DelimitedBlockKind::SingleQuotes => "'",
-                DelimitedBlockKind::DoubleQuotes => "\"",
+                DelimitedSymbol::SingleQuotes => "'",
+                DelimitedSymbol::DoubleQuotes => "\"",
             }
         }
 
         pub fn escaped(&self) -> &'static str {
             match self {
-                DelimitedBlockKind::SingleQuotes => "\'",
-                DelimitedBlockKind::DoubleQuotes => "\"",
+                DelimitedSymbol::SingleQuotes => "\'",
+                DelimitedSymbol::DoubleQuotes => "\"",
             }
         }
 
         pub fn context(&self) -> &'static str {
             match self {
-                DelimitedBlockKind::SingleQuotes => "single:quotes:block",
-                DelimitedBlockKind::DoubleQuotes => "double:quotes:block",
+                DelimitedSymbol::SingleQuotes => "single:quotes:block",
+                DelimitedSymbol::DoubleQuotes => "double:quotes:block",
             }
         }
 
         pub fn missing_close_context(&self) -> &'static str {
             match self {
-                DelimitedBlockKind::SingleQuotes => "single:quotes:block:missing-close",
-                DelimitedBlockKind::DoubleQuotes => "double:quotes:block:missing-close",
+                DelimitedSymbol::SingleQuotes => "single:quotes:block:missing-close",
+                DelimitedSymbol::DoubleQuotes => "double:quotes:block:missing-close",
             }
         }
     }
 
     #[derive(Debug, Copy, Clone, Error, Eq, PartialEq)]
-    pub enum NestedBlockKind {
+    pub enum NestedSymbols {
         #[error("curly")]
         Curly,
         #[error("parenthesis")]
@@ -5008,7 +5008,7 @@ pub mod model {
     }
 
 
-    impl NestedBlockKind {
+    impl NestedSymbols {
         pub fn is_block_terminator(c: char) -> bool {
             match c {
                 '}' => true,
@@ -5051,73 +5051,73 @@ pub mod model {
 
         pub fn context(&self) -> &'static str {
             match self {
-                NestedBlockKind::Curly => "block:{}",
-                NestedBlockKind::Parens => "block:()",
-                NestedBlockKind::Square => "block:[]",
-                NestedBlockKind::Angle => "block:<>",
+                NestedSymbols::Curly => "block:{}",
+                NestedSymbols::Parens => "block:()",
+                NestedSymbols::Square => "block:[]",
+                NestedSymbols::Angle => "block:<>",
             }
         }
 
         pub fn open_context(&self) -> &'static str {
             match self {
-                NestedBlockKind::Curly => "block:open:{",
-                NestedBlockKind::Parens => "block:open:(",
-                NestedBlockKind::Square => "block:open:[",
-                NestedBlockKind::Angle => "block:open:<",
+                NestedSymbols::Curly => "block:open:{",
+                NestedSymbols::Parens => "block:open:(",
+                NestedSymbols::Square => "block:open:[",
+                NestedSymbols::Angle => "block:open:<",
             }
         }
 
         pub fn close_context(&self) -> &'static str {
             match self {
-                NestedBlockKind::Curly => "block:close:}",
-                NestedBlockKind::Parens => "block:close:)",
-                NestedBlockKind::Square => "block:close:]",
-                NestedBlockKind::Angle => "block:close:>",
+                NestedSymbols::Curly => "block:close:}",
+                NestedSymbols::Parens => "block:close:)",
+                NestedSymbols::Square => "block:close:]",
+                NestedSymbols::Angle => "block:close:>",
             }
         }
 
         pub fn unpaired_closing_scope(&self) -> &'static str {
             match self {
-                NestedBlockKind::Curly => "block:close-before-open:}",
-                NestedBlockKind::Parens => "block:close-before-open:)",
-                NestedBlockKind::Square => "block:close-before-open:]",
-                NestedBlockKind::Angle => "block:close-before-open:>",
+                NestedSymbols::Curly => "block:close-before-open:}",
+                NestedSymbols::Parens => "block:close-before-open:)",
+                NestedSymbols::Square => "block:close-before-open:]",
+                NestedSymbols::Angle => "block:close-before-open:>",
             }
         }
 
         pub fn open(&self) -> &'static str {
             match self {
-                NestedBlockKind::Curly => "{",
-                NestedBlockKind::Parens => "(",
-                NestedBlockKind::Square => "[",
-                NestedBlockKind::Angle => "<",
+                NestedSymbols::Curly => "{",
+                NestedSymbols::Parens => "(",
+                NestedSymbols::Square => "[",
+                NestedSymbols::Angle => "<",
             }
         }
 
         pub fn close(&self) -> &'static str {
             match self {
-                NestedBlockKind::Curly => "}",
-                NestedBlockKind::Parens => ")",
-                NestedBlockKind::Square => "]",
-                NestedBlockKind::Angle => ">",
+                NestedSymbols::Curly => "}",
+                NestedSymbols::Parens => ")",
+                NestedSymbols::Square => "]",
+                NestedSymbols::Angle => ">",
             }
         }
 
         pub fn open_as_char(&self) -> char {
             match self {
-                NestedBlockKind::Curly => '{',
-                NestedBlockKind::Parens => '(',
-                NestedBlockKind::Square => '[',
-                NestedBlockKind::Angle => '<',
+                NestedSymbols::Curly => '{',
+                NestedSymbols::Parens => '(',
+                NestedSymbols::Square => '[',
+                NestedSymbols::Angle => '<',
             }
         }
 
         pub fn close_as_char(&self) -> char {
             match self {
-                NestedBlockKind::Curly => '}',
-                NestedBlockKind::Parens => ')',
-                NestedBlockKind::Square => ']',
-                NestedBlockKind::Angle => '>',
+                NestedSymbols::Curly => '}',
+                NestedSymbols::Parens => ')',
+                NestedSymbols::Square => ']',
+                NestedSymbols::Angle => '>',
             }
         }
     }
@@ -5988,7 +5988,7 @@ pub fn kind_parts<I: Span>(input: I) -> Res<I, KindParts> {
 }
 
 pub fn delim_kind<I: Span>(input: I) -> Res<I, Kind> {
-    unwrap_block(BlockSymbol::Nested(NestedBlockKind::Angle), kind)(input)
+    unwrap_block(BlockSymbol::Nested(NestedSymbols::Angle), kind)(input)
 }
 
 pub fn delim_kind_lex<I: Span>(input: I) -> Res<I, KindLex> {
@@ -7333,7 +7333,7 @@ fn parse_mechtron_config<I: Span>(input: I) -> Res<I, Vec<MechtronScope>> {
                 alt((
                     tuple((
                         multispace0,
-                        unwrap_block(BlockSymbol::Nested(NestedBlockKind::Curly), many0(assignment)),
+                        unwrap_block(BlockSymbol::Nested(NestedSymbols::Curly), many0(assignment)),
                     )),
                     fail,
                 )),
@@ -7680,13 +7680,13 @@ pub fn route_attribute(input: &str) -> Result<RouteSelector, ParseErrs0> {
     let (_, (_, lex_route)) = result(pair(
         tag("#"),
         unwrap_block(
-            BlockSymbol::Nested(NestedBlockKind::Square),
+            BlockSymbol::Nested(NestedSymbols::Square),
             pair(
                 tag("route"),
                 unwrap_block(
-                    BlockSymbol::Nested(NestedBlockKind::Parens),
+                    BlockSymbol::Nested(NestedSymbols::Parens),
                     unwrap_block(
-                        BlockSymbol::Delimited(DelimitedBlockKind::DoubleQuotes),
+                        BlockSymbol::Delimited(DelimitedSymbol::DoubleQuotes),
                         nospace0,
                     ),
                 ),
@@ -7700,7 +7700,7 @@ pub fn route_attribute(input: &str) -> Result<RouteSelector, ParseErrs0> {
 pub fn route_attribute_value(input: &str) -> Result<RouteSelector, ParseErrs0> {
     let input = new_span(input);
     let lex_route = result(unwrap_block(
-        BlockSymbol::Delimited(DelimitedBlockKind::DoubleQuotes),
+        BlockSymbol::Delimited(DelimitedSymbol::DoubleQuotes),
         trim(nospace0),
     )(input.clone()))?;
 
@@ -7711,7 +7711,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs0> {
     let (next, (topic, lex_route)) = match pair(
         opt(terminated(
             unwrap_block(
-                BlockSymbol::Nested(NestedBlockKind::Square),
+                BlockSymbol::Nested(NestedSymbols::Square),
                 value_pattern(topic),
             ),
             tag("::"),

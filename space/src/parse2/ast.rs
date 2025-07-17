@@ -10,7 +10,7 @@ use crate::parse2::ast::package::header_decl;
 use crate::parse2::document::{Declarations, Definitions, DocumentDef, Unit};
 use crate::parse2::err::{ParseErrs2, ParseErrs2Def, ParseErrs2Proto};
 use crate::parse2::{Input, ParseResultProto};
-use crate::parse::model::{BlockSymbol, LexBlock, NestedBlockKind};
+use crate::parse::model::{BlockSymbol, LexBlock, NestedSymbols};
 
 pub(crate) fn ast<'a>(tokens: Tokens<'a>) -> ParseResultProto {
     let errs = ParseErrs2Def::new();
@@ -27,10 +27,10 @@ pub enum Ast<'a> {
 mod package {
     use crate::parse2::ast::err::AstErr;
     use crate::parse2::ast::Header;
-    use crate::parse2::err::ParseErrs2Def;
+    use crate::parse2::err::{ParseErrs2Def, ParseErrs2Proto};
     use crate::parse2::token::{AstTokenIter, DocType, Ident, TokenKind};
 
-    pub fn header_decl<'a>(iter: &'a mut AstTokenIter<'a>) -> Result<Header, ParseErrs2Def> {
+    pub fn header_decl<'a>(iter: &'a mut AstTokenIter<'a>) -> Result<Header, ParseErrs2Proto<'a>> {
         /// if it succe
         iter.expect("Document Type",&TokenKind::Ident(Ident::Camel(DocType::Package.into())))?;
         let doc_type = DocType::Package;
@@ -270,32 +270,3 @@ impl <'a,P> BlockParser<P> where P: AstParser<Output=Ast<'a>> {
 
 
 
-
-
-
-
-#[cfg(test)]
-pub mod test {
-    use crate::parse2::Op;
-
-    #[test]
-   fn test() {
-        let doc = "Blah";
-
-        #[test]
-        pub fn tokenz() {
-            let data =
-                r#"
-Release(version   }
-=1.3.7){
-  + <SomeClass>;
-}       
-        "#;
-
-        let op = Op::new("tokenz", data.to_string() );
-
-        op.parse();
-        
-        
-    }
-}    

@@ -1,4 +1,4 @@
-use crate::parse::model::{BlockSymbol, NestedBlockKind};
+use crate::parse::model::{BlockSymbol, NestedSymbols};
 use crate::parse::util::{new_span, preceded, recognize, Span};
 use crate::parse::{CamelCase, Domain, SkewerCase, SnakeCase};
 use crate::parse2::ast::err::{AstErr, AstErrKind};
@@ -23,6 +23,7 @@ use std::ops::Range;
 use std::slice::Iter;
 use std::str::FromStr;
 use std::sync::Arc;
+use nom_supreme::error::GenericErrorTree;
 use strum_macros::{Display, EnumDiscriminants, EnumString, EnumTryAs};
 
 pub(crate) fn tokens(input: Input) -> Res<Vec<Token>> {
@@ -80,11 +81,15 @@ fn parse_u64(input: Input) -> Res<u64> {
 fn version(input: Input) -> Res<Version> {
     let (next, version) = recognize(separated_list1(tag("."), parse_u64))(input.clone())?;
     let version = version.to_string();
-    let version = semver::Version::from_str(version.as_str()).map_err(move |err| {
-        let span = input.slice(0..(next.location_offset() - input.location_offset()));
-        ErrTree::from_external_error(span, ErrorKind::Alpha, AstErrKind::VersionFormat)
-    })?;
-    Ok((next, version))
+    match semver::Version::from_str(version.as_str()) {
+        Ok(version) => {
+            Ok((next, version))
+        }
+        Err(err) => {
+            let span = input.slice(0..(next.location_offset() - input.location_offset()));
+            Err(nom::Err::Failure(ErrTree::from_external_error(span, ErrorKind::Alpha, AstErrKind::VersionFormat)))
+        }
+    }
 }
 
 pub type TokenDef<'a, K> = Unit<'a, TokenKind>;
@@ -150,9 +155,9 @@ pub enum TokenKind {
     #[strum(to_string = "{0}")]
     Ident(Ident),
     #[strum(to_string = "BlockOpen({0})")]
-    Open(NestedBlockKind),
+    Open(NestedSymbols),
     #[strum(to_string = "BlockClose({0})")]
-    Close(NestedBlockKind),
+    Close(NestedSymbols),
 
     //#[strum(to_string="BlockOpen({0})")]
     //Block(Block<Token<'a>>),
@@ -178,8 +183,10 @@ pub enum TokenKind {
     Version(Version),
     /// a `space` or a `tab`
     Space,
-    /// any cluster of whitespace: `space`, `tab` and `newline`
+    /// newline \n
     Newline,
+    /// any cluster of whitespace: `space`, `tab` and `newline`
+    Whitespace,
     /// anything that is not recognized by the parser
     #[strum(to_string = "Undefined({0})")]
     Undefined(String),
@@ -194,16 +201,16 @@ impl TokenKind {
         match &self {
             TokenKind::Ident(ident) => ident.description(),
             TokenKind::Open(symbol) => match symbol {
-                NestedBlockKind::Curly => "block open '{'",
-                NestedBlockKind::Parens => "block open '('",
-                NestedBlockKind::Square => "block open '['",
-                NestedBlockKind::Angle => "block open '<'",
+                NestedSymbols::Curly => "block open '{'",
+                NestedSymbols::Parens => "block open '('",
+                NestedSymbols::Square => "block open '['",
+                NestedSymbols::Angle => "block open '<'",
             },
             TokenKind::Close(symbol) => match symbol {
-                NestedBlockKind::Curly => "block close '}'",
-                NestedBlockKind::Parens => "block close')'",
-                NestedBlockKind::Square => "block close']'",
-                NestedBlockKind::Angle => "block close '>'",
+                NestedSymbols::Curly => "block close '}'",
+                NestedSymbols::Parens => "block close')'",
+                NestedSymbols::Square => "block close']'",
+                NestedSymbols::Angle => "block close '>'",
             },
             TokenKind::Plus => "'+' symbol",
             TokenKind::At => "'@' symbol",
@@ -216,17 +223,18 @@ impl TokenKind {
             TokenKind::VersionLiteral => "'version=' literal",
             TokenKind::Version(_) => IdentKind::Version.description(),
             TokenKind::Space => "' ' space (whitespace)",
-            TokenKind::Newline => "'\\n' newline (whitespace)",
+            TokenKind::Whitespace => "'\\n' newline (whitespace)",
             TokenKind::Undefined(_) => "undefined",
             TokenKind::EOF => "End of File",
             TokenKind::Err(_) => "Err",
+            TokenKind::Newline => "\n"
         }
     }
 
     pub fn whitespace(&self) -> &'static WhiteSpace {
         match self {
             TokenKind::Space => &WhiteSpace::Space,
-            TokenKind::Newline => &WhiteSpace::Newline,
+            TokenKind::Whitespace => &WhiteSpace::Newline,
             _ => &WhiteSpace::None,
         }
     }
@@ -255,7 +263,7 @@ impl TokenKind {
     }
 
     pub fn is_newline(&self) -> bool {
-        *self == Self::Newline
+        *self == Self::Whitespace
     }
 }
 
@@ -266,11 +274,11 @@ impl<'a> From<Version> for TokenKind {
 }
 
 impl TokenKind {
-    fn open(block: NestedBlockKind) -> Self {
+    fn open(block: NestedSymbols) -> Self {
         Self::Open(block)
     }
 
-    fn close(block: NestedBlockKind) -> Self {
+    fn close(block: NestedSymbols) -> Self {
         Self::Close(block)
     }
 }
@@ -398,7 +406,7 @@ pub(super) mod block {
 
      */
     pub(super) mod open {
-        use crate::parse::model::NestedBlockKind;
+        use crate::parse::model::NestedSymbols;
         use crate::parse2::token::TokenKind;
         use crate::parse2::{Input, Res};
         use nom::branch::alt;
@@ -406,23 +414,23 @@ pub(super) mod block {
         use nom_supreme::tag::complete::tag;
         use nom_supreme::ParserExt;
 
-        pub fn angle(input: Input) -> Res<NestedBlockKind> {
-            tag("<")(input).map(|(next, _)| (next, NestedBlockKind::Angle))
+        pub fn angle(input: Input) -> Res<NestedSymbols> {
+            tag("<")(input).map(|(next, _)| (next, NestedSymbols::Angle))
         }
 
-        pub fn square(input: Input) -> Res<NestedBlockKind> {
-            tag("[")(input).map(|(next, _)| (next, NestedBlockKind::Square))
+        pub fn square(input: Input) -> Res<NestedSymbols> {
+            tag("[")(input).map(|(next, _)| (next, NestedSymbols::Square))
         }
 
-        pub fn parenthesis(input: Input) -> Res<NestedBlockKind> {
-            tag("(")(input).map(|(next, _)| (next, NestedBlockKind::Parens))
+        pub fn parenthesis(input: Input) -> Res<NestedSymbols> {
+            tag("(")(input).map(|(next, _)| (next, NestedSymbols::Parens))
         }
 
-        pub fn curly(input: Input) -> Res<NestedBlockKind> {
-            tag("{")(input).map(|(next, _)| (next, NestedBlockKind::Curly))
+        pub fn curly(input: Input) -> Res<NestedSymbols> {
+            tag("{")(input).map(|(next, _)| (next, NestedSymbols::Curly))
         }
 
-        pub fn open(input: Input) -> Res<NestedBlockKind> {
+        pub fn open(input: Input) -> Res<NestedSymbols> {
             alt((angle, square, parenthesis, curly))(input)
         }
 
@@ -435,30 +443,30 @@ pub(super) mod block {
     }
 
     pub(super) mod close {
-        use crate::parse::model::NestedBlockKind;
+        use crate::parse::model::NestedSymbols;
         use crate::parse2::token::TokenKind;
         use crate::parse2::{Input, Res};
         use nom::branch::alt;
         use nom::Parser;
         use nom_supreme::tag::complete::tag;
 
-        pub fn angle(input: Input) -> Res<NestedBlockKind> {
-            tag(">")(input).map(|(next, _)| (next, NestedBlockKind::Angle))
+        pub fn angle(input: Input) -> Res<NestedSymbols> {
+            tag(">")(input).map(|(next, _)| (next, NestedSymbols::Angle))
         }
 
-        pub fn square(input: Input) -> Res<NestedBlockKind> {
-            tag("]")(input).map(|(next, _)| (next, NestedBlockKind::Square))
+        pub fn square(input: Input) -> Res<NestedSymbols> {
+            tag("]")(input).map(|(next, _)| (next, NestedSymbols::Square))
         }
 
-        pub fn parenthesis(input: Input) -> Res<NestedBlockKind> {
-            tag(")")(input.clone()).map(|(next, _)| (next, NestedBlockKind::Parens))
+        pub fn parenthesis(input: Input) -> Res<NestedSymbols> {
+            tag(")")(input.clone()).map(|(next, _)| (next, NestedSymbols::Parens))
         }
 
-        pub fn curly(input: Input) -> Res<NestedBlockKind> {
-            tag("}")(input).map(|(next, _)| (next, NestedBlockKind::Curly))
+        pub fn curly(input: Input) -> Res<NestedSymbols> {
+            tag("}")(input).map(|(next, _)| (next, NestedSymbols::Curly))
         }
 
-        pub fn close(input: Input) -> Res<NestedBlockKind> {
+        pub fn close(input: Input) -> Res<NestedSymbols> {
             alt((angle, square, parenthesis, curly))(input)
         }
         pub fn token(input: Input) -> Res<TokenKind> {
@@ -484,7 +492,7 @@ pub(super) mod whitespace {
     }
 
     pub fn newline(input: Input) -> Res<TokenKind> {
-        value(TokenKind::Newline, tag("\n"))(input)
+        value(TokenKind::Whitespace, tag("\n"))(input)
     }
 
     pub fn whitespace(input: Input) -> Res<TokenKind> {
@@ -745,19 +753,22 @@ impl<'a> Tokens<'a> {
 pub struct AstTokenIter<'a> {
     data: &'a Arc<String>,
     iter: Iter<'a, Token<'a>>,
+    /// ridiculous! but needed in case of EOF. 
+    /// otherwise would have to create a new empty every time
+    /// `Self::expect` and others were executed do to arcane borrowing rules
+    empty:  Input<'a>
 }
 
 impl<'a> AstTokenIter<'a> {
 
-    fn empty(&self) -> Input<'a> {
-        let string = self.data.as_str().slice( (self.data.len()-1)..self.data.len());
-        Input::new_extra(string,self.data)
-    }
-    pub fn new(data: &'a Arc<String>, iter: Iter<'a, Token<'a>>) -> Self {
-        AstTokenIter { data, iter }
+   
+    fn new(data: &'a Arc<String>, iter: Iter<'a, Token<'a>>) -> Self {
+        let string = data.as_str().slice( (data.len()-1)..data.len());
+        let empty = Input::new_extra(string,data);
+        AstTokenIter { data, iter, empty}
     }
 
-    /// return the next token that is not whitespace: [TokenKind::Space] || [TokenKind::Newline]
+    /// return the next token that is not whitespace: [TokenKind::Space] || [TokenKind::Whitespace]
     pub fn skip_ws(&'a mut self) -> Option<&'a Token<'a>> {
         while let Some(token) = self.iter.next() {
             if !token.kind.is_whitespace(&WhiteSpace::Either) {
@@ -773,9 +784,11 @@ impl<'a> AstTokenIter<'a> {
         id: &'static str,
         expect: &TokenKind,
     ) -> Result<&'a Token<'a>, AstErr<'a>> {
-        let token = self
-            .skip_ws()
-            .ok_or_else(move || AstErr::new( self.empty(), AstErrKind::UnexpectedEof(expect.clone())))?;
+        let token = self.skip_ws(); 
+        let token = match token {
+            Some(token) => token,
+            None => Err(AstErr::new(self.empty.clone(), AstErrKind::UnexpectedEof(expect.clone())))?,
+        };
 
         if token.kind == *expect {
             Ok(token)
@@ -805,9 +818,12 @@ impl<'a> AstTokenIter<'a> {
         &'a mut self,
         whitespace: &'static WhiteSpace,
     ) -> Result<&'a Token<'a>, AstErr<'a>> {
-        let token = self
-            .next()
-            .ok_or_else(move || AstErr::new( self.empty(), AstErrKind::UnexpectedEof(TokenKind::Space)))?;
+        let token = self.skip_ws();
+        let token = match token {
+            None => Err(AstErr::new( self.empty.clone(), AstErrKind::UnexpectedEof(TokenKind::Whitespace)))?,
+            Some(token) => token
+        };
+
 
         if token.kind.is_whitespace(whitespace) {
             Ok(token)

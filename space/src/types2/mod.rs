@@ -1,5 +1,5 @@
 use crate::err::ParseErrs0;
-use crate::parse::model::{BlockSymbol, LexBlock, NestedBlockKind};
+use crate::parse::model::{BlockSymbol, LexBlock, NestedSymbols};
 use crate::parse::util::preceded;
 use crate::parse::util::Span;
 use crate::parse::{camel_case, CamelCase, NomErr, SkewerCase, SnakeCase};
@@ -80,8 +80,8 @@ impl Type {
         I: Span,
     {
         alt((
-            lex_block(BlockSymbol::Nested(NestedBlockKind::Angle)),
-            lex_block(BlockSymbol::Nested(NestedBlockKind::Square)),
+            lex_block(BlockSymbol::Nested(NestedSymbols::Angle)),
+            lex_block(BlockSymbol::Nested(NestedSymbols::Square)),
         ))(input)
     }
 }
@@ -341,8 +341,8 @@ where
         let (next, block) = Type::parse_lex_block(input.clone())?;
 
         let disc = match block.kind {
-            BlockSymbol::Nested(NestedBlockKind::Angle) => TypeDisc::Class,
-            BlockSymbol::Nested(NestedBlockKind::Square) => TypeDisc::Data,
+            BlockSymbol::Nested(NestedSymbols::Angle) => TypeDisc::Class,
+            BlockSymbol::Nested(NestedSymbols::Square) => TypeDisc::Data,
             kind => {
                 let tree = nom::Err::Error(NomErr::from_error_kind(input, ErrorKind::Fail));
                 return Err(tree);

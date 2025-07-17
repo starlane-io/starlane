@@ -54,13 +54,8 @@ impl Op {
  */
 
 
-pub fn empty_span() -> Input<'static> {
-    let stat = "";
-    let source = Arc::new(stat.to_string());
-    Input::new_extra(stat, & source)
-}
 
-pub fn parse<'a>(source: &'a Arc<String>) -> Result<DocumentDef<'a>, ParseErrs2Def<'a>>{
+pub fn parse<'a>(source: &Arc<String>) -> Result<Document<'a>, ParseErrs2Proto<'a>> {
     let input = Input::new_extra(source.as_str(), & source);
     let tokens = tokenize(& source, input)?;
     let doc = ast(tokens)?;
