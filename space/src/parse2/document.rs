@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::ops::Deref;
 use std::sync::Arc;
 use derive_builder::Builder;
@@ -37,14 +38,17 @@ impl <'a> DocumentProto<'a> {
     }
 }
 
-
+#[derive(Clone,Debug)]
 pub struct Definitions<'a> {
     pub header: Unit<'a,Header<'a>>,
     pub arg: Declarations<'a>,
     pub env: Declarations<'a>,
     pub property: Declarations<'a>,
 }
+
 pub type Declarations<'a> = Unit<'a,HashMap<VarCase, Unit<'a,Declaration<'a>>>>;
+
+#[derive(Debug,Clone)]
 pub struct Reference<'a> {
    pub name: Unit<'a,VarCase>,
    pub r#type: Unit<'a,Type>,
@@ -116,18 +120,19 @@ pub enum Assignment{
 
 
 
+#[derive(Debug,Clone)]
 pub struct Declaration<'a> {
     pub reference: Unit<'a,Reference<'a>>,
     pub assignment: Unit<'a, Rule>,
 }
 
 #[derive(Clone,Debug)]
-pub struct Unit<'a,I> {
+pub struct Unit<'a,I> where I: Debug+Clone {
     pub span: Input<'a>,
     pub kind: I 
 }
 
-impl <'a,I> Unit<'a,I> {
+impl <'a,I> Unit<'a,I> where I: 'a+Debug+Clone {
     pub fn new(span: Input<'a>, kind: I ) -> Unit<'a,I> {
         Self {
             span,
@@ -135,7 +140,7 @@ impl <'a,I> Unit<'a,I> {
         }
     }
 
-    fn with<T2>(self, kind: T2) -> Unit<'a, T2> {
+    fn with<T2>(self, kind: T2) -> Unit<'a, T2> where T2: 'a+Debug+Clone{
         Unit {
             span: self.span,
             kind,
@@ -143,7 +148,7 @@ impl <'a,I> Unit<'a,I> {
     }
 }
 
-impl <'a,I> Deref for Unit<'a,I> {
+impl <'a,I> Deref for Unit<'a,I> where I: 'a+Debug+Clone {
     type Target = I;
 
     fn deref(&self) -> &Self::Target {
@@ -151,6 +156,7 @@ impl <'a,I> Deref for Unit<'a,I> {
     }
 }
 
+#[derive(Debug,Clone)]
 pub struct Header<'a> {
     pub version: Unit<'a,Version>, 
 }

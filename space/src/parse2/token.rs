@@ -98,8 +98,6 @@ pub type TokenDef<'a,K> = Unit<'a, K>;
 pub type Token<'a> = TokenDef<'a, TokenKind>;
 pub type IdentToken<'a> = TokenDef<'a, Ident>;
 
-impl<'a, T> TokenDef<'a, T> {}
-
 #[derive(Debug, Clone)]
 struct Block<T> {
     kind: BlockSymbol,
@@ -598,11 +596,11 @@ pub mod err {
     }
 }
 
-pub fn result<'a, R>(result: Result<(LocatedSpan<&'a str, &'a Arc<std::string::String>>, R), nom::Err<GenericErrorTree<LocatedSpan<&'a str, &'a Arc<std::string::String>>, &'static str, Ctx, AstErrKind>>>) -> Result<R, ParseErrs2Proto<'a>> {
+pub fn result<'a, R>(result: Result<(LocatedSpan<&'a str, &'a Arc<std::string::String>>, R), nom::Err<ErrTree<'a>>>) -> Result<R, ParseErrs2Proto<'a>> {
     match result {
         Ok((_, e)) => Ok(e),
-        Err(nom::Err::Error(err)) => Result::Err(err.into()),
-        Err(nom::Err::Failure(err)) => Result::Err(err.into()),
+        Err(nom::Err::Error(err)) => Err(ParseErrs2Proto::from(err)),
+        Err(nom::Err::Failure(err)) => Err(ParseErrs2Proto::from(err)),
         Err(nom::Err::Incomplete(needed)) => match needed {
             Needed::Unknown => panic!("Needed::Unknown"),
             Needed::Size(size) => panic!("Needed::Size(size={})", size),
@@ -735,45 +733,43 @@ Package(version=1.3.7){
 
  */
 
+#[derive(Clone, Debug)]
 pub struct Tokens<'a> {
-    pub data: &'a Arc<String>,
     pub tokens: Vec<Token<'a>>,
 }
 
 impl<'a> Tokens<'a> {
-    pub fn new(data: &'a Arc<String>, tokens: Vec<Token<'a>>) -> Self {
-        Self { data, tokens }
+    pub fn new(tokens: Vec<Token<'a>>) -> Self {
+        Self { tokens }
     }
 
-    pub fn iter(self) -> AstTokenIter<'a> {
-        let iter = self.tokens.iter();
-        AstTokenIter::new(self.data, iter)
+    pub fn iter(self) -> TokenIter<'a> {
+        TokenIter::new( self.tokens)
     }
 }
 
-pub struct AstTokenIter<'a> {
-    data: &'a Arc<String>,
-    iter: Iter<'a, Token<'a>>,
-    /// ridiculous! but needed in case of EOF.
-    /// otherwise would have to create a new empty every time
-    /// `Self::expect` and others were executed do to arcane borrowing rules
-    empty:  Input<'a>
+#[derive(Clone, Debug)]
+pub struct TokenIter<'a> {
+    tokens: &'a[Token<'a>]
 }
 
-impl<'a> AstTokenIter<'a> {
+impl<'a> Tokens<'a> {
 
-
-    fn new(data: &'a Arc<String>, iter: Iter<'a, Token<'a>>) -> Self {
-        let string = data.as_str().slice( (data.len()-1)..data.len());
-        let empty = Input::new_extra(string,data);
-        AstTokenIter { data, iter, empty}
+    fn empty(&self) -> Input<'a> {
+        let string = self.data.as_str().slice((self.data.len() - 1)..self.data.len());
+        let empty = Input::new_extra(string, self.data);
+        empty
     }
+
 
     /// return the next token that is not whitespace: [TokenKind::Space] || [TokenKind::Whitespace]
-    pub fn skip_ws(&'a mut self) -> Option<&'a Token<'a>> {
-        while let Some(token) = self.iter.next() {
+    pub fn skip_ws(&'a self) -> Option<(Self,&'a Token<'a>)> {
+        let mut iter = self.tokens.iter();
+        let mut index = 0u16;
+        while let Some(token) = iter.next() {
+            index+=1;
             if !token.kind.is_whitespace(&WhiteSpace::Either) {
-                return Some(token);
+                return Some((next,token));
             }
         }
         /// out of tokens
@@ -781,65 +777,59 @@ impl<'a> AstTokenIter<'a> {
     }
 
     pub fn expect(
-        &'a mut self,
+        &'a self,
         id: &'static str,
         expect: &TokenKind,
-    ) -> Result<&'a Token<'a>, AstErr<'a>> {
-        let empty = self.empty.clone();
-        let token = self.skip_ws();
-        let token = match token {
-            Some(token) => token,
-            None => Err(AstErr::new(empty, AstErrKind::UnexpectedEof(expect.clone())))?,
-        };
-
-        if token.kind == *expect {
-            Ok(token)
+    ) -> Result<Option<(Self,&'a Token<'a>)>, AstErr<'a>> {
+        if let Some((next,token)) = self.skip_ws() {
+            if token.kind == *expect {
+                Ok(Some((next,token)))
+            } else {
+                Err(
+                    AstErr::new(token.span, AstErrKind::ExpectedKind {
+                        id,
+                        kind: expect.clone(),
+                        found: token.kind.clone(),
+                    }
+                    ))
+            }
         } else {
-            Err(
-                AstErr::new(token.span, AstErrKind::ExpectedKind {
-                    id,
-                    kind: expect.clone(),
-                    found: token.kind.clone(),
-                }
-            ))
+            Err(AstErr::new(self.empty(), AstErrKind::UnexpectedEof(expect.clone())))?
         }
     }
 
-    pub fn space(&'a mut self) -> Result<&'a Token<'a>, AstErr<'a>> {
+    pub fn space(&'a self) -> Result<Option<(Self,&'a Token<'a>)>, AstErr<'a>> {
         self.whitespace_kind(&WhiteSpace::Space)
     }
 
-    pub fn newline(&'a mut self) -> Result<&'a Token<'a>, AstErr<'a>> {
+    pub fn newline(&'a self) -> Result<Option<(Self,&'a Token<'a>)>, AstErr<'a>> {
         self.whitespace_kind(&WhiteSpace::Newline)
     }
 
-    pub fn whitespace(&'a mut self) -> Result<&'a Token<'a>, AstErr<'a>> {
+    pub fn whitespace(&'a self) -> Result<Option<(Self,&'a Token<'a>)>, AstErr<'a>> {
         self.whitespace_kind(&WhiteSpace::Either)
     }
     fn whitespace_kind(
-        &'a mut self,
+        &'a self,
         whitespace: &'static WhiteSpace,
-    ) -> Result<&'a Token<'a>, AstErr<'a>> {
-        let empty = self.empty.clone();
-        let token = self.skip_ws();
-        let token = match token {
-            None => Err(AstErr::new( empty, AstErrKind::UnexpectedEof(TokenKind::Whitespace)))?,
-            Some(token) => token
-        };
-
-
-        if token.kind.is_whitespace(whitespace) {
-            Ok(token)
+    ) -> Result<Option<(Self,&'a Token<'a>)>, AstErr<'a>> {
+        let mut next = self.clone();
+        if let Some(token) = next.next() {
+            if token.kind.is_whitespace(whitespace) {
+                Ok(Some((next,token)))
+            } else {
+                Err(AstErr::new(
+                    token.span,
+                    AstErrKind::Whitespace(token.kind.clone()),
+                ))
+            }
         } else {
-            Err(AstErr::new(
-                token.span,
-                AstErrKind::Whitespace(token.kind.clone()),
-            ))
+            Err(AstErr::new( self.empty(), AstErrKind::UnexpectedEof(TokenKind::Whitespace)))
         }
     }
 }
 
-impl<'a> Iterator for AstTokenIter<'a> {
+impl<'a> Iterator for TokenIter<'a> {
     type Item = &'a Token<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {

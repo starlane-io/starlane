@@ -78,10 +78,10 @@ impl <'a> From<&'a ErrTree<'a>> for ParseErrs2Proto<'a> {
                 let mut builder = Report::build(ReportKind::Error, range.clone());
                 match kind {
                     BaseErrorKind::Expected(expect) => {
-                        panic!();
+                        println!("\n\nBaseErrorKind::Expected!\n\n");
                     }
                     BaseErrorKind::Kind(kind) => {
-                        panic!()
+                        println!("\n\nBaseErrorKind::Kind!\n\n");
                     }
                     BaseErrorKind::External(external) => {
                         let err = external.clone().with(location.clone());
@@ -96,7 +96,7 @@ impl <'a> From<&'a ErrTree<'a>> for ParseErrs2Proto<'a> {
                 }
             },
             ErrTree::Alt(_) => {
-                panic!("\n\nERR !ALT\n\n");
+                println!("\n\nErrTree::Alt!\n\n");
             }
         }
         ParseErrs2Proto{ errs: rtn, source: () }

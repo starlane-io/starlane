@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use indexmap::IndexMap;
-use crate::parse2::token::{AstTokenIter, DocType, Token, TokenKind, Tokens};
+use crate::parse2::token::{TokenIter, DocType, Token, TokenKind, Tokens};
 use semver::Version;
 use strum_macros::{Display, EnumString};
 use crate::parse2::ast::err::AstErr;
@@ -28,9 +28,9 @@ mod package {
     use crate::parse2::ast::err::AstErr;
     use crate::parse2::ast::Header;
     use crate::parse2::err::{ParseErrs2Def, ParseErrs2Proto};
-    use crate::parse2::token::{AstTokenIter, DocType, Ident, TokenKind};
+    use crate::parse2::token::{TokenIter, DocType, Ident, TokenKind};
 
-    pub fn header_decl<'a>(iter: &'a mut AstTokenIter<'a>) -> Result<Header, ParseErrs2Proto<'a>> {
+    pub fn header_decl<'a>(iter: &'a mut TokenIter<'a>) -> Result<Header, ParseErrs2Proto<'a>> {
         /// if it succe
         iter.expect("Document Type",&TokenKind::Ident(Ident::Camel(DocType::Package.into())))?;
         let doc_type = DocType::Package;
@@ -122,7 +122,7 @@ pub mod err {
         #[error("Version Format Error. Expecting format: 'major.minor.patch-release+label' i.e.: '3.7.8', '2.0.5-rc', '1.2.1-beta+preview'")]
         VersionFormat,
     }
-    
+
     impl AstErrKind {
         pub fn with(self, span: Input) -> AstErr {
             AstErr::new(span,self)
@@ -181,25 +181,21 @@ impl <P,O> Branch<P,O> where P: AstParser, O: Into<Ast> {
 }
 
 
-pub trait AstParser {
-  type Output: Into<Ast>;
-  fn parse<'a>( &self, tokens: &'a mut AstTokenIter<'a>) -> Result<Self::Output,ParseErrs2Proto<'a>>;
+pub trait AstParser<'a> {
+  type Output: Into<Ast<'a>>;
+  fn parse(&self, tokens: &'a mut TokenIter<'a>) -> Result<Self::Output,ParseErrs2Proto<'a>>;
 }
 
 
-#[derive(Debug,Clone,EnumString,Display,PartialEq,Eq,Hash)]
-pub enum BlockKind {
+#[derive(Debug,Clone)]
+pub enum AstBlock<'a> {
     /// `Defs`(version=1.0.1)  { ... }
-    Header,
-
+    Header(Header),
     /// + `arg` {  ... }
-    #[strum(serialize = "arg")]
-    Arg,
+    Arg(Declarations<'a>),
     /// + `env` { ... }
-    #[strum(serialize = "env")]
-    Env,
+    Env(Declarations<'a>),
     /// + `properties`
-    #[strum(serialize = "properties")]
     PropertyDefs,
     /// a line block is terminated by a semi-colon `;`
     /// `some-param[str] = something`;
@@ -208,8 +204,8 @@ pub enum BlockKind {
 
 
 #[derive(Debug,Clone)]
-struct Block<'a,C> where C: Debug+Clone {
-    kind: BlockKind,
+struct Block<'a,C> where C: 'a+Debug+Clone {
+    kind: AstBlock<'a>,
     symbol: BlockSymbol,
     open: Unit<'a,&'static str>,
     close: Unit<'a,&'static str>,
@@ -230,10 +226,10 @@ impl LiteralParser {
     }
 }
 
-impl <'a> AstParser for LiteralParser {
+impl <'a> AstParser<'a> for LiteralParser {
     type Output = &'a Token<'a>;
 
-    fn parse<'a>(&self,tokens: &'a mut AstTokenIter<'a>) -> Result<Self::Output, ParseErrs2Proto<'a>> {
+    fn parse(&self, tokens: &'a mut TokenIter<'a>) -> Result<Self::Output, ParseErrs2Proto<'a>> {
         if let Some(token) = tokens.expect("literal", self.0.clone().into() ) && self.0 == token.kind {
             Ok(token)
         } else {
@@ -257,7 +253,7 @@ impl <'a,O> DelimitedParser<'a,O> {
 
 impl <'a,I> AstParser for BlockParser<'a,I> where I: AstParser {
     type Output = Block<'a,I>;
-    fn parse<'a>(tokens: &'a mut AstTokenIter<'a>) -> Result<Self::Output, ParseErrs2Proto<'a>> {
+    fn parse<'a>(tokens: &'a mut TokenIter<'a>) -> Result<Self::Output, ParseErrs2Proto<'a>> {
         
     }
 }

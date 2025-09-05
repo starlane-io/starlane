@@ -76,7 +76,7 @@ fn tokenize<'a>(
     input: Input<'a>,
 ) -> Result<Tokens<'a>, ParseErrs2Proto<'a>> {
     let tokens  = result(tokens(input))?;
-    let tokens = Tokens::new(source, tokens);
+    let tokens = Tokens::new(tokens);
     Ok(tokens)
 }
 
