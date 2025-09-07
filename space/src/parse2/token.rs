@@ -1,6 +1,6 @@
 use crate::parse::model::{BlockSymbol, NestedSymbols};
-use crate::parse::util::{new_span, preceded, recognize, Span};
-use crate::parse::{CamelCase, Ctx, Domain, SkewerCase, SnakeCase};
+use crate::parse::util::{preceded, recognize, Span};
+use crate::parse::{CamelCase, Domain, SkewerCase, SnakeCase};
 use crate::parse2::ast::err::{AstErr, AstErrKind};
 use crate::parse2::chars::ident;
 use crate::parse2::document::Unit;
@@ -15,16 +15,14 @@ use nom::combinator::{into, not};
 use nom::error::{ErrorKind, FromExternalError, ParseError};
 use nom::multi::{many0, many1, separated_list1};
 use nom::{Needed, Offset, Parser, Slice};
+use nom_locate::LocatedSpan;
 use nom_supreme::ParserExt;
 use semver::Version;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Range;
-use std::slice::Iter;
 use std::str::FromStr;
 use std::sync::Arc;
-use nom_locate::LocatedSpan;
-use nom_supreme::error::GenericErrorTree;
 use strum_macros::{Display, EnumDiscriminants, EnumString, EnumTryAs};
 
 pub(crate) fn tokens(input: Input) -> Res<Vec<Token>> {

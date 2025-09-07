@@ -1,16 +1,12 @@
+use crate::parse::model::{BlockSymbol, LexBlock};
+use crate::parse2::ast::err::AstErr;
+use crate::parse2::document::{Declarations, Definitions, Unit};
+use crate::parse2::err::{ParseErrs2, ParseErrs2Def, ParseErrs2Proto};
+use crate::parse2::token::{DocType, Token, TokenIter, TokenKind, Tokens};
+use crate::parse2::ParseResultProto;
+use semver::Version;
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::sync::Arc;
-use indexmap::IndexMap;
-use crate::parse2::token::{TokenIter, DocType, Token, TokenKind, Tokens};
-use semver::Version;
-use strum_macros::{Display, EnumString};
-use crate::parse2::ast::err::AstErr;
-use crate::parse2::ast::package::header_decl;
-use crate::parse2::document::{Declarations, Definitions, DocumentDef, Unit};
-use crate::parse2::err::{ParseErrs2, ParseErrs2Def, ParseErrs2Proto};
-use crate::parse2::{Input, ParseResultProto};
-use crate::parse::model::{BlockSymbol, LexBlock, NestedSymbols};
 
 pub(crate) fn ast<'a>(tokens: Tokens<'a>) -> ParseResultProto<'a> {
     let errs = ParseErrs2Def::new();
@@ -25,16 +21,15 @@ pub enum Ast<'a> {
 }
 
 mod package {
-    use crate::parse2::ast::err::AstErr;
     use crate::parse2::ast::Header;
-    use crate::parse2::err::{ParseErrs2Def, ParseErrs2Proto};
-    use crate::parse2::token::{TokenIter, DocType, Ident, TokenKind};
+    use crate::parse2::err::ParseErrs2Proto;
+    use crate::parse2::token::TokenIter;
 
     pub fn header_decl<'a>(iter: &'a mut TokenIter<'a>) -> Result<Header, ParseErrs2Proto<'a>> {
-        /// if it succe
-        iter.expect("Document Type",&TokenKind::Ident(Ident::Camel(DocType::Package.into())))?;
-        let doc_type = DocType::Package;
-        todo!();
+        /// if it success
+        todo!()
+        //iter.expect("Document Type",&TokenKind::Ident(Ident::Camel(DocType::Package.into())))?;
+        //let doc_type = DocType::Package;
     }
 }
 
@@ -48,14 +43,13 @@ struct Header {
 
 pub mod err {
     use crate::parse::CamelCase;
-    use crate::parse2::token::{Token, TokenKind, TokenKindDisc};
-    use crate::parse2::{range, Input, Op};
-    use ariadne::{Label, Report, ReportKind, Source};
+    use crate::parse2::document::Unit;
+    use crate::parse2::err::{ParseErrs2Def, ParseErrs2Proto};
+    use crate::parse2::token::TokenKind;
+    use crate::parse2::Input;
     use std::fmt::{Display, Formatter};
     use std::ops::{Deref, DerefMut};
     use thiserror::Error;
-    use crate::parse2::document::Unit;
-    use crate::parse2::err::{ParseErrs2Def, ParseErrs2Proto};
 
     #[derive(Clone)]
     pub struct Errs<'a> {
@@ -92,7 +86,7 @@ pub mod err {
         
 
     pub type AstErr<'a> = Unit<'a,AstErrKind>;
-   
+
     impl <'a> Into<ParseErrs2Proto<'a>> for AstErr<'a> {
         fn into(self) -> ParseErrs2Proto<'a> {
             let mut errs = ParseErrs2Proto::new();
@@ -103,7 +97,7 @@ pub mod err {
 
     impl<'a> Display for AstErr<'a> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{err} -- range: [{}..{}]: {}", self.span.location_offset(), (self.span.location_offset() + self.span.fragment().len()),self.kind)
+                write!(f, "{} -- range: [{}..{}]: {}", self.kind, self.span.location_offset(), (self.span.location_offset() + self.span.fragment().len()),self.kind)
         }
     }
 
@@ -129,50 +123,48 @@ pub mod err {
         }
     }
     
-    impl ParseErrs2Def {
+    impl <'a,S> ParseErrs2Def<'a,S> {
         pub fn report(&self, errs: &Vec<AstErr>) {
-            let r = 0..self.data.len();
+            todo!("repornt not ready");
+            /*
+            let r = 0..self.source;
             let mut builder = Report::build(ReportKind::Error, r.clone());
             //for err in errs {
             let err = errs.first().unwrap();
-            match err {
-                AstErr::Token { token, err } => {
-                    let report = builder
-                        .with_message("some errors")
-                        .with_label(Label::new(range(&token.span)).with_message(err.to_string()))
-                        .finish();
-
-                    report.print(Source::from(self.data.as_str())).ok();
-                }
-                AstErr::Err(_) => {
-                    panic!();
-                }
-                // }
+            match &err.kind {
+                AstErrKind::DocumentTypeNotRecognized(_) => {}
+                AstErrKind::ExpectedKind { .. } => {}
+                AstErrKind::ExpectedLiteral { .. } => {}
+                AstErrKind::UnexpectedEof(_) => {}
+                AstErrKind::Whitespace(_) => {}
+                AstErrKind::VersionFormat => {}
             }
+            panic!();
+
+             */
         }
     }
 }
 
 
-pub struct Alt<P,O> {
-    branch: Vec<Branch<P,O>>
+pub struct Alt<P,O> where P: AstParser, O: AstParser{
+    branch: Vec<BranchParser<P,O>>
 }
 
-impl <P,O> Alt<P,O> {
-    pub fn add( & mut self, alt: Branch<P,O> ) {
+impl <P,O> Alt<P,O> where P: AstParser, O: AstParser{
+    pub fn add( & mut self, alt: BranchParser<P,O> ) {
         self.branch.push(alt)
     }
 }
 
-struct Branch<P,O> where P: AstParser, O: Into<Ast> {
+struct BranchParser<Pre,Block> where Pre: AstParser, Block: AstParser {
     /// preparser peeks ahead for pattern
-    pub pre: P,
-    /// inside the block 
-    pub block: Box<dyn AstParser<Output=O>>,
+    pub pre: Pre,
+    pub block: Block
 }
 
-impl <P,O> Branch<P,O> where P: AstParser, O: Into<Ast> {
-    pub fn new(pre: P, block: impl AstParser<Output=O>) -> Self {
+impl <P,O> BranchParser<P,O> where P: AstParser, O: AstParser {
+    pub fn new<B>(pre: P, block: B) -> Self where B: 'a+AstParser<'a,Output=O> {
         Self {
             pre,
             block: Box::new(block)
@@ -181,9 +173,8 @@ impl <P,O> Branch<P,O> where P: AstParser, O: Into<Ast> {
 }
 
 
-pub trait AstParser<'a> {
-  type Output: Into<Ast<'a>>;
-  fn parse(&self, tokens: &'a mut TokenIter<'a>) -> Result<Self::Output,ParseErrs2Proto<'a>>;
+pub trait AstParser {
+  fn parse<'a,O>(&self, tokens: &'a mut TokenIter<'a>) -> Result<O,ParseErrs2Proto<'a>> where O: 'a+Into<Ast<'a>>;
 }
 
 
@@ -213,9 +204,9 @@ struct Block<'a,C> where C: 'a+Debug+Clone {
 }
 
 pub struct DelimitedParser<'a,O> {
-    pre: Box<dyn AstParser<Output=_>>,
-    content: Box<dyn AstParser<Output=O>>,
-    post: Box<dyn AstParser<Output=_>>,
+    pre: Box<dyn AstParser<'a,Output=_>>,
+    content: Box<dyn AstParser<'a,Output=O>>,
+    post: Box<dyn AstParser<'a,Output=_>>,
 }
 
 struct LiteralParser(TokenKind);
@@ -245,8 +236,7 @@ impl <'a> AstParser<'a> for LiteralParser {
 
 impl <'a,O> DelimitedParser<'a,O> {
     pub fn new(kind: BlockSymbol) -> Self {
-        
-    }  
+    }
 }
 
 
