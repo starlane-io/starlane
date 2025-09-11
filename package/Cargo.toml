@@ -9,4 +9,12 @@ homepage.workspace = true
 description.workspace = true
 version.workspace = true
 
+[features]
+create=[]
+process=["create"]
+store=[]
+cache=[]
+daemon=[]
+
 [dependencies]
+zip = { workspace=true, default-features=false, optional = true, features=["bzip2"]}
