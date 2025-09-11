@@ -27,7 +27,7 @@ use crate::kind::{
     Sub, UserBaseSubKind,
 };
 use crate::loc::StarKey;
-use crate::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, VersionSegLoc};
+use crate::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, Version};
 use crate::parse::util::unstack;
 use crate::parse::util::{log_parse_err, preceded, recognize, result};
 use crate::particle::PointKindVar;
@@ -641,25 +641,7 @@ pub mod test3 {
 
     #[test]
     pub fn test() {
-        /*
-        let span = new_span("\n\n        ${the }\n");
-        //let result: Res<_,PointSegVar>   = variable_ize(pop(base_point_segment))(span);
-        let result: Res<_,PointVar>   = cut(trim(point_var))(span);
 
-        match result.unwrap_err() {
-            nom::Err::Incomplete(_) => {
-                assert!(false)
-            }
-            nom::Err::Error(_) => {
-                assert!(false)
-            }
-            nom::Err::Failure(err) => {
-                print(&err);
-            }
-        }
-
-
-         */
 
         let span = new_span("\n\n\n\n        yHadron\n");
         //let result: Res<_,PointSegVar>   = variable_ize(pop(base_point_segment))(span);
@@ -3882,7 +3864,7 @@ where
     ))(input)
 }
 
-pub fn root_scope_selector<I: Span>(input: I) -> Res<I, RootScopeSelector<I, Spanned<I, VersionSegLoc>>> {
+pub fn root_scope_selector<I: Span>(input: I) -> Res<I, RootScopeSelector<I, Spanned<I, Version>>> {
     context(
         "root-scope-selector",
         cut(preceded(
@@ -3896,7 +3878,7 @@ pub fn root_scope_selector<I: Span>(input: I) -> Res<I, RootScopeSelector<I, Spa
     .map(|(next, (name, version))| (next, RootScopeSelector { version, name }))
 }
 
-pub fn scope_version<I: Span>(input: I) -> Res<I, Spanned<I, VersionSegLoc>> {
+pub fn scope_version<I: Span>(input: I) -> Res<I, Spanned<I, Version>> {
     context(
         "scope-selector-version",
         tuple((
@@ -3976,7 +3958,7 @@ pub mod model {
 
     use crate::config::bind::{PipelineStepDef, PipelineStopDef};
     use crate::err::ParseErrs0;
-    use crate::loc::VersionSegLoc;
+    use crate::loc::Version;
     use crate::parse::util::{new_span, result, Span, Trace, Tw};
     use crate::parse::{
         lex_child_scopes, method_kind, pipeline, subst_path, value_pattern, wrapped_cmd_method,
@@ -4091,10 +4073,10 @@ pub mod model {
     }
 
     impl<I: ToString, V: ToString> RootScopeSelector<I, V> {
-        pub fn to_concrete(self) -> Result<RootScopeSelector<String, VersionSegLoc>, ParseErrs0> {
+        pub fn to_concrete(self) -> Result<RootScopeSelector<String, Version>, ParseErrs0> {
             Ok(RootScopeSelector {
                 name: self.name.to_string(),
-                version: VersionSegLoc::from_str(self.version.to_string().as_str())?,
+                version: Version::from_str(self.version.to_string().as_str())?,
             })
         }
     }
@@ -4540,7 +4522,7 @@ pub mod model {
     pub type ScopeFilter = ScopeFilterDef<String>;
     pub type ScopeFilters = ScopeFiltersDef<String>;
     pub type LexBlock<I> = Block<I, ()>;
-    pub type LexRootScope<I> = Scope<RootScopeSelector<I, Spanned<I, VersionSegLoc>>, Block<I, ()>, I>;
+    pub type LexRootScope<I> = Scope<RootScopeSelector<I, Spanned<I, Version>>, Block<I, ()>, I>;
     pub type LexScope<I> = Scope<LexScopeSelector<I>, Block<I, ()>, I>;
     pub type LexParentScope<I> = Scope<LexScopeSelector<I>, Vec<LexScope<I>>, I>;
 
@@ -6501,14 +6483,14 @@ pub fn point_and_kind<I: Span>(input: I) -> Res<I, PointKindVar> {
         .map(|(next, (point, kind))| (next, PointKindVar { point, kind }))
 }
 
-pub fn version<I: Span>(input: I) -> Res<I, VersionSegLoc> {
+pub fn version<I: Span>(input: I) -> Res<I, Version> {
     let (next, version) = rec_version(input.clone())?;
     let version = version.to_string();
     let str_input = version.as_str();
     let rtn = semver::Version::parse(str_input);
 
     match rtn {
-        Ok(version) => Ok((next, VersionSegLoc { version })),
+        Ok(version) => Ok((next, Version { version })),
         Err(err) => {
             let tree = Err::Error(NomErr::from_error_kind(input, ErrorKind::Fail));
             Err(tree)
@@ -7256,7 +7238,7 @@ pub fn doc(src: &str) -> Result<Document, ParseErrs0> {
     let lex_root_scope = lex_root_scope(span.clone())?;
     let root_scope_selector = lex_root_scope.selector.clone().to_concrete()?;
     if root_scope_selector.name.as_str() == "Mechtron" {
-        if root_scope_selector.version == VersionSegLoc::from_str("1.0.0")? {
+        if root_scope_selector.version == Version::from_str("1.0.0")? {
             let mechtron = result(parse_mechtron_config(lex_root_scope.block.content.clone()))?;
 
             let mechtron = MechtronConfig::new(mechtron)?;
@@ -7281,7 +7263,7 @@ pub fn doc(src: &str) -> Result<Document, ParseErrs0> {
             Err(ParseErrs0::from_report(report, lex_root_scope.block.content.extra.clone()).into())
         }
     } else if root_scope_selector.name.as_str() == "Bind" {
-        if root_scope_selector.version == VersionSegLoc::from_str("1.0.0")? {
+        if root_scope_selector.version == Version::from_str("1.0.0")? {
             let bind = parse_bind_config(lex_root_scope.block.content.clone())?;
 
             return Ok(Document::BindConfig(bind));

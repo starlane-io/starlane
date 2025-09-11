@@ -128,15 +128,16 @@ pub type Meta = HashMap<String, String>;
 pub type HostKey = String;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct VersionSegLoc {
+pub struct Version {
     pub version: semver::Version,
 }
+
 
 
 #[cfg(feature = "types2")]
 use crate::types::archetype::Archetype;
 #[cfg(feature = "types2")]
-impl Archetype for VersionSegLoc {
+impl Archetype for Version {
     fn parser<I>(input: I) -> Res<I, Self>
     where
         I: Span
@@ -144,13 +145,13 @@ impl Archetype for VersionSegLoc {
         version(input)
     }
 }
-impl Display for VersionSegLoc {
+impl Display for Version {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.version.to_string())
     }
 }
 
-impl Deref for VersionSegLoc {
+impl Deref for Version {
     type Target = semver::Version;
 
     fn deref(&self) -> &Self::Target {
@@ -158,7 +159,7 @@ impl Deref for VersionSegLoc {
     }
 }
 
-impl Serialize for VersionSegLoc {
+impl Serialize for Version {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -170,7 +171,7 @@ impl Serialize for VersionSegLoc {
 struct VersionVisitor;
 
 impl<'de> Visitor<'de> for VersionVisitor {
-    type Value = VersionSegLoc;
+    type Value = Version;
 
     fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
         formatter.write_str("SemVer version")
@@ -180,7 +181,7 @@ impl<'de> Visitor<'de> for VersionVisitor {
     where
         E: de::Error,
     {
-        match VersionSegLoc::from_str(v) {
+        match Version::from_str(v) {
             Ok(version) => Ok(version),
             Err(error) => {
                 //Err(de::Error::custom(error.to_string() ))
@@ -190,7 +191,7 @@ impl<'de> Visitor<'de> for VersionVisitor {
     }
 }
 
-impl<'de> Deserialize<'de> for VersionSegLoc {
+impl<'de> Deserialize<'de> for Version {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -199,7 +200,7 @@ impl<'de> Deserialize<'de> for VersionSegLoc {
     }
 }
 
-impl TryInto<semver::Version> for VersionSegLoc {
+impl TryInto<semver::Version> for Version {
     type Error = ParseErrs0;
 
     fn try_into(self) -> Result<semver::Version, Self::Error> {
@@ -207,7 +208,7 @@ impl TryInto<semver::Version> for VersionSegLoc {
     }
 }
 
-impl FromStr for VersionSegLoc {
+impl FromStr for Version {
     type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {

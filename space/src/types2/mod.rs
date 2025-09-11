@@ -9,7 +9,7 @@ use crate::selector::Pattern;
 use crate::types::class::Class;
 use crate::types::data::Data;
 use crate::types::scope::Scope;
-use crate::types::specific::{SpecificLoc, SpecificSelector};
+use crate::types::specific::{Specific, SpecificSelector};
 use archetype::Archetype;
 use derive_name::Name;
 use getset::Getters;
@@ -49,7 +49,7 @@ pub mod package;
 //pub(crate) trait Typical: Display+Into<TypeKind>+Into<Type> { }
 
 /// [class::Class::Database] is an example of an [Type] because it is not an [ExactDef]
-/// which references a definition in [SpecificLoc]
+/// which references a definition in [Specific]
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(TypeDisc))]
@@ -89,7 +89,7 @@ where
 }
 
 /// [CategoryGeneric] stands for `category` ... a [Type] is a category
-/// if a [SpecificLoc] is not supplied
+/// if a [Specific] is not supplied
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct CategoryGeneric<Scope, Type>
 where
@@ -133,15 +133,15 @@ impl From<Data> for Type {
 pub type AsType = dyn Into<Absolute>;
 pub type AsTypeKind = dyn Into<Type>;
 
-pub type AbsoluteAbsoluteGeneric<Type: Archetype> = Scaffold<Scope, Type, SpecificLoc>;
+pub type AbsoluteAbsoluteGeneric<Type: Archetype> = Scaffold<Scope, Type, Specific>;
 
-pub type Absolute = Scaffold<Scope, Type, SpecificLoc>;
+pub type Absolute = Scaffold<Scope, Type, Specific>;
 
 
 #[cfg(test)]
 impl Absolute {
     pub fn mock_default() -> Self {
-        Self::new(Default::default(),Type::Class(Class::Root),SpecificLoc::mock_default() )
+        Self::new(Default::default(), Type::Class(Class::Root), Specific::mock_default() )
     }
 
     pub fn mock_root() -> Self {
@@ -259,10 +259,10 @@ where
 
 
 impl  TryInto<Absolute>
-for AbsoluteLex<Scope, SpecificLoc>
+for AbsoluteLex<Scope, Specific>
 where
     Scope: Archetype + Default,
-    SpecificLoc: Archetype
+    Specific: Archetype
 {
     type Error = ParseErrs0;
 
@@ -539,7 +539,7 @@ pub mod test2 {
     use crate::types::class::Class;
     use crate::types::scope::parse::scope;
     use crate::types::scope::{Scope, ScopeKeyword, Segment};
-    use crate::types::specific::SpecificLoc;
+    use crate::types::specific::Specific;
     use crate::types::{Absolute, AbsoluteLex, CategoryGeneric, Type};
     use nom::Parser;
     use starlane_space::types::data::Data;
@@ -547,7 +547,7 @@ pub mod test2 {
 
     #[test]
     pub fn test_specific() {
-        let specific = result(SpecificLoc::parser(new_span("contrib:package:1.0.0"))).unwrap();
+        let specific = result(Specific::parser(new_span("contrib:package:1.0.0"))).unwrap();
 
         assert_eq!("contrib", specific.contributor().as_str());
         assert_eq!("package", specific.package().as_str());
@@ -558,13 +558,13 @@ pub mod test2 {
 
     #[test]
     pub fn test_specific_slice_segments() {
-        let specific = result(SpecificLoc::parser(new_span("contrib:package:1.0.0::slice"))).unwrap();
+        let specific = result(Specific::parser(new_span("contrib:package:1.0.0::slice"))).unwrap();
 
         assert_eq!(1,specific.slices().len());
         assert_eq!("slice", specific.slices().first().unwrap().clone().to_string().as_str());
 
 
-        let specific = result(SpecificLoc::parser(new_span("contrib:package:1.0.0::one:two"))).unwrap();
+        let specific = result(Specific::parser(new_span("contrib:package:1.0.0::one:two"))).unwrap();
 
         assert_eq!(2,specific.slices().len());
         let segments = specific.slices().clone();
@@ -573,7 +573,7 @@ pub mod test2 {
         assert_eq!("two", i.next().unwrap().clone().to_string().as_str());
         
         /// test [Segment::Version]
-        let specific = result(SpecificLoc::parser(new_span("contrib:package:1.0.0::1.2.3:two"))).unwrap();
+        let specific = result(Specific::parser(new_span("contrib:package:1.0.0::1.2.3:two"))).unwrap();
         assert_eq!(2,specific.slices().len());
 
         let segments = specific.slices().clone();
@@ -585,12 +585,12 @@ pub mod test2 {
     #[test]
     pub fn test_abstract() {
         let i = new_span("<File>");
-        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let lex: AbsoluteLex<Scope, Specific> = AbsoluteLex::outer_parser(i).unwrap().1;
         let cat: CategoryGeneric<Scope, Type> = lex.try_into().unwrap();
         assert_eq!(cat.r#type, Type::Class(Class::File));
 
         let i = new_span("[BindConfig]");
-        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let lex: AbsoluteLex<Scope, Specific> = AbsoluteLex::outer_parser(i).unwrap().1;
         let cat: CategoryGeneric<Scope, Type> = lex.try_into().unwrap();
         assert_eq!(cat.r#type, Type::Data(Data::BindConfig));
     }
@@ -598,14 +598,14 @@ pub mod test2 {
     #[test]
     pub fn test_full() {
         let i = new_span("<File@contrib:package:1.0.0>");
-        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let lex: AbsoluteLex<Scope, Specific> = AbsoluteLex::outer_parser(i).unwrap().1;
         let r#absolute: Absolute = lex.try_into().unwrap();
         assert_eq!(r#absolute.r#type, Type::Class(Class::File));
         assert_eq!(r#absolute.scope, Scope::default());
         assert_eq!(r#absolute.specific.to_string().as_str(), "contrib:package:1.0.0");
 
         let i = new_span("[BindConfig@contrib:package:1.0.0]");
-        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let lex: AbsoluteLex<Scope, Specific> = AbsoluteLex::outer_parser(i).unwrap().1;
         let full: Absolute = lex.try_into().unwrap();
         assert_eq!(full.r#type, Type::Data(Data::BindConfig));
         assert_eq!(full.scope, Scope::default());
@@ -615,14 +615,14 @@ pub mod test2 {
     #[test]
     pub fn test_full_scope() {
         let i = new_span("<my::File@contrib:package:1.0.0>");
-        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let lex: AbsoluteLex<Scope, Specific> = AbsoluteLex::outer_parser(i).unwrap().1;
         let full: Absolute = lex.try_into().unwrap();
         assert_eq!(full.r#type, Type::Class(Class::File));
         assert_eq!(full.scope.to_string().as_str(), "my");
         assert_eq!(full.specific.to_string().as_str(), "contrib:package:1.0.0");
 
         let i = new_span("[my::BindConfig@contrib:package:1.0.0]");
-        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let lex: AbsoluteLex<Scope, Specific> = AbsoluteLex::outer_parser(i).unwrap().1;
         let full: Absolute = lex.try_into().unwrap();
         assert_eq!(full.r#type, Type::Data(Data::BindConfig));
         assert_eq!(full.scope.to_string().as_str(), "my");
@@ -672,7 +672,7 @@ pub mod test2 {
     #[test]
     pub fn id_abstract_disc() {
         let i = new_span("<File>");
-        let lex: AbsoluteLex<Scope, SpecificLoc> = AbsoluteLex::outer_parser(i).unwrap().1;
+        let lex: AbsoluteLex<Scope, Specific> = AbsoluteLex::outer_parser(i).unwrap().1;
         let cat: CategoryGeneric<Scope, Type> = lex.try_into().unwrap();
         assert_eq!(cat.r#type, Type::Class(Class::File));
     }

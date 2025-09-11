@@ -1,19 +1,19 @@
 use crate::types::def::Defs;
 use crate::types::scope::Segment;
-use crate::types::specific::SpecificLoc;
+use crate::types::specific::Specific;
 use crate::types::Type;
 use derive_builder::Builder;
 use std::collections::HashMap;
 
 #[derive(Clone, Builder)]
 pub struct Package {
-    specific: SpecificLoc,
+    specific: Specific,
     title: String,
     slices: Vec<Slice>,
 }
 
 impl Package {
-    pub fn new(specific: SpecificLoc, title: impl AsRef<str>) -> Self {
+    pub fn new(specific: Specific, title: impl AsRef<str>) -> Self {
         {
             let specific = specific.root();
             let title = title.as_ref().to_string();

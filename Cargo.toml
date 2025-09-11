@@ -14,7 +14,7 @@ version="0.3.20"
 default-run = "main"
 resolver = "2"
 #members = ["main", "space", "hyperspace", "base","macros", "foundation/docker-desktop", "platform/registry/postgres", "platform/postgres", "ext/service/starlane-cli-local-filestore-service" ]
-members = ["main", "space", "hyperspace", "base","macros", "foundation/docker-desktop", "platform/registry/postgres", "platform/postgres"]
+members = ["main", "space", "hyperspace", "base","macros", "foundation/docker-desktop", "platform/registry/postgres", "platform/postgres", "package"]
 
 exclude = [ ]
 
@@ -28,6 +28,7 @@ starlane-base = { package="starlane-base", path= "base", version = "0.3.20" }
 starlane-platform-for-postgres = { package="starlane-platform-for-postgres", path= "platform/postgres" }
 starlane-platform-for-postgres-registry = { package="starlane-platform-for-postgres-registry", path= "platform/registry/postgres" }
 starlane-foundation-for-docker-desktop = { package="starlane-foundation-for-docker-desktop", path= "foundation/docker-desktop"}
+starlane-package = { package="starlane-package", path="package" }
 
 lazy_static = "1.5.0"
 uuid = { version="1.17.0" }

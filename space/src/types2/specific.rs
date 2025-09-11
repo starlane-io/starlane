@@ -9,17 +9,31 @@ use nom::combinator::opt;
 use nom::multi::separated_list1;
 use nom::sequence::tuple;
 use serde::{Deserialize, Serialize};
-use starlane_space::loc::VersionSegLoc;
+use starlane_space::loc::Version;
 use starlane_space::selector::Pattern;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use crate::types::{Absolute, Type};
 use crate::types::class::Class;
 
-pub type SpecificLoc = SpecificScaffold<PublisherSegLoc, PackageSegLoc, VersionSegLoc, Segment>;
+pub type Specific = SpecificDef<Publisher, Package, Version, Segment>;
+
+
 
 #[cfg(test)]
-impl SpecificLoc{
+#[test]
+fn test() {
+    Specific::mock_default();
+    Specific::mock_0();
+    Specific::mock_1();
+    println!("SpecificLoc::mock_default() -> {}", Specific::mock_default());
+    println!("SpecificLoc::mock_0() -> {}", Specific::mock_1());
+    println!("SpecificLoc::mock_1() -> {}", Specific::mock_0());
+}
+
+
+#[cfg(test)]
+impl Specific {
     pub fn mock_default() -> Self {
         result(Self::parser(new_span("starlane.io:uberscott:1.0.1::main:7.0.7"))).unwrap()
     }
@@ -33,12 +47,12 @@ impl SpecificLoc{
     }
 }
 
-pub type PublisherSegLoc = Domain;
-pub type PackageSegLoc = SkewerCase;
+pub type Publisher = Domain;
+pub type Package = SkewerCase;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Hash, Getters)]
 #[get = "pub"]
-pub struct SpecificScaffold<Publisher, Package, Version, SliceSegment>
+pub struct SpecificDef<Publisher, Package, Version, SliceSegment>
 where
     Publisher: Archetype,
     Package: Archetype,
@@ -52,7 +66,7 @@ where
 }
 
 impl<Publisher, Package, Version, SliceSegment> Display
-    for SpecificScaffold<Publisher, Package, Version, SliceSegment>
+    for SpecificDef<Publisher, Package, Version, SliceSegment>
 where
     Publisher: Archetype,
     Package: Archetype,
@@ -76,7 +90,7 @@ where
 }
 
 impl<Publisher, Package, Version, SliceSeg> Archetype
-    for SpecificScaffold<Publisher, Package, Version, SliceSeg>
+    for SpecificDef<Publisher, Package, Version, SliceSeg>
 where
     Publisher: Archetype,
     Package: Archetype,
@@ -102,7 +116,7 @@ where
             let slices = slices.unwrap_or_else(|| vec![]);
             (
                 next,
-                SpecificScaffold {
+                SpecificDef {
                     contributor,
                     package,
                     version,
@@ -113,7 +127,7 @@ where
     }
 }
 
-impl<Publisher, Package, Version, SliceSeg> SpecificScaffold<Publisher, Package, Version, SliceSeg>
+impl<Publisher, Package, Version, SliceSeg> SpecificDef<Publisher, Package, Version, SliceSeg>
 where
     Publisher: Archetype,
     Package: Archetype,
@@ -145,10 +159,10 @@ where
 }
 
 pub type SpecificSelector =
-    SpecificScaffold<PublisherSelector, PackageSelector, VersionPattern, SlicePattern>;
+    SpecificDef<PublisherSelector, PackageSelector, VersionPattern, SlicePattern>;
 
-pub type PublisherSelector = Pattern<PublisherSegLoc>;
-pub type PackageSelector = Pattern<PackageSegLoc>;
+pub type PublisherSelector = Pattern<Publisher>;
+pub type PackageSelector = Pattern<Package>;
 pub type VersionPattern = Pattern<VersionReq>;
 pub type SlicePattern = Pattern<Segment>;
 

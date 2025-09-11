@@ -14,7 +14,7 @@ use thiserror::Error;
 use crate::err::ParseErrs0;
 use crate::err::SpaceErr;
 use crate::kind::{BaseKind, Kind, KindParts, Specific, SubKind};
-use crate::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, VersionSegLoc};
+use crate::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};
 use crate::parse::util::{result, Span};
 use crate::parse::util::{new_span, Trace};
 use crate::parse::{consume_hierarchy, kind_selector, point_segment_selector, point_selector, specific_selector, CamelCase, Env, Res};
@@ -683,7 +683,7 @@ pub type KeySegment = String;
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub enum ExactPointSeg {
     PointSeg(PointSeg),
-    Version(VersionSegLoc),
+    Version(Version),
 }
 
 impl ExactPointSeg {

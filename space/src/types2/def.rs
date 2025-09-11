@@ -1,7 +1,7 @@
 use crate::parse::SnakeCase;
 use crate::types::property::{PropertiesConfig, PropertiesConfigBuilder, PropertyDef};
 use crate::types::err::TypeErr;
-use crate::types::specific::SpecificLoc;
+use crate::types::specific::Specific;
 use crate::types::{err, Absolute, Type};
 use getset::Getters;
 use std::collections::HashMap;
@@ -10,15 +10,15 @@ use std::fmt::Display;
 /// [Defs] for an [Absolute]
 #[derive(Clone, Getters)]
 pub struct Defs {
-    specific: SpecificLoc,
+    specific: Specific,
 
     /// [Self::specific] must be in 
     #[getset(skip)]
-    layers: HashMap<SpecificLoc, Layer>,
+    layers: HashMap<Specific, Layer>,
 }
 
 impl Defs {
-    pub fn new(specific: SpecificLoc) -> Defs {
+    pub fn new(specific: Specific) -> Defs {
         Self {
             specific,
            layers: Default::default(),
@@ -103,8 +103,8 @@ todo!()
 
 #[derive(Clone,  Getters)]
 pub struct Layer {
-    parent: Option<SpecificLoc>,
-    specific: SpecificLoc,
+    parent: Option<Specific>,
+    specific: Specific,
     changes: Vec<Change>,
 }
 
@@ -112,11 +112,11 @@ pub struct Layer {
 #[derive(Clone)]
 pub struct LayerBuilder {
     parent: Option<Layer>,
-    specific: SpecificLoc,
+    specific: Specific,
     changes: Vec<Change>,   
 }
 impl LayerBuilder {
-    pub fn new(specific: SpecificLoc) -> LayerBuilder
+    pub fn new(specific: Specific) -> LayerBuilder
     {
         Self {
             specific,
@@ -234,17 +234,17 @@ impl TypeCompositeBuilder {
 
 #[derive(Clone, Getters)]
 pub struct SpecificComposite {
-    pub specific: SpecificLoc,
+    pub specific: Specific,
     pub types: HashMap<Type, TypeComposite>,   
 }
 
 pub struct SpecificCompositeBuilder {
-    specific: SpecificLoc,
+    specific: Specific,
     types: HashMap<Type, TypeCompositeBuilder>,
 }
 
 impl SpecificCompositeBuilder {
-    pub fn of(specific: SpecificLoc) -> Self {
+    pub fn of(specific: Specific) -> Self {
         Self {
             specific,
             types: Default::default(),
@@ -267,7 +267,7 @@ mod tests {
     use crate::types::{Absolute, Type};
     use crate::types::class::Class;
     use crate::types::def::{Add, Change, Defs, LayerBuilder, TypeCompositeBuilder};
-    use crate::types::specific::SpecificLoc;
+    use crate::types::specific::Specific;
 
     #[test] 
    pub fn type_builder() {

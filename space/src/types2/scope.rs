@@ -1,5 +1,5 @@
 use crate::err::ParseErrs0;
-use crate::loc::VersionSegLoc;
+use crate::loc::Version;
 use crate::parse::util::{new_span, result, Span};
 use crate::parse::{Res, SkewerCase};
 use core::str::FromStr;
@@ -13,7 +13,7 @@ use strum_macros::{EnumDiscriminants, EnumString};
 use validator::ValidateRequired;
 
 use crate::types::scope::parse::scope;
-use crate::types::specific::SpecificLoc;
+use crate::types::specific::Specific;
 use once_cell::sync::Lazy;
 use crate::types::archetype::Archetype;
 
@@ -57,6 +57,7 @@ pub enum ScopeKeyword {
     Serialize,
     Deserialize,
 )]
+
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(SegmentKind))]
 #[strum_discriminants(derive(Hash, strum_macros::EnumString))]
@@ -64,13 +65,13 @@ pub enum ScopeKeyword {
 #[strum(serialize_all = "lowercase")]
 pub enum Segment {
     #[strum(to_string = "{0}")]
-    Version(VersionSegLoc),
+    Version(Version),
     #[strum(to_string = "{0}")]
     Segment(SkewerCase),
 }
 
-impl From<VersionSegLoc> for Segment {
-    fn from(version: VersionSegLoc) -> Self {
+impl From<Version> for Segment {
+    fn from(version: Version) -> Self {
         Self::Version(version)
     }
 }
@@ -86,7 +87,7 @@ impl Archetype for Segment {
     where
         I: Span,
     {
-        alt((into(SkewerCase::parser), into(VersionSegLoc::parser)))(input)
+        alt((into(SkewerCase::parser), into(Version::parser)))(input)
     }
 }
 
