@@ -70,6 +70,16 @@ pub enum Segment {
     Segment(SkewerCase),
 }
 
+impl Segment {
+    pub fn is_main(&self) -> bool {
+        if let Self::Segment(id) = self  {
+            "main" == id.as_str()
+        } else {
+            false
+        }
+    }
+}
+
 impl From<Version> for Segment {
     fn from(version: Version) -> Self {
         Self::Version(version)

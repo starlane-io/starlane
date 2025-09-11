@@ -3206,6 +3206,9 @@ dependencies = [
 name = "starlane-package"
 version = "0.3.20"
 dependencies = [
+ "starlane-space",
+ "thiserror 2.0.16",
+ "walkdir",
  "zip",
 ]
 

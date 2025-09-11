@@ -17,7 +17,7 @@ use crate::types::{Absolute, Type};
 use crate::types::class::Class;
 
 pub type Specific = SpecificDef<Publisher, Package, Version, Segment>;
-
+pub type Release = ReleaseDef<Publisher, Package, Version >;
 
 
 #[cfg(test)]
@@ -52,6 +52,51 @@ pub type Package = SkewerCase;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Hash, Getters)]
 #[get = "pub"]
+pub struct ReleaseDef<Publisher, Package, Version >
+where
+    Publisher: Archetype,
+    Package: Archetype,
+    Version: Archetype,
+{
+    contributor: Publisher,
+    package: Package,
+    version: Version,
+}
+
+impl<Publisher, Package, Version > Display
+for ReleaseDef<Publisher, Package, Version>
+where
+    Publisher: Archetype,
+    Package: Archetype,
+    Version: Archetype,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}:{}", self.contributor, self.package, self.version)?;
+        Ok(())
+    }
+}
+
+impl<Publisher, Package, Version > ReleaseDef<Publisher, Package, Version>
+where
+    Publisher: Archetype,
+    Package: Archetype,
+    Version: Archetype,
+{
+    pub fn new(
+        contributor: Publisher,
+        package: Package,
+        version: Version,
+    ) -> Self {
+        Self {
+                contributor,
+                package,
+                version,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Hash, Getters)]
+#[get = "pub"]
 pub struct SpecificDef<Publisher, Package, Version, SliceSegment>
 where
     Publisher: Archetype,
@@ -59,9 +104,7 @@ where
     Version: Archetype,
     SliceSegment: Archetype,
 {
-    contributor: Publisher,
-    package: Package,
-    version: Version,
+    release: ReleaseDef<Publisher,Package,Version>,
     slices: Vec<SliceSegment>,
 }
 
@@ -74,7 +117,7 @@ where
     SliceSegment: Archetype,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}:{}", self.contributor, self.package, self.version)?;
+        write!(f, "{}", self.release)?;
 
         /// this is a bit weird, but the delimiter between `version` & `slice` needs
         /// two colons `::` ... the second one is prepended in the segment for loop
@@ -117,9 +160,9 @@ where
             (
                 next,
                 SpecificDef {
-                    contributor,
+                    release: ReleaseDef {contributor,
                     package,
-                    version,
+                    version},
                     slices,
                 },
             )
@@ -141,20 +184,28 @@ where
         slices: Vec<SliceSeg>,
     ) -> Self {
         Self {
-            contributor,
-            package,
-            version,
+            release: ReleaseDef {
+                contributor,
+                package,
+                version,
+            },
             slices,
         }
     }
 
     ///
-    pub fn root(self) -> Self {
-        if self.slices.is_empty() {
-            self
-        } else {
-            Self::new(self.contributor, self.package, self.version, vec![])
-        }
+    pub fn root(self) -> ReleaseDef<Publisher, Package, Version> {
+            self.release
+    }
+}
+
+impl <Publisher,Package,Version,SliceSegment> Into<ReleaseDef<Publisher,Package,Version>> for SpecificDef<Publisher,Package,Version,SliceSegment> where
+    Publisher: Archetype,
+    Package: Archetype,
+    Version: Archetype,
+    SliceSegment: Archetype{
+    fn into(self) -> ReleaseDef<Publisher, Package, Version> {
+        self.release
     }
 }
 
@@ -201,3 +252,14 @@ pub(crate) mod parse {
 }
 
  */
+
+#[derive(Debug,Clone,Eq,PartialEq,Hash)]
+pub enum RootSegment{
+    Main,
+    Segment(Segment),
+}
+
+
+
+
+
