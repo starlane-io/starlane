@@ -1,24 +1,23 @@
 use crate::types::def::Defs;
 use crate::types::scope::Segment;
-use crate::types::specific::Specific;
 use crate::types::Type;
+use crate::types2::specific::Release;
 use derive_builder::Builder;
 use std::collections::HashMap;
 
 #[derive(Clone, Builder)]
 pub struct Package {
-    specific: Specific,
+    release: Release,
     title: String,
     slices: Vec<Slice>,
 }
 
 impl Package {
-    pub fn new(specific: Specific, title: impl AsRef<str>) -> Self {
+    pub fn new(release: Release, title: impl AsRef<str>) -> Self {
         {
-            let specific = specific.root();
             let title = title.as_ref().to_string();
             Self {
-                specific,
+                release,
                 title,
                 slices: Default::default(),
             }

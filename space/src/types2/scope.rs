@@ -70,6 +70,7 @@ pub enum Segment {
     Segment(SkewerCase),
 }
 
+
 impl Segment {
     pub fn is_main(&self) -> bool {
         if let Self::Segment(id) = self  {

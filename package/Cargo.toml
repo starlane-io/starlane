@@ -10,15 +10,15 @@ description.workspace = true
 version.workspace = true
 
 [features]
-default=["create"]
-create=["dep:zip","dep:walkdir"]
-process=["create"]
-store=[]
-cache=[]
-daemon=[]
+default = ["create"]
+create = ["dep:zip", "dep:walkdir"]
+process = ["create"]
+store = []
+cache = []
+daemon = []
 
 [dependencies]
-starlane-space = {workspace=true, features=["types2"]}
-thiserror = {workspace = true}
-walkdir= { workspace=true,  optional = true}
-zip = { workspace=true, optional=true, default-features=false,  features=["bzip2"]}
+starlane-space = { workspace = true, features = ["types2"] }
+thiserror = { workspace = true }
+walkdir = { workspace = true, optional = true }
+zip = { workspace = true, optional = true, default-features = false, features = ["bzip2"] }
