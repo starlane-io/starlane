@@ -1,20 +1,43 @@
 use crate::create::PackErr;
 use starlane_space::parse::SkewerCase;
 use starlane_space::types::scope::Segment;
-use starlane_space::types::specific::{Release, Specific};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::str::FromStr;
 use thiserror::Error;
+use starlane_space::types::specific::Release;
 
 #[cfg(feature = "create")]
 pub mod create;
 
 /// a convenience struct for understanding and
 /// managing the anatomy of a package structure.
+
 pub struct Package {
-    /// this is the default/main slice if no slice is specified
-    main: Slice,
+    release: String,
+    slices: Vec<Slice>,
+}
+
+
+impl Package {
+
+    pub fn new( release: String, slices: Vec<Slice> ) -> Self {
+        Self { release, slices }
+    }
+
+    pub fn diagnose(&self) {
+        self.diagnose_indent(0);
+    }
+
+    pub fn diagnose_indent(&self,mut spaces:usize ) {
+        let indent = " ".repeat(spaces);
+        println!("{indent}{}[Package]", self.release);
+        for slice in &self.slices {
+            slice.diagnose_indent(spaces+2);
+        }
+    }
+
+
 }
 
 #[derive(Error, Debug)]
@@ -35,18 +58,7 @@ impl From<PackErr> for PackageErr {
 }
 
 impl Package {
-    pub fn new() -> Self {
-        let main = Slice::new_main();
-        Self { main }
-    }
-
     pub fn verify(&self) -> Result<(), PackageErr> {
-        if !self.main.is_main() {
-            return Err(PackageErr::IllegalMain);
-        }
-
-        self.main.verify_children()?;
-
         Ok(())
     }
 }
@@ -65,28 +77,34 @@ impl Package {
 /// to operate and likewise the `cdn` (Content Delivery Network) slice may be conveniently packaged
 /// with the versions its meant to work with...
 ///
+ #[derive(Clone,Debug)]
 pub struct Slice {
     /// the identity of this slice
     segment: Segment,
     slices: Vec<Slice>,
-    files: Vec<FileEntity>,
+    directory: Directory,
 }
 
+
 impl Slice {
+
+
     pub fn new(segment: Segment) -> Self {
+        let name = segment.to_string();
         Self {
             segment,
             slices: vec![],
-            files: vec![],
+            directory: Directory::new(name)
         }
     }
 
     pub fn new_main() -> Self {
-        let segment = Segment::Segment(SkewerCase::from_str("main").unwrap());
+        let name = "main";
+        let segment = Segment::Segment(SkewerCase::from_str(name).unwrap());
         Self {
             segment,
             slices: vec![],
-            files: vec![],
+            directory: Directory::new(name.to_string()),
         }
     }
 
@@ -103,8 +121,21 @@ impl Slice {
 
         Ok(())
     }
+
+
+    pub fn diagnose(&self) {
+        self.diagnose_indent(0);
+    }
+
+    pub fn diagnose_indent(&self,mut spaces:usize ) {
+        let indent = " ".repeat(spaces );
+
+        println!("{indent}{}[Slice]",self.segment);
+        self.directory.diagnose_indent(spaces+2,false )
+    }
 }
 
+#[derive(Clone,Debug)]
 pub struct Directory {
     name: String,
     files: Vec<FileEntity>,
@@ -117,18 +148,43 @@ impl Directory {
             files: vec![],
         }
     }
+
+    pub fn diagnose_indent(&self, mut spaces:usize, vanity: bool) {
+        let indent = " ".repeat(spaces );
+
+        if vanity {
+            println!("{indent}{}[Directory]",self.name);
+        }
+
+        for entry in &self.files {
+            match entry {
+                FileEntity::File(file) => {
+                    println!("{indent}..{}[File]",file);
+                }
+                _ => {}
+            }
+        }
+
+        for entry in &self.files {
+            match entry {
+                FileEntity::Directory(directory) => {
+                    directory.diagnose_indent(spaces+2, true);
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 pub enum Entity {
-    File(FileEntity),
+    Directory(Directory),
     Slice(Slice),
 }
+#[derive(Clone,Debug)]
 pub enum FileEntity {
     File(String),
     Directory(Directory),
 }
 
 #[cfg(test)]
-mod tests {
-    use super::Package;
-}
+mod tests {}

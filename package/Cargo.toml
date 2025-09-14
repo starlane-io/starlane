@@ -11,7 +11,7 @@ version.workspace = true
 
 [features]
 default = ["create"]
-create = ["dep:zip", "dep:walkdir"]
+create = ["dep:zip", "dep:walkdir", "dep:derive_builder"]
 process = ["create"]
 store = []
 cache = []
@@ -22,3 +22,4 @@ starlane-space = { workspace = true, features = ["types2"] }
 thiserror = { workspace = true }
 walkdir = { workspace = true, optional = true }
 zip = { workspace = true, optional = true, default-features = false, features = ["bzip2"] }
+derive_builder={workspace = true,optional = true}
