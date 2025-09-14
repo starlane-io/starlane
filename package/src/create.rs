@@ -6,7 +6,6 @@ use std::str::FromStr;
 use std::{fs, io};
 use thiserror::Error;
 use walkdir::Error;
-use starlane_space::types::specific::Release;
 
 #[derive(Debug, Error)]
 pub enum PackErr {
@@ -98,12 +97,12 @@ pub fn create(release: String, dir: &PathBuf) -> Result<Package, PackErr> {
             if path.is_file() {
                 slice
                     .directory
-                    .files
+                    .children
                     .push(FileEntity::File(file_name(&path)?));
             } else {
                 match walk_entity(&path)? {
                     Entity::Directory(directory) => {
-                        slice.directory.files.push(FileEntity::Directory(directory));
+                        slice.directory.children.push(FileEntity::Directory(directory));
                     }
                     Entity::Slice(s) => {
                         slice.slices.push(s);
@@ -116,15 +115,17 @@ pub fn create(release: String, dir: &PathBuf) -> Result<Package, PackErr> {
 
     /// walkdir
     fn walk_dir(dir: &PathBuf) -> Result<Directory, PackErr> {
-        let name = dir.display().to_string();
+        let name = file_name(dir)?;
         let mut directory = Directory::new(name);
         for entry in fs::read_dir(dir)? {
             let path = entry?.path();
-            if path.is_file() {
-                directory.files.push(FileEntity::File(file_name(&path)?));
-            } else {
-                let subdir = walk_dir(&path)?;
-                directory.files.push(FileEntity::Directory(subdir));
+            if !ignore(&path) {
+                if path.is_file() {
+                    directory.children.push(FileEntity::File(file_name(&path)?));
+                } else {
+                    let subdir = walk_dir(&path)?;
+                    directory.children.push(FileEntity::Directory(subdir));
+                }
             }
         }
         Ok(directory)
@@ -152,7 +153,6 @@ mod test {
     use crate::create::create;
     use std::path::PathBuf;
     use std::str::FromStr;
-    use starlane_space::types::specific::Release;
 
     #[test]
     pub fn test_create() {

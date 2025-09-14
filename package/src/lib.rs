@@ -138,14 +138,14 @@ impl Slice {
 #[derive(Clone,Debug)]
 pub struct Directory {
     name: String,
-    files: Vec<FileEntity>,
+    children: Vec<FileEntity>,
 }
 
 impl Directory {
     pub fn new(name: String) -> Self {
         Self {
             name,
-            files: vec![],
+            children: vec![],
         }
     }
 
@@ -156,7 +156,7 @@ impl Directory {
             println!("{indent}{}[Directory]",self.name);
         }
 
-        for entry in &self.files {
+        for entry in &self.children {
             match entry {
                 FileEntity::File(file) => {
                     println!("{indent}..{}[File]",file);
@@ -165,7 +165,7 @@ impl Directory {
             }
         }
 
-        for entry in &self.files {
+        for entry in &self.children {
             match entry {
                 FileEntity::Directory(directory) => {
                     directory.diagnose_indent(spaces+2, true);
