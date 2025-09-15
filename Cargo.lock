@@ -3210,7 +3210,6 @@ dependencies = [
  "once_cell",
  "starlane-space",
  "thiserror 2.0.16",
- "walkdir",
  "zip",
 ]
 
