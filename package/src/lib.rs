@@ -1,11 +1,14 @@
+use std::collections::HashMap;
 use crate::create::PackErr;
 use starlane_space::parse::SkewerCase;
 use starlane_space::types::scope::Segment;
 use std::fmt::Debug;
-use std::hash::Hash;
 use std::str::FromStr;
 use thiserror::Error;
-use starlane_space::types::specific::Release;
+use once_cell::sync::Lazy;
+
+pub static MAIN_SLICE: Lazy<Segment> = Lazy::new(|| Segment::Segment(SkewerCase::from_str("main").unwrap()));
+
 
 #[cfg(feature = "create")]
 pub mod create;
@@ -15,14 +18,25 @@ pub mod create;
 
 pub struct Package {
     release: String,
-    slices: Vec<Slice>,
+    slices: HashMap<Segment,Slice>,
 }
 
 
 impl Package {
 
-    pub fn new( release: String, slices: Vec<Slice> ) -> Self {
+    pub fn new( release: String, slices: HashMap<Segment,Slice> ) -> Self {
         Self { release, slices }
+    }
+
+    pub(crate) fn finalize(& mut self) {
+        if !self.slices.contains_key(&MAIN_SLICE) {
+            let main = Slice::new(MAIN_SLICE.clone());
+            self.slices.insert(MAIN_SLICE.clone(), main);
+        }
+    }
+
+    pub fn main(&self) -> Result<&Slice,PackageErr>{
+        self.slices.get(&MAIN_SLICE).ok_or(PackageErr::MissingMainSlice)
     }
 
     pub fn diagnose(&self) {
@@ -32,7 +46,7 @@ impl Package {
     pub fn diagnose_indent(&self,mut spaces:usize ) {
         let indent = " ".repeat(spaces);
         println!("{indent}{}[Package]", self.release);
-        for slice in &self.slices {
+        for (_,slice) in &self.slices {
             slice.diagnose_indent(spaces+2);
         }
     }
@@ -46,6 +60,8 @@ pub enum PackageErr {
     IllegalMain,
     #[error("subslices may not be named 'main'")]
     MainSubSlice,
+   #[error("package missing 'main' slice")]
+    MissingMainSlice,
     #[cfg(feature = "create")]
     #[error("{0}")]
     PackErr(PackErr),
@@ -81,7 +97,7 @@ impl Package {
 pub struct Slice {
     /// the identity of this slice
     segment: Segment,
-    slices: Vec<Slice>,
+    slices: HashMap<Segment,Slice>,
     directory: Directory,
 }
 
@@ -93,7 +109,7 @@ impl Slice {
         let name = segment.to_string();
         Self {
             segment,
-            slices: vec![],
+            slices: Default::default(),
             directory: Directory::new(name)
         }
     }
@@ -103,7 +119,7 @@ impl Slice {
         let segment = Segment::Segment(SkewerCase::from_str(name).unwrap());
         Self {
             segment,
-            slices: vec![],
+            slices: Default::default(),
             directory: Directory::new(name.to_string()),
         }
     }
@@ -112,7 +128,7 @@ impl Slice {
         self.segment.is_main()
     }
     pub fn verify_children(&self) -> Result<(), PackageErr> {
-        for slice in &self.slices {
+        for (_,slice) in &self.slices {
             if slice.is_main() {
                 return Err(PackageErr::MainSubSlice);
             }
@@ -131,21 +147,24 @@ impl Slice {
         let indent = " ".repeat(spaces );
 
         println!("{indent}{}[Slice]",self.segment);
-        self.directory.diagnose_indent(spaces+2,false )
+        self.directory.diagnose_indent(spaces+2,false );
+        for (_,slice) in &self.slices {
+            slice.diagnose_indent(spaces+2);
+        }
     }
 }
 
 #[derive(Clone,Debug)]
 pub struct Directory {
     name: String,
-    children: Vec<FileEntity>,
+    children: HashMap<String,FileEntity>,
 }
 
 impl Directory {
     pub fn new(name: String) -> Self {
         Self {
             name,
-            children: vec![],
+            children: Default::default(),
         }
     }
 
@@ -156,7 +175,7 @@ impl Directory {
             println!("{indent}{}[Directory]",self.name);
         }
 
-        for entry in &self.children {
+        for (_,entry) in &self.children {
             match entry {
                 FileEntity::File(file) => {
                     println!("{indent}..{}[File]",file);
@@ -165,7 +184,7 @@ impl Directory {
             }
         }
 
-        for entry in &self.children {
+        for (_,entry) in &self.children {
             match entry {
                 FileEntity::Directory(directory) => {
                     directory.diagnose_indent(spaces+2, true);
@@ -184,6 +203,16 @@ pub enum Entity {
 pub enum FileEntity {
     File(String),
     Directory(Directory),
+}
+
+impl FileEntity {
+    pub fn is_dir(&self) -> bool{
+        match self {
+            Self::Directory(_) => true,
+            _ => false,
+        }
+    }
+
 }
 
 #[cfg(test)]

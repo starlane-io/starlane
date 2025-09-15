@@ -4,6 +4,7 @@ use starlane_space::types::scope::Segment;
 use std::path::{PathBuf, StripPrefixError};
 use std::str::FromStr;
 use std::{fs, io};
+use std::collections::HashMap;
 use thiserror::Error;
 use walkdir::Error;
 
@@ -95,17 +96,20 @@ pub fn create(release: String, dir: &PathBuf) -> Result<Package, PackErr> {
         for entry in fs::read_dir(dir)? {
             let path = entry?.path();
             if path.is_file() {
-                slice
-                    .directory
-                    .children
-                    .push(FileEntity::File(file_name(&path)?));
+                if !ignore(&path) {
+                    let filename = file_name(&path)?;
+                    slice
+                        .directory
+                        .children
+                        .insert(filename.clone(), FileEntity::File(filename));
+                }
             } else {
                 match walk_entity(&path)? {
                     Entity::Directory(directory) => {
-                        slice.directory.children.push(FileEntity::Directory(directory));
+                        slice.directory.children.insert(directory.name.clone(),FileEntity::Directory(directory));
                     }
                     Entity::Slice(s) => {
-                        slice.slices.push(s);
+                        slice.slices.insert(s.segment.clone(), s);
                     }
                 }
             }
@@ -121,29 +125,30 @@ pub fn create(release: String, dir: &PathBuf) -> Result<Package, PackErr> {
             let path = entry?.path();
             if !ignore(&path) {
                 if path.is_file() {
-                    directory.children.push(FileEntity::File(file_name(&path)?));
+                    let filename = file_name(&path)?;
+                    directory.children.insert(filename.clone(),FileEntity::File(filename));
                 } else {
                     let subdir = walk_dir(&path)?;
-                    directory.children.push(FileEntity::Directory(subdir));
+                    directory.children.insert(subdir.name.clone(),FileEntity::Directory(subdir));
                 }
             }
         }
         Ok(directory)
     }
 
-    let mut slices = Vec::<Slice>::new();
+    let mut slices =HashMap::new();
 
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
             let slice = walk_slice(&path)?;
-            slices.push(slice);
+            slices.insert(slice.segment.clone(), slice);
         }
     }
 
-    let package = Package::new(release, slices);
-
+    let mut package = Package::new(release, slices);
+    package.finalize();
     package.diagnose();
     Ok(package)
 }
@@ -153,10 +158,39 @@ mod test {
     use crate::create::create;
     use std::path::PathBuf;
     use std::str::FromStr;
+    use starlane_space::parse::SkewerCase;
+    use starlane_space::types::scope::Segment;
+    use crate::FileEntity;
 
     #[test]
     pub fn test_create() {
         let path = PathBuf::from_str("test/package-layout-example").unwrap();
-        create("uberscott.io:mystuff:1.3.5".to_string(),&path);
+        let package= create("uberscott.io:mystuff:1.3.5".to_string(),&path).unwrap();
+
+        // hierarchy
+        {
+            // files
+            let hierarchy_segment = Segment::Segment(SkewerCase::from_str("hierarchy").unwrap());
+            let hierarchy = package.slices.get(&hierarchy_segment).expect("expecting 'hierarchy'");
+            assert!(hierarchy.directory.children.get(&"dir1".to_string()).expect("expecting 'dir1'").is_dir());
+            assert!(!hierarchy.directory.children.get(&"little-file.txt".to_string()).expect("expecting 'dir1'").is_dir());
+            assert_eq!(hierarchy.directory.children.len(),2);
+
+            // slices
+            assert_eq!(hierarchy.slices.len(),2);
+        }
+
+
+        // main
+        {
+            let main = package.main().expect("expecting 'main'");
+            assert_eq!(main.directory.children.len(),3);
+            if let FileEntity::Directory(off) = main.directory.children.get(&"off".to_string() ).expect("expecting 'off'") {
+                assert_eq!(off.children.len(),2);
+            } else {
+                assert!(false)
+            }
+            assert!(main.slices.is_empty());
+        }
     }
 }
