@@ -16,16 +16,15 @@ pub mod create;
 /// a convenience struct for understanding and
 /// managing the anatomy of a package structure.
 
-pub struct Package {
-    release: String,
+pub struct PackageStructure {
     slices: HashMap<Segment,Slice>,
 }
 
 
-impl Package {
+impl PackageStructure {
 
-    pub fn new( release: String, slices: HashMap<Segment,Slice> ) -> Self {
-        Self { release, slices }
+    pub fn new( slices: HashMap<Segment,Slice> ) -> Self {
+        Self { slices }
     }
 
     pub(crate) fn finalize(& mut self) {
@@ -45,7 +44,7 @@ impl Package {
 
     pub fn diagnose_indent(&self,mut spaces:usize ) {
         let indent = " ".repeat(spaces);
-        println!("{indent}{}[Package]", self.release);
+        println!("{indent}[PackageStructure]");
         for (_,slice) in &self.slices {
             slice.diagnose_indent(spaces+2);
         }
@@ -73,13 +72,13 @@ impl From<PackErr> for PackageErr {
     }
 }
 
-impl Package {
+impl PackageStructure {
     pub fn verify(&self) -> Result<(), PackageErr> {
         Ok(())
     }
 }
 
-/// a [Slice] is NOT a [Directory] but an independent part of a [Package] that
+/// a [Slice] is NOT a [Directory] but an independent part of a [PackageStructure] that
 /// can be downloaded separately and independently. For example imagine a package with slices:
 /// ```md
 /// * package `uberscott.com:website:1.2.3` with slices:
@@ -88,7 +87,7 @@ impl Package {
 ///   - common
 ///   - cdn
 /// ```
-/// It behooves the developer to wrap all aspects of a release into one [Package] for consistency,
+/// It behooves the developer to wrap all aspects of a release into one [PackageStructure] for consistency,
 /// however, the `frontend` for example may not need to download the entire `backend` slice
 /// to operate and likewise the `cdn` (Content Delivery Network) slice may be conveniently packaged
 /// with the versions its meant to work with...

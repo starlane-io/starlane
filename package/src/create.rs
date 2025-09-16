@@ -1,4 +1,4 @@
-use crate::{Directory, Entity, FileEntity, Package, Slice};
+use crate::{Directory, Entity, FileEntity, PackageStructure, Slice};
 use starlane_space::err::ParseErrs0;
 use starlane_space::types::scope::Segment;
 use std::path::{PathBuf, StripPrefixError};
@@ -6,14 +6,111 @@ use std::str::FromStr;
 use std::{fs, io};
 use std::collections::HashMap;
 use thiserror::Error;
-use walkdir::Error;
+
+pub struct PackageDirectoryStructure {
+    pub root: PathBuf,
+    pub structure: PackageStructure,
+}
+
+impl PackageDirectoryStructure {
+    pub fn create(root: &PathBuf) -> Result<Self, PackErr> {
+        /// should only be called on a directory that is directly
+        /// under a Slice (because it could be a sub-slice)
+        fn walk_entity(dir: &PathBuf) -> Result<Entity, PackErr> {
+            if has_slice_file(dir) {
+                slice_name(dir)?;
+                Ok(Entity::Slice(walk_slice(dir)?))
+            } else {
+                println!("DIR  : {}", dir.display());
+                Ok(Entity::Directory(walk_dir(dir)?))
+            }
+        }
+
+        fn walk_slice(dir: &PathBuf) -> Result<Slice, PackErr> {
+            let name = slice_name(&dir)?;
+            let mut slice = Slice::new(name);
+            for entry in fs::read_dir(dir)? {
+                let path = entry?.path();
+                if path.is_file() {
+                    if !ignore(&path) {
+                        let filename = file_name(&path)?;
+                        slice
+                            .directory
+                            .children
+                            .insert(filename.clone(), FileEntity::File(filename));
+                    }
+                } else {
+                    match walk_entity(&path)? {
+                        Entity::Directory(directory) => {
+                            slice.directory.children.insert(directory.name.clone(),FileEntity::Directory(directory));
+                        }
+                        Entity::Slice(s) => {
+                            slice.slices.insert(s.segment.clone(), s);
+                        }
+                    }
+                }
+            }
+            Ok(slice)
+        }
+
+        /// walkdir
+        fn walk_dir(dir: &PathBuf) -> Result<Directory, PackErr> {
+            let name = file_name(dir)?;
+            let mut directory = Directory::new(name);
+            for entry in fs::read_dir(dir)? {
+                let path = entry?.path();
+                if !ignore(&path) {
+                    if path.is_file() {
+                        let filename = file_name(&path)?;
+                        directory.children.insert(filename.clone(),FileEntity::File(filename));
+                    } else {
+                        let subdir = walk_dir(&path)?;
+                        directory.children.insert(subdir.name.clone(),FileEntity::Directory(subdir));
+                    }
+                }
+            }
+            Ok(directory)
+        }
+
+        let mut slices =HashMap::new();
+
+        for entry in fs::read_dir(root)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                let slice = walk_slice(&path)?;
+                slices.insert(slice.segment.clone(), slice);
+            }
+        }
+
+        let mut structure = PackageStructure::new(slices);
+        structure.finalize();
+        
+        
+        let pds = Self {
+            root: root.clone(),
+            structure,
+        };
+        
+        Ok(pds)
+    }
+
+    pub fn diagnose(&self) {
+        self.diagnose_indent(0);
+    }
+
+    pub fn diagnose_indent(&self,mut spaces:usize ) {
+        let indent = " ".repeat(spaces);
+        println!("{indent}{}[PackageDirectoryStructure]",self.root.display());
+        self.structure.diagnose_indent(spaces+2);
+    }
+
+}
 
 #[derive(Debug, Error)]
 pub enum PackErr {
     #[error("{0}")]
     SliceNameErr(ParseErrs0),
-    #[error("{0}")]
-    WalkDirErr(Error),
     #[error("{0}")]
     IoErr(std::io::Error),
     #[error("{0}")]
@@ -33,11 +130,7 @@ impl From<ParseErrs0> for PackErr {
         PackErr::SliceNameErr(errs)
     }
 }
-impl From<walkdir::Error> for PackErr {
-    fn from(errs: walkdir::Error) -> Self {
-        PackErr::WalkDirErr(errs)
-    }
-}
+
 impl From<StripPrefixError> for PackErr {
     fn from(errs: StripPrefixError) -> Self {
         PackErr::StripPrefixErr(errs)
@@ -77,101 +170,29 @@ fn ignore(path: &PathBuf) -> bool {
     }
 }
 
-pub fn create(release: String, dir: &PathBuf) -> Result<Package, PackErr> {
-    /// should only be called on a directory that is directly
-    /// under a Slice (because it could be a sub-slice)
-    fn walk_entity(dir: &PathBuf) -> Result<Entity, PackErr> {
-        if has_slice_file(dir) {
-            slice_name(dir)?;
-            Ok(Entity::Slice(walk_slice(dir)?))
-        } else {
-            println!("DIR  : {}", dir.display());
-            Ok(Entity::Directory(walk_dir(dir)?))
-        }
-    }
 
-    fn walk_slice(dir: &PathBuf) -> Result<Slice, PackErr> {
-        let name = slice_name(&dir)?;
-        let mut slice = Slice::new(name);
-        for entry in fs::read_dir(dir)? {
-            let path = entry?.path();
-            if path.is_file() {
-                if !ignore(&path) {
-                    let filename = file_name(&path)?;
-                    slice
-                        .directory
-                        .children
-                        .insert(filename.clone(), FileEntity::File(filename));
-                }
-            } else {
-                match walk_entity(&path)? {
-                    Entity::Directory(directory) => {
-                        slice.directory.children.insert(directory.name.clone(),FileEntity::Directory(directory));
-                    }
-                    Entity::Slice(s) => {
-                        slice.slices.insert(s.segment.clone(), s);
-                    }
-                }
-            }
-        }
-        Ok(slice)
-    }
-
-    /// walkdir
-    fn walk_dir(dir: &PathBuf) -> Result<Directory, PackErr> {
-        let name = file_name(dir)?;
-        let mut directory = Directory::new(name);
-        for entry in fs::read_dir(dir)? {
-            let path = entry?.path();
-            if !ignore(&path) {
-                if path.is_file() {
-                    let filename = file_name(&path)?;
-                    directory.children.insert(filename.clone(),FileEntity::File(filename));
-                } else {
-                    let subdir = walk_dir(&path)?;
-                    directory.children.insert(subdir.name.clone(),FileEntity::Directory(subdir));
-                }
-            }
-        }
-        Ok(directory)
-    }
-
-    let mut slices =HashMap::new();
-
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            let slice = walk_slice(&path)?;
-            slices.insert(slice.segment.clone(), slice);
-        }
-    }
-
-    let mut package = Package::new(release, slices);
-    package.finalize();
-    package.diagnose();
-    Ok(package)
-}
 
 #[cfg(test)]
 mod test {
-    use crate::create::create;
     use std::path::PathBuf;
     use std::str::FromStr;
     use starlane_space::parse::SkewerCase;
     use starlane_space::types::scope::Segment;
+    use crate::create::PackageDirectoryStructure;
     use crate::FileEntity;
 
     #[test]
     pub fn test_create() {
         let path = PathBuf::from_str("test/package-layout-example").unwrap();
-        let package= create("uberscott.io:mystuff:1.3.5".to_string(),&path).unwrap();
+        let pds= PackageDirectoryStructure::create(&path).unwrap();
+        pds.diagnose();
+        let structure = &pds.structure;
 
         // hierarchy
         {
             // files
             let hierarchy_segment = Segment::Segment(SkewerCase::from_str("hierarchy").unwrap());
-            let hierarchy = package.slices.get(&hierarchy_segment).expect("expecting 'hierarchy'");
+            let hierarchy = structure.slices.get(&hierarchy_segment).expect("expecting 'hierarchy'");
             assert!(hierarchy.directory.children.get(&"dir1".to_string()).expect("expecting 'dir1'").is_dir());
             assert!(!hierarchy.directory.children.get(&"little-file.txt".to_string()).expect("expecting 'dir1'").is_dir());
             assert_eq!(hierarchy.directory.children.len(),2);
@@ -183,7 +204,7 @@ mod test {
 
         // main
         {
-            let main = package.main().expect("expecting 'main'");
+            let main = structure.main().expect("expecting 'main'");
             assert_eq!(main.directory.children.len(),3);
             if let FileEntity::Directory(off) = main.directory.children.get(&"off".to_string() ).expect("expecting 'off'") {
                 assert_eq!(off.children.len(),2);
