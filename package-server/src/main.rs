@@ -17,14 +17,14 @@ use uuid::Uuid;
 
 #[tokio::main]
 async fn main() {
-    start(RepoApp::default()).await;
+    start(RepoState::default()).await;
 }
 
-pub struct RepoApp {
+pub struct RepoState {
     pub bind: String
 }
 
-impl Default for RepoApp {
+impl Default for RepoState {
     fn default() -> Self {
         Self {
             bind: "0.0.0.0:3000".to_string()
@@ -33,7 +33,7 @@ impl Default for RepoApp {
 }
 
 
-pub async fn start(repo: RepoApp) {
+pub async fn start(repo: RepoState) {
     let repo = Arc::new(repo);
     // Build the router
     let app = Router::new()
@@ -55,17 +55,12 @@ pub async fn start(repo: RepoApp) {
 }
 
 /// Handler for uploading zip files
-async fn upload_zip(app: State<Arc<RepoApp>>, mut multipart: Multipart) -> Result<Response, AppError> {
+async fn upload_zip(app: State<Arc<RepoState>>, mut multipart: Multipart) -> Result<Response, AppError> {
     let storage_dir = PathBuf::from("./zip_storage");
 
     while let Some(field) = multipart.next_field().await? {
         let name = field.name().unwrap_or("").to_string();
         let file_name = field.file_name().unwrap_or("").to_string();
-
-        // Only process zip files
-        if !file_name.ends_with(".zip") {
-            return Err(AppError::InvalidFileType);
-        }
 
         // Generate unique ID for the file
         let file_id = Uuid::new_v4();
@@ -170,9 +165,15 @@ impl From<axum::extract::multipart::MultipartError> for AppError {
 mod test {
     use std::path::PathBuf;
     use starlane_package::server::PackageRepo;
+    use crate::{start, RepoState};
 
     #[tokio::test]
     async fn test() -> anyhow::Result<()> {
+        let state = RepoState::default();
+        tokio::spawn( async move {
+            start(state).await;
+        });
+
         let server = PackageRepo::default();
 
         /*

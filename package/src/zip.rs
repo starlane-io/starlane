@@ -21,7 +21,7 @@ use zip::write::SimpleFileOptions;
 /// let temp_zip = zip_directory_to_temp(Path::new("./my_folder"))?;
 /// println!("Created zip at: {:?}", temp_zip);
 /// ```
-pub fn zip_directory_to_temp<P: AsRef<Path>>(source_dir: P) -> Result<PathBuf, ZipError> {
+pub fn zip_directory_to_temp<P: AsRef<Path>>(source_dir: P) -> Result<NamedTempFile, ZipError> {
     let source_dir = source_dir.as_ref();
 
     // Validate that the source directory exists
@@ -40,7 +40,7 @@ pub fn zip_directory_to_temp<P: AsRef<Path>>(source_dir: P) -> Result<PathBuf, Z
     let temp_path = temp_file.path().to_path_buf();
 
     // Create the zip archive
-    let file = temp_file.into_file();
+    let file = temp_file.as_file();
     let mut zip = ZipWriter::new(file);
 
     // Set compression options
@@ -87,7 +87,7 @@ pub fn zip_directory_to_temp<P: AsRef<Path>>(source_dir: P) -> Result<PathBuf, Z
     // Finalize the zip file
     zip.finish().map_err(ZipError::ZipOperation)?;
 
-    Ok(temp_path)
+    Ok(temp_file)
 }
 
 /// Alternative version that allows custom temp directory
@@ -219,10 +219,11 @@ mod tests {
 
         // Test the zip function
         let zip_path = zip_directory_to_temp(&test_dir).unwrap();
+        let path = zip_path.path().to_path_buf();
 
         // Verify the zip file exists
-        assert!(zip_path.exists());
-        assert!(zip_path.metadata().unwrap().len() > 0);
+        assert!(path.exists());
+        assert!(path.metadata().unwrap().len() > 0);
 
         println!("Created zip at: {:?}", zip_path);
     }

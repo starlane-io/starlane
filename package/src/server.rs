@@ -8,6 +8,12 @@ pub struct PackageRepo {
     pub url: String
 }
 
+impl PackageRepo {
+    pub fn new( url:String) -> Self {
+        Self { url }
+    }
+}
+
 impl Default for PackageRepo {
     fn default() -> Self {
         Self {
@@ -19,16 +25,23 @@ impl Default for PackageRepo {
 impl PackageRepo {
     /// Upload a zip file to the package-server
     pub async fn upload_zip_file(&self, pds: &PackageDirectoryStructure) -> Result<(),PackageErr> {
-        let zip_path = pds.zip()?;
+println!("uploading zip file");
+
+        let tmp_file= pds.zip()?;
+
+        let zip_path= tmp_file.path().to_path_buf();
+println!("zip_path: {}", zip_path.display());
         // Read the zip file
         let file_bytes = tokio::fs::read(&zip_path).await?;
 
+        println!("Uploading {} bytes", file_bytes.len());
         // Get the filename
         let file_name = zip_path
             .file_name()
             .and_then(|n| n.to_str())
-            .unwrap_or("archive.zip");
+            .unwrap_or("archive");
 
+        println!("file_name {}...", file_name);
         // Create multipart form
         let form = reqwest::multipart::Form::new()
             .part(
