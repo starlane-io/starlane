@@ -9,25 +9,39 @@ use axum::{
 };
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::Arc;
+use axum::extract::State;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
 use uuid::Uuid;
 
 #[tokio::main]
 async fn main() {
-    // Create directory for storing zip files
-    let storage_dir = PathBuf::from("./zip_storage");
-    if !storage_dir.exists() {
-        std::fs::create_dir_all(&storage_dir).expect("Failed to create storage directory");
-    }
+    start(RepoApp::default()).await;
+}
 
+pub struct RepoApp {
+    pub bind: String
+}
+
+impl Default for RepoApp {
+    fn default() -> Self {
+        Self {
+            bind: "0.0.0.0:3000".to_string()
+        }
+    }
+}
+
+
+pub async fn start(repo: RepoApp) {
+    let repo = Arc::new(repo);
     // Build the router
     let app = Router::new()
-        .route("/zip", post(upload_zip))
+        .route("/zip", post(upload_zip)).with_state(repo.clone())
         .route("/zip/{id}", get(download_zip));
 
     // Run the server
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+    let listener = tokio::net::TcpListener::bind(repo.bind.clone())
         .await
         .expect("Failed to bind to address");
 
@@ -41,7 +55,7 @@ async fn main() {
 }
 
 /// Handler for uploading zip files
-async fn upload_zip(mut multipart: Multipart) -> Result<Response, AppError> {
+async fn upload_zip(app: State<Arc<RepoApp>>, mut multipart: Multipart) -> Result<Response, AppError> {
     let storage_dir = PathBuf::from("./zip_storage");
 
     while let Some(field) = multipart.next_field().await? {
@@ -148,5 +162,40 @@ impl From<std::io::Error> for AppError {
 impl From<axum::extract::multipart::MultipartError> for AppError {
     fn from(err: axum::extract::multipart::MultipartError) -> Self {
         AppError::MultipartError(err)
+    }
+}
+
+
+
+mod test {
+    use std::path::PathBuf;
+    use starlane_package::server::PackageRepo;
+
+    #[tokio::test]
+    async fn test() -> anyhow::Result<()> {
+        let server = PackageRepo::default();
+
+        /*
+        // Example: Upload a zip file
+        let zip_to_upload = PathBuf::from("./my-archive.zip");
+
+        println!("Uploading zip file: {:?}", zip_to_upload);
+        let response = upload_zip_file(server_url, zip_to_upload).await?;
+
+        // Extract the UUID from the response
+        // Response format: "File uploaded successfully. ID: <uuid>"
+        if let Some(id) = response.split("ID: ").nth(1) {
+            let file_id = id.trim();
+            println!("File ID: {}", file_id);
+
+            // Example: Download the same file
+            let download_path = PathBuf::from("./downloaded-archive.zip");
+            println!("Downloading file with ID: {}", file_id);
+            download_zip_file(server_url, file_id, download_path).await?;
+        }
+
+         */
+
+        Ok(())
     }
 }

@@ -9,19 +9,14 @@ homepage.workspace = true
 description.workspace = true
 version.workspace = true
 
-[features]
-default = ["create"]
-create = ["dep:zip", "dep:zip", "dep:derive_builder", "dep:tempfile"]
-process = ["create"]
-store = []
-cache = []
-daemon = []
-
 [dependencies]
 starlane-space = { workspace = true, features = ["types2"] }
 thiserror = { workspace = true }
-zip = { workspace = true, optional = true, default-features = false, features = ["bzip2"] }
-tempfile = { workspace = true, optional = true }
+zip = { workspace = true, default-features = false, features = ["bzip2"] }
+tempfile = { workspace = true }
 derive_builder={workspace = true,optional = true}
 once_cell = {workspace = true}
 walkdir = {workspace = true}
+reqwest = {workspace=true, features=["multipart"] }
+anyhow = "1.0.99"
+tokio = "1.47.1"

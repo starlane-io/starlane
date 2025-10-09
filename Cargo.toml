@@ -124,6 +124,8 @@ derive-name = "1.1.0"
 tracing = "0.1.41"
 tracing-core = "0.1.34"
 
+reqwest = "0.12.23"
+
 # dependencies currently in the `Penalty Box`:
 #retry-if = "0.2.3"
 #wasmer = "5.0.4"

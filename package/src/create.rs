@@ -124,7 +124,8 @@ pub enum PackErr {
     #[error("Invalid slice name: '{0}'")]
     InvalidSliceName(String),
     #[error("ZipErr: {0}")]
-    ZipError(ZipError)
+    ZipError(ZipError),
+
 }
 
 impl From<ZipError> for PackErr {

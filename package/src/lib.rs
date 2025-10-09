@@ -3,17 +3,21 @@ use crate::create::PackErr;
 use starlane_space::parse::SkewerCase;
 use starlane_space::types::scope::Segment;
 use std::fmt::Debug;
+use std::io;
+use std::io::Error;
+use std::path::PathBuf;
 use std::str::FromStr;
 use thiserror::Error;
 use once_cell::sync::Lazy;
 
 pub static MAIN_SLICE: Lazy<Segment> = Lazy::new(|| Segment::Segment(SkewerCase::from_str("main").unwrap()));
 
+pub static PACKAGE_LAYOUT_EXAMPLE: Lazy<PathBuf> = Lazy::new(  || PathBuf::from_str("test/package-layout-example").unwrap());
 
-#[cfg(feature = "create")]
 pub mod create;
 
 pub mod zip;
+pub mod server;
 
 /// a convenience struct for understanding and
 /// managing the anatomy of a package structure.
@@ -63,9 +67,29 @@ pub enum PackageErr {
     MainSubSlice,
    #[error("package missing 'main' slice")]
     MissingMainSlice,
-    #[cfg(feature = "create")]
     #[error("{0}")]
     PackErr(PackErr),
+
+   #[error("{0}")]
+   RequestErr(reqwest::Error),
+
+   #[error("UploadErr: {0}")]
+   UploadErr(String),
+
+   #[error("IOErr: {0}")]
+   IOErr(io::Error)
+}
+
+impl From <io::Error> for PackageErr {
+    fn from(value: Error) -> Self {
+        PackageErr::IOErr(value)
+    }
+}
+
+impl From <reqwest::Error> for PackageErr {
+    fn from(err: reqwest::Error) -> Self {
+        PackageErr::RequestErr(err)
+    }
 }
 
 impl From<PackErr> for PackageErr {
