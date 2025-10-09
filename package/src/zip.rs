@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
 use walkdir::WalkDir;
 use zip::{write::FileOptions, CompressionMethod, ZipWriter};
-
+use zip::write::SimpleFileOptions;
 
 /// Zips a directory into a temporary file and returns the path to that file.
 ///
@@ -44,7 +44,7 @@ pub fn zip_directory_to_temp<P: AsRef<Path>>(source_dir: P) -> Result<PathBuf, Z
     let mut zip = ZipWriter::new(file);
 
     // Set compression options
-    let options = FileOptions::default()
+    let options = SimpleFileOptions::default()
         .compression_method(CompressionMethod::Deflated)
         .unix_permissions(0o755);
 
@@ -113,7 +113,7 @@ pub fn zip_directory_to_temp_in<P: AsRef<Path>, T: AsRef<Path>>(
     let file = temp_file.into_file();
     let mut zip = ZipWriter::new(file);
 
-    let options = FileOptions::default()
+    let options = SimpleFileOptions::default()
         .compression_method(CompressionMethod::Deflated)
         .unix_permissions(0o755);
 
@@ -151,70 +151,7 @@ pub fn zip_directory_to_temp_in<P: AsRef<Path>, T: AsRef<Path>>(
     Ok(temp_path)
 }
 
-/// Version that creates a persistent temp file (doesn't auto-delete)
-pub fn zip_directory_to_persistent_temp<P: AsRef<Path>>(
-    source_dir: P,
-) -> Result<PathBuf, ZipError> {
-    let source_dir = source_dir.as_ref();
 
-    if !source_dir.exists() {
-        return Err(ZipError::DirectoryNotFound(source_dir.to_path_buf()));
-    }
-
-    if !source_dir.is_dir() {
-        return Err(ZipError::NotADirectory(source_dir.to_path_buf()));
-    }
-
-    // Create a temporary file and persist it
-    let temp_file = NamedTempFile::new().map_err(ZipError::TempFileCreation)?;
-
-    let temp_path = temp_file.path().to_path_buf();
-
-    // Persist the temporary file (prevents auto-deletion)
-    let (_file, persistent_path) = temp_file
-        .keep()
-        .map_err(|e| ZipError::TempFileCreation(e.error))?;
-
-    // Create the zip using the persistent path
-    let file = File::create(&persistent_path)
-        .map_err(|e| ZipError::FileRead(persistent_path.clone(), e))?;
-
-    let mut zip = ZipWriter::new(file);
-    let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
-
-    for entry in WalkDir::new(source_dir).into_iter().filter_map(|e| e.ok()) {
-        let path = entry.path();
-        let name = path
-            .strip_prefix(source_dir)
-            .map_err(|_| ZipError::PathError(format!("Failed to strip prefix from {:?}", path)))?;
-
-        if name.as_os_str().is_empty() {
-            continue;
-        }
-
-        let name_str = name
-            .to_str()
-            .ok_or_else(|| ZipError::PathError(format!("Invalid UTF-8 in path: {:?}", name)))?;
-
-        if path.is_file() {
-            zip.start_file(name_str, options)
-                .map_err(ZipError::ZipOperation)?;
-
-            let file_contents =
-                fs::read(path).map_err(|e| ZipError::FileRead(path.to_path_buf(), e))?;
-
-            zip.write_all(&file_contents)
-                .map_err(ZipError::ZipOperation)?;
-        } else if path.is_dir() {
-            let dir_name = format!("{}/", name_str);
-            zip.add_directory(dir_name, options)
-                .map_err(ZipError::ZipOperation)?;
-        }
-    }
-
-    zip.finish().map_err(ZipError::ZipOperation)?;
-    Ok(persistent_path)
-}
 
 /// Custom error type for zip operations
 #[derive(Debug)]
@@ -248,6 +185,9 @@ impl std::fmt::Display for ZipError {
             }
             ZipError::PathError(msg) => {
                 write!(f, "Path error: {}", msg)
+            }
+            ZipError::WriteError(msg) => {
+                write!(f,"Write Error: {}",msg)
             }
         }
     }

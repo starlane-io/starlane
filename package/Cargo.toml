@@ -24,3 +24,4 @@ zip = { workspace = true, optional = true, default-features = false, features = 
 tempfile = { workspace = true, optional = true }
 derive_builder={workspace = true,optional = true}
 once_cell = {workspace = true}
+walkdir = {workspace = true}

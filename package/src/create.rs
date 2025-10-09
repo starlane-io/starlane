@@ -6,6 +6,7 @@ use std::str::FromStr;
 use std::{fs, io};
 use std::collections::HashMap;
 use thiserror::Error;
+use crate::zip::{zip_directory_to_temp, ZipError};
 
 pub struct PackageDirectoryStructure {
     pub root: PathBuf,
@@ -105,6 +106,11 @@ impl PackageDirectoryStructure {
         self.structure.diagnose_indent(spaces+2);
     }
 
+
+    pub fn zip(&self) -> Result<PathBuf, PackErr> {
+        use crate::zip::zip_directory_to_temp;
+        Ok(zip_directory_to_temp(self.root.clone())?)
+    }
 }
 
 #[derive(Debug, Error)]
@@ -117,6 +123,14 @@ pub enum PackErr {
     StripPrefixErr(StripPrefixError),
     #[error("Invalid slice name: '{0}'")]
     InvalidSliceName(String),
+    #[error("ZipErr: {0}")]
+    ZipError(ZipError)
+}
+
+impl From<ZipError> for PackErr {
+    fn from(err: ZipError) -> Self {
+        PackErr::ZipError(err)
+    }
 }
 
 impl From<io::Error> for PackErr {
@@ -213,5 +227,9 @@ mod test {
             }
             assert!(main.slices.is_empty());
         }
+
+        let zipfile = pds.zip().expect("expecting zip");
+
+        println!("\n\nzipfile: {:?}", zipfile);
     }
 }

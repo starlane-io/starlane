@@ -13,6 +13,8 @@ pub static MAIN_SLICE: Lazy<Segment> = Lazy::new(|| Segment::Segment(SkewerCase:
 #[cfg(feature = "create")]
 pub mod create;
 
+pub mod zip;
+
 /// a convenience struct for understanding and
 /// managing the anatomy of a package structure.
 
