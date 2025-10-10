@@ -11,9 +11,11 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use axum::extract::State;
+use tempfile::NamedTempFile;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
 use uuid::Uuid;
+use starlane_package::zip::{unzip_from_binary_to_temp, ZipError};
 
 #[tokio::main]
 async fn main() {
@@ -56,29 +58,26 @@ pub async fn start(repo: RepoState) {
 
 /// Handler for uploading zip files
 async fn upload_zip(app: State<Arc<RepoState>>, mut multipart: Multipart) -> Result<Response, AppError> {
+    println!(".... uploading zip file");
     let storage_dir = PathBuf::from("./zip_storage");
 
     while let Some(field) = multipart.next_field().await? {
         let name = field.name().unwrap_or("").to_string();
+println!(". field name: {}", name);
         let file_name = field.file_name().unwrap_or("").to_string();
 
         // Generate unique ID for the file
-        let file_id = Uuid::new_v4();
-        let file_path = storage_dir.join(format!("{}.zip", file_id));
 
         // Read the file data
         let data = field.bytes().await?;
-
-        // Save the file
-        let mut file = std::fs::File::create(&file_path)?;
-        file.write_all(&data)?;
-
-        println!("Uploaded zip file: {} (ID: {})", file_name, file_id);
+        println!(". data.len: {}", data.len());
+        let dir = unzip_from_binary_to_temp(data.as_ref())?;
+        println!(". dir: {:?}", dir);
 
         // Return the file ID to the client
         return Ok((
             StatusCode::CREATED,
-            format!("File uploaded successfully. ID: {}", file_id),
+            format!("File uploaded successfully."),
         )
             .into_response());
     }
@@ -130,6 +129,8 @@ enum AppError {
     IoError(std::io::Error),
     #[allow(dead_code)]
     MultipartError(axum::extract::multipart::MultipartError),
+    #[allow(dead_code)]
+    ZipError(ZipError),
 }
 
 impl IntoResponse for AppError {
@@ -142,6 +143,7 @@ impl IntoResponse for AppError {
             AppError::MultipartError(_) => {
                 (StatusCode::BAD_REQUEST, "Failed to process multipart data")
             }
+            AppError::ZipError(_) => (StatusCode::BAD_REQUEST, "Failed to process zip file"),
         };
 
         (status, message).into_response()
@@ -161,42 +163,9 @@ impl From<axum::extract::multipart::MultipartError> for AppError {
 }
 
 
-
-mod test {
-    use std::path::PathBuf;
-    use starlane_package::server::PackageRepo;
-    use crate::{start, RepoState};
-
-    #[tokio::test]
-    async fn test() -> anyhow::Result<()> {
-        let state = RepoState::default();
-        tokio::spawn( async move {
-            start(state).await;
-        });
-
-        let server = PackageRepo::default();
-
-        /*
-        // Example: Upload a zip file
-        let zip_to_upload = PathBuf::from("./my-archive.zip");
-
-        println!("Uploading zip file: {:?}", zip_to_upload);
-        let response = upload_zip_file(server_url, zip_to_upload).await?;
-
-        // Extract the UUID from the response
-        // Response format: "File uploaded successfully. ID: <uuid>"
-        if let Some(id) = response.split("ID: ").nth(1) {
-            let file_id = id.trim();
-            println!("File ID: {}", file_id);
-
-            // Example: Download the same file
-            let download_path = PathBuf::from("./downloaded-archive.zip");
-            println!("Downloading file with ID: {}", file_id);
-            download_zip_file(server_url, file_id, download_path).await?;
-        }
-
-         */
-
-        Ok(())
+impl From<ZipError> for AppError {
+    fn from(err: ZipError) -> Self {
+        AppError::ZipError(err)
     }
 }
+

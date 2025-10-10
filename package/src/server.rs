@@ -23,12 +23,13 @@ impl Default for PackageRepo {
 }
 
 impl PackageRepo {
+
+
     /// Upload a zip file to the package-server
     pub async fn upload_zip_file(&self, pds: &PackageDirectoryStructure) -> Result<(),PackageErr> {
 println!("uploading zip file");
 
         let tmp_file= pds.zip()?;
-
         let zip_path= tmp_file.path().to_path_buf();
 println!("zip_path: {}", zip_path.display());
         // Read the zip file
@@ -47,18 +48,21 @@ println!("zip_path: {}", zip_path.display());
             .part(
                 "file",
                 reqwest::multipart::Part::bytes(file_bytes)
-                    .file_name(file_name.to_string())
+                    .file_name("file")
                     .mime_str("application/zip")?,
             );
 
+        println!("form: {:?}", form);
         // Send the POST request
         let client = reqwest::Client::new();
+println!("url: {}/zip",self.url);
         let response = client
-            .post(format!("{}/zip", self.url))
+            .post(format!("http://{}/zip", self.url))
             .multipart(form)
             .send()
             .await?;
 
+println!("response: {:?}", response);
         if response.status().is_success() {
             let body = response.text().await?;
             println!("Upload successful: {}", body);

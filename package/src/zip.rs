@@ -235,6 +235,76 @@ mod tests {
     }
 }
 
+// ... existing code ...
+
+/// Unzips binary data to a temporary directory
+///
+/// # Arguments
+/// * `zip_bytes` - Binary data of the zip file
+///
+/// # Returns
+/// * `Result<tempfile::TempDir, ZipError>` - Temporary directory containing unzipped contents
+///
+/// # Example
+/// ```rust
+/// let zip_data = std::fs::read("archive.zip")?;
+/// let temp_dir = unzip_from_binary_to_temp(&zip_data)?;
+/// println!("Unzipped to: {:?}", temp_dir.path());
+/// ```
+pub fn unzip_from_binary_to_temp(zip_bytes: &[u8]) -> Result<tempfile::TempDir, ZipError> {
+    use std::io::Cursor;
+    use zip::ZipArchive;
+
+    // Create a temporary directory
+    let temp_dir = tempfile::TempDir::new().map_err(ZipError::TempFileCreation)?;
+
+    // Create a cursor from the bytes
+    let cursor = Cursor::new(zip_bytes);
+
+    // Open the zip archive
+    let mut archive = ZipArchive::new(cursor).map_err(ZipError::ZipOperation)?;
+
+    // Extract all files
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(ZipError::ZipOperation)?;
+        let outpath = match file.enclosed_name() {
+            Some(path) => temp_dir.path().join(path),
+            None => continue,
+        };
+
+        if file.name().ends_with('/') {
+            // It's a directory
+            fs::create_dir_all(&outpath)
+                .map_err(|e| ZipError::FileRead(outpath.clone(), e))?;
+        } else {
+            // It's a file
+            if let Some(parent) = outpath.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| ZipError::FileRead(parent.to_path_buf(), e))?;
+            }
+
+            let mut outfile = File::create(&outpath)
+                .map_err(|e| ZipError::FileRead(outpath.clone(), e))?;
+
+            std::io::copy(&mut file, &mut outfile)
+                .map_err(ZipError::WriteError)?;
+        }
+
+        // Set permissions on Unix
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Some(mode) = file.unix_mode() {
+                fs::set_permissions(&outpath, fs::Permissions::from_mode(mode))
+                    .map_err(|e| ZipError::FileRead(outpath.clone(), e))?;
+            }
+        }
+    }
+
+    Ok(temp_dir)
+}
+
+// ... existing code ...
 /*
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 1: Basic usage
