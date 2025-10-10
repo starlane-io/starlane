@@ -31,7 +31,7 @@ pub mod install;
 
 pub mod cli;
 
-use crate::cli::{Cli, Commands, ContextCmd};
+use crate::cli::{Cli, Commands, ContextCmd, PackArgs, PackCmd};
 use crate::install::{Console, StarlaneTheme};
 use anyhow::{anyhow, ensure};
 use clap::Parser;
@@ -60,7 +60,7 @@ use std::fmt::Display;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
 use std::ops::{Add, Index, Mul};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
 use std::{io, process};
@@ -70,6 +70,9 @@ use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::{FileOptionExtension, FileOptions};
 use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
+use starlane_package::create::PackageDirectoryStructure;
+use starlane_package::{PackageErr, PACKAGE_LAYOUT_EXAMPLE};
+use starlane_package::server::PackageRepo;
 /*
 let config = Default::default();
 
@@ -90,7 +93,10 @@ fn context() -> String {
     enviro()
 }
 
-pub fn main() -> Result<(), anyhow::Error> {
+#[tokio::main]
+pub async fn main() -> Result<(), anyhow::Error> {
+
+
     ctrlc::set_handler(move || shutdown(1)).unwrap();
 
     init();
@@ -109,20 +115,18 @@ pub fn main() -> Result<(), anyhow::Error> {
             install::install(edit)
         }
         Commands::Run => {
+            /*
             let runtime = Builder::new_multi_thread().enable_all().build()?;
             runtime.block_on(async move { push_scope(run, create_mark!()).await });
+
+             */
+
+            push_scope(run, create_mark!()).await;
             Ok(())
         }
         Commands::Term(args) => {
-            let runtime = Builder::new_multi_thread().enable_all().build()?;
-
-            match runtime.block_on(async move { cli::term(args).await }) {
-                Ok(_) => Ok(()),
-                Err(err) => {
-                    println!("err! {}", err.to_string());
-                    Err(err.into())
-                }
-            }
+             cli::term(args).await.unwrap();
+            Ok(())
         }
         Commands::Version => {
             println!("{}", VERSION.to_string());
@@ -195,6 +199,21 @@ pub fn main() -> Result<(), anyhow::Error> {
                 }
             }
             Ok(())
+        }
+        Commands::Pack(sub) => {
+            match sub {
+                PackArgs { command} => {
+                   match command{
+                       PackCmd::Publish => {
+                           publish().await.unwrap();
+                           Ok(())
+                       }
+                       PackCmd::Verify => {
+                           todo!();
+                       }
+                   }
+                }
+            }
         }
     }
 }
@@ -685,3 +704,11 @@ fn list_contexts() -> Result<Vec<String>,anyhow::Error> {
 }
 
  */
+
+
+async fn publish() -> Result<(),PackageErr> {
+   let server = PackageRepo::default();
+   let path =  std::env::current_dir().unwrap();
+   let pds = PackageDirectoryStructure::create(&path).unwrap();
+   server.upload(&pds).await
+}

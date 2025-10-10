@@ -62,8 +62,18 @@ pub struct PackArgs{
     pub command: PackCmd,
 }
 
-#[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
+impl Default for PackArgs {
+    fn default() -> Self {
+        Self {
+            command: PackCmd::Verify,
+        }
+    }
+}
+
+
+#[derive(Hash,Eq,PartialEq,Debug, Subcommand, EnumString, strum_macros::Display)]
 pub enum PackCmd{
+    Verify,
     Publish,
 }
 

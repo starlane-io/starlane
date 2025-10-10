@@ -44,10 +44,11 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
+use starlane_space::types::property::{PropertyMod, SetProperties};
+
 /// embedded postgres for local development environments is slated to be removed in favor of
 /// Postgres provided by `DockerDesktopFoundation`
 // pub mod embed;
-use starlane::types1::property::{PropertyMod, SetProperties};
 
 pub struct PostgresRegistry {
     logger: Logger,
