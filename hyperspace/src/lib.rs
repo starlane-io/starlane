@@ -12,7 +12,7 @@ pub mod executor;
 pub mod host;
 pub mod hyperlane;
 pub mod base;
-pub mod properties;
+//pub mod properties;
 pub mod shutdown;
 pub mod tests;
 

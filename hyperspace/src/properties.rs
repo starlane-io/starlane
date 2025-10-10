@@ -1,7 +1,9 @@
+use std::str::FromStr;
 use once_cell::sync::Lazy;
 use starlane_space::err::SpaceErr;
 use starlane_space::kind::BaseKind;
 use starlane_space::loc::ToBaseKind;
+use starlane_space::parse::SnakeCase;
 use starlane_space::types::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
     PropertySource, U64Pattern, UsernamePattern,
@@ -20,7 +22,7 @@ pub static UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG: Lazy<PropertiesConfig> =
 
 fn default_properties_config() -> Result<PropertiesConfig, SpaceErr> {
     let mut builder = PropertiesConfig::builder();
-    builder.build()
+    Ok(builder.build())
 }
 
 fn mechtron_properties_config() -> Result<PropertiesConfig, SpaceErr> {
@@ -36,7 +38,7 @@ fn mechtron_properties_config() -> Result<PropertiesConfig, SpaceErr> {
         vec![],
     );
     builder.add(
-        "config",
+        SnakeCase::from_str("config").unwrap(),
         Box::new(PointPattern {}),
         true,
         false,
@@ -51,7 +53,7 @@ fn mechtron_properties_config() -> Result<PropertiesConfig, SpaceErr> {
 fn unrequired_bind_and_config_properties_config() -> Result<PropertiesConfig, SpaceErr> {
     let mut builder = PropertiesConfig::builder();
     builder.add(
-        "bind",
+        SnakeCase::from_str("bind").unwrap(),
         Box::new(PointPattern {}),
         false,
         false,
@@ -61,7 +63,7 @@ fn unrequired_bind_and_config_properties_config() -> Result<PropertiesConfig, Sp
         vec![],
     );
     builder.add(
-        "config",
+        SnakeCase::from_str("config").unwrap(),
         Box::new(PointPattern {}),
         false,
         false,
@@ -70,13 +72,13 @@ fn unrequired_bind_and_config_properties_config() -> Result<PropertiesConfig, Sp
         false,
         vec![],
     );
-    builder.build()
+    Ok(builder.build())
 }
 
 fn user_properties_config() -> Result<PropertiesConfig, SpaceErr> {
     let mut builder = PropertiesConfig::builder();
     builder.add(
-        "bind",
+        SnakeCase::from_str("bind").unwrap(),
         Box::new(PointPattern {}),
         true,
         false,
@@ -86,7 +88,7 @@ fn user_properties_config() -> Result<PropertiesConfig, SpaceErr> {
         vec![],
     );
     builder.add(
-        "username",
+        SnakeCase::from_str("username").unwrap(),
         Box::new(UsernamePattern {}),
         false,
         false,
@@ -96,7 +98,7 @@ fn user_properties_config() -> Result<PropertiesConfig, SpaceErr> {
         vec![],
     );
     builder.add(
-        "email",
+        SnakeCase::from_str("email").unwrap() ,
         Box::new(EmailPattern {}),
         false,
         true,
@@ -106,7 +108,7 @@ fn user_properties_config() -> Result<PropertiesConfig, SpaceErr> {
         vec![PropertyPermit::Read],
     );
     builder.add(
-        "password",
+        SnakeCase::from_str("password").unwrap(),
         Box::new(AnythingPattern {}),
         false,
         true,
@@ -121,7 +123,7 @@ fn user_properties_config() -> Result<PropertiesConfig, SpaceErr> {
 fn userbase_properties_config() -> Result<PropertiesConfig, SpaceErr> {
     let mut builder = PropertiesConfig::builder();
     builder.add(
-        "bind",
+        SnakeCase::from_str("bind").unwrap(),
         Box::new(PointPattern {}),
         true,
         false,
@@ -131,7 +133,7 @@ fn userbase_properties_config() -> Result<PropertiesConfig, SpaceErr> {
         vec![],
     );
     builder.add(
-        "config",
+        SnakeCase::from_str("config").unwrap(),
         Box::new(PointPattern {}),
         false,
         true,
@@ -141,7 +143,7 @@ fn userbase_properties_config() -> Result<PropertiesConfig, SpaceErr> {
         vec![],
     );
     builder.add(
-        "registration-email-as-username",
+        SnakeCase::from_str("registration_email_as_username").unwrap(),
         Box::new(BoolPattern {}),
         false,
         false,
@@ -151,7 +153,7 @@ fn userbase_properties_config() -> Result<PropertiesConfig, SpaceErr> {
         vec![],
     );
     builder.add(
-        "verify-email",
+        SnakeCase::from_str("verify_email").unwrap(),
         Box::new(BoolPattern {}),
         false,
         false,
@@ -161,7 +163,7 @@ fn userbase_properties_config() -> Result<PropertiesConfig, SpaceErr> {
         vec![],
     );
     builder.add(
-        "sso-session-max-lifespan",
+        SnakeCase::from_str("sso_session_max_lifespan"),
         Box::new(U64Pattern {}),
         false,
         true,

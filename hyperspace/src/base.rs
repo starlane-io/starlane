@@ -80,19 +80,23 @@ where Self: 'static,
     //    fn select_service(&self, kind: &KindSelector, star: &StarKey, point: &Point ) ->
 
     fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
+        todo!();
+        /*
         let mut builder = PropertiesConfigBuilder::new();
         builder.kind(kind.clone());
         match kind.to_base() {
             BaseKind::Mechtron => {
                 builder.add_property("config", true, true).unwrap();
-                builder.build().unwrap()
+                builder.build()
             }
             BaseKind::Host => {
                 builder.add_property("bin", true, true).unwrap();
-                builder.build().unwrap()
+                builder.build()
             }
-            _ => builder.build().unwrap(),
+            _ => builder.build()
         }
+
+         */
     }
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder;

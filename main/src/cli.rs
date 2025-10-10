@@ -53,6 +53,18 @@ pub enum Commands {
         all: bool,
     },
     Context(ContextArgs),
+    Pack(PackArgs)
+}
+
+#[derive(Debug, Args)]
+pub struct PackArgs{
+    #[clap(subcommand)]
+    pub command: PackCmd,
+}
+
+#[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
+pub enum PackCmd{
+    Publish,
 }
 
 #[derive(Debug, Args)]

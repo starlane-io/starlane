@@ -13,7 +13,7 @@ use starlane_space::security::{Access, AccessGrant, IndexedAccessGrant};
 use starlane_space::selector::Selector;
 use starlane_space::substance::SubstanceList;
 use std::sync::Arc;
-use starlane::types1::property::SetProperties;
+use starlane_space::types::property::SetProperties;
 use crate::base::config::{BaseConfig, BaseSubConfig};
 
 pub mod err;

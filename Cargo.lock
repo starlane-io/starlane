@@ -3538,6 +3538,7 @@ dependencies = [
  "starlane-foundation-for-docker-desktop",
  "starlane-hyperspace",
  "starlane-macros",
+ "starlane-package",
  "starlane-platform-for-postgres",
  "starlane-platform-for-postgres-registry",
  "starlane-space",

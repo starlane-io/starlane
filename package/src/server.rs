@@ -26,7 +26,7 @@ impl PackageRepo {
 
 
     /// Upload a zip file to the package-server
-    pub async fn upload_zip_file(&self, pds: &PackageDirectoryStructure) -> Result<(),PackageErr> {
+    pub async fn upload(&self, pds: &PackageDirectoryStructure) -> Result<(),PackageErr> {
 println!("uploading zip file");
 
         let tmp_file= pds.zip()?;

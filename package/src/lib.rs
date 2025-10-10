@@ -241,6 +241,7 @@ impl FileEntity {
 
 
 
+
 #[cfg(test)]
 mod test {
     use std::path::PathBuf;
@@ -255,7 +256,7 @@ mod test {
     pub async fn test_upload() {
         let server = PackageRepo::default();
         let pds = PackageDirectoryStructure::create(&PACKAGE_LAYOUT_EXAMPLE).unwrap();
-        server.upload_zip_file(&pds).await.unwrap();
+        server.upload(&pds).await.unwrap();
     }
 
 
