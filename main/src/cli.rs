@@ -71,10 +71,15 @@ impl Default for PackArgs {
 }
 
 
-#[derive(Hash,Eq,PartialEq,Debug, Subcommand, EnumString, strum_macros::Display)]
+#[derive(Hash,Eq,PartialEq,Debug, Subcommand, strum_macros::Display)]
 pub enum PackCmd{
     Verify,
-    Publish,
+    Publish(PubArgs),
+}
+
+#[derive(Debug, Args,Hash,Eq,PartialEq)]
+pub struct PubArgs{
+    pub path: Option<String>,
 }
 
 #[derive(Debug, Args)]

@@ -72,7 +72,7 @@ use zip::write::{FileOptionExtension, FileOptions};
 use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
 use starlane_package::create::PackageDirectoryStructure;
 use starlane_package::{PackageErr, PACKAGE_LAYOUT_EXAMPLE};
-use starlane_package::server::PackageRepo;
+use starlane_package::server::{PackObserver, PackageRepo, PublishObserver};
 /*
 let config = Default::default();
 
@@ -204,8 +204,9 @@ pub async fn main() -> Result<(), anyhow::Error> {
             match sub {
                 PackArgs { command} => {
                    match command{
-                       PackCmd::Publish => {
-                           publish().await.unwrap();
+                       PackCmd::Publish(args) => {
+                           let path = args.path.map(|p|PathBuf::from_str(p.as_str()).unwrap()).unwrap_or(std::env::current_dir().unwrap());
+                           publish(&path).await.unwrap();
                            Ok(())
                        }
                        PackCmd::Verify => {
@@ -706,9 +707,46 @@ fn list_contexts() -> Result<Vec<String>,anyhow::Error> {
  */
 
 
-async fn publish() -> Result<(),PackageErr> {
+pub struct PackPubObserver<'a> {
+    console: &'a Console
+}
+
+impl <'a> PackPubObserver<'a> {
+    pub fn new( console: &'a Console) -> Self {
+        Self {
+            console
+        }
+    }
+}
+
+
+
+impl <'a> PackObserver for PackPubObserver<'a> {
+
+    fn start_pack( &mut self, dir: &PathBuf ) {
+        self.console.newlines(1);
+        self.console.intro(format!("Packing {}", dir.display()));
+    }
+
+    fn end_pack(&mut self) {
+        self.console.outro("Packing complete");
+    }
+
+    fn found_slice(&mut self, name: &str) {
+        self.console.info(format!("Found slice {}", name));
+    }
+
+}
+
+impl <'a> PublishObserver for PackPubObserver<'a> {
+
+}
+
+
+async fn publish(path: &PathBuf) -> Result<(),PackageErr> {
+   let console = Console::new();
+   let mut observer = PackPubObserver::new(&console);
    let server = PackageRepo::default();
-   let path =  std::env::current_dir().unwrap();
-   let pds = PackageDirectoryStructure::create(&path).unwrap();
-   server.upload(&pds).await
+   let pds = PackageDirectoryStructure::create(&path, & mut observer).unwrap();
+   server.upload(&pds, &mut observer).await
 }

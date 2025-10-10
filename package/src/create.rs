@@ -7,6 +7,7 @@ use std::{fs, io};
 use std::collections::HashMap;
 use tempfile::NamedTempFile;
 use thiserror::Error;
+use crate::server::PackObserver;
 use crate::zip::{zip_directory_to_temp, ZipError};
 
 pub struct PackageDirectoryStructure {
@@ -15,7 +16,12 @@ pub struct PackageDirectoryStructure {
 }
 
 impl PackageDirectoryStructure {
-    pub fn create(root: &PathBuf) -> Result<Self, PackErr> {
+    pub fn create(root: &PathBuf, observer: &mut dyn PackObserver) -> Result<Self, PackErr> {
+
+        observer.start_pack( &root);
+
+        observer.start_verify_layout();
+        
         /// should only be called on a directory that is directly
         /// under a Slice (because it could be a sub-slice)
         fn walk_entity(dir: &PathBuf) -> Result<Entity, PackErr> {
@@ -81,6 +87,7 @@ impl PackageDirectoryStructure {
             let path = entry.path();
             if path.is_dir() {
                 let slice = walk_slice(&path)?;
+                observer.found_slice(slice.segment.to_string().as_str());
                 slices.insert(slice.segment.clone(), slice);
             }
         }
@@ -93,7 +100,8 @@ impl PackageDirectoryStructure {
             root: root.clone(),
             structure,
         };
-        
+
+        observer.end_pack();
         Ok(pds)
     }
 

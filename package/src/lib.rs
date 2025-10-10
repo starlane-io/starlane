@@ -251,18 +251,32 @@ mod test {
     use crate::create::PackageDirectoryStructure;
     use crate::{FileEntity, PACKAGE_LAYOUT_EXAMPLE};
     use crate::server::PackageRepo;
+    
+    pub struct MockPublishObserver();
+    
+    impl Default for MockPublishObserver {
+        fn default() -> Self {
+            Self()
+        }
+    }
+
+    impl crate::server::PublishObserver for MockPublishObserver {}
+    impl crate::server::PackObserver for MockPublishObserver {}
 
     #[tokio::test]
     pub async fn test_upload() {
+        
+        let mut observer = MockPublishObserver::default();
         let server = PackageRepo::default();
-        let pds = PackageDirectoryStructure::create(&PACKAGE_LAYOUT_EXAMPLE).unwrap();
-        server.upload(&pds).await.unwrap();
+        let pds = PackageDirectoryStructure::create(&PACKAGE_LAYOUT_EXAMPLE,& mut observer).unwrap();
+        server.upload(&pds,& mut observer).await.unwrap();
     }
 
 
     #[test]
     pub fn test_create() {
-        let pds= PackageDirectoryStructure::create(&PACKAGE_LAYOUT_EXAMPLE).unwrap();
+        let mut observer = MockPublishObserver::default();
+        let pds= PackageDirectoryStructure::create(&PACKAGE_LAYOUT_EXAMPLE, & mut observer).unwrap();
         pds.diagnose();
         let structure = &pds.structure;
 
