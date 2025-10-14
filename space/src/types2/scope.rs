@@ -9,6 +9,7 @@ use nom::combinator::{all_consuming, into};
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
+use std::path::PathBuf;
 use strum_macros::{EnumDiscriminants, EnumString};
 use validator::ValidateRequired;
 
@@ -38,6 +39,79 @@ pub enum ScopeKeyword {
     /// collisions
     #[strum(ascii_case_insensitive)]
     Root,
+}
+#[derive(
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    Serialize,
+    Deserialize,
+)]
+pub struct SlicePath {
+    pub segments: Vec<Segment>,
+}
+
+impl SlicePath {
+    pub fn new(segments: Vec<Segment>) -> Self {
+        Self { segments }
+    }
+
+    pub fn push(&self, segment: Segment) -> Self {
+        let mut segments = self.segments.clone();
+        segments.push(segment);
+        Self { segments }
+    }
+    
+    pub fn insert(&self, segment: Segment ) -> Self {
+        let mut segments = self.segments.clone();
+        segments.insert(0, segment);
+        Self { segments }
+    }
+
+    pub fn is_main(&self) -> bool {
+        if let Some(segment) = self.segments.first() {
+            segment.is_main()
+        } else {
+            false
+        }
+    }
+    
+    pub fn first(&self) -> Option<&Segment> {
+        self.segments.first()
+    }
+
+    pub fn remove_first(& mut self) -> Option<Segment> {
+        if self.segments.len() > 0 {
+        Some(self.segments.remove(0))
+            } else {
+            None
+        }
+    }
+
+}
+
+impl Into<PathBuf> for SlicePath {
+    fn into(self) -> PathBuf {
+        let mut path = PathBuf::new();
+        for segment in &self.segments {
+            path.push(segment.to_string());
+        }
+        path
+    }
+}
+
+impl Display for SlicePath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut rtn = String::new();
+        for segment in &self.segments {
+            rtn.push_str(&segment.to_string());
+            rtn.push_str(":");
+        }
+        rtn.pop();
+        write!(f, "{}", rtn)
+    }
 }
 
 /// a segment providing `scope` [Specific] [Meta] in the case where
@@ -80,6 +154,14 @@ impl Segment {
         }
     }
 }
+
+
+impl Into<SlicePath> for Segment {
+    fn into(self) -> SlicePath {
+        SlicePath::new(vec![self])
+    }
+}
+
 
 impl From<Version> for Segment {
     fn from(version: Version) -> Self {

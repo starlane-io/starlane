@@ -70,7 +70,7 @@ use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::{FileOptionExtension, FileOptions};
 use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
-use starlane_package::create::PackageDirectoryStructure;
+use starlane_package::create::PackageFileStructure;
 use starlane_package::{PackageErr, PACKAGE_LAYOUT_EXAMPLE};
 use starlane_package::server::{PackObserver, PackageRepo, PublishObserver};
 /*
@@ -747,6 +747,6 @@ async fn publish(path: &PathBuf) -> Result<(),PackageErr> {
    let console = Console::new();
    let mut observer = PackPubObserver::new(&console);
    let server = PackageRepo::default();
-   let pds = PackageDirectoryStructure::create(&path, & mut observer).unwrap();
+   let pds = PackageFileStructure::create(&path, & mut observer).unwrap();
    server.upload(&pds, &mut observer).await
 }

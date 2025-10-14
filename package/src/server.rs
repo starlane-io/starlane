@@ -1,7 +1,7 @@
 use reqwest;
 use std::path::PathBuf;
 use anyhow::Result;
-use crate::create::{PackErr, PackageDirectoryStructure};
+use crate::create::{PackErr, PackageLayout};
 use crate::PackageErr;
 
 pub struct PackageRepo {
@@ -18,7 +18,7 @@ impl PackageRepo {
     pub async fn publish( &self, observer: &mut dyn PublishObserver )  -> Result<(),PackageErr>{
         let server = PackageRepo::default();
         let path =  std::env::current_dir().unwrap();
-        let pds = PackageDirectoryStructure::create(&path, observer).unwrap();
+        let pds = PackageLayout::create(&path, observer).unwrap();
         server.upload(&pds, observer).await
     }
 }
@@ -32,7 +32,7 @@ pub trait PackObserver{
     
     fn found_directory(&mut self, name: &str) {}
     fn found_file(&mut self, name: &str) {}
-    fn end_verify_layout( &self, package: &PackageDirectoryStructure ) {}
+    fn end_verify_layout( &self, package: &PackageLayout) {}
     fn start_archive( &self ) {}
     fn end_archive( &self ) {}
     fn end_pack( &mut self ) {}
@@ -55,7 +55,7 @@ impl PackageRepo {
 
 
     /// Upload a zip file to the package-server
-    pub async fn upload(&self, pds: &PackageDirectoryStructure, observer: & dyn PublishObserver) -> Result<(),PackageErr> {
+    pub async fn upload(&self, pds: &PackageLayout, observer: & dyn PublishObserver) -> Result<(),PackageErr> {
 
         observer.start_upload(&self.url);
 

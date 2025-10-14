@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 use crate::create::PackErr;
 use starlane_space::parse::SkewerCase;
-use starlane_space::types::scope::Segment;
+use starlane_space::types::scope::{Segment, SlicePath};
 use std::fmt::Debug;
-use std::io;
+use std::{fs, io};
 use std::io::Error;
 use std::path::PathBuf;
 use std::str::FromStr;
 use thiserror::Error;
 use once_cell::sync::Lazy;
+use crate::server::PackObserver;
 
 pub static MAIN_SLICE: Lazy<Segment> = Lazy::new(|| Segment::Segment(SkewerCase::from_str("main").unwrap()));
 
@@ -18,46 +19,6 @@ pub mod create;
 
 pub mod zip;
 pub mod server;
-
-/// a convenience struct for understanding and
-/// managing the anatomy of a package structure.
-
-pub struct PackageStructure {
-    slices: HashMap<Segment,Slice>,
-}
-
-
-impl PackageStructure {
-
-    pub fn new( slices: HashMap<Segment,Slice> ) -> Self {
-        Self { slices }
-    }
-
-    pub(crate) fn finalize(& mut self) {
-        if !self.slices.contains_key(&MAIN_SLICE) {
-            let main = Slice::new(MAIN_SLICE.clone());
-            self.slices.insert(MAIN_SLICE.clone(), main);
-        }
-    }
-
-    pub fn main(&self) -> Result<&Slice,PackageErr>{
-        self.slices.get(&MAIN_SLICE).ok_or(PackageErr::MissingMainSlice)
-    }
-
-    pub fn diagnose(&self) {
-        self.diagnose_indent(0);
-    }
-
-    pub fn diagnose_indent(&self,mut spaces:usize ) {
-        let indent = " ".repeat(spaces);
-        println!("{indent}[PackageStructure]");
-        for (_,slice) in &self.slices {
-            slice.diagnose_indent(spaces+2);
-        }
-    }
-
-
-}
 
 #[derive(Error, Debug)]
 pub enum PackageErr {
@@ -98,11 +59,6 @@ impl From<PackErr> for PackageErr {
     }
 }
 
-impl PackageStructure {
-    pub fn verify(&self) -> Result<(), PackageErr> {
-        Ok(())
-    }
-}
 
 /// a [Slice] is NOT a [Directory] but an independent part of a [PackageStructure] that
 /// can be downloaded separately and independently. For example imagine a package with slices:
@@ -121,7 +77,7 @@ impl PackageStructure {
  #[derive(Clone,Debug)]
 pub struct Slice {
     /// the identity of this slice
-    segment: Segment,
+    pub segment: Segment,
     slices: HashMap<Segment,Slice>,
     directory: Directory,
 }
@@ -138,6 +94,83 @@ impl Slice {
             directory: Directory::new(name)
         }
     }
+
+    pub fn create(root: &PathBuf, observer: &mut dyn PackObserver) -> Result<Self, PackErr> {
+
+        observer.start_pack( &root);
+
+        observer.start_verify_layout();
+
+        /// should only be called on a directory that is directly
+        /// under a Slice (because it could be a sub-slice)
+        fn walk_entity(dir: &PathBuf) -> Result<Entity, PackErr> {
+            if crate::create::has_slice_file(dir) {
+                crate::create::slice_name(dir)?;
+                Ok(Entity::Slice(walk_slice(dir,None)?))
+            } else {
+                println!("DIR  : {}", dir.display());
+                Ok(Entity::Directory(walk_dir(dir)?))
+            }
+        }
+
+        /// `segment` is provided if its the Main segment
+        fn walk_slice(dir: &PathBuf, segment: Option<Segment>) -> Result<Slice, PackErr> {
+            let name = match segment {
+                None => crate::create::slice_name(&dir)?,
+                Some(segment) => segment
+            };
+
+            let mut slice = Slice::new(name);
+            for entry in fs::read_dir(dir)? {
+                let path = entry?.path();
+                if path.is_file() {
+                    if !crate::create::ignore(&path) {
+                        let filename = crate::create::file_name(&path)?;
+                        slice
+                            .directory
+                            .children
+                            .insert(filename.clone(), FileEntity::File(filename));
+                    }
+                } else {
+                    match walk_entity(&path)? {
+                        Entity::Directory(directory) => {
+                            slice.directory.children.insert(directory.name.clone(),FileEntity::Directory(directory));
+                        }
+                        Entity::Slice(s) => {
+                            slice.slices.insert(s.segment.clone(), s);
+                        }
+                    }
+                }
+            }
+            Ok(slice)
+        }
+
+        /// walk a non-slice directory
+        fn walk_dir(dir: &PathBuf) -> Result<Directory, PackErr> {
+            let name = crate::create::file_name(dir)?;
+            let mut directory = Directory::new(name);
+            for entry in fs::read_dir(dir)? {
+                let path = entry?.path();
+                if !crate::create::ignore(&path) {
+                    if path.is_file() {
+                        let filename = crate::create::file_name(&path)?;
+                        directory.children.insert(filename.clone(),FileEntity::File(filename));
+                    } else {
+                        let subdir = walk_dir(&path)?;
+                        directory.children.insert(subdir.name.clone(),FileEntity::Directory(subdir));
+                    }
+                }
+            }
+            Ok(directory)
+        }
+
+        let mut main = walk_slice(root,Some(MAIN_SLICE.clone()))?;
+
+        observer.end_pack();
+        Ok(main)
+    }
+
+
 
     pub fn new_main() -> Self {
         let name = "main";
@@ -161,6 +194,10 @@ impl Slice {
         }
 
         Ok(())
+    }
+
+    pub fn get_child_slice( &self, segment: &Segment) -> Option<&Slice> {
+        self.slices.get(segment)
     }
 
 
@@ -248,7 +285,7 @@ mod test {
     use std::str::FromStr;
     use starlane_space::parse::SkewerCase;
     use starlane_space::types::scope::Segment;
-    use crate::create::PackageDirectoryStructure;
+    use crate::create::PackageLayout;
     use crate::{FileEntity, PACKAGE_LAYOUT_EXAMPLE};
     use crate::server::PackageRepo;
     
@@ -268,7 +305,7 @@ mod test {
         
         let mut observer = MockPublishObserver::default();
         let server = PackageRepo::default();
-        let pds = PackageDirectoryStructure::create(&PACKAGE_LAYOUT_EXAMPLE,& mut observer).unwrap();
+        let pds = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, & mut observer).unwrap();
         server.upload(&pds,& mut observer).await.unwrap();
     }
 
@@ -276,15 +313,14 @@ mod test {
     #[test]
     pub fn test_create() {
         let mut observer = MockPublishObserver::default();
-        let pds= PackageDirectoryStructure::create(&PACKAGE_LAYOUT_EXAMPLE, & mut observer).unwrap();
-        pds.diagnose();
-        let structure = &pds.structure;
+        let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, & mut observer).unwrap();
+        layout.diagnose();
 
         // hierarchy
         {
             // files
             let hierarchy_segment = Segment::Segment(SkewerCase::from_str("hierarchy").unwrap());
-            let hierarchy = structure.slices.get(&hierarchy_segment).expect("expecting 'hierarchy'");
+            let hierarchy = layout.slices.get(&hierarchy_segment).expect("expecting 'hierarchy'");
             assert!(hierarchy.directory.children.get(&"dir1".to_string()).expect("expecting 'dir1'").is_dir());
             assert!(!hierarchy.directory.children.get(&"little-file.txt".to_string()).expect("expecting 'dir1'").is_dir());
             assert_eq!(hierarchy.directory.children.len(),2);
@@ -296,17 +332,16 @@ mod test {
 
         // main
         {
-            let main = structure.main().expect("expecting 'main'");
-            assert_eq!(main.directory.children.len(),3);
-            if let FileEntity::Directory(off) = main.directory.children.get(&"off".to_string() ).expect("expecting 'off'") {
+            assert_eq!(layout.main.directory.children.len(),4);
+            if let FileEntity::Directory(off) = layout.main.directory.children.get(&"off".to_string() ).expect("expecting 'off'") {
                 assert_eq!(off.children.len(),2);
             } else {
                 assert!(false)
             }
-            assert!(main.slices.is_empty());
+            assert_eq!(3,layout.main.slices.len());
         }
 
-        let zipfile = pds.zip().expect("expecting zip");
+        let zipfile = layout.zip().expect("expecting zip");
 
         println!("\n\nzipfile: {:?}", zipfile);
     }
