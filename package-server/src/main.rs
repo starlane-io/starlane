@@ -15,6 +15,8 @@ use tempfile::NamedTempFile;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
 use uuid::Uuid;
+use starlane_package::create::{PackErr, PackageLayout};
+use starlane_package::server::PackObserver;
 use starlane_package::zip::{unzip_from_binary_to_temp, ZipError};
 
 #[tokio::main]
@@ -74,6 +76,12 @@ println!(". field name: {}", name);
         let dir = unzip_from_binary_to_temp(data.as_ref())?;
         println!(". dir: {:?}", dir);
 
+        let mut observer = IgnoreObserver();
+        let path = dir.path().to_path_buf();
+        let layout = PackageLayout::create( &path, & mut observer )?;
+
+        layout.diagnose();
+
         // Return the file ID to the client
         return Ok((
             StatusCode::CREATED,
@@ -131,6 +139,14 @@ enum AppError {
     MultipartError(axum::extract::multipart::MultipartError),
     #[allow(dead_code)]
     ZipError(ZipError),
+    #[allow(dead_code)]
+    PackErr(PackErr)
+}
+
+impl From<PackErr> for AppError {
+    fn from(err: PackErr) -> Self {
+        AppError::PackErr(err)
+    }
 }
 
 impl IntoResponse for AppError {
@@ -144,6 +160,7 @@ impl IntoResponse for AppError {
                 (StatusCode::BAD_REQUEST, "Failed to process multipart data")
             }
             AppError::ZipError(_) => (StatusCode::BAD_REQUEST, "Failed to process zip file"),
+            AppError::PackErr(err) => (StatusCode::BAD_REQUEST, "could not process package zip"),
         };
 
         (status, message).into_response()
@@ -169,3 +186,7 @@ impl From<ZipError> for AppError {
     }
 }
 
+
+pub struct IgnoreObserver();
+
+impl PackObserver for IgnoreObserver { }
