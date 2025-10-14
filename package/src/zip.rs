@@ -1,5 +1,5 @@
 use std::fs::{self, File};
-use std::io::{self, Write};
+use std::io::{self, Error, Write};
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
 use walkdir::WalkDir;
@@ -91,12 +91,12 @@ pub fn zip_directory_to_temp<P: AsRef<Path>>(source_dir: P) -> Result<NamedTempF
 }
 
 /// Alternative version that allows custom temp directory
-pub fn zip_directory_to_temp_in<P: AsRef<Path>, T: AsRef<Path>>(
+pub fn zip_slice_dir_to<P: AsRef<Path>, T: AsRef<Path>>(
     source_dir: P,
-    temp_dir: T,
-) -> Result<PathBuf, ZipError> {
+    target_file: T,
+) -> Result<(), ZipError> {
     let source_dir = source_dir.as_ref();
-    let temp_dir = temp_dir.as_ref();
+    let target_file = target_file.as_ref();
 
     if !source_dir.exists() {
         return Err(ZipError::DirectoryNotFound(source_dir.to_path_buf()));
@@ -106,11 +106,8 @@ pub fn zip_directory_to_temp_in<P: AsRef<Path>, T: AsRef<Path>>(
         return Err(ZipError::NotADirectory(source_dir.to_path_buf()));
     }
 
-    // Create temporary file in specified directory
-    let temp_file = NamedTempFile::new_in(temp_dir).map_err(ZipError::TempFileCreation)?;
+    let file = File::create(target_file)?;
 
-    let temp_path = temp_file.path().to_path_buf();
-    let file = temp_file.into_file();
     let mut zip = ZipWriter::new(file);
 
     let options = SimpleFileOptions::default()
@@ -148,7 +145,7 @@ pub fn zip_directory_to_temp_in<P: AsRef<Path>, T: AsRef<Path>>(
     }
 
     zip.finish().map_err(ZipError::ZipOperation)?;
-    Ok(temp_path)
+    Ok(())
 }
 
 
@@ -193,6 +190,11 @@ impl std::fmt::Display for ZipError {
     }
 }
 
+impl From<io::Error> for ZipError {
+    fn from(err: Error) -> Self {
+        Self::WriteError(err)
+    }
+}
 impl std::error::Error for ZipError {}
 
 #[cfg(test)]

@@ -6,7 +6,7 @@ use std::str::FromStr;
 use std::{fs, io};
 use std::collections::HashMap;
 use std::ops::Deref;
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, TempDir};
 use thiserror::Error;
 use crate::server::PackObserver;
 use crate::zip::{zip_directory_to_temp, ZipError};
@@ -20,7 +20,7 @@ impl PackageLayout {
 
     pub fn create(root: &PathBuf, observer: &mut dyn PackObserver) -> Result<Self, PackErr> {
         let main = Slice::create(root,observer)?;
-        
+
         Ok(Self {
             root: root.clone(),
             main,
@@ -42,6 +42,12 @@ impl PackageLayout {
         use crate::zip::zip_directory_to_temp;
         let path = zip_directory_to_temp(self.root.clone())?;
         Ok(path)
+    }
+
+    pub fn zip_slices(&self) -> Result<TempDir, PackErr> {
+        let zip_root = TempDir::new()?;
+        let path = zip_root.path();
+
     }
 }
 
