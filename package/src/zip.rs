@@ -98,6 +98,8 @@ pub fn zip_slice_dir_to<P: AsRef<Path>, T: AsRef<Path>>(
     let source_dir = source_dir.as_ref();
     let target_file = target_file.as_ref();
 
+println!("zip_slice_dir_to: source_dir: {}, target_file: {}", source_dir.display(), target_file.display());
+
     if !source_dir.exists() {
         return Err(ZipError::DirectoryNotFound(source_dir.to_path_buf()));
     }

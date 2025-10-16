@@ -73,6 +73,7 @@ use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
 use starlane_package::{PackageErr, PACKAGE_LAYOUT_EXAMPLE};
 use starlane_package::create::PackageLayout;
 use starlane_package::server::{PackObserver, PackageRepo, PublishObserver};
+use starlane_package_server::start_package_server;
 /*
 let config = Default::default();
 
@@ -95,7 +96,6 @@ fn context() -> String {
 
 #[tokio::main]
 pub async fn main() -> Result<(), anyhow::Error> {
-
 
     ctrlc::set_handler(move || shutdown(1)).unwrap();
 
@@ -211,6 +211,10 @@ pub async fn main() -> Result<(), anyhow::Error> {
                        }
                        PackCmd::Verify => {
                            todo!();
+                       }
+                       PackCmd::Serve => {
+                          start_package_server().await;
+                          Ok(())
                        }
                    }
                 }

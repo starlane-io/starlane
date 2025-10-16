@@ -1,24 +1,48 @@
 use crate::parse::util::{new_span, preceded, result, Span};
-use crate::parse::{Domain, Res, SkewerCase};
+use crate::parse::{domain, skewer_case, version, Domain, Res, SkewerCase};
 use crate::selector::VersionReq;
 use crate::types::archetype::Archetype;
 use crate::types::scope::Segment;
 use getset::Getters;
 use nom::bytes::complete::tag;
-use nom::combinator::opt;
+use nom::combinator::{all_consuming, opt};
 use nom::multi::separated_list1;
-use nom::sequence::tuple;
+use nom::sequence::{tuple, Tuple};
 use serde::{Deserialize, Serialize};
 use starlane_space::loc::Version;
 use starlane_space::selector::Pattern;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
+use std::str::FromStr;
+use starlane_space::parse::consume_point;
+use crate::err::ParseErrs0;
 use crate::types::{Absolute, Type};
+use crate::types2::scope::SlicePath;
 use crate::types::class::Class;
 
-pub type Specific = SpecificDef<Publisher, Package, Version, Segment>;
+pub type Specific = SpecificDef<Publisher, Package, Version, SlicePath>;
 pub type Release = ReleaseDef<Publisher, Package, Version >;
 
+
+impl FromStr for Release{
+    type Err = ParseErrs0;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let i = new_span(s);
+        let (_,release) = all_consuming(release)(i)?;
+        Ok(release)
+    }
+}
+
+pub fn release<S>(i: S) -> Res<S,Release> where S: Span {
+    ((domain,tag(":"),skewer_case,tag(":"),version)).parse(i).map( |(next,(publisher,_,package,_,version))|{
+        (next,Release {
+            publisher,
+            package,
+            version
+        })
+    })
+}
 
 #[cfg(test)]
 #[test]
@@ -58,9 +82,15 @@ where
     Package: Archetype,
     Version: Archetype,
 {
-    contributor: Publisher,
+    publisher: Publisher,
     package: Package,
     version: Version,
+}
+
+impl Release {
+    pub fn filename(&self) -> String {
+        format!("{}_{}_{}",self.publisher,self.package,self.version)
+    }
 }
 
 impl<Publisher, Package, Version > Display
@@ -71,7 +101,7 @@ where
     Version: Archetype,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}:{}", self.contributor, self.package, self.version)?;
+        write!(f, "{}:{}:{}", self.publisher, self.package, self.version)?;
         Ok(())
     }
 }
@@ -88,7 +118,7 @@ where
         version: Version,
     ) -> Self {
         Self {
-                contributor,
+            publisher: contributor,
                 package,
                 version,
         }
@@ -97,15 +127,15 @@ where
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Hash, Getters)]
 #[get = "pub"]
-pub struct SpecificDef<Publisher, Package, Version, SliceSegment>
+pub struct SpecificDef<Publisher, Package, Version, SlicePath>
 where
     Publisher: Archetype,
     Package: Archetype,
     Version: Archetype,
-    SliceSegment: Archetype,
+    SlicePath: Archetype,
 {
     release: ReleaseDef<Publisher,Package,Version>,
-    slices: Vec<SliceSegment>,
+    slices: SlicePath,
 }
 
 impl<Publisher, Package, Version, SliceSegment> Display
@@ -118,27 +148,23 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.release)?;
+        let slices  = self.slices.to_string();
 
-        /// this is a bit weird, but the delimiter between `version` & `slice` needs
-        /// two colons `::` ... the second one is prepended in the segment for loop
-        if !self.slices.is_empty() {
-            write!(f, ":")?;
+        if !slices.is_empty() {
+            write!(f, "::{}", self.slices)?;
         }
 
-        for seg in self.slices.iter() {
-            write!(f, ":{}", seg)?;
-        }
         Ok(())
     }
 }
 
-impl<Publisher, Package, Version, SliceSeg> Archetype
-    for SpecificDef<Publisher, Package, Version, SliceSeg>
+impl<Publisher, Package, Version, SlicePath> Archetype
+    for SpecificDef<Publisher, Package, Version, SlicePath>
 where
     Publisher: Archetype,
     Package: Archetype,
     Version: Archetype,
-    SliceSeg: Archetype,
+    SlicePath: Archetype+Default,
 {
     fn parser<I>(input: I) -> Res<I, Self>
     where
@@ -152,15 +178,16 @@ where
             Version::parser,
             opt(preceded(
                 tag("::"),
-                separated_list1(tag(":"), SliceSeg::parser),
+                SlicePath::parser,
             )),
         ))(input)
         .map(|(next, (contributor, _, package, _, version, slices))| {
-            let slices = slices.unwrap_or_else(|| vec![]);
+            let slices = slices.unwrap_or_else(|| SlicePath::default());
             (
                 next,
                 SpecificDef {
-                    release: ReleaseDef {contributor,
+                    release: ReleaseDef {
+                        publisher: contributor,
                     package,
                     version},
                     slices,
@@ -170,22 +197,22 @@ where
     }
 }
 
-impl<Publisher, Package, Version, SliceSeg> SpecificDef<Publisher, Package, Version, SliceSeg>
+impl<Publisher, Package, Version, Slices> SpecificDef<Publisher, Package, Version, Slices>
 where
     Publisher: Archetype,
     Package: Archetype,
     Version: Archetype,
-    SliceSeg: Archetype,
+    Slices: Archetype,
 {
     pub fn new(
         contributor: Publisher,
         package: Package,
         version: Version,
-        slices: Vec<SliceSeg>,
+        slices: Slices,
     ) -> Self {
         Self {
             release: ReleaseDef {
-                contributor,
+                publisher: contributor,
                 package,
                 version,
             },

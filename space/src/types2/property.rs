@@ -8,7 +8,6 @@ use crate::parse::{SkewerCase, SnakeCase};
 use crate::point::Point;
 use serde::Deserialize;
 use serde::Serialize;
-use thiserror::__private::AsDisplay;
 use validator::ValidateEmail;
 use crate::types::Absolute;
 

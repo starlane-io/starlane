@@ -11,6 +11,7 @@ version.workspace = true
 
 [dependencies]
 starlane-space = { workspace = true, features = ["types2"] }
+starlane-base = { workspace = true }
 thiserror = { workspace = true }
 zip = { workspace = true, default-features = false, features = ["bzip2"] }
 tempfile = { workspace = true }
@@ -20,3 +21,6 @@ walkdir = {workspace = true}
 reqwest = {workspace=true, features=["multipart"] }
 anyhow = "1.0.99"
 tokio = "1.47.1"
+toml = {workspace = true}
+serde = { workspace = true }
+serde_derive = {workspace = true}

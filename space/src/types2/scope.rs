@@ -10,12 +10,15 @@ use serde_derive::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::path::PathBuf;
+use nom::bytes::complete::tag;
+use nom::multi::{separated_list0, separated_list1};
 use strum_macros::{EnumDiscriminants, EnumString};
 use validator::ValidateRequired;
 
 use crate::types::scope::parse::scope;
 use crate::types::specific::Specific;
 use once_cell::sync::Lazy;
+use uuid::Uuid;
 use crate::types::archetype::Archetype;
 
 pub static ROOT_SCOPE: Lazy<Scope> = Lazy::new(|| Scope(Some(ScopeKeyword::Root), vec![]));
@@ -40,6 +43,14 @@ pub enum ScopeKeyword {
     #[strum(ascii_case_insensitive)]
     Root,
 }
+
+
+static MAIN_PATH: Lazy<SlicePath> =
+    Lazy::new(|| {
+        SlicePath::new(vec![Segment::Segment(SkewerCase::from_str("main").unwrap())])
+    });
+
+
 #[derive(
     Clone,
     Debug,
@@ -54,6 +65,29 @@ pub struct SlicePath {
 }
 
 impl SlicePath {
+
+    pub fn main() -> Self {
+        MAIN_PATH.clone()
+    }
+    pub fn as_path(&self) -> PathBuf {
+        let mut path = PathBuf::new();
+        for segment in &self.segments {
+            path.push(segment.to_string());
+        }
+        path
+    }
+}
+
+
+impl Default for SlicePath {
+    fn default() -> Self {
+        Self {
+            segments: vec![],
+        }
+    }
+}
+
+impl SlicePath {
     pub fn new(segments: Vec<Segment>) -> Self {
         Self { segments }
     }
@@ -63,11 +97,9 @@ impl SlicePath {
         segments.push(segment);
         Self { segments }
     }
-    
-    pub fn insert(&self, segment: Segment ) -> Self {
-        let mut segments = self.segments.clone();
-        segments.insert(0, segment);
-        Self { segments }
+
+    pub fn insert(&mut self, segment: Segment ) {
+        self.segments.insert(0, segment);
     }
 
     pub fn is_main(&self) -> bool {
@@ -77,7 +109,15 @@ impl SlicePath {
             false
         }
     }
-    
+
+    pub fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item=&Segment> {
+        self.segments.iter()
+    }
+
     pub fn first(&self) -> Option<&Segment> {
         self.segments.first()
     }
@@ -90,6 +130,27 @@ impl SlicePath {
         }
     }
 
+    pub fn filename(&self) -> String {
+        let mut rtn = String::new();
+        for segment in &self.segments {
+            rtn.push_str(&segment.to_string());
+            rtn.push_str("_");
+        }
+        /// remove the trailing underscore
+        rtn.pop();
+        rtn
+    }
+}
+
+impl Archetype for SlicePath {
+    fn parser<I>(input: I) -> Res<I, Self>
+    where
+        I: Span
+    {
+        separated_list0(tag(":"),Segment::parser)(input).map(|(next,segments)| {
+            (next, SlicePath::new(segments) )
+        })
+    }
 }
 
 impl Into<PathBuf> for SlicePath {

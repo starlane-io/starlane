@@ -19,6 +19,7 @@ pub mod create;
 
 pub mod zip;
 pub mod server;
+pub mod repo;
 
 #[derive(Error, Debug)]
 pub enum PackageErr {
@@ -214,6 +215,30 @@ impl Slice {
             slice.diagnose_indent(spaces+2);
         }
     }
+
+    pub fn gather_slice_paths(&self) -> Vec<SlicePath> {
+println!("GATHER SLIcE PATHS!");
+        let mut paths = Vec::new();
+        for slice in self.slices.values() {
+            for mut p in slice.gather_slice_paths() {
+                if !self.is_main() {
+                    print!(" ---> p '{}'", p.to_string());
+                    p.insert(self.segment.clone());
+
+                    println!(" => '{}'", p.to_string());
+                }
+                paths.push(p);
+            }
+        }
+
+        if !self.is_main() {
+            let p : SlicePath = self.segment.clone().into();
+println!("rtn  slice path: {}", p.to_string());
+            paths.push(p);
+        }
+println!(" {} -[ paths ]-> ", paths.len() ) ;
+        paths
+    }
 }
 
 #[derive(Clone,Debug)]
@@ -281,14 +306,17 @@ impl FileEntity {
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
+    use std::fs;
     use std::str::FromStr;
+    use tempfile::TempDir;
     use starlane_space::parse::SkewerCase;
     use starlane_space::types::scope::Segment;
     use crate::create::PackageLayout;
     use crate::{FileEntity, PACKAGE_LAYOUT_EXAMPLE};
+    use crate::repo::SourceRepo;
     use crate::server::PackageRepo;
-    
+    use crate::zip::unzip_from_binary_to_temp;
+
     pub struct MockPublishObserver();
     
     impl Default for MockPublishObserver {
@@ -305,17 +333,11 @@ mod test {
         
         let mut observer = MockPublishObserver::default();
         let server = PackageRepo::default();
-        let pds = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, & mut observer).unwrap();
-        server.upload(&pds,& mut observer).await.unwrap();
+        let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, & mut observer).unwrap();
+        server.upload(&layout, & mut observer).await.unwrap();
     }
 
-
-    #[test]
-    pub fn test_create() {
-        let mut observer = MockPublishObserver::default();
-        let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, & mut observer).unwrap();
-        layout.diagnose();
-
+    fn verify_mock_layout(layout: &PackageLayout) -> Result<(),&'static str> {
         // hierarchy
         {
             // files
@@ -340,9 +362,37 @@ mod test {
             }
             assert_eq!(3,layout.main.slices.len());
         }
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_create() {
+        let mut observer = MockPublishObserver::default();
+        let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, & mut observer).unwrap();
+        layout.diagnose();
+
+        verify_mock_layout(&layout).unwrap();
+
+        let repo_dir = TempDir::new().expect("expecting temp dir");
+        let source = SourceRepo::new(repo_dir.path().to_path_buf());
 
         let zipfile = layout.zip().expect("expecting zip");
+        let data= fs::read(zipfile.path()).expect("expecting zipfile");
+        let unzip_dir= unzip_from_binary_to_temp(data.as_ref()).expect("unzipping bin zipfile");
+
+        println!("\n\nzipfile: {:?}", zipfile);
+
+        let path = unzip_dir.path().to_path_buf();
+        let layout = PackageLayout::create(&path, & mut observer).unwrap();
+
+        verify_mock_layout(&layout).unwrap();
+
+        source.save_package(layout).unwrap();
 
         println!("\n\nzipfile: {:?}", zipfile);
     }
 }
+
+pub struct IgnoreObserver;
+
+impl PackObserver for IgnoreObserver { }

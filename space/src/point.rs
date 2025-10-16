@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::path::PathBuf;
 use strum_macros::EnumDiscriminants;
-use thiserror::__private::AsDisplay;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]

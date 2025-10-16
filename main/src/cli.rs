@@ -75,6 +75,7 @@ impl Default for PackArgs {
 pub enum PackCmd{
     Verify,
     Publish(PubArgs),
+    Serve,
 }
 
 #[derive(Debug, Args,Hash,Eq,PartialEq)]

@@ -1,43 +1,39 @@
-
 use axum::{
-    body::Body,
     extract::Multipart,
     http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Router,
 };
-use std::io::Write;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 use axum::extract::State;
-use tempfile::NamedTempFile;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
-use uuid::Uuid;
 use starlane_package::create::{PackErr, PackageLayout};
-use starlane_package::server::PackObserver;
+use starlane_package::IgnoreObserver;
 use starlane_package::zip::{unzip_from_binary_to_temp, ZipError};
+use starlane_package::repo::SourceRepo;
 
-#[tokio::main]
-async fn main() {
-    start(RepoState::default()).await;
-}
 
 pub struct RepoState {
-    pub bind: String
+    pub bind: String,
+    pub repo: SourceRepo
 }
 
 impl Default for RepoState {
     fn default() -> Self {
         Self {
-            bind: "0.0.0.0:3000".to_string()
+            bind: "0.0.0.0:3000".to_string(),
+            repo: SourceRepo::default()
         }
     }
 }
 
 
-pub async fn start(repo: RepoState) {
+pub async fn start_package_server() {
+    let repo = RepoState::default();
     let repo = Arc::new(repo);
     // Build the router
     let app = Router::new()
@@ -82,6 +78,9 @@ println!(". field name: {}", name);
 
         layout.diagnose();
 
+        app.repo.save_package(layout)?;
+
+println!("\n\npackage saved...\n\n");
         // Return the file ID to the client
         return Ok((
             StatusCode::CREATED,
@@ -187,6 +186,3 @@ impl From<ZipError> for AppError {
 }
 
 
-pub struct IgnoreObserver();
-
-impl PackObserver for IgnoreObserver { }
