@@ -398,17 +398,17 @@ pub struct IgnoreObserver;
 impl PackObserver for IgnoreObserver { }
 
 pub trait PackObserver: Send + Sync{
-    fn start_pack( &mut self, dir: &PathBuf ) {}
-    fn start_verify_layout( &mut self ) {}
+    fn start_pack( &self, dir: &PathBuf ) {}
+    fn start_verify_layout( &self ) {}
 
-    fn found_slice(&mut self, name: &str) {}
+    fn found_slice(&self, name: &str) {}
 
-    fn found_directory(&mut self, name: &str) {}
-    fn found_file(&mut self, name: &str) {}
+    fn found_directory(&self, name: &str) {}
+    fn found_file(&self, name: &str) {}
     fn end_verify_layout( &self, package: &PackageLayout) {}
     fn start_archive( &self ) {}
     fn end_archive( &self ) {}
-    fn end_pack( &mut self ) {}
+    fn end_pack( &self ) {}
 }
 
 pub trait PublishObserver: PackObserver {

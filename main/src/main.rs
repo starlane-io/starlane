@@ -66,6 +66,7 @@ use std::time::Duration;
 use std::{io, process};
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
+use tokio::sync::mpsc;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::{FileOptionExtension, FileOptions};
@@ -712,14 +713,39 @@ fn list_contexts() -> Result<Vec<String>,anyhow::Error> {
  */
 
 
+#[derive(Hash,Eq,PartialEq)]
+pub enum PackEvent {
+    StartPack(PathBuf),
+    EndPack,
+    FoundSlice(String)
+}
+
+#[derive(Clone)]
 pub struct PackPubObserver {
-    console: Console
+    tx: mpsc::Sender<PackEvent>
 }
 
 impl PackPubObserver {
     pub fn new( console: Console) -> Self {
+        let (tx,mut rx) = mpsc::channel(10);
+        async move {
+            while let Some(event) = rx.recv().await {
+                match event {
+                    PackEvent::StartPack(dir) => {
+                        console.newlines(1);
+                        console.intro(format!("Packing {}", dir.display())).unwrap_or_default();
+                    }
+                    PackEvent::EndPack => {
+                        console.outro("end pack").unwrap_or_default();
+                    }
+                    PackEvent::FoundSlice(slice) => {
+                        console.info(format!("found slice: {}", slice)).unwrap_or_default();
+                    }
+                }
+            }
+        };
         Self {
-            console
+            tx
         }
     }
 }
@@ -728,17 +754,16 @@ impl PackPubObserver {
 
 impl  PackObserver for PackPubObserver {
 
-    fn start_pack( &mut self, dir: &PathBuf ) {
-        self.console.newlines(1);
-        self.console.intro(format!("Packing {}", dir.display()));
+    fn start_pack( &self, dir: &PathBuf ) {
+        self.tx.try_send(PackEvent::StartPack(dir.clone())).unwrap_or_default();
     }
 
-    fn end_pack(&mut self) {
-        self.console.outro("Packing complete");
+    fn end_pack(&self) {
+        self.tx.try_send(PackEvent::EndPack).unwrap_or_default();
     }
 
-    fn found_slice(&mut self, name: &str) {
-        self.console.info(format!("Found slice {}", name));
+    fn found_slice(&self, name: &str) {
+        self.tx.try_send(PackEvent::FoundSlice(name.to_string())).unwrap_or_default();
     }
 
 }
