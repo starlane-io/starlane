@@ -24,3 +24,6 @@ tokio = "1.47.1"
 toml = {workspace = true}
 serde = { workspace = true }
 serde_derive = {workspace = true}
+async-trait={workspace = true}
+axum = {workspace = true, version = "1.0.0", features = ["multipart"] }
+axum-core = {workspace = true}

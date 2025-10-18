@@ -3535,7 +3535,6 @@ dependencies = [
  "starlane-hyperspace",
  "starlane-macros",
  "starlane-package",
- "starlane-package-server",
  "starlane-platform-for-postgres",
  "starlane-platform-for-postgres-registry",
  "starlane-space",
@@ -3675,6 +3674,9 @@ name = "starlane-package"
 version = "0.3.20"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "axum",
+ "axum-core",
  "derive_builder",
  "once_cell",
  "reqwest",
@@ -3688,22 +3690,6 @@ dependencies = [
  "toml",
  "walkdir",
  "zip",
-]
-
-[[package]]
-name = "starlane-package-server"
-version = "0.3.20"
-dependencies = [
- "anyhow",
- "axum",
- "http",
- "reqwest",
- "starlane-base",
- "starlane-package",
- "starlane-space",
- "tempfile",
- "tokio",
- "uuid",
 ]
 
 [[package]]

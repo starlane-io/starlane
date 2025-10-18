@@ -549,9 +549,9 @@ pub mod test2 {
     pub fn test_specific() {
         let specific = result(Specific::parser(new_span("contrib:package:1.0.0"))).unwrap();
 
-        assert_eq!("contrib", specific.contributor().as_str());
-        assert_eq!("package", specific.package().as_str());
-        assert_eq!("1.0.0", specific.version().clone().to_string().as_str());
+        assert_eq!("contrib", specific.release().publisher().as_str());
+        assert_eq!("package", specific.release().package().as_str());
+        assert_eq!("1.0.0", specific.release().version().clone().to_string().as_str());
         assert!(specific.slices().is_empty())
     }
 

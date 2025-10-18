@@ -11,7 +11,7 @@ use serde_derive::Deserialize;
 use tempfile::{NamedTempFile, TempDir};
 use thiserror::Error;
 use starlane_space::types::specific::Release;
-use crate::server::PackObserver;
+use crate::PackObserver;
 use crate::zip::{zip_directory_to_temp, ZipError};
 
 pub struct PackageLayout {

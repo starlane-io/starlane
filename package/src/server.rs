@@ -1,122 +1,186 @@
-use reqwest;
 use std::path::PathBuf;
-use anyhow::Result;
+use std::sync::Arc;
+use axum::extract::multipart::Multipart;
+use axum::extract::State;
+use axum_core::response::{IntoResponse, Response};
+use reqwest::{header, StatusCode};
+use tokio::fs;
+use axum::routing::method_routing::{get, post};
+use axum::routing::Router;
+use tokio::io::AsyncReadExt;
 use crate::create::{PackErr, PackageLayout};
-use crate::PackageErr;
+use crate::IgnoreObserver;
+use crate::repo::SourceRepo;
+use crate::zip::{unzip_from_binary_to_temp, ZipError};
 
-pub struct PackageRepo {
-    pub url: String
+pub struct RepoState {
+    pub bind: String,
+    pub repo: SourceRepo
 }
 
-impl PackageRepo {
-    pub fn new( url:String) -> Self {
-        Self { url }
-    }
-
-
-    /// publish the current directory
-    pub async fn publish( &self, observer: &mut dyn PublishObserver )  -> Result<(),PackageErr>{
-        let server = PackageRepo::default();
-        let path =  std::env::current_dir().unwrap();
-        let pds = PackageLayout::create(&path, observer).unwrap();
-        server.upload(&pds, observer).await
-    }
-}
-
-
-pub trait PackObserver{
-    fn start_pack( &mut self, dir: &PathBuf ) {}
-    fn start_verify_layout( &mut self ) {}
-
-    fn found_slice(&mut self, name: &str) {}
-    
-    fn found_directory(&mut self, name: &str) {}
-    fn found_file(&mut self, name: &str) {}
-    fn end_verify_layout( &self, package: &PackageLayout) {}
-    fn start_archive( &self ) {}
-    fn end_archive( &self ) {}
-    fn end_pack( &mut self ) {}
-}
-
-pub trait PublishObserver: PackObserver {
-    fn start_upload( &self, server: &String ) {}
-    fn end_upload( &self ) {}
-}
-
-impl Default for PackageRepo {
+impl Default for RepoState {
     fn default() -> Self {
         Self {
-            url: "localhost:3000".to_string()
+            bind: "0.0.0.0:3000".to_string(),
+            repo: SourceRepo::default()
         }
     }
 }
 
-impl PackageRepo {
+pub async fn start_package_server() {
+    let repo = RepoState::default();
+    let repo = Arc::new(repo);
+    // Build the router
+    let app = Router::new()
+        .route("/zip", post(upload_zip)).with_state(repo.clone())
+        .route("/zip/{id}", get(download_zip));
 
+    // Run the server
+    let listener = tokio::net::TcpListener::bind(repo.bind.clone())
+        .await
+        .expect("Failed to bind to address");
 
-    /// Upload a zip file to the package-server
-    pub async fn upload(&self, pds: &PackageLayout, observer: & dyn PublishObserver) -> Result<(),PackageErr> {
+    println!("Server running on http://0.0.0.0:3000");
+    println!("POST /zip - Upload a zip file");
+    println!("GET /zip/:id - Download a zip file");
 
-        observer.start_upload(&self.url);
+    axum::serve(listener, app).with_graceful_shutdown(shutdown_signal())
+        .await
+        .expect("Failed to start server");
+}
 
-        let tmp_file= pds.zip()?;
-        let zip_path= tmp_file.path().to_path_buf();
-        // Read the zip file
-        let file_bytes = tokio::fs::read(&zip_path).await?;
+async fn shutdown_signal() {
+    tokio::signal::ctrl_c()
+        .await
+        .expect("Failed to listen for Ctrl+C signal");
+    println!("Received Ctrl+C, initiating graceful shutdown...");
+}
+/// Handler for uploading zip files
+async fn upload_zip(app: State<Arc<RepoState>>, mut multipart: Multipart) -> Result<Response, AppError> {
+    println!(".... uploading zip file");
+    let storage_dir = PathBuf::from("./zip_storage");
 
-        // Get the filename
-        let file_name = zip_path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("archive");
+    while let Some(field) = multipart.next_field().await? {
+        let name = field.name().unwrap_or("").to_string();
+println!(". field name: {}", name);
+        let file_name = field.file_name().unwrap_or("").to_string();
 
-        // Create multipart form
-        let form = reqwest::multipart::Form::new()
-            .part(
-                "file",
-                reqwest::multipart::Part::bytes(file_bytes)
-                    .file_name("file")
-                    .mime_str("application/zip")?,
-            );
+        // Generate unique ID for the file
 
-        // Send the POST request
-        let client = reqwest::Client::new();
-        let response = client
-            .post(format!("http://{}/zip", self.url))
-            .multipart(form)
-            .send()
-            .await?;
+        // Read the file data
+        let data = field.bytes().await?;
+        println!(". data.len: {}", data.len());
+        let dir = unzip_from_binary_to_temp(data.as_ref())?;
+        println!(". dir: {:?}", dir);
 
-println!("response: {:?}", response);
-        if response.status().is_success() {
-            let body = response.text().await?;
-            println!("Upload successful: {}", body);
-            Ok(())
-        } else {
-            let status = response.status();
-            let error_text = response.text().await?;
-            Err(PackageErr::UploadErr(format!("Upload failed with status {}: {}", status, error_text).to_string()))
-        }
+        let mut observer = IgnoreObserver;
+        let path = dir.path().to_path_buf();
+        let layout = PackageLayout::create( &path, & mut observer )?;
+
+        layout.diagnose();
+
+        app.repo.save_package(layout)?;
+
+println!("\n\npackage saved...\n\n");
+        // Return the file ID to the client
+        return Ok((
+            StatusCode::CREATED,
+            format!("File uploaded successfully."),
+        )
+            .into_response());
     }
 
-    /// Download a zip file from the package-server
-    async fn download_zip_file(server_url: &str, file_id: &str, output_path: PathBuf) -> Result<()> {
-        let client = reqwest::Client::new();
-        let response = client
-            .get(format!("{}/zip/{}", server_url, file_id))
-            .send()
-            .await?;
+    Err(AppError::NoFileProvided)
+}
 
-        if response.status().is_success() {
-            let bytes = response.bytes().await?;
-            tokio::fs::write(&output_path, bytes).await?;
-            println!("Download successful: saved to {:?}", output_path);
-            Ok(())
-        } else {
-            let status = response.status();
-            let error_text = response.text().await?;
-            anyhow::bail!("Download failed with status {}: {}", status, error_text);
-        }
+/// Handler for downloading zip files
+async fn download_zip(
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> Result<Response, AppError> {
+    let storage_dir = PathBuf::from("./zip_storage");
+    let file_path = storage_dir.join(format!("{}.zip", id));
+
+    // Check if file exists
+    if !file_path.exists() {
+        return Err(AppError::FileNotFound);
+    }
+
+    // Read the file
+    let mut file = fs::File::open(&file_path).await?;
+    let mut contents = Vec::new();
+    file.read_to_end(&mut contents).await?;
+
+    println!("Downloading zip file with ID: {}", id);
+
+    // Return the file as a response
+    Ok((
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "application/zip"),
+            (
+                header::CONTENT_DISPOSITION,
+                &format!("attachment; filename=\"{}.zip\"", id),
+            ),
+        ],
+        contents,
+    )
+        .into_response())
+}
+
+/// Custom error type for the application
+#[derive(Debug)]
+enum AppError {
+    NoFileProvided,
+    InvalidFileType,
+    FileNotFound,
+    #[allow(dead_code)]
+    IoError(std::io::Error),
+    #[allow(dead_code)]
+    MultipartError(axum::extract::multipart::MultipartError),
+    #[allow(dead_code)]
+    ZipError(ZipError),
+    #[allow(dead_code)]
+    PackErr(PackErr)
+}
+
+impl From<PackErr> for AppError {
+    fn from(err: PackErr) -> Self {
+        AppError::PackErr(err)
     }
 }
 
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        let (status, message) = match self {
+            AppError::NoFileProvided => (StatusCode::BAD_REQUEST, "No file provided"),
+            AppError::InvalidFileType => (StatusCode::BAD_REQUEST, "Only .zip files are allowed"),
+            AppError::FileNotFound => (StatusCode::NOT_FOUND, "File not found"),
+            AppError::IoError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"),
+            AppError::MultipartError(_) => {
+                (StatusCode::BAD_REQUEST, "Failed to process multipart data")
+            }
+            AppError::ZipError(_) => (StatusCode::BAD_REQUEST, "Failed to process zip file"),
+            AppError::PackErr(err) => (StatusCode::BAD_REQUEST, "could not process package zip"),
+        };
+
+        (status, message).into_response()
+    }
+}
+
+impl From<std::io::Error> for AppError {
+    fn from(err: std::io::Error) -> Self {
+        AppError::IoError(err)
+    }
+}
+
+impl From<axum::extract::multipart::MultipartError> for AppError {
+    fn from(err: axum::extract::multipart::MultipartError) -> Self {
+        AppError::MultipartError(err)
+    }
+}
+
+impl From<ZipError> for AppError {
+    fn from(err: ZipError) -> Self {
+        AppError::ZipError(err)
+    }
+}

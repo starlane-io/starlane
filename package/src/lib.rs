@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::create::PackErr;
+use crate::create::{PackErr, PackageLayout};
 use starlane_space::parse::SkewerCase;
 use starlane_space::types::scope::{Segment, SlicePath};
 use std::fmt::Debug;
@@ -9,7 +9,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use thiserror::Error;
 use once_cell::sync::Lazy;
-use crate::server::PackObserver;
 
 pub static MAIN_SLICE: Lazy<Segment> = Lazy::new(|| Segment::Segment(SkewerCase::from_str("main").unwrap()));
 
@@ -18,8 +17,10 @@ pub static PACKAGE_LAYOUT_EXAMPLE: Lazy<PathBuf> = Lazy::new(  || PathBuf::from_
 pub mod create;
 
 pub mod zip;
-pub mod server;
+pub mod remote;
 pub mod repo;
+pub mod cache;
+pub mod server;
 
 #[derive(Error, Debug)]
 pub enum PackageErr {
@@ -312,9 +313,9 @@ mod test {
     use starlane_space::parse::SkewerCase;
     use starlane_space::types::scope::Segment;
     use crate::create::PackageLayout;
-    use crate::{FileEntity, PACKAGE_LAYOUT_EXAMPLE};
-    use crate::repo::SourceRepo;
-    use crate::server::PackageRepo;
+    use crate::{FileEntity, PackObserver, PublishObserver, PACKAGE_LAYOUT_EXAMPLE};
+    use crate::repo::{Repo, SourceRepo};
+    use crate::remote::RemoteRepo;
     use crate::zip::unzip_from_binary_to_temp;
 
     pub struct MockPublishObserver();
@@ -325,16 +326,15 @@ mod test {
         }
     }
 
-    impl crate::server::PublishObserver for MockPublishObserver {}
-    impl crate::server::PackObserver for MockPublishObserver {}
+    impl PublishObserver for MockPublishObserver {}
+    impl PackObserver for MockPublishObserver {}
 
     #[tokio::test]
     pub async fn test_upload() {
-        
         let mut observer = MockPublishObserver::default();
-        let server = PackageRepo::default();
+        let server = RemoteRepo::default();
         let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, & mut observer).unwrap();
-        server.upload(&layout, & mut observer).await.unwrap();
+        server.submit(&layout, & mut observer).await.unwrap();
     }
 
     fn verify_mock_layout(layout: &PackageLayout) -> Result<(),&'static str> {
@@ -396,3 +396,22 @@ mod test {
 pub struct IgnoreObserver;
 
 impl PackObserver for IgnoreObserver { }
+
+pub trait PackObserver: Send + Sync{
+    fn start_pack( &mut self, dir: &PathBuf ) {}
+    fn start_verify_layout( &mut self ) {}
+
+    fn found_slice(&mut self, name: &str) {}
+
+    fn found_directory(&mut self, name: &str) {}
+    fn found_file(&mut self, name: &str) {}
+    fn end_verify_layout( &self, package: &PackageLayout) {}
+    fn start_archive( &self ) {}
+    fn end_archive( &self ) {}
+    fn end_pack( &mut self ) {}
+}
+
+pub trait PublishObserver: PackObserver {
+    fn start_upload( &self, server: &String ) {}
+    fn end_upload( &self ) {}
+}

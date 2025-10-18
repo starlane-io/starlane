@@ -70,10 +70,11 @@ use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::{FileOptionExtension, FileOptions};
 use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
-use starlane_package::{PackageErr, PACKAGE_LAYOUT_EXAMPLE};
+use starlane_package::{PackObserver, PackageErr, PublishObserver, PACKAGE_LAYOUT_EXAMPLE};
 use starlane_package::create::PackageLayout;
-use starlane_package::server::{PackObserver, PackageRepo, PublishObserver};
-use starlane_package_server::start_package_server;
+use starlane_package::remote::RemoteRepo;
+use starlane_package::repo::Repo;
+use starlane_package::server::start_package_server;
 /*
 let config = Default::default();
 
@@ -711,12 +712,12 @@ fn list_contexts() -> Result<Vec<String>,anyhow::Error> {
  */
 
 
-pub struct PackPubObserver<'a> {
-    console: &'a Console
+pub struct PackPubObserver {
+    console: Console
 }
 
-impl <'a> PackPubObserver<'a> {
-    pub fn new( console: &'a Console) -> Self {
+impl PackPubObserver {
+    pub fn new( console: Console) -> Self {
         Self {
             console
         }
@@ -725,7 +726,7 @@ impl <'a> PackPubObserver<'a> {
 
 
 
-impl <'a> PackObserver for PackPubObserver<'a> {
+impl  PackObserver for PackPubObserver {
 
     fn start_pack( &mut self, dir: &PathBuf ) {
         self.console.newlines(1);
@@ -742,15 +743,15 @@ impl <'a> PackObserver for PackPubObserver<'a> {
 
 }
 
-impl <'a> PublishObserver for PackPubObserver<'a> {
+impl PublishObserver for PackPubObserver {
 
 }
 
 
 async fn publish(path: &PathBuf) -> Result<(),PackageErr> {
    let console = Console::new();
-   let mut observer = PackPubObserver::new(&console);
-   let server = PackageRepo::default();
+   let mut observer = PackPubObserver::new(console.clone());
+   let remote = RemoteRepo::default();
    let pds = PackageLayout::create(&path, & mut observer).unwrap();
-   server.upload(&pds, &mut observer).await
+   remote.submit(&pds, observer).await
 }
