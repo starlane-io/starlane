@@ -1,7 +1,7 @@
 use crate::parse::SnakeCase;
 use crate::types::property::{PropertiesConfig, PropertiesConfigBuilder, PropertyDef};
 use crate::types::err::TypeErr;
-use crate::types::specific::Specific;
+use crate::types::specific::Slice;
 use crate::types::{err, Absolute, Type};
 use getset::Getters;
 use std::collections::HashMap;
@@ -10,15 +10,15 @@ use std::fmt::Display;
 /// [Defs] for an [Absolute]
 #[derive(Clone, Getters)]
 pub struct Defs {
-    specific: Specific,
+    specific: Slice,
 
     /// [Self::specific] must be in 
     #[getset(skip)]
-    layers: HashMap<Specific, Layer>,
+    layers: HashMap<Slice, Layer>,
 }
 
 impl Defs {
-    pub fn new(specific: Specific) -> Defs {
+    pub fn new(specific: Slice) -> Defs {
         Self {
             specific,
            layers: Default::default(),
@@ -103,8 +103,8 @@ todo!()
 
 #[derive(Clone,  Getters)]
 pub struct Layer {
-    parent: Option<Specific>,
-    specific: Specific,
+    parent: Option<Slice>,
+    specific: Slice,
     changes: Vec<Change>,
 }
 
@@ -112,11 +112,11 @@ pub struct Layer {
 #[derive(Clone)]
 pub struct LayerBuilder {
     parent: Option<Layer>,
-    specific: Specific,
+    specific: Slice,
     changes: Vec<Change>,   
 }
 impl LayerBuilder {
-    pub fn new(specific: Specific) -> LayerBuilder
+    pub fn new(specific: Slice) -> LayerBuilder
     {
         Self {
             specific,
@@ -234,17 +234,17 @@ impl TypeCompositeBuilder {
 
 #[derive(Clone, Getters)]
 pub struct SpecificComposite {
-    pub specific: Specific,
+    pub specific: Slice,
     pub types: HashMap<Type, TypeComposite>,   
 }
 
 pub struct SpecificCompositeBuilder {
-    specific: Specific,
+    specific: Slice,
     types: HashMap<Type, TypeCompositeBuilder>,
 }
 
 impl SpecificCompositeBuilder {
-    pub fn of(specific: Specific) -> Self {
+    pub fn of(specific: Slice) -> Self {
         Self {
             specific,
             types: Default::default(),
@@ -267,7 +267,7 @@ mod tests {
     use crate::types::{Absolute, Type};
     use crate::types::class::Class;
     use crate::types::def::{Add, Change, Defs, LayerBuilder, TypeCompositeBuilder};
-    use crate::types::specific::Specific;
+    use crate::types::specific::Slice;
 
     #[test] 
    pub fn type_builder() {

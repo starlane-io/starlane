@@ -3684,6 +3684,8 @@ dependencies = [
  "serde_derive",
  "starlane-base",
  "starlane-space",
+ "strum",
+ "strum_macros",
  "tempfile",
  "thiserror 2.0.16",
  "tokio",

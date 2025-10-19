@@ -3,8 +3,8 @@ use std::io::{self, Error, Write};
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
 use walkdir::WalkDir;
-use zip::{write::FileOptions, CompressionMethod, ZipWriter};
 use zip::write::SimpleFileOptions;
+use zip::{CompressionMethod, ZipWriter};
 
 /// Zips a directory into a temporary file and returns the path to that file.
 ///

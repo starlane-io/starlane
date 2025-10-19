@@ -1,16 +1,16 @@
-use std::fs;
-use std::path::PathBuf;
-use async_trait::async_trait;
-use starlane_base::env::get_starlane_package_source;
 use crate::create::{PackErr, PackageLayout};
 use crate::zip::zip_slice_dir_to;
+use crate::{PackageErr, PublishObserver};
+use async_trait::async_trait;
+use starlane_base::env::get_starlane_package_source;
 use starlane_space::types::scope::SlicePath;
-use starlane_space::types::specific::{Release, Specific};
-use crate::{PackObserver, PackageErr, PublishObserver};
+use starlane_space::types::specific::Slice;
+use std::fs;
+use std::path::PathBuf;
 
 #[async_trait]
 pub trait Repo {
-    async fn get_slice(&self, specific: &Specific) -> Result<Vec<u8>, PackageErr>;
+    async fn get_slice(&self, specific: &Slice) -> Result<Vec<u8>, PackageErr>;
     async fn submit<P>(&self, pds: &PackageLayout, observer: P) -> anyhow::Result<(), PackageErr> where P: PublishObserver+Send+Sync;
 }
 
@@ -50,7 +50,7 @@ impl SourceRepo {
         Ok(())
     }
 
-    pub fn get_slice_path(&self, specific: Specific ) -> Result<PathBuf, String> {
+    pub fn get_slice_path(&self, specific: Slice) -> Result<PathBuf, String> {
         let release = specific.release().to_string().replace(":","_");
         let release_path = self.root.join(release);
 

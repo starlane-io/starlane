@@ -114,14 +114,20 @@ pub fn get_starlane_package_source() -> String {
     dir
 }
 
+
+
 pub static STARLANE_PACKAGE_REMOTE: Lazy<String> = Lazy::new(|| {
     let dir = std::env::var("STARLANE_PACKAGE_REMOTE")
         .unwrap_or(format!("{}/package/remote", STARLANE_HOME.to_string()).to_string());
-
     fs::create_dir_all(&dir).unwrap();
     dir
 });
 
+pub fn get_starlane_package_remote() -> String {
+    let dir = STARLANE_PACKAGE_REMOTE.to_string();
+    fs::create_dir_all(&dir).unwrap();
+    dir
+}
 
 pub static STARLANE_WRITE_LOGS: Lazy<StarlaneWriteLogs> =
     Lazy::new(|| match std::env::var("STARLANE_WRITE_LOGS") {

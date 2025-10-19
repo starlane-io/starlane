@@ -44,12 +44,21 @@ use lerp::Lerp;
 use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
 use shadow_rs::shadow;
-use starlane_base::env;
-use starlane_base::env::{enviro_dir, ensure_global_settings, save_global_settings, set_enviro, STARLANE_HOME, config_exists, enviro};
 use starlane::starlane::Starlane;
+use starlane_base::env;
+use starlane_base::env::{
+    config_exists, ensure_global_settings, enviro, enviro_dir, save_global_settings, set_enviro,
+    STARLANE_HOME,
+};
+use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
 pub use starlane_hyperspace::base::Platform;
 use starlane_hyperspace::shutdown::shutdown;
 use starlane_macros::{create_mark, ToBase};
+use starlane_package::create::PackageLayout;
+use starlane_package::remote::RemoteRepo;
+use starlane_package::repo::Repo;
+use starlane_package::server::start_package_server;
+use starlane_package::{PackObserver, PackageErr, PublishObserver, PACKAGE_LAYOUT_EXAMPLE};
 use starlane_space::err::PrintErr;
 use starlane_space::loc::ToBaseKind;
 use starlane_space::log::push_scope;
@@ -70,12 +79,6 @@ use tokio::sync::mpsc;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::{FileOptionExtension, FileOptions};
-use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
-use starlane_package::{PackObserver, PackageErr, PublishObserver, PACKAGE_LAYOUT_EXAMPLE};
-use starlane_package::create::PackageLayout;
-use starlane_package::remote::RemoteRepo;
-use starlane_package::repo::Repo;
-use starlane_package::server::start_package_server;
 /*
 let config = Default::default();
 
@@ -98,7 +101,6 @@ fn context() -> String {
 
 #[tokio::main]
 pub async fn main() -> Result<(), anyhow::Error> {
-
     ctrlc::set_handler(move || shutdown(1)).unwrap();
 
     init();
@@ -127,7 +129,7 @@ pub async fn main() -> Result<(), anyhow::Error> {
             Ok(())
         }
         Commands::Term(args) => {
-             cli::term(args).await.unwrap();
+            cli::term(args).await.unwrap();
             Ok(())
         }
         Commands::Version => {
@@ -202,26 +204,25 @@ pub async fn main() -> Result<(), anyhow::Error> {
             }
             Ok(())
         }
-        Commands::Pack(sub) => {
-            match sub {
-                PackArgs { command} => {
-                   match command{
-                       PackCmd::Publish(args) => {
-                           let path = args.path.map(|p|PathBuf::from_str(p.as_str()).unwrap()).unwrap_or(std::env::current_dir().unwrap());
-                           publish(&path).await.unwrap();
-                           Ok(())
-                       }
-                       PackCmd::Verify => {
-                           todo!();
-                       }
-                       PackCmd::Serve => {
-                          start_package_server().await;
-                          Ok(())
-                       }
-                   }
+        Commands::Pack(sub) => match sub {
+            PackArgs { command } => match command {
+                PackCmd::Publish(args) => {
+                    let path = args
+                        .path
+                        .map(|p| PathBuf::from_str(p.as_str()).unwrap())
+                        .unwrap_or(std::env::current_dir().unwrap());
+                    publish(&path).await.unwrap();
+                    Ok(())
                 }
-            }
-        }
+                PackCmd::Verify => {
+                    todo!();
+                }
+                PackCmd::Serve => {
+                    start_package_server().await;
+                    Ok(())
+                }
+            },
+        },
     }
 }
 
@@ -537,7 +538,7 @@ pub fn zip_dir<T>(
 where
     T: Write + Seek,
 {
- todo!()
+    todo!()
 }
 /*
 *
@@ -551,7 +552,7 @@ where
     T: Write + Seek,
 {
     let mut zip = zip::ZipWriter::new(writer);
-    
+
     let options: FileOptions<'_, _> = FileOptions::default()
         .compression_method(method)
         .unix_permissions(0o755);
@@ -712,71 +713,69 @@ fn list_contexts() -> Result<Vec<String>,anyhow::Error> {
 
  */
 
-
-#[derive(Hash,Eq,PartialEq)]
+#[derive(Hash, Eq, PartialEq)]
 pub enum PackEvent {
     StartPack(PathBuf),
     EndPack,
-    FoundSlice(String)
+    FoundSlice(String),
 }
 
 #[derive(Clone)]
 pub struct PackPubObserver {
-    tx: mpsc::Sender<PackEvent>
+    tx: mpsc::Sender<PackEvent>,
 }
 
 impl PackPubObserver {
-    pub fn new( console: Console) -> Self {
-        let (tx,mut rx) = mpsc::channel(10);
+    pub fn new(console: Console) -> Self {
+        let (tx, mut rx) = mpsc::channel(10);
         async move {
             while let Some(event) = rx.recv().await {
                 match event {
                     PackEvent::StartPack(dir) => {
                         console.newlines(1);
-                        console.intro(format!("Packing {}", dir.display())).unwrap_or_default();
+                        console
+                            .intro(format!("Packing {}", dir.display()))
+                            .unwrap_or_default();
                     }
                     PackEvent::EndPack => {
                         console.outro("end pack").unwrap_or_default();
                     }
                     PackEvent::FoundSlice(slice) => {
-                        console.info(format!("found slice: {}", slice)).unwrap_or_default();
+                        console
+                            .info(format!("found slice: {}", slice))
+                            .unwrap_or_default();
                     }
                 }
             }
         };
-        Self {
-            tx
-        }
+        Self { tx }
     }
 }
 
+impl PackObserver for PackPubObserver {
+    fn start_pack(&self, dir: &PathBuf) {
+        self.tx
+            .try_send(PackEvent::StartPack(dir.clone()))
+            .unwrap_or_default();
+    }
 
-
-impl  PackObserver for PackPubObserver {
-
-    fn start_pack( &self, dir: &PathBuf ) {
-        self.tx.try_send(PackEvent::StartPack(dir.clone())).unwrap_or_default();
+    fn found_slice(&self, name: &str) {
+        self.tx
+            .try_send(PackEvent::FoundSlice(name.to_string()))
+            .unwrap_or_default();
     }
 
     fn end_pack(&self) {
         self.tx.try_send(PackEvent::EndPack).unwrap_or_default();
     }
-
-    fn found_slice(&self, name: &str) {
-        self.tx.try_send(PackEvent::FoundSlice(name.to_string())).unwrap_or_default();
-    }
-
 }
 
-impl PublishObserver for PackPubObserver {
+impl PublishObserver for PackPubObserver {}
 
-}
-
-
-async fn publish(path: &PathBuf) -> Result<(),PackageErr> {
-   let console = Console::new();
-   let mut observer = PackPubObserver::new(console.clone());
-   let remote = RemoteRepo::default();
-   let pds = PackageLayout::create(&path, & mut observer).unwrap();
-   remote.submit(&pds, observer).await
+async fn publish(path: &PathBuf) -> Result<(), PackageErr> {
+    let console = Console::new();
+    let mut observer = PackPubObserver::new(console.clone());
+    let remote = RemoteRepo::default();
+    let pds = PackageLayout::create(&path, &mut observer)?;
+    remote.submit(&pds, observer).await
 }

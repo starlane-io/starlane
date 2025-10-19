@@ -1,23 +1,22 @@
-use crate::{Directory, Entity, FileEntity, Slice};
+use crate::zip::{zip_directory_to_temp, ZipError};
+use crate::PackObserver;
+use crate::SliceLayout;
+use serde::de::DeserializeOwned;
+use serde_derive::Deserialize;
 use starlane_space::err::ParseErrs0;
 use starlane_space::types::scope::Segment;
+use starlane_space::types::specific::Release;
+use std::ops::Deref;
 use std::path::{PathBuf, StripPrefixError};
 use std::str::FromStr;
 use std::{fs, io};
-use std::collections::HashMap;
-use std::ops::Deref;
-use serde::de::DeserializeOwned;
-use serde_derive::Deserialize;
-use tempfile::{NamedTempFile, TempDir};
+use tempfile::NamedTempFile;
 use thiserror::Error;
-use starlane_space::types::specific::Release;
-use crate::PackObserver;
-use crate::zip::{zip_directory_to_temp, ZipError};
 
 pub struct PackageLayout {
     pub config: PackageConfig,
     pub root: PathBuf,
-    pub main: Slice,
+    pub main: SliceLayout,
 }
 
 impl PackageLayout {
@@ -28,7 +27,7 @@ impl PackageLayout {
     }
 
     pub fn create(root: &PathBuf, observer: &mut dyn PackObserver) -> Result<Self, PackErr> {
-        let main = Slice::create(root,observer)?;
+        let main = SliceLayout::create(root, observer)?;
         let toml_path = root.join("package.toml");
         let config: PackageConfigRaw = Self::read_toml(&toml_path)?;
         let config: PackageConfig = config.try_into()?;
@@ -91,7 +90,7 @@ impl TryFrom<PackageConfigRaw> for PackageConfig {
 
 
 impl Deref for PackageLayout {
-    type Target = Slice;
+    type Target = SliceLayout;
 
     fn deref(&self) -> &Self::Target {
         & self.main

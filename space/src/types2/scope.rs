@@ -16,7 +16,7 @@ use strum_macros::{EnumDiscriminants, EnumString};
 use validator::ValidateRequired;
 
 use crate::types::scope::parse::scope;
-use crate::types::specific::Specific;
+use crate::types::specific::Slice;
 use once_cell::sync::Lazy;
 use uuid::Uuid;
 use crate::types::archetype::Archetype;
@@ -76,6 +76,12 @@ impl SlicePath {
         }
         path
     }
+    
+    
+    
+
+
+    
 }
 
 

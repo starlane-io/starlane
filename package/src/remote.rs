@@ -1,11 +1,11 @@
-use reqwest;
-use std::path::PathBuf;
+use crate::create::PackageLayout;
+use crate::repo::Repo;
+use crate::{PackageErr, PublishObserver};
 use anyhow::Result;
 use async_trait::async_trait;
-use starlane_space::types::specific::Specific;
-use crate::create::{PackErr, PackageLayout};
-use crate::{PackObserver, PackageErr, PublishObserver};
-use crate::repo::Repo;
+use reqwest;
+use starlane_space::types::specific::Slice;
+use std::path::PathBuf;
 
 pub struct RemoteRepo {
     pub url: String
@@ -13,7 +13,7 @@ pub struct RemoteRepo {
 
 #[async_trait]
 impl Repo for RemoteRepo {
-    async fn get_slice(&self, specific: &Specific) -> std::result::Result<Vec<u8>, PackageErr> {
+    async fn get_slice(&self, specific: &Slice) -> std::result::Result<Vec<u8>, PackageErr> {
         todo!()
     }
 

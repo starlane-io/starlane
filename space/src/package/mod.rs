@@ -1,5 +1,5 @@
-use crate::types2::specific::Specific;
+use crate::types2::specific::Slice;
 
 pub struct Package {
-  pub specific: Specific
+  pub specific: Slice
 }

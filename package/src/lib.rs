@@ -1,14 +1,14 @@
-use std::collections::HashMap;
 use crate::create::{PackErr, PackageLayout};
+use once_cell::sync::Lazy;
 use starlane_space::parse::SkewerCase;
 use starlane_space::types::scope::{Segment, SlicePath};
+use std::collections::HashMap;
 use std::fmt::Debug;
-use std::{fs, io};
 use std::io::Error;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::{fs, io};
 use thiserror::Error;
-use once_cell::sync::Lazy;
 
 pub static MAIN_SLICE: Lazy<Segment> = Lazy::new(|| Segment::Segment(SkewerCase::from_str("main").unwrap()));
 
@@ -19,7 +19,7 @@ pub mod create;
 pub mod zip;
 pub mod remote;
 pub mod repo;
-pub mod cache;
+pub mod download;
 pub mod server;
 
 #[derive(Error, Debug)]
@@ -62,7 +62,7 @@ impl From<PackErr> for PackageErr {
 }
 
 
-/// a [Slice] is NOT a [Directory] but an independent part of a [PackageStructure] that
+/// a [SliceLayout] is NOT a [Directory] but an independent part of a [PackageStructure] that
 /// can be downloaded separately and independently. For example imagine a package with slices:
 /// ```md
 /// * package `uberscott.com:website:1.2.3` with slices:
@@ -77,15 +77,15 @@ impl From<PackErr> for PackageErr {
 /// with the versions its meant to work with...
 ///
  #[derive(Clone,Debug)]
-pub struct Slice {
+pub struct SliceLayout{
     /// the identity of this slice
     pub segment: Segment,
-    slices: HashMap<Segment,Slice>,
+    slices: HashMap<Segment, SliceLayout>,
     directory: Directory,
 }
 
 
-impl Slice {
+impl SliceLayout {
 
 
     pub fn new(segment: Segment) -> Self {
@@ -116,13 +116,13 @@ impl Slice {
         }
 
         /// `segment` is provided if its the Main segment
-        fn walk_slice(dir: &PathBuf, segment: Option<Segment>) -> Result<Slice, PackErr> {
+        fn walk_slice(dir: &PathBuf, segment: Option<Segment>) -> Result<SliceLayout, PackErr> {
             let name = match segment {
                 None => crate::create::slice_name(&dir)?,
                 Some(segment) => segment
             };
 
-            let mut slice = Slice::new(name);
+            let mut slice = SliceLayout::new(name);
             for entry in fs::read_dir(dir)? {
                 let path = entry?.path();
                 if path.is_file() {
@@ -198,7 +198,7 @@ impl Slice {
         Ok(())
     }
 
-    pub fn get_child_slice( &self, segment: &Segment) -> Option<&Slice> {
+    pub fn get_child_slice( &self, segment: &Segment) -> Option<&SliceLayout> {
         self.slices.get(segment)
     }
 
@@ -285,7 +285,7 @@ impl Directory {
 
 pub enum Entity {
     Directory(Directory),
-    Slice(Slice),
+    Slice(SliceLayout),
 }
 #[derive(Clone,Debug)]
 pub enum FileEntity {
@@ -307,16 +307,16 @@ impl FileEntity {
 
 #[cfg(test)]
 mod test {
+    use crate::create::PackageLayout;
+    use crate::remote::RemoteRepo;
+    use crate::repo::{Repo, SourceRepo};
+    use crate::zip::unzip_from_binary_to_temp;
+    use crate::{FileEntity, PackObserver, PublishObserver, PACKAGE_LAYOUT_EXAMPLE};
+    use starlane_space::parse::SkewerCase;
+    use starlane_space::types::scope::Segment;
     use std::fs;
     use std::str::FromStr;
     use tempfile::TempDir;
-    use starlane_space::parse::SkewerCase;
-    use starlane_space::types::scope::Segment;
-    use crate::create::PackageLayout;
-    use crate::{FileEntity, PackObserver, PublishObserver, PACKAGE_LAYOUT_EXAMPLE};
-    use crate::repo::{Repo, SourceRepo};
-    use crate::remote::RemoteRepo;
-    use crate::zip::unzip_from_binary_to_temp;
 
     pub struct MockPublishObserver();
     
@@ -334,7 +334,7 @@ mod test {
         let mut observer = MockPublishObserver::default();
         let server = RemoteRepo::default();
         let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, & mut observer).unwrap();
-        server.submit(&layout, & mut observer).await.unwrap();
+        server.submit(&layout, observer).await.unwrap();
     }
 
     fn verify_mock_layout(layout: &PackageLayout) -> Result<(),&'static str> {
