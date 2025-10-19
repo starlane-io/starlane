@@ -96,6 +96,8 @@ impl Deref for PackageLayout {
 pub enum PackErr {
     #[error("{0}")]
     SliceNameErr(ParseErrs0),
+    #[error("slice not found: '{0}'")]
+    SliceNotFound(String),
     #[error("{0}")]
     IoErr(std::io::Error),
     #[error("{0}")]

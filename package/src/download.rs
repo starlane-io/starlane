@@ -3,10 +3,8 @@ use crate::repo::Repo;
 use crate::zip::{unzip_from_binary_to_temp, ZipError};
 use crate::PackageErr;
 use starlane_space::types::specific::Slice;
-use std::fs;
 use std::path::PathBuf;
-use std::sync::mpsc;
-use strum_macros::{Display, EnumString};
+use strum_macros::Display;
 use thiserror::Error;
 use tokio::sync::oneshot;
 

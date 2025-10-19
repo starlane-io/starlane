@@ -25,6 +25,15 @@ pub type Release = ReleaseDef<Publisher, Package, Version>;
 pub type Slice = SliceDef<Publisher, Package, Version, SlicePath>;
 pub type File = FileDef<Slice, FilePath>;
 
+impl FromStr for Slice {
+    type Err = ParseErrs0; 
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let i = new_span(s);
+        result(Self::parser(i))
+    }
+}
+
 impl FromStr for Release {
     type Err = ParseErrs0;
 
@@ -149,6 +158,7 @@ where
     release: ReleaseDef<Publisher, Package, Version>,
     slices: SlicePath,
 }
+
 
 impl<Publisher, Package, Version, SliceSegment> Display
     for SliceDef<Publisher, Package, Version, SliceSegment>
@@ -301,6 +311,7 @@ impl Slice {
         PathBuf::from(path)
     }
 }
+
 
 impl File {
     pub fn to_path(&self) -> PathBuf {

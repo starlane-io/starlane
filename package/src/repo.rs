@@ -8,6 +8,7 @@ use starlane_space::types::specific::Slice;
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
+use tokio::io::AsyncReadExt;
 
 #[async_trait]
 pub trait Repo {
@@ -59,12 +60,16 @@ impl SourceRepo {
         Ok(())
     }
 
-    pub fn get_slice_path(&self, specific: Slice) -> Result<PathBuf, String> {
-        let release = specific.release().to_string().replace(":", "_");
-        let release_path = self.root.join(release);
+    pub async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>,PackErr> {
+        let path = self.root.join(slice.to_path());
+        if !path.exists() {
+            return Err(PackErr::SliceNotFound(slice.to_string()));
+        }
 
-        let slice_path = release_path.join(specific.slices().filename()).join(".zip");
-
-        Ok(slice_path)
+        let mut file = tokio::fs::File::open(&path).await?;
+        let mut contents = Vec::new();
+        file.read_to_end(&mut contents).await?;
+        
+        Ok(contents)
     }
 }

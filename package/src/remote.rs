@@ -6,15 +6,19 @@ use async_trait::async_trait;
 use reqwest;
 use starlane_space::types::specific::Slice;
 use std::path::PathBuf;
+use axum::body::Bytes;
+use reqwest::Client;
 
 pub struct RemoteRepo {
     pub url: String,
+    pub client: Client
 }
 
 #[async_trait]
 impl Repo for RemoteRepo {
-    async fn get_slice(&self, specific: &Slice) -> std::result::Result<Vec<u8>, PackageErr> {
-        todo!()
+    async fn get_slice(&self, slice: &Slice) -> std::result::Result<Vec<u8>, PackageErr> {
+        Ok(self.client.get(format!("http://{}/slice", self.url))
+        .query(&[("slice", slice.to_string())]).send().await.unwrap().bytes().await?.into())
     }
 
     /// Upload a zip file to the package-server
@@ -46,7 +50,7 @@ impl Repo for RemoteRepo {
         // Send the POST request
         let client = reqwest::Client::new();
         let response = client
-            .post(format!("http://{}/zip", self.url))
+            .post(format!("http://{}/package", self.url))
             .multipart(form)
             .send()
             .await?;
@@ -66,7 +70,8 @@ impl Repo for RemoteRepo {
 
 impl RemoteRepo {
     pub fn new(url: String) -> Self {
-        Self { url }
+        let client = reqwest::Client::new();
+        Self { url, client }
     }
 
     /// Download a zip file from the package-server
@@ -95,8 +100,10 @@ impl RemoteRepo {
 
 impl Default for RemoteRepo {
     fn default() -> Self {
+        let client  = reqwest::Client::new();
         Self {
             url: "localhost:3000".to_string(),
+            client,
         }
     }
 }

@@ -9,12 +9,20 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::{fs, io};
 use thiserror::Error;
+use starlane_space::types::specific::Slice;
 
 pub static MAIN_SLICE: Lazy<Segment> =
     Lazy::new(|| Segment::Segment(SkewerCase::from_str("main").unwrap()));
 
 pub static PACKAGE_LAYOUT_EXAMPLE: Lazy<PathBuf> =
     Lazy::new(|| PathBuf::from_str("test/package-layout-example").unwrap());
+
+pub static ROOT_SLICE: Lazy<Slice> = Lazy::new(|| Slice::from_str("uberscott.com:postgres:1.0.1").unwrap() );
+pub static MY_SLICE: Lazy<Slice> = Lazy::new(|| Slice::from_str("uberscott.com:postgres:1.0.1::my-slice").unwrap() );
+
+
+
+
 
 pub mod create;
 
@@ -306,7 +314,7 @@ mod test {
     use crate::remote::RemoteRepo;
     use crate::repo::{Repo, SourceRepo};
     use crate::zip::unzip_from_binary_to_temp;
-    use crate::{FileEntity, PackObserver, PublishObserver, PACKAGE_LAYOUT_EXAMPLE};
+    use crate::{FileEntity, PackObserver, PublishObserver, MAIN_SLICE, MY_SLICE, PACKAGE_LAYOUT_EXAMPLE};
     use starlane_space::parse::SkewerCase;
     use starlane_space::types::scope::Segment;
     use std::fs;
@@ -333,6 +341,10 @@ mod test {
         let repo = RemoteRepo::default();
         let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, &mut observer).unwrap();
         repo.submit(&layout, observer).await.unwrap();
+
+        let my_slice = repo.get_slice(&MY_SLICE).await.unwrap();
+println!("slice size: {}", my_slice.len());
+
     }
 
     fn verify_mock_layout(layout: &PackageLayout) -> Result<(), &'static str> {

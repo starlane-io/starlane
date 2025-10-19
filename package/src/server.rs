@@ -3,16 +3,21 @@ use crate::repo::SourceRepo;
 use crate::zip::{unzip_from_binary_to_temp, ZipError};
 use crate::IgnoreObserver;
 use axum::extract::multipart::Multipart;
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::routing::method_routing::{get, post};
 use axum::routing::Router;
 use axum_core::response::{IntoResponse, Response};
 use reqwest::{header, StatusCode};
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
+use serde_derive::Deserialize;
 use tempfile::TempDir;
+use thiserror::Error;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
+use starlane_space::err::ParseErrs0;
+use starlane_space::types::specific::Slice;
 
 pub struct ServerBuilder {
     pub bind: String,
@@ -41,10 +46,10 @@ impl ServerBuilder {
     {
         let state = Arc::new(RepoState::new(self.repo.clone()));
         let router = Router::new()
-            .route("/zip", post(upload_zip))
-            .with_state(state)
-            .route("/zip/{id}", get(download_zip));
-
+            .route("/package", post(upload_zip))
+            .with_state(state.clone())
+            .route("/slice", get(get_slice))
+             .with_state(state);
         router
     }
 
@@ -79,6 +84,10 @@ impl ServerBuilder {
 }
 
 
+#[derive(Debug, Deserialize)]
+struct SliceParams{
+    slice: String,
+}
 pub struct RepoState {
     pub repo: SourceRepo,
 }
@@ -135,7 +144,7 @@ async fn shutdown_signal() {
 }
 /// Handler for uploading zip files
 async fn upload_zip(
-    app: State<Arc<RepoState>>,
+    state: State<Arc<RepoState>>,
     mut multipart: Multipart,
 ) -> Result<Response, AppError> {
     println!(".... uploading zip file");
@@ -160,7 +169,7 @@ async fn upload_zip(
 
         layout.diagnose();
 
-        app.repo.save_package(layout)?;
+        state.repo.save_package(layout)?;
 
         println!("\n\npackage saved...\n\n");
         // Return the file ID to the client
@@ -171,33 +180,20 @@ async fn upload_zip(
 }
 
 /// Handler for downloading zip files
-async fn download_zip(
-    axum::extract::Path(id): axum::extract::Path<String>,
+async fn get_slice(
+    state: State<Arc<RepoState>>,
+    params: Query<SliceParams>,
+
 ) -> Result<Response, AppError> {
-    let storage_dir = PathBuf::from("./zip_storage");
-    let file_path = storage_dir.join(format!("{}.zip", id));
+    let slice = Slice::from_str( params.slice.as_str() )?;
 
-    // Check if file exists
-    if !file_path.exists() {
-        return Err(AppError::FileNotFound);
-    }
-
-    // Read the file
-    let mut file = fs::File::open(&file_path).await?;
-    let mut contents = Vec::new();
-    file.read_to_end(&mut contents).await?;
-
-    println!("Downloading zip file with ID: {}", id);
+    let contents = state.repo.get_slice(&slice).await?;
 
     // Return the file as a response
     Ok((
         StatusCode::OK,
         [
             (header::CONTENT_TYPE, "application/zip"),
-            (
-                header::CONTENT_DISPOSITION,
-                &format!("attachment; filename=\"{}.zip\"", id),
-            ),
         ],
         contents,
     )
@@ -205,18 +201,28 @@ async fn download_zip(
 }
 
 /// Custom error type for the application
-#[derive(Debug)]
+#[derive(Debug,Error)]
 enum AppError {
+    #[error("No file provided. Please provide a package file to upload.")]
     NoFileProvided,
+    #[error("Invalid file type. Only .zip files are allowed.")]
     InvalidFileType,
+    #[allow(dead_code)]
+    #[error("Illegal Slice Name: '{0}'")]
+    IllegalSliceName(#[from] ParseErrs0),
+    #[error("File not found.")]
     FileNotFound,
     #[allow(dead_code)]
+    #[error("{0}")]
     IoError(std::io::Error),
     #[allow(dead_code)]
+    #[error("{0}")]
     MultipartError(axum::extract::multipart::MultipartError),
     #[allow(dead_code)]
+    #[error("{0}")]
     ZipError(ZipError),
     #[allow(dead_code)]
+    #[error("{0}")]
     PackErr(PackErr),
 }
 
@@ -229,16 +235,20 @@ impl From<PackErr> for AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
-            AppError::NoFileProvided => (StatusCode::BAD_REQUEST, "No file provided"),
-            AppError::InvalidFileType => (StatusCode::BAD_REQUEST, "Only .zip files are allowed"),
-            AppError::FileNotFound => (StatusCode::NOT_FOUND, "File not found"),
-            AppError::IoError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"),
+            AppError::NoFileProvided => (StatusCode::BAD_REQUEST, "No file provided".to_string()),
+            AppError::InvalidFileType => (StatusCode::BAD_REQUEST, "Only .zip files are allowed".to_string()),
+            AppError::FileNotFound => (StatusCode::NOT_FOUND, "File not found".to_string()),
+            AppError::IoError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string()),
             AppError::MultipartError(_) => {
-                (StatusCode::BAD_REQUEST, "Failed to process multipart data")
+                (StatusCode::BAD_REQUEST, "Failed to process multipart data".to_string())
             }
-            AppError::ZipError(_) => (StatusCode::BAD_REQUEST, "Failed to process zip file"),
-            AppError::PackErr(err) => (StatusCode::BAD_REQUEST, "could not process package zip"),
+            AppError::ZipError(_) => (StatusCode::BAD_REQUEST, "Failed to process zip file".to_string()),
+            AppError::PackErr(err) => (StatusCode::BAD_REQUEST, "could not process package zip".to_string()),
+            AppError::IllegalSliceName(err) => {
+                (StatusCode::BAD_REQUEST, format!("Illegal Slice Name: '{}'",err))
+            }
         };
+
 
         (status, message).into_response()
     }
