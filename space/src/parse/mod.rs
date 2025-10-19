@@ -51,6 +51,8 @@ use crate::substance::{
     Substance, SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternVar,
     SubstanceTypePatternDef, SubstanceTypePatternVar,
 };
+use crate::types::archetype::Archetype;
+use crate::types::property::{PropertyMod, PropertyName, SetProperties};
 use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValuePattern};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::ext::ExtMethod;
@@ -80,7 +82,10 @@ use nom::combinator::{cut, eof, fail, not, peek, value, verify};
 use nom::error::{ErrorKind, ParseError};
 use nom::multi::{many0, many1, separated_list0};
 use nom::sequence::{delimited, pair, terminated, tuple};
-use nom::{AsChar, Compare, FindToken, Finish, InputIter, InputLength, InputTake, InputTakeAtPosition, Offset, Parser, Slice};
+use nom::{
+    AsChar, Compare, FindToken, Finish, InputIter, InputLength, InputTake, InputTakeAtPosition,
+    Offset, Parser, Slice,
+};
 use nom::{Err, IResult};
 use nom_locate::LocatedSpan;
 use nom_supreme::context::ContextError;
@@ -88,6 +93,7 @@ use nom_supreme::error::GenericErrorTree;
 use nom_supreme::final_parser::ExtractContext;
 use nom_supreme::ParserExt;
 use regex::Regex;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with_macros::{DeserializeFromStr, SerializeDisplay};
 use std::collections::HashMap;
@@ -97,11 +103,8 @@ use std::hash::{Hash, Hasher};
 use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
-use serde::de::DeserializeOwned;
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
-use crate::types::archetype::Archetype;
-use crate::types::property::{PropertyMod, PropertyName, SetProperties};
 
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
 pub type StarParser<I: Span, O> = dyn nom_supreme::parser_ext::ParserExt<I, O, NomErr<I>>;
@@ -641,8 +644,6 @@ pub mod test3 {
 
     #[test]
     pub fn test() {
-
-
         let span = new_span("\n\n\n\n        yHadron\n");
         //let result: Res<_,PointSegVar>   = variable_ize(pop(base_point_segment))(span);
         let result: Res<_, PointVar> = cut(trim(point_var))(span);
@@ -1531,8 +1532,6 @@ impl FromStr for CamelCase {
     }
 }
 
-
-
 /*
 
 impl Serialize for CamelCase {
@@ -1584,8 +1583,6 @@ pub struct Domain {
     string: String,
 }
 
-
-
 impl Serialize for Domain {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -1610,7 +1607,6 @@ impl<'de> Deserialize<'de> for Domain {
     }
 }
 
-
 impl FromStr for Domain {
     type Err = ParseErrs0;
 
@@ -1625,9 +1621,6 @@ impl Display for Domain {
     }
 }
 
-
-
-
 impl Deref for Domain {
     type Target = String;
 
@@ -1640,10 +1633,6 @@ impl Deref for Domain {
 pub struct SkewerCase {
     string: String,
 }
-
-
-
-
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct SnakeCase {
@@ -1752,7 +1741,6 @@ impl Deref for SkewerCase {
     }
 }
 
-
 /*
 pub fn from<I,Fn,In,Out>(mut f: Fn) -> impl FnMut(I) -> Res<I, Out> where Fn: FnMut(I) -> Res<I,In>+Copy, Out: From<In>, I: Span {
     move |input| {
@@ -1762,12 +1750,19 @@ pub fn from<I,Fn,In,Out>(mut f: Fn) -> impl FnMut(I) -> Res<I, Out> where Fn: Fn
 
  */
 
-
-pub fn from_camel<I,O>(input:I) -> Res<I,O> where I: Span, O: From<CamelCase>{
+pub fn from_camel<I, O>(input: I) -> Res<I, O>
+where
+    I: Span,
+    O: From<CamelCase>,
+{
     into(camel_case)(input)
 }
 
-pub fn from_skewer<I,O>(input:I) -> Res<I,O> where I: Span, O: From<SkewerCase>{
+pub fn from_skewer<I, O>(input: I) -> Res<I, O>
+where
+    I: Span,
+    O: From<SkewerCase>,
+{
     into(skewer_case)(input)
 }
 
@@ -1797,7 +1792,7 @@ pub fn snake_case<I: Span>(input: I) -> Res<I, SnakeCase> {
     context("expect-snake-case", skewer_case_chars)(input).map(|(next, chars)| {
         (
             next,
-            SnakeCase{
+            SnakeCase {
                 string: chars.to_string(),
             },
         )
@@ -3006,7 +3001,7 @@ where
         + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     F: nom::Parser<I, O, NomErr<I>>,
-    O: Clone + FromStr<Err =ParseErrs0>,
+    O: Clone + FromStr<Err = ParseErrs0>,
 {
     move |input: I| {
         let (next, element) = f.parse(input.clone())?;
@@ -5464,25 +5459,28 @@ pub mod cmd_test {
     use crate::selector::{PointHierarchy, PointKindSeg};
     use crate::util::ToResolved;
 
-    use crate::parse::{command, create_command, point_selector, publish_command, script, upload_blocks, CamelCase, SnakeCase};
+    use crate::parse::{
+        command, create_command, point_selector, publish_command, script, upload_blocks, CamelCase,
+        SnakeCase,
+    };
     use crate::types::property::PropertyName;
     /*
-        #[mem]
-        pub async fn test2() -> Result<(),Error>{
-            let input = "? xreate localhost<Space>";
-            let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
-            match x {
-                Ok(_) => {}
-                Err(err) => {
-                    println!("err: {}", err.to_string())
-                }
+    #[mem]
+    pub async fn test2() -> Result<(),Error>{
+        let input = "? xreate localhost<Space>";
+        let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
+        match x {
+            Ok(_) => {}
+            Err(err) => {
+                println!("err: {}", err.to_string())
             }
-
-
-            Ok(())
         }
 
-         */
+
+        Ok(())
+    }
+
+     */
 
     //    #[test]
     pub fn test() -> Result<(), ParseErrs0> {
@@ -6075,8 +6073,7 @@ pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
                                 Kind::Database(DatabaseSubKind::Relational(specific.clone())),
                             )),
                             None => {
-                                let err =
-                                    NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                                let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
                                 Err(nom::Err::Error(NomErr::add_context(
                                     input,
                                     ErrCtx::InvalidSubKind(BaseKind::Database, sub.to_string()),
@@ -6102,8 +6099,7 @@ pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
                                 ));
                             }
                             None => {
-                                let err =
-                                    NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
+                                let err = NomErr::from_error_kind(input.clone(), ErrorKind::Fail);
                                 Err(nom::Err::Error(NomErr::add_context(
                                     input,
                                     ErrCtx::InvalidSubKind(BaseKind::UserBase, sub.to_string()),
@@ -6498,7 +6494,10 @@ pub fn version<I: Span>(input: I) -> Res<I, Version> {
     }
 }
 
-pub fn specific<I>(input: I) -> Res<I, Specific> where I: Span {
+pub fn specific<I>(input: I) -> Res<I, Specific>
+where
+    I: Span,
+{
     tuple((
         domain,
         tag(":"),
@@ -6590,7 +6589,7 @@ where
     i.split_at_position1_complete(
         |item| {
             let char_item = item.as_char();
-                 !(char_item == '_')
+            !(char_item == '_')
                 && !((char_item.is_alpha() && char_item.is_lowercase()) || char_item.is_dec_digit())
         },
         ErrorKind::AlphaNumeric,
@@ -6619,7 +6618,8 @@ where
     i.split_at_position1_complete(
         |item| {
             let char_item = item.as_char();
-            !(char_item == '-' || char_item == '_') && !(char_item.is_alpha() || char_item.is_dec_digit())
+            !(char_item == '-' || char_item == '_')
+                && !(char_item.is_alpha() || char_item.is_dec_digit())
         },
         ErrorKind::AlphaNumeric,
     )
@@ -7804,14 +7804,7 @@ fn find_parse_err<I: Span>(_: &Err<NomErr<I>>) -> ParseErrs0 {
     todo!()
 }
 
-
-
-
-
-
-
-
-impl Serialize for SnakeCase{
+impl Serialize for SnakeCase {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -7857,15 +7850,17 @@ impl Deref for SnakeCase {
     }
 }
 
-#[cfg(not(feature="types2") )]
+#[cfg(not(feature = "types2"))]
 mod archetypes {
-    use crate::parse::{camel_case, domain, skewer_case, snake_case, CamelCase, Domain, Res, SkewerCase, SnakeCase};
     use crate::parse::util::Span;
+    use crate::parse::{
+        camel_case, domain, skewer_case, snake_case, CamelCase, Domain, Res, SkewerCase, SnakeCase,
+    };
 
     impl CamelCase {
         pub fn parser<I>(input: I) -> Res<I, Self>
         where
-            I: Span
+            I: Span,
         {
             camel_case(input)
         }
@@ -7873,16 +7868,16 @@ mod archetypes {
     impl Domain {
         pub fn parser<I>(input: I) -> Res<I, Self>
         where
-            I: Span
+            I: Span,
         {
             domain(input)
         }
     }
 
-    impl SkewerCase{
+    impl SkewerCase {
         pub fn parser<I>(input: I) -> Res<I, Self>
         where
-            I: Span
+            I: Span,
         {
             skewer_case(input)
         }
@@ -7891,23 +7886,25 @@ mod archetypes {
     impl SnakeCase {
         pub fn parser<I>(input: I) -> Res<I, Self>
         where
-            I: Span
+            I: Span,
         {
             snake_case(input)
         }
     }
 }
 
-#[cfg(feature="types2")]
+#[cfg(feature = "types2")]
 mod archetypes {
-    use crate::parse::{camel_case, domain, skewer_case, snake_case, CamelCase, Domain, Res, SkewerCase, SnakeCase};
     use crate::parse::util::Span;
+    use crate::parse::{
+        camel_case, domain, skewer_case, snake_case, CamelCase, Domain, Res, SkewerCase, SnakeCase,
+    };
     use crate::types::archetype::Archetype;
 
     impl Archetype for CamelCase {
         fn parser<I>(input: I) -> Res<I, Self>
         where
-            I: Span
+            I: Span,
         {
             camel_case(input)
         }
@@ -7915,16 +7912,16 @@ mod archetypes {
     impl Archetype for Domain {
         fn parser<I>(input: I) -> Res<I, Self>
         where
-            I: Span
+            I: Span,
         {
             domain(input)
         }
     }
 
-    impl Archetype for SkewerCase{
+    impl Archetype for SkewerCase {
         fn parser<I>(input: I) -> Res<I, Self>
         where
-            I: Span
+            I: Span,
         {
             skewer_case(input)
         }
@@ -7933,10 +7930,9 @@ mod archetypes {
     impl Archetype for SnakeCase {
         fn parser<I>(input: I) -> Res<I, Self>
         where
-            I: Span
+            I: Span,
         {
             snake_case(input)
         }
     }
 }
-

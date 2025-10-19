@@ -27,5 +27,6 @@ serde_derive = {workspace = true}
 async-trait={workspace = true}
 axum = {workspace = true, version = "1.0.0", features = ["multipart"] }
 axum-core = {workspace = true}
+axum-test= {workspace = true}
 strum = {workspace = true}
 strum_macros = {workspace = true}

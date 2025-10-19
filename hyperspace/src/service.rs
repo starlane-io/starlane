@@ -1,14 +1,15 @@
 pub mod standard;
 
-use std::env;
-use std::env::current_dir;
+use crate::executor::cli::HostEnv;
 use crate::executor::dialect::filestore::{FileStore, FileStoreErr, FILE_STORE_ROOT};
 use crate::executor::{ExeConf, Executor};
 use crate::host::err::HostErr;
+use crate::host::{ExeStub, Host, HostCli};
 use crate::machine::MachineErr;
 use crate::service::private::ServiceCall;
 use itertools::Itertools;
 use nom::AsBytes;
+use once_cell::sync::Lazy;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::err::SpaceErr;
 use starlane_space::kind::Kind;
@@ -19,17 +20,16 @@ use starlane_space::point::Point;
 use starlane_space::selector::KindSelector;
 use starlane_space::util::{IdSelector, OptSelector, ValueMatcher};
 use starlane_space::wave::exchange::asynch::{DirectedHandler, Router};
+use std::env;
+use std::env::current_dir;
 use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::hash::Hash;
 use std::io::Read;
 use std::ops::{Deref, DerefMut};
 use std::path::absolute;
-use once_cell::sync::Lazy;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use crate::executor::cli::HostEnv;
-use crate::host::{ExeStub, Host, HostCli};
 
 pub type FileStoreService = Service<FileStore>;
 
@@ -252,7 +252,6 @@ pub trait ServiceCore<C>
 
  */
 
-
 pub static STARLANE_DATA_DIR: Lazy<String> = Lazy::new(|| {
     std::env::var("STARLANE_DATA_DIR").unwrap_or_else(|e| {
         let dir: String = match dirs::home_dir() {
@@ -262,7 +261,6 @@ pub static STARLANE_DATA_DIR: Lazy<String> = Lazy::new(|| {
         format!("{}/starlane/data", dir).to_string()
     })
 });
-
 
 pub fn service_conf() -> ServiceConf {
     let mut builder = HostEnv::builder();
@@ -276,10 +274,7 @@ pub fn service_conf() -> ServiceConf {
     println!("{}", env::current_dir().unwrap().to_str().unwrap());
     println!("  FILE_STORE_ROOT: {}", FILE_STORE_ROOT);
     println!("STARLANE_DATA_DIR: {}", STARLANE_DATA_DIR.as_str());
-    builder.env(
-        FILE_STORE_ROOT,
-        STARLANE_DATA_DIR.to_string(),
-    );
+    builder.env(FILE_STORE_ROOT, STARLANE_DATA_DIR.to_string());
     let env = builder.build();
     let path = "../target/debug/starlane-cli-filestore-service".to_string();
     let args: Option<Vec<String>> = Option::None;
@@ -287,31 +282,29 @@ pub fn service_conf() -> ServiceConf {
     let stub = ExeStub::new(path.into(), env);
 
     ServiceConf::Exe(ExeConf::Host(Host::Cli(HostCli::Os(stub))))
-
 }
-
-
-
 
 #[cfg(test)]
 pub mod tests {
     use crate::host::{ExeStub, Host};
 
     use crate::executor::cli::HostEnv;
-    use crate::executor::dialect::filestore::{FileStore, FileStoreIn, FileStoreOut, FILE_STORE_ROOT};
+    use crate::executor::dialect::filestore::{
+        FileStore, FileStoreIn, FileStoreOut, FILE_STORE_ROOT,
+    };
     use crate::executor::{ExeConf, Executor};
     use crate::host::HostCli;
-    use crate::service::{service_conf, Service, ServiceConf, ServiceErr, ServiceKind, ServiceTemplate};
+    use crate::service::{
+        service_conf, Service, ServiceConf, ServiceErr, ServiceKind, ServiceTemplate,
+    };
+    use once_cell::sync::Lazy;
     use starlane_space::kind::BaseKind;
     use starlane_space::selector::KindSelector;
     use starlane_space::util::OptSelector;
+    use std::env::current_dir;
     use std::path::{absolute, PathBuf};
     use std::{env, io};
-    use std::env::current_dir;
-    use once_cell::sync::Lazy;
     use tokio::fs;
-
-
 
     fn filestore() -> FileStore {
         if std::fs::exists("./tmp").unwrap() {
@@ -427,7 +420,6 @@ pub mod tests {
 
          */
 
-    
     /// disabled while trying to get `starlane` to compile after being in moth balls for 6 months...
     //#[tokio::test]
     pub async fn test_filestore() {

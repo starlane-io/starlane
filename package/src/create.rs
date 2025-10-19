@@ -20,9 +20,8 @@ pub struct PackageLayout {
 }
 
 impl PackageLayout {
-
     pub fn release_directory(&self) -> PathBuf {
-        let path = PathBuf::from(self.config.release.to_string().replace(":","_"));
+        let path = PathBuf::from(self.config.release.to_string().replace(":", "_"));
         path
     }
 
@@ -39,7 +38,7 @@ impl PackageLayout {
         })
     }
 
-    fn read_toml<T: DeserializeOwned>( toml_path: &PathBuf) -> Result<T, PackErr> {
+    fn read_toml<T: DeserializeOwned>(toml_path: &PathBuf) -> Result<T, PackErr> {
         let contents = fs::read_to_string(&toml_path)?;
         let parsed: T = toml::from_str(&contents)
             .map_err(|e| PackErr::TomlParseErr(toml_path.clone(), e.to_string()))?;
@@ -50,30 +49,30 @@ impl PackageLayout {
         self.diagnose_indent(0);
     }
 
-    pub fn diagnose_indent(&self,mut spaces:usize ) {
+    pub fn diagnose_indent(&self, mut spaces: usize) {
         let indent = " ".repeat(spaces);
-        println!("{indent}{}[PackageLayout] -> {}",self.root.display(),self.config.release.to_string());
-        self.main.diagnose_indent(spaces+2);
+        println!(
+            "{indent}{}[PackageLayout] -> {}",
+            self.root.display(),
+            self.config.release.to_string()
+        );
+        self.main.diagnose_indent(spaces + 2);
     }
-
 
     pub fn zip(&self) -> Result<NamedTempFile, PackErr> {
         use crate::zip::zip_directory_to_temp;
         let path = zip_directory_to_temp(self.root.clone())?;
         Ok(path)
     }
-
 }
 
-
-
-#[derive(Debug,Deserialize)]
+#[derive(Debug, Deserialize)]
 struct PackageConfigRaw {
     release: String,
 }
 
 struct PackageConfig {
-    release: Release
+    release: Release,
 }
 
 impl TryFrom<PackageConfigRaw> for PackageConfig {
@@ -81,19 +80,15 @@ impl TryFrom<PackageConfigRaw> for PackageConfig {
 
     fn try_from(raw: PackageConfigRaw) -> Result<Self, Self::Error> {
         let specific = Release::from_str(raw.release.as_str())?;
-        Ok(Self {
-            release: specific
-        })
+        Ok(Self { release: specific })
     }
 }
-
-
 
 impl Deref for PackageLayout {
     type Target = SliceLayout;
 
     fn deref(&self) -> &Self::Target {
-        & self.main
+        &self.main
     }
 }
 
@@ -169,6 +164,3 @@ pub fn ignore(path: &PathBuf) -> bool {
         _ => false,
     }
 }
-
-
-

@@ -1,5 +1,6 @@
 use clap::clap_derive::{Args, Subcommand};
 use clap::Parser;
+use macros::logger;
 use starlane_base::env::STARLANE_HOME;
 use starlane_hyperspace::driver::control::{ControlCliSession, ControlClient};
 use starlane_hyperspace::hyperlane::tcp::HyperlaneTcpClient;
@@ -22,7 +23,6 @@ use strum_macros::EnumString;
 use tokio::io::AsyncWriteExt;
 use walkdir::{DirEntry, WalkDir};
 use zip::write::{FileOptions, FullFileOptions};
-use macros::logger;
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -53,11 +53,11 @@ pub enum Commands {
         all: bool,
     },
     Context(ContextArgs),
-    Pack(PackArgs)
+    Pack(PackArgs),
 }
 
 #[derive(Debug, Args)]
-pub struct PackArgs{
+pub struct PackArgs {
     #[clap(subcommand)]
     pub command: PackCmd,
 }
@@ -70,16 +70,15 @@ impl Default for PackArgs {
     }
 }
 
-
-#[derive(Hash,Eq,PartialEq,Debug, Subcommand, strum_macros::Display)]
-pub enum PackCmd{
+#[derive(Hash, Eq, PartialEq, Debug, Subcommand, strum_macros::Display)]
+pub enum PackCmd {
     Verify,
     Publish(PubArgs),
     Serve,
 }
 
-#[derive(Debug, Args,Hash,Eq,PartialEq)]
-pub struct PubArgs{
+#[derive(Debug, Args, Hash, Eq, PartialEq)]
+pub struct PubArgs {
     pub path: Option<String>,
 }
 
@@ -300,7 +299,6 @@ fn zip_dir<T>(
 where
     T: Write + Seek,
 {
-
     todo!()
 }
 /*

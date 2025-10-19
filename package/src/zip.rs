@@ -74,8 +74,7 @@ pub fn zip_directory_to_temp<P: AsRef<Path>>(source_dir: P) -> Result<NamedTempF
                 fs::read(path).map_err(|e| ZipError::FileRead(path.to_path_buf(), e))?;
 
             zip.write_all(&file_contents)
-                .map_err(|err|ZipError::WriteError(err))?;
-            
+                .map_err(|err| ZipError::WriteError(err))?;
         } else if path.is_dir() {
             // Add directory to zip (with trailing slash)
             let dir_name = format!("{}/", name_str);
@@ -98,7 +97,11 @@ pub fn zip_slice_dir_to<P: AsRef<Path>, T: AsRef<Path>>(
     let source_dir = source_dir.as_ref();
     let target_file = target_file.as_ref();
 
-println!("zip_slice_dir_to: source_dir: {}, target_file: {}", source_dir.display(), target_file.display());
+    println!(
+        "zip_slice_dir_to: source_dir: {}, target_file: {}",
+        source_dir.display(),
+        target_file.display()
+    );
 
     if !source_dir.exists() {
         return Err(ZipError::DirectoryNotFound(source_dir.to_path_buf()));
@@ -150,8 +153,6 @@ println!("zip_slice_dir_to: source_dir: {}, target_file: {}", source_dir.display
     Ok(())
 }
 
-
-
 /// Custom error type for zip operations
 #[derive(Debug)]
 pub enum ZipError {
@@ -186,7 +187,7 @@ impl std::fmt::Display for ZipError {
                 write!(f, "Path error: {}", msg)
             }
             ZipError::WriteError(msg) => {
-                write!(f,"Write Error: {}",msg)
+                write!(f, "Write Error: {}", msg)
             }
         }
     }
@@ -278,8 +279,7 @@ pub fn unzip_from_binary_to_temp(zip_bytes: &[u8]) -> Result<tempfile::TempDir, 
 
         if file.name().ends_with('/') {
             // It's a directory
-            fs::create_dir_all(&outpath)
-                .map_err(|e| ZipError::FileRead(outpath.clone(), e))?;
+            fs::create_dir_all(&outpath).map_err(|e| ZipError::FileRead(outpath.clone(), e))?;
         } else {
             // It's a file
             if let Some(parent) = outpath.parent() {
@@ -287,11 +287,10 @@ pub fn unzip_from_binary_to_temp(zip_bytes: &[u8]) -> Result<tempfile::TempDir, 
                     .map_err(|e| ZipError::FileRead(parent.to_path_buf(), e))?;
             }
 
-            let mut outfile = File::create(&outpath)
-                .map_err(|e| ZipError::FileRead(outpath.clone(), e))?;
+            let mut outfile =
+                File::create(&outpath).map_err(|e| ZipError::FileRead(outpath.clone(), e))?;
 
-            std::io::copy(&mut file, &mut outfile)
-                .map_err(ZipError::WriteError)?;
+            std::io::copy(&mut file, &mut outfile).map_err(ZipError::WriteError)?;
         }
 
         // Set permissions on Unix

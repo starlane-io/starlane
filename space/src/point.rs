@@ -6,7 +6,10 @@ use crate::loc::{
 };
 use crate::parse::util::result;
 use crate::parse::util::{new_span, Trace};
-use crate::parse::{consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, skewer_case, Env, ResolverErr, SkewerCase};
+use crate::parse::{
+    consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, skewer_case,
+    Env, ResolverErr, SkewerCase,
+};
 use crate::selector::{PointHierarchyOpt, PointKindSegOpt, Selector};
 use crate::util::ToResolved;
 use crate::wave::{Agent, Recipients, ToRecipients};
@@ -18,7 +21,17 @@ use std::fmt::Display;
 use std::path::PathBuf;
 use strum_macros::EnumDiscriminants;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize)]
+#[derive(
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    EnumDiscriminants,
+    strum_macros::Display,
+    Serialize,
+    Deserialize,
+)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(RouteTagDiscriminant))]
 #[strum_discriminants(derive(
@@ -31,7 +44,7 @@ use strum_macros::EnumDiscriminants;
 #[non_exhaustive]
 pub enum RouteTag {
     Hub,
-    _Ext(SkewerCase)
+    _Ext(SkewerCase),
 }
 
 impl FromStr for RouteTag {
@@ -45,20 +58,18 @@ impl FromStr for RouteTag {
             /// right now there is only one builtin [RouteTag::Hub]
             RouteTagDiscriminant::Hub => Ok(Self::Hub),
             /// if it isn't a builtin then it's an extended type
-            _ => Ok(Self::_Ext(skewer))
+            _ => Ok(Self::_Ext(skewer)),
         }
     }
 }
 
 impl From<SkewerCase> for RouteTag {
-
     fn from(skewer: SkewerCase) -> Self {
         /// [RouteTag::from_str] will not fail because [SkewerCase::as_str] is already known
         /// to be of the `skewer case` convention
         Self::from_str(skewer.as_str()).unwrap()
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum RouteSeg {

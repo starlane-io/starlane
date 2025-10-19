@@ -23,7 +23,7 @@ use std::str::FromStr;
 
 pub type Release = ReleaseDef<Publisher, Package, Version>;
 pub type Slice = SliceDef<Publisher, Package, Version, SlicePath>;
-pub type File= FileDef<Slice,FilePath>;
+pub type File = FileDef<Slice, FilePath>;
 
 impl FromStr for Release {
     type Err = ParseErrs0;
@@ -59,10 +59,7 @@ fn test() {
     Slice::mock_default();
     Slice::mock_0();
     Slice::mock_1();
-    println!(
-        "SpecificLoc::mock_default() -> {}",
-        Slice::mock_default()
-    );
+    println!("SpecificLoc::mock_default() -> {}", Slice::mock_default());
     println!("SpecificLoc::mock_0() -> {}", Slice::mock_1());
     println!("SpecificLoc::mock_1() -> {}", Slice::mock_0());
 }
@@ -258,8 +255,7 @@ where
     path: FilePath,
 }
 
-impl<Slice, FilePath> Display
-for FileDef<Slice, FilePath>
+impl<Slice, FilePath> Display for FileDef<Slice, FilePath>
 where
     Slice: Archetype,
     FilePath: Archetype,
@@ -270,8 +266,7 @@ where
         Ok(())
     }
 }
-impl<Slice, FilePath> Archetype
-for FileDef<Slice, FilePath>
+impl<Slice, FilePath> Archetype for FileDef<Slice, FilePath>
 where
     Slice: Archetype,
     FilePath: Archetype,
@@ -280,15 +275,8 @@ where
     where
         I: Span,
     {
-        pair(
-            Slice::parser,
-            FilePath::parser,
-)(input).map( |(next, (slice, path))| {
-            (next,FileDef {
-                slice,
-                path
-            })
-        })
+        pair(Slice::parser, FilePath::parser)(input)
+            .map(|(next, (slice, path))| (next, FileDef { slice, path }))
     }
 }
 
@@ -301,7 +289,7 @@ impl Release {
         path.push_str("/");
         path.push_str(&self.version.to_string());
         PathBuf::from(path)
-    }   
+    }
 }
 
 impl Slice {
@@ -314,8 +302,7 @@ impl Slice {
     }
 }
 
-
-impl File{
+impl File {
     pub fn to_path(&self) -> PathBuf {
         let mut path = String::new();
         path.push_str(self.slice.to_path().to_str().unwrap());
@@ -324,15 +311,14 @@ impl File{
     }
 }
 
-pub type SliceSelector =
-    SliceDef<PublisherSelector, PackageSelector, VersionPattern, SlicePattern>;
+pub type SliceSelector = SliceDef<PublisherSelector, PackageSelector, VersionPattern, SlicePattern>;
 
 pub type PublisherSelector = Pattern<Publisher>;
 pub type PackageSelector = Pattern<Package>;
 pub type VersionPattern = Pattern<VersionReq>;
 pub type SlicePattern = Pattern<SlicePath>;
 
-pub type FilePattern= Pattern<FilePath>;
+pub type FilePattern = Pattern<FilePath>;
 /*
 pub(crate) mod parse {
     use nom::sequence::tuple;
@@ -375,16 +361,7 @@ pub enum RootSegment {
     Segment(Segment),
 }
 
-
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct FileSegment(String);
 
 impl Display for FileSegment {
@@ -396,33 +373,24 @@ impl Display for FileSegment {
 impl Archetype for FileSegment {
     fn parser<I>(input: I) -> Res<I, Self>
     where
-        I: Span
+        I: Span,
     {
         filename(input).map(|(next, segment)| ((next, Self(segment.to_string()))))
     }
 }
 
-
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct FilePath {
     pub segments: Vec<FileSegment>,
 }
 
 impl FilePath {
-   pub fn to_path(&self) -> PathBuf {
+    pub fn to_path(&self) -> PathBuf {
         let mut path = PathBuf::new();
-       path.push("/");
-        for (index,segment) in self.segments.iter().enumerate() {
+        path.push("/");
+        for (index, segment) in self.segments.iter().enumerate() {
             path.push(segment.to_string());
-            if( index < self.segments.len() - 1 ) {
+            if (index < self.segments.len() - 1) {
                 path.push("/");
             }
         }
@@ -430,12 +398,9 @@ impl FilePath {
     }
 }
 
-
 impl Default for FilePath {
     fn default() -> Self {
-        Self {
-            segments: vec![],
-        }
+        Self { segments: vec![] }
     }
 }
 
@@ -450,7 +415,7 @@ impl FilePath {
         Self { segments }
     }
 
-    pub fn insert(&mut self, segment: FileSegment ) {
+    pub fn insert(&mut self, segment: FileSegment) {
         self.segments.insert(0, segment);
     }
 
@@ -458,7 +423,7 @@ impl FilePath {
         self.segments.is_empty()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=&FileSegment> {
+    pub fn iter(&self) -> impl Iterator<Item = &FileSegment> {
         self.segments.iter()
     }
 
@@ -466,7 +431,7 @@ impl FilePath {
         self.segments.first()
     }
 
-    pub fn remove_first(& mut self) -> Option<FileSegment> {
+    pub fn remove_first(&mut self) -> Option<FileSegment> {
         if self.segments.len() > 0 {
             Some(self.segments.remove(0))
         } else {
@@ -477,7 +442,7 @@ impl FilePath {
     pub fn path(&self) -> String {
         let mut rtn = String::new();
         rtn.push_str("/");
-        for (index,segment) in self.segments.iter().enumerate() {
+        for (index, segment) in self.segments.iter().enumerate() {
             rtn.push_str(&segment.to_string());
             if index < self.segments.len() - 1 {
                 rtn.push_str("/");
@@ -496,10 +461,9 @@ impl Display for FilePath {
 impl Archetype for FilePath {
     fn parser<I>(input: I) -> Res<I, Self>
     where
-        I: Span
+        I: Span,
     {
-        preceded(tag("/"),separated_list0(tag("/"),FileSegment::parser))(input).map(|(next,segments)| {
-            (next, FilePath::new(segments) )
-        })
+        preceded(tag("/"), separated_list0(tag("/"), FileSegment::parser))(input)
+            .map(|(next, segments)| (next, FilePath::new(segments)))
     }
 }

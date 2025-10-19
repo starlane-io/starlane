@@ -37,6 +37,7 @@ use starlane_space::selector::{
 };
 use starlane_space::status::Handle;
 use starlane_space::substance::{Substance, SubstanceList, SubstanceMap};
+use starlane_space::types::property::{PropertyMod, SetProperties};
 use starlane_space::util::ValuePattern;
 use starlane_space::HYPERUSER;
 use std::collections::{HashMap, HashSet};
@@ -44,7 +45,6 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
-use starlane_space::types::property::{PropertyMod, SetProperties};
 
 /// embedded postgres for local development environments is slated to be removed in favor of
 /// Postgres provided by `DockerDesktopFoundation`
@@ -56,10 +56,7 @@ pub struct PostgresRegistry {
 }
 
 impl PostgresRegistry {
-    pub async fn new(
-        handle: Handle<PostgresDatabase>,
-        logger: Logger
-    ) -> Result<Self, RegErr> {
+    pub async fn new(handle: Handle<PostgresDatabase>, logger: Logger) -> Result<Self, RegErr> {
         let logger = push_loc!((logger, Point::global_registry()));
 
         let registry = Self {
@@ -1340,11 +1337,11 @@ pub mod test {
     use starlane_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
     use starlane_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
     use starlane_space::loc::{MachineName, StarKey, ToPoint};
-    use starlane_space::types::property::PropertiesConfig;
     use starlane_space::particle::Status;
     use starlane_space::point::Point;
     use starlane_space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
     use starlane_space::selector::{PointHierarchy, Selector};
+    use starlane_space::types::property::PropertiesConfig;
     use starlane_space::HYPERUSER;
 
     #[derive(Clone)]

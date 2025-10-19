@@ -10,29 +10,104 @@ use axum_core::response::{IntoResponse, Response};
 use reqwest::{header, StatusCode};
 use std::path::PathBuf;
 use std::sync::Arc;
+use tempfile::TempDir;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
 
-pub struct RepoState {
+pub struct ServerBuilder {
     pub bind: String,
     pub repo: SourceRepo
+}
+
+impl Default for ServerBuilder {
+    fn default() -> Self {
+        Self {
+            bind: "0.0.0.0:3000".to_string(),
+            repo: SourceRepo::default(),
+        }
+    }
+}
+
+impl ServerBuilder {
+
+    pub fn temp() -> (Self,TempDir) {
+        let (repo,dir)= SourceRepo::temp();
+        (Self {
+            bind: "0.0.0.0:3000".to_string(),
+            repo
+        },dir)
+    }
+    pub fn router(&self) -> Router
+    {
+        let state = Arc::new(RepoState::new(self.repo.clone()));
+        let router = Router::new()
+            .route("/zip", post(upload_zip))
+            .with_state(state)
+            .route("/zip/{id}", get(download_zip));
+
+        router
+    }
+
+    pub fn serve(self) -> tokio::sync::oneshot::Sender<()> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        tokio::spawn( async move {
+            println!("Starting server....");
+            let router = self.router();
+            // Run the server
+            let listener = tokio::net::TcpListener::bind(self.bind.clone())
+                .await
+                .expect("Failed to bind to address");
+
+            println!("Server running on http://{}", self.bind);
+            println!("POST /zip - Upload a zip file");
+            println!("GET /zip/:id - Download a zip file");
+            async fn stop(rx: tokio::sync::oneshot::Receiver<()>) {
+                rx.await.unwrap()
+            }
+
+            axum::serve(listener, router)
+                .with_graceful_shutdown(stop(rx))
+                .await
+                .expect("Failed to start server");
+
+            println!("Server stopped");
+        });
+        tx
+    }
+
+
+}
+
+
+pub struct RepoState {
+    pub repo: SourceRepo,
+}
+
+impl RepoState {
+    pub fn new( repo: SourceRepo ) -> Self {
+        Self {
+            repo
+        }
+    }
 }
 
 impl Default for RepoState {
     fn default() -> Self {
         Self {
-            bind: "0.0.0.0:3000".to_string(),
-            repo: SourceRepo::default()
+            repo: SourceRepo::default(),
         }
     }
 }
 
+
+/*
 pub async fn start_package_server() {
     let repo = RepoState::default();
     let repo = Arc::new(repo);
     // Build the router
     let app = Router::new()
-        .route("/zip", post(upload_zip)).with_state(repo.clone())
+        .route("/zip", post(upload_zip))
+        .with_state(repo.clone())
         .route("/zip/{id}", get(download_zip));
 
     // Run the server
@@ -44,10 +119,13 @@ pub async fn start_package_server() {
     println!("POST /zip - Upload a zip file");
     println!("GET /zip/:id - Download a zip file");
 
-    axum::serve(listener, app).with_graceful_shutdown(shutdown_signal())
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
         .await
         .expect("Failed to start server");
 }
+
+ */
 
 async fn shutdown_signal() {
     tokio::signal::ctrl_c()
@@ -56,13 +134,16 @@ async fn shutdown_signal() {
     println!("Received Ctrl+C, initiating graceful shutdown...");
 }
 /// Handler for uploading zip files
-async fn upload_zip(app: State<Arc<RepoState>>, mut multipart: Multipart) -> Result<Response, AppError> {
+async fn upload_zip(
+    app: State<Arc<RepoState>>,
+    mut multipart: Multipart,
+) -> Result<Response, AppError> {
     println!(".... uploading zip file");
     let storage_dir = PathBuf::from("./zip_storage");
 
     while let Some(field) = multipart.next_field().await? {
         let name = field.name().unwrap_or("").to_string();
-println!(". field name: {}", name);
+        println!(". field name: {}", name);
         let file_name = field.file_name().unwrap_or("").to_string();
 
         // Generate unique ID for the file
@@ -75,19 +156,15 @@ println!(". field name: {}", name);
 
         let mut observer = IgnoreObserver;
         let path = dir.path().to_path_buf();
-        let layout = PackageLayout::create( &path, & mut observer )?;
+        let layout = PackageLayout::create(&path, &mut observer)?;
 
         layout.diagnose();
 
         app.repo.save_package(layout)?;
 
-println!("\n\npackage saved...\n\n");
+        println!("\n\npackage saved...\n\n");
         // Return the file ID to the client
-        return Ok((
-            StatusCode::CREATED,
-            format!("File uploaded successfully."),
-        )
-            .into_response());
+        return Ok((StatusCode::CREATED, format!("File uploaded successfully.")).into_response());
     }
 
     Err(AppError::NoFileProvided)
@@ -140,7 +217,7 @@ enum AppError {
     #[allow(dead_code)]
     ZipError(ZipError),
     #[allow(dead_code)]
-    PackErr(PackErr)
+    PackErr(PackErr),
 }
 
 impl From<PackErr> for AppError {
@@ -182,5 +259,20 @@ impl From<axum::extract::multipart::MultipartError> for AppError {
 impl From<ZipError> for AppError {
     fn from(err: ZipError) -> Self {
         AppError::ZipError(err)
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use axum_test::TestServer;
+    use crate::server::ServerBuilder;
+
+    #[test]
+    pub fn test() {
+        // must hang on to TempDir ref until test is finished
+        let (server,tmp) = ServerBuilder::temp();
+        let server = TestServer::new( server.router()).unwrap();
+        //server.post("/zip").await.();
+        todo!()
     }
 }

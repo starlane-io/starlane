@@ -3,20 +3,22 @@ pub mod context;
 mod detail;
 pub mod err;
 
-use std::hash::{Hash, Hasher};
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::parse::CamelCase;
-use starlane_space::status::{Action, ActionRequest, Entity, EntityReadier, EntityResult, PendingDetail, StatusProbe};
+use starlane_space::status::{
+    Action, ActionRequest, Entity, EntityReadier, EntityResult, PendingDetail, StatusProbe,
+};
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use strum_macros::EnumDiscriminants;
 
+use crate::base::config::BaseConfig;
+use crate::base::BaseSub;
 use crate::registry::Registry;
 use starlane_space::status::Status;
-use crate::base::BaseSub;
-use crate::base::config::BaseConfig;
 
-#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize,Eq,PartialEq,Hash)]
+#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ProviderKindDisc))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
@@ -41,7 +43,6 @@ pub enum ProviderKind {
     _Ext(CamelCase),
 }
 
-
 /*
 impl kinds::ProviderKind for ProviderKind{ }
 
@@ -60,7 +61,6 @@ impl Hash for ProviderKindDef {
 }
 
  */
-
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
@@ -93,14 +93,12 @@ pub enum Strata {
 }
 
 /// [Provider] can be from a [Foundation] or a [Platform].
-/// 
+///
 /// A [Provider] is an add-on to the [Foundation] infrastructure which may need to be
 /// downloaded, installed, initialized and started... and [Platform] [Provider]s typically
-/// make a contextual connection available for the [Provider]'s service... 
+/// make a contextual connection available for the [Provider]'s service...
 #[async_trait]
 pub trait Provider: BaseSub + StatusProbe + Send + Sync {
-
-
     fn provider_kind(&self) -> &ProviderKindDisc {
         todo!()
     }
@@ -123,12 +121,11 @@ pub trait Provider: BaseSub + StatusProbe + Send + Sync {
     /// [StateDetail::Fatal] should fail immediately.
     ///
     /// Progress [Status] of [Self::ready] can be tracked using: [Self::status_watcher]
-    
+
     DISABLED for now... trying to get project compiling and passing tests first
     async fn ready(&self) -> EntityResult<Self::Entity>;
-    
-     */
 
+     */
 }
 
 /*

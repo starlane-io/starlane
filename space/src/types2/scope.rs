@@ -5,21 +5,21 @@ use crate::parse::{Res, SkewerCase};
 use core::str::FromStr;
 use futures::TryFutureExt;
 use nom::branch::alt;
+use nom::bytes::complete::tag;
 use nom::combinator::{all_consuming, into};
+use nom::multi::{separated_list0, separated_list1};
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::path::PathBuf;
-use nom::bytes::complete::tag;
-use nom::multi::{separated_list0, separated_list1};
 use strum_macros::{EnumDiscriminants, EnumString};
 use validator::ValidateRequired;
 
+use crate::types::archetype::Archetype;
 use crate::types::scope::parse::scope;
 use crate::types::specific::Slice;
 use once_cell::sync::Lazy;
 use uuid::Uuid;
-use crate::types::archetype::Archetype;
 
 pub static ROOT_SCOPE: Lazy<Scope> = Lazy::new(|| Scope(Some(ScopeKeyword::Root), vec![]));
 
@@ -44,28 +44,18 @@ pub enum ScopeKeyword {
     Root,
 }
 
+static MAIN_PATH: Lazy<SlicePath> = Lazy::new(|| {
+    SlicePath::new(vec![Segment::Segment(
+        SkewerCase::from_str("main").unwrap(),
+    )])
+});
 
-static MAIN_PATH: Lazy<SlicePath> =
-    Lazy::new(|| {
-        SlicePath::new(vec![Segment::Segment(SkewerCase::from_str("main").unwrap())])
-    });
-
-
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct SlicePath {
     pub segments: Vec<Segment>,
 }
 
 impl SlicePath {
-
     pub fn main() -> Self {
         MAIN_PATH.clone()
     }
@@ -76,20 +66,11 @@ impl SlicePath {
         }
         path
     }
-    
-    
-    
-
-
-    
 }
-
 
 impl Default for SlicePath {
     fn default() -> Self {
-        Self {
-            segments: vec![],
-        }
+        Self { segments: vec![] }
     }
 }
 
@@ -104,7 +85,7 @@ impl SlicePath {
         Self { segments }
     }
 
-    pub fn insert(&mut self, segment: Segment ) {
+    pub fn insert(&mut self, segment: Segment) {
         self.segments.insert(0, segment);
     }
 
@@ -120,7 +101,7 @@ impl SlicePath {
         self.segments.is_empty()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=&Segment> {
+    pub fn iter(&self) -> impl Iterator<Item = &Segment> {
         self.segments.iter()
     }
 
@@ -128,10 +109,10 @@ impl SlicePath {
         self.segments.first()
     }
 
-    pub fn remove_first(& mut self) -> Option<Segment> {
+    pub fn remove_first(&mut self) -> Option<Segment> {
         if self.segments.len() > 0 {
-        Some(self.segments.remove(0))
-            } else {
+            Some(self.segments.remove(0))
+        } else {
             None
         }
     }
@@ -151,11 +132,10 @@ impl SlicePath {
 impl Archetype for SlicePath {
     fn parser<I>(input: I) -> Res<I, Self>
     where
-        I: Span
+        I: Span,
     {
-        separated_list0(tag(":"),Segment::parser)(input).map(|(next,segments)| {
-            (next, SlicePath::new(segments) )
-        })
+        separated_list0(tag(":"), Segment::parser)(input)
+            .map(|(next, segments)| (next, SlicePath::new(segments)))
     }
 }
 
@@ -198,7 +178,6 @@ impl Display for SlicePath {
     Serialize,
     Deserialize,
 )]
-
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(SegmentKind))]
 #[strum_discriminants(derive(Hash, strum_macros::EnumString))]
@@ -211,10 +190,9 @@ pub enum Segment {
     Segment(SkewerCase),
 }
 
-
 impl Segment {
     pub fn is_main(&self) -> bool {
-        if let Self::Segment(id) = self  {
+        if let Self::Segment(id) = self {
             "main" == id.as_str()
         } else {
             false
@@ -222,13 +200,11 @@ impl Segment {
     }
 }
 
-
 impl Into<SlicePath> for Segment {
     fn into(self) -> SlicePath {
         SlicePath::new(vec![self])
     }
 }
-
 
 impl From<Version> for Segment {
     fn from(version: Version) -> Self {
@@ -360,16 +336,14 @@ impl Scope {
 
 #[cfg(test)]
 pub mod test {
+    use crate::parse::util::{new_span, result};
     use crate::types::scope::parse::parse;
     use crate::types::scope::ScopeKeyword;
-    use std::str::FromStr;
-    use crate::parse::util::{new_span, result};
     use crate::types2::scope::parse::scope;
-    
-    
+    use std::str::FromStr;
+
     #[test]
     fn text_x() {
-
         assert_eq!(ScopeKeyword::from_str("root").unwrap(), ScopeKeyword::Root);
         let domain = result(scope(new_span("hello"))).unwrap();
         assert_eq!(domain.to_string().as_str(), "hello");
@@ -377,7 +351,7 @@ pub mod test {
         assert_eq!(domain.prefix().is_none(), true);
     }
 
-/*
+    /*
 
         let scope = parse("root").unwrap();
         println!("{:?}", scope);
@@ -429,9 +403,9 @@ pub mod parse {
     pub fn scope<I: Span>(input: I) -> Res<I, Scope> {
         context(
             "scope parsing",
-            terminated(separated_list0(tag("::"), postfix_segment), tag("::"))
+            terminated(separated_list0(tag("::"), postfix_segment), tag("::")),
         )(input)
-            .map(|(next, segments)| (next, Scope::from_segments(segments))) 
+        .map(|(next, segments)| (next, Scope::from_segments(segments)))
     }
 
     fn prefix<I: Span>(input: I) -> Res<I, ScopeKeyword> {

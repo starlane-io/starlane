@@ -11,11 +11,11 @@ pub mod artifact;
 
 pub mod filestore;
 
+use crate::base::Platform;
 use crate::driver::control::ControlErr;
 use crate::driver::star::StarDriverFactory;
 use crate::executor::dialect::filestore::FileStoreErr;
 use crate::machine::MachineErr;
-use crate::base::Platform;
 use crate::registry::err::RegErr;
 use crate::registry::{Registration, Registry};
 use crate::service::{
@@ -34,8 +34,8 @@ use starlane_macros::push_loc;
 use starlane_macros::{handler, route, DirectedHandler, ToSpaceErr};
 use starlane_space::artifact::asynch::{ArtErr, Artifacts};
 use starlane_space::artifact::ArtRef;
-use starlane_space::command::common::StateSrc::Subst;
 use starlane_space::command::common::StateSrc;
+use starlane_space::command::common::StateSrc::Subst;
 use starlane_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
@@ -54,6 +54,7 @@ use starlane_space::particle::{Details, Status, Stub};
 use starlane_space::point::Point;
 use starlane_space::selector::KindSelector;
 use starlane_space::substance::{Substance, SubstanceErr};
+use starlane_space::types::property::SetProperties;
 use starlane_space::util::{log, IdSelector, ValueMatcher};
 use starlane_space::wave::core::cmd::CmdMethod;
 use starlane_space::wave::core::http2::StatusCode;
@@ -73,7 +74,6 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
-use starlane_space::types::property::SetProperties;
 
 pub struct DriversBuilder {
     factories: Vec<Arc<dyn HyperDriverFactory>>,

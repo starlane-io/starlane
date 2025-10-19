@@ -1,6 +1,7 @@
 use crate::parse::util::{preceded, Span};
 use ariadne::{Label, Report, ReportKind, Source};
 use cliclack::input;
+use nom::bytes::complete::tag;
 use nom::character::complete::alpha1;
 use nom::combinator::all_consuming;
 use nom::error::{
@@ -14,14 +15,13 @@ use nom_supreme::context::ContextError;
 use nom_supreme::parser_ext::ParserExt;
 use std::fmt::{Debug, Formatter};
 use std::ops::Range;
-use nom::bytes::complete::tag;
 use strum_macros::{Display, EnumString};
 //use nom_supreme::tag::complete::tag;
 use nom_supreme::context;
 use nom_supreme::final_parser::ExtractContext;
 use nom_supreme::tag::TagError;
+use starlane_macros::push_ctx_for_input;
 use thiserror::Error;
-use starlane_macros::{push_ctx_for_input};
 
 type Input<'a> = LocatedSpan<&'a str, ParseOpRef<'a>>;
 
@@ -176,11 +176,11 @@ impl<'a> TagError<Input<'a>, Ctx> for ParseErrs<'a> {
 }
 
 pub fn expect<O>(
-    f: impl FnMut(Input) -> Res<O>+Copy,
+    f: impl FnMut(Input) -> Res<O> + Copy,
     ctx: &'static str,
     expected: &'static str,
     found: &'static str,
-) -> impl FnMut(Input) -> Res<O>+Copy {
+) -> impl FnMut(Input) -> Res<O> + Copy {
     move |input| {
         f.context(Ctx::Expected {
             ctx,
@@ -191,26 +191,22 @@ pub fn expect<O>(
     }
 }
 
-
-
-
 /*
 fn segments(ix : Input) -> Res < Vec < Input > >
 {
-    let mut f = move | ix2| 
+    let mut f = move | ix2|
         {
             let mut parser =
                 pair(separated_list1(tag(":"), alpha1 :: < Input, ParseErrs >),
                      preceded(tag("^").context(Ctx :: Yuk), alpha1));
-            
+
             parser.parse(ix2).map(| (next, (segments, extra)) | (next, segments))
         };
-    
+
     expect(f , "segment", "x", "y") (ix)
 }
 
  */
-
 
 pub fn segments(i: Input) -> Res<Vec<Input>> {
     let mut parser = pair(
@@ -222,9 +218,6 @@ pub fn segments(i: Input) -> Res<Vec<Input>> {
         .parse(i)
         .map(|(next, (segments, extra))| (next, segments))
 }
-
-
-
 
 /*
 #[push_ctx_for_input]
@@ -241,7 +234,6 @@ pub fn segments(i: Input) -> Res<Vec<Input>> {
 }
 
  */
-
 
 #[test]
 fn test() {

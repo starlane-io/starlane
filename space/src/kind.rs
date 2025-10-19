@@ -17,10 +17,10 @@ use crate::selector::{
 use crate::util::ValuePattern;
 use convert_case::{Case, Casing};
 use core::str::FromStr;
+use indexmap::Equivalent;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use indexmap::Equivalent;
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {
@@ -764,7 +764,6 @@ impl StarStub {
     }
 }
 
-
 /// A Specific is used to associate [Type](s) with an'Exact' definition(s)
 ///
 /// The Specific segment schema is designed to avoid naming collisions and follows
@@ -829,7 +828,7 @@ impl Equivalent<Specific> for &Specific {
 
 impl Into<Specific> for &Specific {
     fn into(self) -> Specific {
-       self.clone()
+        self.clone()
     }
 }
 

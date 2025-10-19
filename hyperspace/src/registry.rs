@@ -1,3 +1,4 @@
+use crate::base::config::{BaseConfig, BaseSubConfig};
 use crate::registry::err::RegErr;
 use async_trait::async_trait;
 use starlane_space::command::common::SetRegistry;
@@ -12,9 +13,8 @@ use starlane_space::point::Point;
 use starlane_space::security::{Access, AccessGrant, IndexedAccessGrant};
 use starlane_space::selector::Selector;
 use starlane_space::substance::SubstanceList;
-use std::sync::Arc;
 use starlane_space::types::property::SetProperties;
-use crate::base::config::{BaseConfig, BaseSubConfig};
+use std::sync::Arc;
 
 pub mod err;
 
