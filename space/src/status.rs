@@ -26,11 +26,10 @@ use strum_macros::EnumDiscriminants;
 /// [starlane_hyperspace]: ../../starlane_hyperspace
 /// [Provider]: ../../starlane_hyperspace/src/provider.rs
 pub trait Entity: Send + Sync {
-
     //fn kind(&self) -> &Self::Kind;
 }
 
-impl Entity for () { }
+impl Entity for () {}
 
 /// [StatusWatcher] is type bound to [tokio::sync::watch::Receiver<StatusResult>]) can get the realtime
 /// [StatusDetail] of a [StatusProbe] by polling: [StatusWatcher::borrow] or by listening for
@@ -97,15 +96,16 @@ where
     hold: tokio::sync::mpsc::Sender<()>,
 }
 
-impl <E> Deref for Handle<E> where
-    E: Entity + Send + Sync + ?Sized{
+impl<E> Deref for Handle<E>
+where
+    E: Entity + Send + Sync + ?Sized,
+{
     type Target = Arc<E>;
 
-    fn deref(&self) -> & Self::Target {
-        & self.entity
+    fn deref(&self) -> &Self::Target {
+        &self.entity
     }
 }
-
 
 impl<E> Handle<E>
 where
@@ -201,8 +201,8 @@ pub enum Status {
     /// the [Entity]s actually [Status] cannot be determined because it cannot
     /// be reached over the network.
     Unreachable,
-    /// A non-fatal error occurred that [StatusProbe] does not comprehend.  Panic signals that 
-    /// no more attempts will be made to remedy the situation.  The entity must be `unpanicked` 
+    /// A non-fatal error occurred that [StatusProbe] does not comprehend.  Panic signals that
+    /// no more attempts will be made to remedy the situation.  The entity must be `unpanicked`
     /// in order for trying to resume.
     Panic,
     /// the [StatusProbe] reports that it cannot go on... [Status::Fatal] is a suggestion
@@ -210,7 +210,7 @@ pub enum Status {
     /// [StatusProbe], abort its [EntityReadier::ready] attempt or kill the entire process
     /// with an error code
     Fatal,
-    /// the desired state 
+    /// the desired state
     Ready,
 }
 
@@ -670,8 +670,6 @@ pub mod test {
     use crate::status::{Entity, Handle};
     use std::ops::Deref;
 
-
     #[test]
-    pub fn compiles() { }
-
+    pub fn compiles() {}
 }

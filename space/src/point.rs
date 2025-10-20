@@ -1,12 +1,15 @@
 use crate::err::ParseErrs0;
 use crate::loc::{
     Layer, PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Topic, VarVal,
-    Variable, VersionSegLoc, CENTRAL, GLOBAL_DEPENDENCIES, GLOBAL_EXEC, GLOBAL_FOUNDATION, GLOBAL_LOGGER,
+    Variable, Version, CENTRAL, GLOBAL_DEPENDENCIES, GLOBAL_EXEC, GLOBAL_FOUNDATION, GLOBAL_LOGGER,
     GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT,
 };
 use crate::parse::util::result;
 use crate::parse::util::{new_span, Trace};
-use crate::parse::{consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, skewer_case, Env, ResolverErr, SkewerCase};
+use crate::parse::{
+    consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, skewer_case,
+    Env, ResolverErr, SkewerCase,
+};
 use crate::selector::{PointHierarchyOpt, PointKindSegOpt, Selector};
 use crate::util::ToResolved;
 use crate::wave::{Agent, Recipients, ToRecipients};
@@ -17,9 +20,18 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::path::PathBuf;
 use strum_macros::EnumDiscriminants;
-use thiserror::__private::AsDisplay;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, EnumDiscriminants, strum_macros::Display, Serialize, Deserialize)]
+#[derive(
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    EnumDiscriminants,
+    strum_macros::Display,
+    Serialize,
+    Deserialize,
+)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(RouteTagDiscriminant))]
 #[strum_discriminants(derive(
@@ -32,7 +44,7 @@ use thiserror::__private::AsDisplay;
 #[non_exhaustive]
 pub enum RouteTag {
     Hub,
-    _Ext(SkewerCase)
+    _Ext(SkewerCase),
 }
 
 impl FromStr for RouteTag {
@@ -46,20 +58,18 @@ impl FromStr for RouteTag {
             /// right now there is only one builtin [RouteTag::Hub]
             RouteTagDiscriminant::Hub => Ok(Self::Hub),
             /// if it isn't a builtin then it's an extended type
-            _ => Ok(Self::_Ext(skewer))
+            _ => Ok(Self::_Ext(skewer)),
         }
     }
 }
 
 impl From<SkewerCase> for RouteTag {
-
     fn from(skewer: SkewerCase) -> Self {
         /// [RouteTag::from_str] will not fail because [SkewerCase::as_str] is already known
         /// to be of the `skewer case` convention
         Self::from_str(skewer.as_str()).unwrap()
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum RouteSeg {
@@ -392,7 +402,7 @@ pub enum PointSegCtx {
     FilesystemRootDir,
     Dir(String),
     File(String),
-    Version(VersionSegLoc),
+    Version(Version),
     Working(Trace),
     Pop(Trace),
 }
@@ -405,7 +415,7 @@ pub enum PointSegVar {
     FilesystemRootDir,
     Dir(String),
     File(String),
-    Version(VersionSegLoc),
+    Version(Version),
     Working(Trace),
     Pop(Trace),
     Var(Variable),
@@ -548,7 +558,7 @@ pub enum PointSeg {
     FsRootDir,
     Dir(String),
     File(String),
-    Version(VersionSegLoc),
+    Version(Version),
 }
 
 impl PointSeg {

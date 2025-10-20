@@ -18,7 +18,7 @@ use starlane_space::command::direct::set::Set;
 use starlane_space::err::SpaceErr;
 use starlane_space::hyper::{ParticleLocation, ParticleRecord};
 use starlane_space::kind::{BaseKind, Kind, KindParts, Specific};
-use starlane_space::loc::{StarKey, ToBaseKind, VersionSegLoc};
+use starlane_space::loc::{StarKey, ToBaseKind, Version};
 use starlane_space::log::Logger;
 use starlane_space::parse::util::{parse_errs, result};
 use starlane_space::parse::{CamelCase, Domain, SkewerCase};
@@ -37,6 +37,7 @@ use starlane_space::selector::{
 };
 use starlane_space::status::Handle;
 use starlane_space::substance::{Substance, SubstanceList, SubstanceMap};
+use starlane_space::types::property::{PropertyMod, SetProperties};
 use starlane_space::util::ValuePattern;
 use starlane_space::HYPERUSER;
 use std::collections::{HashMap, HashSet};
@@ -44,10 +45,10 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
+
 /// embedded postgres for local development environments is slated to be removed in favor of
 /// Postgres provided by `DockerDesktopFoundation`
 // pub mod embed;
-use starlane::types1::property::{PropertyMod, SetProperties};
 
 pub struct PostgresRegistry {
     logger: Logger,
@@ -55,10 +56,7 @@ pub struct PostgresRegistry {
 }
 
 impl PostgresRegistry {
-    pub async fn new(
-        handle: Handle<PostgresDatabase>,
-        logger: Logger
-    ) -> Result<Self, RegErr> {
+    pub async fn new(handle: Handle<PostgresDatabase>, logger: Logger) -> Result<Self, RegErr> {
         let logger = push_loc!((logger, Point::global_registry()));
 
         let registry = Self {
@@ -1098,9 +1096,9 @@ impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord {
                                 let version = if let Option::Some(version_variant) = version_variant
                                 {
                                     let version = format!("{}-{}", version, version_variant);
-                                    VersionSegLoc::from_str(version.as_str())?
+                                    Version::from_str(version.as_str())?
                                 } else {
-                                    VersionSegLoc::from_str(version.as_str())?
+                                    Version::from_str(version.as_str())?
                                 };
 
                                 let provider = Domain::from_str(provider.as_str())?;
@@ -1339,11 +1337,11 @@ pub mod test {
     use starlane_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
     use starlane_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
     use starlane_space::loc::{MachineName, StarKey, ToPoint};
-    use starlane_space::types::property::PropertiesConfig;
     use starlane_space::particle::Status;
     use starlane_space::point::Point;
     use starlane_space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
     use starlane_space::selector::{PointHierarchy, Selector};
+    use starlane_space::types::property::PropertiesConfig;
     use starlane_space::HYPERUSER;
 
     #[derive(Clone)]

@@ -1,24 +1,24 @@
 use crate::parse::SkewerCase;
 use crate::point;
-use crate::types::specific::SpecificLoc;
+use crate::types::specific::Slice;
 
 #[non_exhaustive]
-pub enum VersionTag{
+pub enum VersionTag {
     /// magically derive the version in this order:
     /// 1. [VersionTag::Using] (if set)
     /// 2. [VersionTag::Latest] use the latest
     Default,
-    /// the global version number for [SpecificLoc]
+    /// the global version number for [Slice]
     Using,
     /// reference the latest version...
     Latest,
 
     /// custom [VersionTag] defined in the registry
-    _Ext(SkewerCase)
+    _Ext(SkewerCase),
 }
 
 #[non_exhaustive]
-pub enum RouteTag{
+pub enum RouteTag {
     /// references the default hub `hub.starlane.io` by default
     Hub,
 }

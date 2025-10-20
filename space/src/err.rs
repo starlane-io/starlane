@@ -869,8 +869,7 @@ pub mod report {
         labels: Vec<Label>,
     }
 
-    impl <'a> Into<ariadne::Report<'a>> for Report {
-
+    impl<'a> Into<ariadne::Report<'a>> for Report {
         fn into(self) -> ariadne::Report<'a> {
             panic!("starlane_space::err::report::Report::into() disabled for now")
         }
@@ -885,7 +884,7 @@ pub mod report {
             }
             builder.finish()
         }
-        
+
          */
     }
 
@@ -958,7 +957,7 @@ pub mod report {
         Advice,
     }
 
-    impl <'a> Into<ariadne::ReportKind<'a>> for ReportKind {
+    impl<'a> Into<ariadne::ReportKind<'a>> for ReportKind {
         fn into(self) -> ariadne::ReportKind<'a> {
             match self {
                 ReportKind::Error => ariadne::ReportKind::Error,

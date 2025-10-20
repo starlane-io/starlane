@@ -103,6 +103,42 @@ pub static STARLANE_CACHE_DIR: Lazy<String> = Lazy::new(|| {
         .unwrap_or(format!("{}/cache", STARLANE_HOME.to_string()).to_string())
 });
 
+pub static STARLANE_PACKAGE_SOURCE: Lazy<String> = Lazy::new(|| {
+    std::env::var("STARLANE_PACKAGE_SOURCE")
+        .unwrap_or(format!("{}/package/source", STARLANE_HOME.to_string()).to_string())
+});
+
+pub fn get_starlane_package_source() -> String {
+    let dir = STARLANE_PACKAGE_SOURCE.to_string();
+    fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+pub static STARLANE_PACKAGE_REMOTE: Lazy<String> = Lazy::new(|| {
+    let dir = std::env::var("STARLANE_PACKAGE_REMOTE")
+        .unwrap_or(format!("{}/package/remote", STARLANE_HOME.to_string()).to_string());
+    fs::create_dir_all(&dir).unwrap();
+    dir
+});
+
+pub fn get_starlane_package_remote() -> String {
+    let dir = STARLANE_PACKAGE_REMOTE.to_string();
+    fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+pub static STARLANE_PACKAGE_CACHE: Lazy<String> = Lazy::new(|| {
+    let dir = std::env::var("STARLANE_PACKAGE_CACHE")
+        .unwrap_or(format!("{}/package/cache", STARLANE_HOME.to_string()).to_string());
+    fs::create_dir_all(&dir).unwrap();
+    dir
+});
+
+pub fn get_starlane_package_cache() -> String {
+    let dir = STARLANE_PACKAGE_CACHE.to_string();
+    fs::create_dir_all(&dir).unwrap();
+    dir
+}
 pub static STARLANE_WRITE_LOGS: Lazy<StarlaneWriteLogs> =
     Lazy::new(|| match std::env::var("STARLANE_WRITE_LOGS") {
         Ok(value) => StarlaneWriteLogs::from_str(value.as_str()).unwrap_or_default(),

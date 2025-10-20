@@ -1,83 +1,83 @@
-use serde::{Deserialize, Serialize};
-use async_trait::async_trait;
-use starlane_hyperspace::driver::{DriverAvail, DriversBuilder};
-use starlane_hyperspace::err::HypErr;
-use starlane_hyperspace::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
-use starlane_hyperspace::machine::MachineTemplate;
-use starlane_hyperspace::base::{Platform, PlatformConfig};
-use starlane_space::artifact::asynch::Artifacts;
-use starlane_space::kind::StarSub;
-use starlane_space::loc::{MachineName, StarKey};
-use std::sync::Arc;
-use starlane_hyperspace::driver::base::BaseDriverFactory;
-use starlane_hyperspace::driver::control::ControlDriverFactory;
-use starlane_hyperspace::driver::root::RootDriverFactory;
-use starlane_hyperspace::driver::space::SpaceDriverFactory;
-use std::fs;
-use std::path::Path;
-use std::str::FromStr;
-use port_check::is_local_ipv4_port_free;
 use anyhow::anyhow;
-use starlane_hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
-use starlane_hyperspace::shutdown::panic_shutdown;
-use starlane_macros::push_loc;
-use starlane_space::point::Point;
+use async_trait::async_trait;
 use base::env::{config_path, STARLANE_CONTROL_PORT};
 use base::foundation::StarlaneConfig;
 use hyperspace::base::BaseSub;
 use hyperspace::registry;
 use hyperspace::registry::Registry;
 use hyperspace::service::STARLANE_DATA_DIR;
+use port_check::is_local_ipv4_port_free;
+use serde::{Deserialize, Serialize};
 use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
+use starlane_hyperspace::base::{Platform, PlatformConfig};
+use starlane_hyperspace::driver::base::BaseDriverFactory;
+use starlane_hyperspace::driver::control::ControlDriverFactory;
+use starlane_hyperspace::driver::root::RootDriverFactory;
+use starlane_hyperspace::driver::space::SpaceDriverFactory;
+use starlane_hyperspace::driver::{DriverAvail, DriversBuilder};
+use starlane_hyperspace::err::HypErr;
+use starlane_hyperspace::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
+use starlane_hyperspace::hyperlane::{
+    AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper,
+};
+use starlane_hyperspace::machine::MachineTemplate;
+use starlane_hyperspace::shutdown::panic_shutdown;
+use starlane_macros::push_loc;
+use starlane_space::artifact::asynch::Artifacts;
+use starlane_space::kind::StarSub;
+use starlane_space::loc::{MachineName, StarKey};
+use starlane_space::point::Point;
+use std::fs;
+use std::path::Path;
+use std::str::FromStr;
+use std::sync::Arc;
 
 pub mod prelude {
-   use starlane_hyperspace::base;
-   /// abstract
-   pub use base::config::BaseConfig;
-   pub use base::config::BaseSubConfig;
+    /// abstract
+    pub use base::config::BaseConfig;
+    pub use base::config::BaseSubConfig;
+    use starlane_hyperspace::base;
 
-   /// [Platform]
-   pub use base::Platform;
-   pub use base::config::PlatformConfig;
+    pub use base::config::PlatformConfig;
+    /// [Platform]
+    pub use base::Platform;
 
-   /// [foundation]
-   pub use base::Foundation;
-   pub use base::config::FoundationConfig;
+    pub use base::config::FoundationConfig;
+    /// [foundation]
+    pub use base::Foundation;
 
-   /// [provider]
-   pub use base::provider::Provider;
-   pub use base::config::ProviderConfig;
-
+    pub use base::config::ProviderConfig;
+    /// [provider]
+    pub use base::provider::Provider;
 
     pub mod platform {
         pub mod postgres {
             pub mod service {
-                use starlane_platform_for_postgres::service::{Provider,ProviderConfig,PostgresService,PostgresServiceHandle};
+                use starlane_platform_for_postgres::service::{
+                    PostgresService, PostgresServiceHandle, Provider, ProviderConfig,
+                };
             }
             pub mod database {
                 //use starlane_platform_for_postgres::database::{Provider,ProviderConfig,PostgresService,PostgresDatabaseHandle};
-                use starlane_platform_for_postgres::database::{ProviderConfig,PostgresDatabaseHandle};
+                use starlane_platform_for_postgres::database::{
+                    PostgresDatabaseHandle, ProviderConfig,
+                };
             }
-
-
         }
     }
-
 }
 
-
 mod concrete {
+    use crate::starlane::prelude;
     use base::foundation::StarlaneConfig;
     use hyperspace::base::config::{BaseSubConfig, RegistryConfig};
-    use crate::starlane::prelude;
 
-
-    pub struct Platform{
-        config: PlatformConfig
+    pub struct Platform {
+        config: PlatformConfig,
     }
 
-    #[derive(Clone,Debug,)]
-    pub struct PlatformConfig{
+    #[derive(Clone, Debug)]
+    pub struct PlatformConfig {
         kind: PlatformKind,
     }
 
@@ -105,36 +105,30 @@ mod concrete {
         }
     }
 
-    impl BaseSubConfig for PlatformConfig { }
+    impl BaseSubConfig for PlatformConfig {}
 
-    impl prelude::PlatformConfig for PlatformConfig { }
+    impl prelude::PlatformConfig for PlatformConfig {}
 
-
-    #[derive(Clone,Debug,Eq,PartialEq,Hash)]
-    pub enum PlatformKind{
-       Standalone
+    #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+    pub enum PlatformKind {
+        Standalone,
     }
-
-
-
-
 }
 
 pub mod config {
     use starlane_hyperspace::base::PlatformConfig;
     use starlane_hyperspace::registry;
-    pub trait RegistryConfig:  registry::RegistryConfig { }
+    pub trait RegistryConfig: registry::RegistryConfig {}
 }
 
 #[derive(Clone)]
 pub struct Starlane {
     config: StarlaneConfig,
     artifacts: Artifacts,
-    registry: Registry
+    registry: Registry,
 }
 
-
-impl  Starlane  {
+impl Starlane {
     pub async fn new(
         config: StarlaneConfig,
         foundation: DockerDaemonFoundation,
@@ -191,13 +185,11 @@ where
     Self: Sync + Send + Sized,
 {
     type Config = StarlaneConfig;
-    
+
     type Err = HypErr;
 
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
-    
-    
 
     fn data_dir(&self) -> String {
         STARLANE_DATA_DIR.clone()
@@ -315,7 +307,6 @@ where
         server.start().unwrap();
     }
 
-
     async fn scorch(&self) -> Result<(), Self::Err> {
         if !self.config().can_scorch {
             Err(anyhow!("in config '{}' can_scorch=false", config_path()))?;
@@ -325,21 +316,21 @@ where
     }
 
     fn config(&self) -> &Self::Config {
-        & self.config
-     }
+        &self.config
+    }
 }
 
-
 mod partial {
-    mod my { pub use super::super::*; }
+    mod my {
+        pub use super::super::*;
+    }
 
     pub mod config {
-        use serde_derive::{Deserialize, Serialize};
+        use super::my;
         use base::foundation::StarlaneConfig;
         use hyperspace::base::config::BaseSubConfig;
+        use serde_derive::{Deserialize, Serialize};
         use starlane_hyperspace::registry;
-        use super::my;
-
 
         /// this [PlatformConfig] is a `partial` because it doesn't have all the necessary
         /// configuration to produce *any* present version of the [registry::Registry].
@@ -357,7 +348,7 @@ mod partial {
             pub control_port: u16,
         }
 
-        impl BaseSubConfig for PlatformConfig { }
+        impl BaseSubConfig for PlatformConfig {}
 
         impl my::PlatformConfig for PlatformConfig {
             type RegistryConfig = StarlaneConfig;
@@ -371,26 +362,19 @@ mod partial {
             }
 
             fn registry(&self) -> &Self::RegistryConfig {
-                & self.registry
+                &self.registry
             }
 
             fn home(&self) -> &String {
-                & self.home
+                &self.home
             }
 
             fn enviro(&self) -> &String {
-                & self.enviro
+                &self.enviro
             }
         }
-
-
-
-
+    }
 }
-
-
-}
-
 
 mod platform {
     pub struct Platform {}

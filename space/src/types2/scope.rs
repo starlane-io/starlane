@@ -1,21 +1,25 @@
 use crate::err::ParseErrs0;
-use crate::loc::VersionSegLoc;
+use crate::loc::Version;
 use crate::parse::util::{new_span, result, Span};
 use crate::parse::{Res, SkewerCase};
 use core::str::FromStr;
 use futures::TryFutureExt;
 use nom::branch::alt;
+use nom::bytes::complete::tag;
 use nom::combinator::{all_consuming, into};
+use nom::multi::{separated_list0, separated_list1};
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
+use std::path::PathBuf;
 use strum_macros::{EnumDiscriminants, EnumString};
 use validator::ValidateRequired;
 
-use crate::types::scope::parse::scope;
-use crate::types::specific::SpecificLoc;
-use once_cell::sync::Lazy;
 use crate::types::archetype::Archetype;
+use crate::types::scope::parse::scope;
+use crate::types::specific::Slice;
+use once_cell::sync::Lazy;
+use uuid::Uuid;
 
 pub static ROOT_SCOPE: Lazy<Scope> = Lazy::new(|| Scope(Some(ScopeKeyword::Root), vec![]));
 
@@ -38,6 +42,123 @@ pub enum ScopeKeyword {
     /// collisions
     #[strum(ascii_case_insensitive)]
     Root,
+}
+
+static ROOT_PATH: Lazy<SlicePath> = Lazy::new(|| {
+    SlicePath::new(vec![Segment::Segment(
+        SkewerCase::from_str("root").unwrap(),
+    )])
+});
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct SlicePath {
+    pub segments: Vec<Segment>,
+}
+
+impl SlicePath {
+    pub fn root() -> Self {
+        ROOT_PATH.clone()
+    }
+    pub fn as_path(&self) -> PathBuf {
+        let mut path = PathBuf::new();
+        for segment in &self.segments {
+            path.push(segment.to_string());
+        }
+        path
+    }
+}
+
+impl Default for SlicePath {
+    fn default() -> Self {
+        Self { segments: vec![] }
+    }
+}
+
+impl SlicePath {
+    pub fn new(segments: Vec<Segment>) -> Self {
+        Self { segments }
+    }
+
+    pub fn push(&self, segment: Segment) -> Self {
+        let mut segments = self.segments.clone();
+        segments.push(segment);
+        Self { segments }
+    }
+
+    pub fn insert(&mut self, segment: Segment) {
+        self.segments.insert(0, segment);
+    }
+
+    pub fn is_root(&self) -> bool {
+        self.is_empty()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Segment> {
+        self.segments.iter()
+    }
+
+    pub fn first(&self) -> Option<&Segment> {
+        self.segments.first()
+    }
+
+    pub fn remove_first(&mut self) -> Option<Segment> {
+        if self.segments.len() > 0 {
+            Some(self.segments.remove(0))
+        } else {
+            None
+        }
+    }
+
+    pub fn filename(&self) -> String {
+        if self.is_root() {
+            return "root".to_string();
+        }
+
+        let mut rtn = String::new();
+        for segment in &self.segments {
+            rtn.push_str(&segment.to_string());
+            rtn.push_str("_");
+        }
+        /// remove the trailing underscore
+        rtn.pop();
+        rtn
+    }
+}
+
+impl Archetype for SlicePath {
+    fn parser<I>(input: I) -> Res<I, Self>
+    where
+        I: Span,
+    {
+        separated_list0(tag(":"), Segment::parser)(input)
+            .map(|(next, segments)| (next, SlicePath::new(segments)))
+    }
+}
+
+impl Into<PathBuf> for SlicePath {
+    fn into(self) -> PathBuf {
+        let mut path = PathBuf::new();
+        for segment in &self.segments {
+            path.push(segment.to_string());
+        }
+        path
+    }
+}
+
+impl Display for SlicePath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut rtn = String::new();
+        for segment in &self.segments {
+            rtn.push_str(&segment.to_string());
+            rtn.push_str(":");
+        }
+        rtn.pop();
+        write!(f, "{}", rtn)
+    }
 }
 
 /// a segment providing `scope` [Specific] [Meta] in the case where
@@ -64,13 +185,29 @@ pub enum ScopeKeyword {
 #[strum(serialize_all = "lowercase")]
 pub enum Segment {
     #[strum(to_string = "{0}")]
-    Version(VersionSegLoc),
+    Version(Version),
     #[strum(to_string = "{0}")]
     Segment(SkewerCase),
 }
 
-impl From<VersionSegLoc> for Segment {
-    fn from(version: VersionSegLoc) -> Self {
+impl Segment {
+    pub fn is_root(&self) -> bool {
+        if let Self::Segment(id) = self {
+            "root" == id.as_str()
+        } else {
+            false
+        }
+    }
+}
+
+impl Into<SlicePath> for Segment {
+    fn into(self) -> SlicePath {
+        SlicePath::new(vec![self])
+    }
+}
+
+impl From<Version> for Segment {
+    fn from(version: Version) -> Self {
         Self::Version(version)
     }
 }
@@ -86,7 +223,7 @@ impl Archetype for Segment {
     where
         I: Span,
     {
-        alt((into(SkewerCase::parser), into(VersionSegLoc::parser)))(input)
+        alt((into(SkewerCase::parser), into(Version::parser)))(input)
     }
 }
 
@@ -199,16 +336,14 @@ impl Scope {
 
 #[cfg(test)]
 pub mod test {
+    use crate::parse::util::{new_span, result};
     use crate::types::scope::parse::parse;
     use crate::types::scope::ScopeKeyword;
-    use std::str::FromStr;
-    use crate::parse::util::{new_span, result};
     use crate::types2::scope::parse::scope;
-    
-    
+    use std::str::FromStr;
+
     #[test]
     fn text_x() {
-
         assert_eq!(ScopeKeyword::from_str("root").unwrap(), ScopeKeyword::Root);
         let domain = result(scope(new_span("hello"))).unwrap();
         assert_eq!(domain.to_string().as_str(), "hello");
@@ -216,7 +351,7 @@ pub mod test {
         assert_eq!(domain.prefix().is_none(), true);
     }
 
-/*
+    /*
 
         let scope = parse("root").unwrap();
         println!("{:?}", scope);
@@ -268,9 +403,9 @@ pub mod parse {
     pub fn scope<I: Span>(input: I) -> Res<I, Scope> {
         context(
             "scope parsing",
-            terminated(separated_list0(tag("::"), postfix_segment), tag("::"))
+            terminated(separated_list0(tag("::"), postfix_segment), tag("::")),
         )(input)
-            .map(|(next, segments)| (next, Scope::from_segments(segments))) 
+        .map(|(next, segments)| (next, Scope::from_segments(segments)))
     }
 
     fn prefix<I: Span>(input: I) -> Res<I, ScopeKeyword> {
