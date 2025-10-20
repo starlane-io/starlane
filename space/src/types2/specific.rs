@@ -23,7 +23,16 @@ use std::str::FromStr;
 
 pub type Release = ReleaseDef<Publisher, Package, Version>;
 pub type Slice = SliceDef<Publisher, Package, Version, SlicePath>;
-pub type File = FileDef<Slice, FilePath>;
+pub type PackFile = PackFileDef<Slice, FilePath>;
+
+impl FromStr for PackFile {
+    type Err = ParseErrs0;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let i = new_span(s);
+        result(Self::parser(i))
+    }
+}
 
 impl FromStr for Slice {
     type Err = ParseErrs0;
@@ -255,7 +264,7 @@ where
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Hash, Getters)]
 #[get = "pub"]
-pub struct FileDef<Slice, FilePath>
+pub struct PackFileDef<Slice, FilePath>
 where
     Slice: Archetype,
     FilePath: Archetype,
@@ -264,7 +273,7 @@ where
     path: FilePath,
 }
 
-impl<Slice, FilePath> Display for FileDef<Slice, FilePath>
+impl<Slice, FilePath> Display for PackFileDef<Slice, FilePath>
 where
     Slice: Archetype,
     FilePath: Archetype,
@@ -275,7 +284,7 @@ where
         Ok(())
     }
 }
-impl<Slice, FilePath> Archetype for FileDef<Slice, FilePath>
+impl<Slice, FilePath> Archetype for PackFileDef<Slice, FilePath>
 where
     Slice: Archetype,
     FilePath: Archetype,
@@ -285,7 +294,7 @@ where
         I: Span,
     {
         pair(Slice::parser, FilePath::parser)(input)
-            .map(|(next, (slice, path))| (next, FileDef { slice, path }))
+            .map(|(next, (slice, path))| (next, PackFileDef { slice, path }))
     }
 }
 
@@ -320,7 +329,7 @@ impl Slice {
     }
 }
 
-impl File {
+impl PackFile {
     pub fn to_path(&self) -> PathBuf {
         let mut path = String::new();
         path.push_str(self.slice.to_path().to_str().unwrap());

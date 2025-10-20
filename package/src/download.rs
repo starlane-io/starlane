@@ -8,7 +8,10 @@ use strum_macros::Display;
 use tempfile::TempDir;
 use thiserror::Error;
 use tokio::sync::oneshot;
+use starlane_base::env;
+use crate::cache::CacheLayout;
 
+#[derive(Clone)]
 pub struct Downloader {
     path: PathBuf,
     tx: tokio::sync::mpsc::Sender<DownloadRequest>,
@@ -23,10 +26,17 @@ pub enum DownloadErr {
     IoErr(#[from] tokio::io::Error),
 }
 
+impl Default for Downloader {
+    fn default() -> Self {
+        let path = PathBuf::from(env::get_starlane_package_cache());
+        let repo = RemoteRepo::default();
+        Self::new( path, repo )
+    }
+}
+
 impl Downloader {
     pub fn new(path: PathBuf, repo: RemoteRepo) -> Self {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
-
         DownloadRunner::new(path.clone(), repo, rx, None);
         Self { path, tx }
     }
@@ -40,10 +50,13 @@ impl Downloader {
         Self { path, tx }
     }
 
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
     /// return () meaning
     pub async fn download(&self, slice: &Slice) -> Result<(), DownloadErr> {
         let (request, rtn) = DownloadRequest::new(slice.clone());
-println!("sending download request");
         self.tx.send(request).await.unwrap();
         rtn.await.map_err(|_| DownloadErr::Internal)?;
         Ok(())
@@ -63,7 +76,7 @@ impl DownloadRequest {
 }
 
 struct DownloadRunner {
-    path: PathBuf,
+    layout: CacheLayout,
     repo: RemoteRepo,
     tmp: Option<TempDir>,
     rx: tokio::sync::mpsc::Receiver<DownloadRequest>,
@@ -71,7 +84,8 @@ struct DownloadRunner {
 
 impl DownloadRunner {
     pub fn new(path: PathBuf, repo: RemoteRepo, rx: tokio::sync::mpsc::Receiver<DownloadRequest>, tmp: Option<TempDir>) {
-        let mut runner = Self { path, repo, rx, tmp };
+        let layout = CacheLayout{ path };
+        let mut runner = Self { layout, repo, rx, tmp };
         runner.start();
         println!("returning from DownloadRunner::new");
     }
@@ -92,7 +106,7 @@ impl DownloadRunner {
     }
 
     async fn download_slice(&self, slice: &Slice) -> Result<(), DownloadErr> {
-        let path = self.path.join(slice.to_path());
+        let path = self.layout.slice_path(slice);
         println!("slice path: '{}'", path.to_str().unwrap());
         if path.exists() {
             println!("slice exists!");
@@ -103,8 +117,9 @@ impl DownloadRunner {
         println!("got data....");
         let dir = unzip_from_binary_to_temp(data.as_slice())?;
         println!("unzipped slice....");
-        tokio::fs::rename(dir.path(), path).await?;
-        println!("slice renamed....");
+        tokio::fs::create_dir_all(path.parent().unwrap()).await?;
+        tokio::fs::rename(dir.path(), path.clone()).await?;
+        println!("slice renamed.... to {}", path.display() );
         Ok(())
     }
 }

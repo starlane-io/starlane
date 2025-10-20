@@ -3,7 +3,7 @@ use crate::create::{PackErr, PackageLayout};
 use once_cell::sync::Lazy;
 use starlane_space::parse::SkewerCase;
 use starlane_space::types::scope::{Segment, SlicePath};
-use starlane_space::types::specific::Slice;
+use starlane_space::types::specific::{PackFile, Slice};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::Error;
@@ -22,6 +22,8 @@ pub static PACKAGE: Lazy<Slice> =
     Lazy::new(|| Slice::from_str("uberscott.com:postgres:1.0.1").unwrap());
 pub static MY_SLICE: Lazy<Slice> =
     Lazy::new(|| Slice::from_str("uberscott.com:postgres:1.0.1::my-slice").unwrap());
+pub static ADVICE_FILE: Lazy<PackFile> =
+    Lazy::new(|| PackFile::from_str("uberscott.com:postgres:1.0.1::my-slice/advice.txt").unwrap());
 
 pub mod create;
 
@@ -359,9 +361,7 @@ mod test {
     use crate::repo::{Repo, SourceRepo};
     use crate::server::ServerBuilder;
     use crate::zip::{unzip_from_binary_to_temp, unzip_from_file_to_temp, zip_slice_dir_to};
-    use crate::{
-        FileEntity, PackObserver, PublishObserver, MY_SLICE, PACKAGE, PACKAGE_LAYOUT_EXAMPLE,
-    };
+    use crate::{FileEntity, PackObserver, PublishObserver, ADVICE_FILE, MY_SLICE, PACKAGE, PACKAGE_LAYOUT_EXAMPLE};
     use starlane_space::parse::SkewerCase;
     use starlane_space::types::scope::Segment;
     use std::fs;
@@ -369,6 +369,7 @@ mod test {
     use std::str::FromStr;
     use tempfile::NamedTempFile;
     use tokio::io::AsyncWriteExt;
+    use crate::cache::PackageCache;
     use crate::download::Downloader;
 
     pub struct MockPublishObserver();
@@ -467,6 +468,17 @@ println!("Server started");
 
         downloader.download(&MY_SLICE).await.unwrap();
     }
+
+    #[tokio::test]
+    pub async fn test_cache() {
+        let handle= ServerBuilder::mock();
+        println!("Server started");
+        let cache = PackageCache::temp();
+        cache.get_file(&ADVICE_FILE).await.unwrap();
+    }
+
+
+
 
     fn verify_mock_layout(layout: &PackageLayout) -> Result<(), &'static str> {
         // hierarchy
