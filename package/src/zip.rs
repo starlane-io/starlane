@@ -2,10 +2,9 @@ use std::fs::{self, File};
 use std::io::{self, Error, Read, Write};
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
-use walkdir::{DirEntry, WalkDir};
+use walkdir::WalkDir;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
-use crate::SliceLayout;
 
 /// Zips a directory into a temporary file and returns the path to that file.
 ///
@@ -92,7 +91,6 @@ pub fn zip_directory_to_temp<P: AsRef<Path>>(source_dir: P) -> Result<NamedTempF
 
 /// Alternative version that allows custom temp directory
 pub fn zip_slice_dir_to<P: AsRef<Path>, T: AsRef<Path>>(
-
     source_dir: P,
     target_file: T,
 ) -> Result<(), ZipError> {
@@ -118,7 +116,6 @@ pub fn zip_slice_dir_to<P: AsRef<Path>, T: AsRef<Path>>(
     for entry in WalkDir::new(source_dir)
         .into_iter()
         .filter_entry(|e| {
-
             if e.path() == source_dir {
                 true
             } else
@@ -131,8 +128,9 @@ pub fn zip_slice_dir_to<P: AsRef<Path>, T: AsRef<Path>>(
                 // Always include files
                 true
             }
-        }).filter_map(|e| e.ok())
-     {
+        })
+        .filter_map(|e| e.ok())
+    {
         let path = entry.path();
         let name = path
             .strip_prefix(source_dir)
@@ -156,10 +154,9 @@ pub fn zip_slice_dir_to<P: AsRef<Path>, T: AsRef<Path>>(
             zip.write_all(&file_contents)
                 .map_err(ZipError::WriteError)?;
         } else if path.is_dir() {
-
-                let dir_name = format!("{}/", name_str);
-                zip.add_directory(dir_name, options)
-                    .map_err(ZipError::ZipOperation)?;
+            let dir_name = format!("{}/", name_str);
+            zip.add_directory(dir_name, options)
+                .map_err(ZipError::ZipOperation)?;
         }
     }
 
@@ -319,7 +316,7 @@ pub fn unzip_from_binary_to_temp(zip_bytes: &[u8]) -> Result<tempfile::TempDir, 
     Ok(temp_dir)
 }
 
-pub fn unzip_from_file_to_temp(file: &PathBuf ) -> Result<tempfile::TempDir, ZipError> {
+pub fn unzip_from_file_to_temp(file: &PathBuf) -> Result<tempfile::TempDir, ZipError> {
     let mut content = vec![];
     let mut file = fs::File::open(file)?;
     file.read_to_end(&mut content)?;

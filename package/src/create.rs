@@ -42,8 +42,8 @@ impl PackageLayout {
         })
     }
 
-    pub fn get_slice(&self, segment: &str ) -> Option<&SliceLayout> {
-            self.root.get_slice(segment)
+    pub fn get_slice(&self, segment: &str) -> Option<&SliceLayout> {
+        self.root.get_slice(segment)
     }
 
     fn read_toml<T: DeserializeOwned>(toml_path: &PathBuf) -> Result<T, PackErr> {

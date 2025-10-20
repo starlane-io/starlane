@@ -3,6 +3,7 @@ use crate::create::{PackErr, PackageLayout};
 use once_cell::sync::Lazy;
 use starlane_space::parse::SkewerCase;
 use starlane_space::types::scope::{Segment, SlicePath};
+use starlane_space::types::specific::Slice;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::Error;
@@ -10,7 +11,6 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{fs, io};
 use thiserror::Error;
-use starlane_space::types::specific::Slice;
 
 pub static ROOT_SLICE: Lazy<Segment> =
     Lazy::new(|| Segment::Segment(SkewerCase::from_str("root").unwrap()));
@@ -18,11 +18,10 @@ pub static ROOT_SLICE: Lazy<Segment> =
 pub static PACKAGE_LAYOUT_EXAMPLE: Lazy<PathBuf> =
     Lazy::new(|| PathBuf::from_str("test/package-layout-example").unwrap());
 
-pub static PACKAGE: Lazy<Slice> = Lazy::new(|| Slice::from_str("uberscott.com:postgres:1.0.1").unwrap() );
-pub static MY_SLICE: Lazy<Slice> = Lazy::new(|| Slice::from_str("uberscott.com:postgres:1.0.1::my-slice").unwrap() );
-
-
-
+pub static PACKAGE: Lazy<Slice> =
+    Lazy::new(|| Slice::from_str("uberscott.com:postgres:1.0.1").unwrap());
+pub static MY_SLICE: Lazy<Slice> =
+    Lazy::new(|| Slice::from_str("uberscott.com:postgres:1.0.1::my-slice").unwrap());
 
 pub mod create;
 
@@ -102,11 +101,11 @@ impl SliceLayout {
 
     /// return true if this path is in the directory structure
     /// false if it doesn't exist or is a slice
-    pub fn is_member( &self, path: &PathBuf ) -> bool {
+    pub fn is_member(&self, path: &PathBuf) -> bool {
         self.directory.is_member(path)
     }
 
-    pub fn get_slice(&self, segment: &str ) -> Option<&SliceLayout> {
+    pub fn get_slice(&self, segment: &str) -> Option<&SliceLayout> {
         if let Ok(segment) = Segment::from_str(segment) {
             self.slices.get(&segment)
         } else {
@@ -328,15 +327,10 @@ impl Directory {
     }
 }
 pub fn first_component(path: &std::path::Path) -> Option<String> {
-    path.components()
-        .find_map(|comp| {
-            match comp {
-                std::path::Component::Normal(os_str) => {
-                    os_str.to_str().map(|s| s.to_string())
-                }
-                _ => None
-            }
-        })
+    path.components().find_map(|comp| match comp {
+        std::path::Component::Normal(os_str) => os_str.to_str().map(|s| s.to_string()),
+        _ => None,
+    })
 }
 pub enum Entity {
     Directory(Directory),
@@ -362,17 +356,18 @@ mod test {
     use crate::create::PackageLayout;
     use crate::remote::RemoteRepo;
     use crate::repo::{Repo, SourceRepo};
+    use crate::server::ServerBuilder;
     use crate::zip::{unzip_from_binary_to_temp, unzip_from_file_to_temp, zip_slice_dir_to};
-    use crate::{FileEntity, PackObserver, PublishObserver, ROOT_SLICE, MY_SLICE, PACKAGE_LAYOUT_EXAMPLE, PACKAGE};
+    use crate::{
+        FileEntity, PackObserver, PublishObserver, MY_SLICE, PACKAGE, PACKAGE_LAYOUT_EXAMPLE,
+    };
     use starlane_space::parse::SkewerCase;
     use starlane_space::types::scope::Segment;
     use std::fs;
     use std::path::Path;
     use std::str::FromStr;
-    use tempfile::{NamedTempFile, TempDir};
+    use tempfile::NamedTempFile;
     use tokio::io::AsyncWriteExt;
-    use walkdir::WalkDir;
-    use crate::server::ServerBuilder;
 
     pub struct MockPublishObserver();
 
@@ -385,13 +380,10 @@ mod test {
     impl PublishObserver for MockPublishObserver {}
     impl PackObserver for MockPublishObserver {}
 
-    fn package_layout() -> PackageLayout{
+    fn package_layout() -> PackageLayout {
         let mut observer = MockPublishObserver::default();
-        PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE,&mut observer).unwrap()
+        PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, &mut observer).unwrap()
     }
-
-
-
 
     #[test]
     pub fn test_slice_membership() {
@@ -408,26 +400,25 @@ mod test {
         let in_dir = PACKAGE_LAYOUT_EXAMPLE.join("hierarchy");
         let layout = package_layout();
         let hierarchy = layout.get_slice("hierarchy").unwrap();
-        let tmp_file= NamedTempFile::new().unwrap();
+        let tmp_file = NamedTempFile::new().unwrap();
         let out_file = tmp_file.path().to_path_buf();
-        zip_slice_dir_to(&in_dir,&out_file).unwrap();
+        zip_slice_dir_to(&in_dir, &out_file).unwrap();
         let unzip_temp = unzip_from_file_to_temp(&out_file).unwrap();
         let tmp_dir = unzip_temp.path().to_path_buf();
         let dir1 = tmp_dir.join("dir1");
-        let sub1= tmp_dir.join("sub1");
-        let sub2= tmp_dir.join("sub2");
+        let sub1 = tmp_dir.join("sub1");
+        let sub2 = tmp_dir.join("sub2");
 
         assert!(dir1.exists());
         assert!(!sub1.exists());
         assert!(!sub2.exists());
-
     }
 
     #[tokio::test]
     pub async fn test_source() {
-       let (source,_dir) = SourceRepo::temp();
-       let layout = package_layout();
-       source.submit(layout).unwrap();
+        let (source, _dir) = SourceRepo::temp();
+        let layout = package_layout();
+        source.submit(layout).unwrap();
         {
             let zip = source.get_slice(&MY_SLICE).await.unwrap();
             let dir = unzip_from_binary_to_temp(zip.as_slice()).unwrap();
@@ -443,9 +434,9 @@ mod test {
         }
     }
 
-        #[tokio::test]
+    #[tokio::test]
     pub async fn test_upload_and_download() {
-        let (builder,_tmp) = ServerBuilder::temp();
+        let (builder, _tmp) = ServerBuilder::temp();
         let mut handle = builder.serve();
         let repo = RemoteRepo::default();
 
@@ -455,9 +446,8 @@ mod test {
 
         let my_slice = repo.get_slice(&MY_SLICE).await.unwrap();
         drop(handle);
-println!("slice size: {}", my_slice.len());
         let slice_dir = unzip_from_binary_to_temp(my_slice.as_slice()).unwrap();
-        let slice_path= slice_dir.path().to_path_buf();
+        let slice_path = slice_dir.path().to_path_buf();
         let advice = slice_path.join("advice.txt");
         let mut stdout = tokio::io::stdout();
         stdout.flush().await.unwrap();
@@ -518,7 +508,7 @@ println!("slice size: {}", my_slice.len());
 
         verify_mock_layout(&layout).unwrap();
 
-        let (source,tmp_dir) = SourceRepo::temp();
+        let (source, tmp_dir) = SourceRepo::temp();
 
         let zipfile = layout.zip().expect("expecting zip");
         let data = fs::read(zipfile.path()).expect("expecting zipfile");

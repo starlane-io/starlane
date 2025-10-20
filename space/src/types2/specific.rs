@@ -159,7 +159,6 @@ where
     slices: SlicePath,
 }
 
-
 impl<Publisher, Package, Version, SliceSegment> Display
     for SliceDef<Publisher, Package, Version, SliceSegment>
 where
@@ -239,8 +238,6 @@ where
     pub fn package(self) -> ReleaseDef<Publisher, Package, Version> {
         self.release
     }
-
-
 }
 
 impl<Publisher, Package, Version, SliceSegment> Into<ReleaseDef<Publisher, Package, Version>>
@@ -321,9 +318,7 @@ impl Slice {
     pub fn is_root_slice(&self) -> bool {
         self.slices.is_root()
     }
-
 }
-
 
 impl File {
     pub fn to_path(&self) -> PathBuf {

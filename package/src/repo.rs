@@ -13,7 +13,11 @@ use tokio::io::AsyncReadExt;
 #[async_trait]
 pub trait Repo {
     async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>, PackageErr>;
-    async fn submit<P>(&self, layout: &PackageLayout, observer: P) -> anyhow::Result<(), PackageErr>
+    async fn submit<P>(
+        &self,
+        layout: &PackageLayout,
+        observer: P,
+    ) -> anyhow::Result<(), PackageErr>
     where
         P: PublishObserver + Send + Sync;
 }
@@ -45,11 +49,14 @@ impl SourceRepo {
         Ok(())
     }
 
-    pub fn temp() -> (Self,TempDir) {
+    pub fn temp() -> (Self, TempDir) {
         let dir = TempDir::new().unwrap();
-        (Self {
-            root: dir.path().to_path_buf()
-        },dir)
+        (
+            Self {
+                root: dir.path().to_path_buf(),
+            },
+            dir,
+        )
     }
 
     pub fn submit(&self, package: PackageLayout) -> Result<(), PackErr> {
@@ -69,17 +76,12 @@ impl SourceRepo {
         Ok(())
     }
 
-    pub async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>,PackErr> {
-println!("\n\n ! -> getting slice: {}",slice);
-
+    pub async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>, PackErr> {
         let path = self.root.join(slice.to_path());
 
-println!("SLICE PATH: {}",path.display());
         if !path.exists() {
             return Err(PackErr::SliceNotFound(slice.to_string()));
         }
-
-println!("GOT FILE: {}",path.display());
 
         let mut file = tokio::fs::File::open(&path).await?;
         let mut contents = Vec::new();

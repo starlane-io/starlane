@@ -8,20 +8,18 @@ use axum::routing::method_routing::{get, post};
 use axum::routing::Router;
 use axum_core::response::{IntoResponse, Response};
 use reqwest::{header, StatusCode};
+use serde_derive::Deserialize;
+use starlane_space::err::ParseErrs0;
+use starlane_space::types::specific::Slice;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use serde_derive::Deserialize;
 use tempfile::TempDir;
 use thiserror::Error;
-use tokio::fs;
-use tokio::io::AsyncReadExt;
-use starlane_space::err::ParseErrs0;
-use starlane_space::types::specific::Slice;
 
 pub struct ServerBuilder {
     pub bind: String,
-    pub repo: SourceRepo
+    pub repo: SourceRepo,
 }
 
 impl Default for ServerBuilder {
@@ -34,38 +32,35 @@ impl Default for ServerBuilder {
 }
 
 impl ServerBuilder {
-
-    pub fn temp() -> (Self,TempDir) {
-        let (repo,dir)= SourceRepo::temp();
-        (Self {
-            bind: "0.0.0.0:3000".to_string(),
-            repo
-        },dir)
+    pub fn temp() -> (Self, TempDir) {
+        let (repo, dir) = SourceRepo::temp();
+        (
+            Self {
+                bind: "0.0.0.0:3000".to_string(),
+                repo,
+            },
+            dir,
+        )
     }
-    pub fn router(&self) -> Router
-    {
+    pub fn router(&self) -> Router {
         let state = Arc::new(RepoState::new(self.repo.clone()));
         let router = Router::new()
             .route("/package", post(upload_zip))
             .with_state(state.clone())
             .route("/slice", get(get_slice))
-             .with_state(state);
+            .with_state(state);
         router
     }
 
     pub fn serve(self) -> tokio::sync::oneshot::Sender<()> {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        tokio::spawn( async move {
-            println!("Starting server....");
+        tokio::spawn(async move {
             let router = self.router();
             // Run the server
             let listener = tokio::net::TcpListener::bind(self.bind.clone())
                 .await
                 .expect("Failed to bind to address");
 
-            println!("Server running on http://{}", self.bind);
-            println!("POST /zip - Upload a zip file");
-            println!("GET /zip/:id - Download a zip file");
             async fn stop(rx: tokio::sync::oneshot::Receiver<()>) {
                 rx.await.unwrap()
             }
@@ -74,18 +69,13 @@ impl ServerBuilder {
                 .with_graceful_shutdown(stop(rx))
                 .await
                 .expect("Failed to start server");
-
-            println!("Server stopped");
         });
         tx
     }
-
-
 }
 
-
 #[derive(Debug, Deserialize)]
-struct SliceParams{
+struct SliceParams {
     slice: String,
 }
 pub struct RepoState {
@@ -93,10 +83,8 @@ pub struct RepoState {
 }
 
 impl RepoState {
-    pub fn new( repo: SourceRepo ) -> Self {
-        Self {
-            repo
-        }
+    pub fn new(repo: SourceRepo) -> Self {
+        Self { repo }
     }
 }
 
@@ -107,7 +95,6 @@ impl Default for RepoState {
         }
     }
 }
-
 
 /*
 pub async fn start_package_server() {
@@ -140,28 +127,23 @@ async fn shutdown_signal() {
     tokio::signal::ctrl_c()
         .await
         .expect("Failed to listen for Ctrl+C signal");
-    println!("Received Ctrl+C, initiating graceful shutdown...");
 }
 /// Handler for uploading zip files
 async fn upload_zip(
     state: State<Arc<RepoState>>,
     mut multipart: Multipart,
 ) -> Result<Response, AppError> {
-    println!(".... uploading zip file");
     let storage_dir = PathBuf::from("./zip_storage");
 
     while let Some(field) = multipart.next_field().await? {
         let name = field.name().unwrap_or("").to_string();
-        println!(". field name: {}", name);
         let file_name = field.file_name().unwrap_or("").to_string();
 
         // Generate unique ID for the file
 
         // Read the file data
         let data = field.bytes().await?;
-        println!(". data.len: {}", data.len());
         let dir = unzip_from_binary_to_temp(data.as_ref())?;
-        println!(". dir: {:?}", dir);
 
         let mut observer = IgnoreObserver;
         let path = dir.path().to_path_buf();
@@ -171,7 +153,6 @@ async fn upload_zip(
 
         state.repo.submit(layout)?;
 
-        println!("\n\npackage saved...\n\n");
         // Return the file ID to the client
         return Ok((StatusCode::CREATED, format!("File uploaded successfully.")).into_response());
     }
@@ -183,25 +164,22 @@ async fn upload_zip(
 async fn get_slice(
     state: State<Arc<RepoState>>,
     params: Query<SliceParams>,
-
 ) -> Result<Response, AppError> {
-    let slice = Slice::from_str( params.slice.as_str() )?;
+    let slice = Slice::from_str(params.slice.as_str())?;
 
     let contents = state.repo.get_slice(&slice).await?;
 
     // Return the file as a response
     Ok((
         StatusCode::OK,
-        [
-            (header::CONTENT_TYPE, "application/zip"),
-        ],
+        [(header::CONTENT_TYPE, "application/zip")],
         contents,
     )
         .into_response())
 }
 
 /// Custom error type for the application
-#[derive(Debug,Error)]
+#[derive(Debug, Error)]
 enum AppError {
     #[error("No file provided. Please provide a package file to upload.")]
     NoFileProvided,
@@ -236,19 +214,32 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
             AppError::NoFileProvided => (StatusCode::BAD_REQUEST, "No file provided".to_string()),
-            AppError::InvalidFileType => (StatusCode::BAD_REQUEST, "Only .zip files are allowed".to_string()),
+            AppError::InvalidFileType => (
+                StatusCode::BAD_REQUEST,
+                "Only .zip files are allowed".to_string(),
+            ),
             AppError::FileNotFound => (StatusCode::NOT_FOUND, "File not found".to_string()),
-            AppError::IoError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string()),
-            AppError::MultipartError(_) => {
-                (StatusCode::BAD_REQUEST, "Failed to process multipart data".to_string())
-            }
-            AppError::ZipError(_) => (StatusCode::BAD_REQUEST, "Failed to process zip file".to_string()),
-            AppError::PackErr(err) => (StatusCode::BAD_REQUEST, "could not process package zip".to_string()),
-            AppError::IllegalSliceName(err) => {
-                (StatusCode::BAD_REQUEST, format!("Illegal Slice Name: '{}'",err))
-            }
+            AppError::IoError(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error".to_string(),
+            ),
+            AppError::MultipartError(_) => (
+                StatusCode::BAD_REQUEST,
+                "Failed to process multipart data".to_string(),
+            ),
+            AppError::ZipError(_) => (
+                StatusCode::BAD_REQUEST,
+                "Failed to process zip file".to_string(),
+            ),
+            AppError::PackErr(err) => (
+                StatusCode::BAD_REQUEST,
+                "could not process package zip".to_string(),
+            ),
+            AppError::IllegalSliceName(err) => (
+                StatusCode::BAD_REQUEST,
+                format!("Illegal Slice Name: '{}'", err),
+            ),
         };
-
 
         (status, message).into_response()
     }
