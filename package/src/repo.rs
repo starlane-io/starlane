@@ -33,19 +33,28 @@ impl Default for SourceRepo {
 
 impl SourceRepo {
     pub fn new(path: PathBuf) -> Self {
+        if !path.exists() {
+            fs::create_dir_all(&path).unwrap();
+        }
         Self { root: path }
     }
-    
+
+    pub fn nuke(&self) -> Result<(), PackageErr> {
+        fs::remove_dir_all(&self.root)?;
+        fs::create_dir_all(&self.root)?;
+        Ok(())
+    }
+
     pub fn temp() -> (Self,TempDir) {
         let dir = TempDir::new().unwrap();
         (Self {
-            root: dir.path().clone().to_path_buf()
+            root: dir.path().to_path_buf()
         },dir)
     }
 
     pub fn save_package(&self, package: PackageLayout) -> Result<(), PackErr> {
-        let release_dir = self.root.join(package.release_directory());
-        fs::create_dir(release_dir.clone())?;
+        let release_dir = self.root.join(package.release().to_path());
+        fs::create_dir_all(release_dir.clone())?;
         /// first zip main/root which is a special case
         let main_target = release_dir.join(SlicePath::main().filename());
         zip_slice_dir_to(&package.root, main_target)?;
@@ -62,14 +71,17 @@ impl SourceRepo {
 
     pub async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>,PackErr> {
         let path = self.root.join(slice.to_path());
+println!("SLICE PATH: {}",path.display());
         if !path.exists() {
             return Err(PackErr::SliceNotFound(slice.to_string()));
         }
 
+println!("GOT FILE: {}",path.display());
+
         let mut file = tokio::fs::File::open(&path).await?;
         let mut contents = Vec::new();
         file.read_to_end(&mut contents).await?;
-        
+
         Ok(contents)
     }
 }

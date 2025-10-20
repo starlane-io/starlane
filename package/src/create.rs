@@ -25,6 +25,10 @@ impl PackageLayout {
         path
     }
 
+    pub fn release(&self) -> &Release {
+        &self.config.release
+    }
+
     pub fn create(root: &PathBuf, observer: &mut dyn PackObserver) -> Result<Self, PackErr> {
         let main = SliceLayout::create(root, observer)?;
         let toml_path = root.join("package.toml");
@@ -36,6 +40,10 @@ impl PackageLayout {
             root: root.clone(),
             main,
         })
+    }
+
+    pub fn get_slice(&self, segment: &str ) -> Option<&SliceLayout> {
+            self.main.get_slice(segment)
     }
 
     fn read_toml<T: DeserializeOwned>(toml_path: &PathBuf) -> Result<T, PackErr> {

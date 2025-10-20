@@ -118,6 +118,10 @@ impl SlicePath {
     }
 
     pub fn filename(&self) -> String {
+        if self.is_main() {
+            return "main".to_string();
+        }
+        
         let mut rtn = String::new();
         for segment in &self.segments {
             rtn.push_str(&segment.to_string());

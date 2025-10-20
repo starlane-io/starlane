@@ -26,7 +26,7 @@ pub type Slice = SliceDef<Publisher, Package, Version, SlicePath>;
 pub type File = FileDef<Slice, FilePath>;
 
 impl FromStr for Slice {
-    type Err = ParseErrs0; 
+    type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let i = new_span(s);

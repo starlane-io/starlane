@@ -1,10 +1,11 @@
 use std::fs::{self, File};
-use std::io::{self, Error, Write};
+use std::io::{self, Error, Read, Write};
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
+use crate::SliceLayout;
 
 /// Zips a directory into a temporary file and returns the path to that file.
 ///
@@ -91,17 +92,12 @@ pub fn zip_directory_to_temp<P: AsRef<Path>>(source_dir: P) -> Result<NamedTempF
 
 /// Alternative version that allows custom temp directory
 pub fn zip_slice_dir_to<P: AsRef<Path>, T: AsRef<Path>>(
+
     source_dir: P,
     target_file: T,
 ) -> Result<(), ZipError> {
     let source_dir = source_dir.as_ref();
     let target_file = target_file.as_ref();
-
-    println!(
-        "zip_slice_dir_to: source_dir: {}, target_file: {}",
-        source_dir.display(),
-        target_file.display()
-    );
 
     if !source_dir.exists() {
         return Err(ZipError::DirectoryNotFound(source_dir.to_path_buf()));
@@ -119,7 +115,25 @@ pub fn zip_slice_dir_to<P: AsRef<Path>, T: AsRef<Path>>(
         .compression_method(CompressionMethod::Deflated)
         .unix_permissions(0o755);
 
-    for entry in WalkDir::new(source_dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(source_dir)
+        .into_iter()
+        .filter_entry(|e| {
+
+            if e.path() == source_dir {
+                true
+            } else
+            // Skip directories that contain a .slice file
+            if e.path().is_dir() {
+                let slice_marker = e.path().join(".slice");
+                let rtn = !slice_marker.exists();
+                println!("{} -> {}",slice_marker.display(),rtn);
+                rtn
+            } else {
+                // Always include files
+                true
+            }
+        }).filter_map(|e| e.ok())
+     {
         let path = entry.path();
         let name = path
             .strip_prefix(source_dir)
@@ -143,9 +157,10 @@ pub fn zip_slice_dir_to<P: AsRef<Path>, T: AsRef<Path>>(
             zip.write_all(&file_contents)
                 .map_err(ZipError::WriteError)?;
         } else if path.is_dir() {
-            let dir_name = format!("{}/", name_str);
-            zip.add_directory(dir_name, options)
-                .map_err(ZipError::ZipOperation)?;
+
+                let dir_name = format!("{}/", name_str);
+                zip.add_directory(dir_name, options)
+                    .map_err(ZipError::ZipOperation)?;
         }
     }
 
@@ -229,8 +244,6 @@ mod tests {
         // Verify the zip file exists
         assert!(path.exists());
         assert!(path.metadata().unwrap().len() > 0);
-
-        println!("Created zip at: {:?}", zip_path);
     }
 
     #[test]
@@ -305,6 +318,13 @@ pub fn unzip_from_binary_to_temp(zip_bytes: &[u8]) -> Result<tempfile::TempDir, 
     }
 
     Ok(temp_dir)
+}
+
+pub fn unzip_from_file_to_temp(file: &PathBuf ) -> Result<tempfile::TempDir, ZipError> {
+    let mut content = vec![];
+    let mut file = fs::File::open(file)?;
+    file.read_to_end(&mut content)?;
+    unzip_from_binary_to_temp(content.as_slice())
 }
 
 // ... existing code ...

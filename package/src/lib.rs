@@ -1,3 +1,4 @@
+#![allow(warnings)]
 use crate::create::{PackErr, PackageLayout};
 use once_cell::sync::Lazy;
 use starlane_space::parse::SkewerCase;
@@ -5,7 +6,7 @@ use starlane_space::types::scope::{Segment, SlicePath};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::Error;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{fs, io};
 use thiserror::Error;
@@ -19,7 +20,6 @@ pub static PACKAGE_LAYOUT_EXAMPLE: Lazy<PathBuf> =
 
 pub static ROOT_SLICE: Lazy<Slice> = Lazy::new(|| Slice::from_str("uberscott.com:postgres:1.0.1").unwrap() );
 pub static MY_SLICE: Lazy<Slice> = Lazy::new(|| Slice::from_str("uberscott.com:postgres:1.0.1::my-slice").unwrap() );
-
 
 
 
@@ -100,6 +100,20 @@ impl SliceLayout {
         }
     }
 
+    /// return true if this path is in the directory structure
+    /// false if it doesn't exist or is a slice
+    pub fn is_member( &self, path: &PathBuf ) -> bool {
+        self.directory.is_member(path)
+    }
+
+    pub fn get_slice(&self, segment: &str ) -> Option<&SliceLayout> {
+        if let Ok(segment) = Segment::from_str(segment) {
+            self.slices.get(&segment)
+        } else {
+            None
+        }
+    }
+
     pub fn create(root: &PathBuf, observer: &mut dyn PackObserver) -> Result<Self, PackErr> {
         observer.start_pack(&root);
 
@@ -112,7 +126,6 @@ impl SliceLayout {
                 crate::create::slice_name(dir)?;
                 Ok(Entity::Slice(walk_slice(dir, None)?))
             } else {
-                println!("DIR  : {}", dir.display());
                 Ok(Entity::Directory(walk_dir(dir)?))
             }
         }
@@ -224,15 +237,11 @@ impl SliceLayout {
     }
 
     pub fn gather_slice_paths(&self) -> Vec<SlicePath> {
-        println!("GATHER SLIcE PATHS!");
         let mut paths = Vec::new();
         for slice in self.slices.values() {
             for mut p in slice.gather_slice_paths() {
                 if !self.is_main() {
-                    print!(" ---> p '{}'", p.to_string());
                     p.insert(self.segment.clone());
-
-                    println!(" => '{}'", p.to_string());
                 }
                 paths.push(p);
             }
@@ -240,10 +249,8 @@ impl SliceLayout {
 
         if !self.is_main() {
             let p: SlicePath = self.segment.clone().into();
-            println!("rtn  slice path: {}", p.to_string());
             paths.push(p);
         }
-        println!(" {} -[ paths ]-> ", paths.len());
         paths
     }
 }
@@ -259,6 +266,38 @@ impl Directory {
         Self {
             name,
             children: Default::default(),
+        }
+    }
+
+    pub fn is_member(&self, path: &Path) -> bool {
+        if path.is_absolute() {
+            return false;
+        }
+
+        if let Some(first) = first_component(path) {
+            if let Some(child) = self.children.get(&first) {
+                match child {
+                    FileEntity::File(file) => {
+                        if path.components().count() == 1 {
+                            file == &first
+                        } else {
+                            false
+                        }
+                    }
+                    FileEntity::Directory(directory) => {
+                        if path.components().count() == 1 {
+                            directory.name == first
+                        } else {
+                            let path = path.strip_prefix(&first).unwrap();
+                            directory.is_member(path)
+                        }
+                    }
+                }
+            } else {
+                false
+            }
+        } else {
+            false
         }
     }
 
@@ -288,7 +327,17 @@ impl Directory {
         }
     }
 }
-
+pub fn first_component(path: &std::path::Path) -> Option<String> {
+    path.components()
+        .find_map(|comp| {
+            match comp {
+                std::path::Component::Normal(os_str) => {
+                    os_str.to_str().map(|s| s.to_string())
+                }
+                _ => None
+            }
+        })
+}
 pub enum Entity {
     Directory(Directory),
     Slice(SliceLayout),
@@ -313,13 +362,16 @@ mod test {
     use crate::create::PackageLayout;
     use crate::remote::RemoteRepo;
     use crate::repo::{Repo, SourceRepo};
-    use crate::zip::unzip_from_binary_to_temp;
-    use crate::{FileEntity, PackObserver, PublishObserver, MAIN_SLICE, MY_SLICE, PACKAGE_LAYOUT_EXAMPLE};
+    use crate::zip::{unzip_from_binary_to_temp, unzip_from_file_to_temp, zip_slice_dir_to};
+    use crate::{FileEntity, PackObserver, PublishObserver, MAIN_SLICE, MY_SLICE, PACKAGE_LAYOUT_EXAMPLE, ROOT_SLICE};
     use starlane_space::parse::SkewerCase;
     use starlane_space::types::scope::Segment;
     use std::fs;
+    use std::path::Path;
     use std::str::FromStr;
-    use tempfile::TempDir;
+    use tempfile::{NamedTempFile, TempDir};
+    use tokio::io::AsyncWriteExt;
+    use walkdir::WalkDir;
     use crate::server::ServerBuilder;
 
     pub struct MockPublishObserver();
@@ -333,18 +385,99 @@ mod test {
     impl PublishObserver for MockPublishObserver {}
     impl PackObserver for MockPublishObserver {}
 
-    #[tokio::test]
-    pub async fn test_upload() {
+    fn package_layout() -> PackageLayout{
         let mut observer = MockPublishObserver::default();
+        PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE,&mut observer).unwrap()
+    }
+
+
+    #[test]
+    pub fn walkdir_filter() {
+        for entry in  WalkDir::new(PACKAGE_LAYOUT_EXAMPLE.clone()).into_iter().filter_entry(|e| {
+            if e.path().is_dir() {
+                let slice = e.path().join(".slice");
+                println!("checking slice: {} -> {}", slice.display(), slice.exists());
+                !slice.exists()
+            } else {
+                true
+            }
+        }) {
+            let entry = entry.unwrap();
+            println!(" -- entry : {}", entry.path().display() );
+        }
+
+    }
+
+    #[test]
+    pub fn test_slice_membership() {
+        let package = package_layout();
+        let hierarchy = package.get_slice("hierarchy").unwrap();
+        let path = Path::new("dir1").to_path_buf();
+        assert!(hierarchy.is_member(&path));
+        let path = Path::new("sub1").to_path_buf();
+        assert!(!hierarchy.is_member(&path));
+    }
+
+    #[tokio::test]
+    pub async fn test_zip_slice() {
+        let in_dir = PACKAGE_LAYOUT_EXAMPLE.join("hierarchy");
+        let layout = package_layout();
+        let hierarchy = layout.get_slice("hierarchy").unwrap();
+        let tmp_file= NamedTempFile::new().unwrap();
+        let out_file = tmp_file.path().to_path_buf();
+        zip_slice_dir_to(&in_dir,&out_file).unwrap();
+        let unzip_temp = unzip_from_file_to_temp(&out_file).unwrap();
+        let tmp_dir = unzip_temp.path().to_path_buf();
+        let dir1 = tmp_dir.join("dir1");
+        let sub1= tmp_dir.join("sub1");
+        let sub2= tmp_dir.join("sub2");
+
+        assert!(dir1.exists());
+        assert!(!sub1.exists());
+        assert!(!sub2.exists());
+
+    }
+
+    #[tokio::test]
+    pub async fn test_source() {
+       let (source,_dir) = SourceRepo::temp();
+       let layout = package_layout();
+       source.save_package(layout).unwrap();
+        {
+            let zip = source.get_slice(&MY_SLICE).await.unwrap();
+            let dir = unzip_from_binary_to_temp(zip.as_slice()).unwrap();
+            let path = dir.path().to_path_buf().join("advice.txt");
+            assert!(path.exists())
+        }
+
+        {
+            let zip = source.get_slice(&ROOT_SLICE).await.unwrap();
+            let dir = unzip_from_binary_to_temp(zip.as_slice()).unwrap();
+            let path = dir.path().to_path_buf().join("some-file.txt");
+            assert!(path.exists())
+        }
+    }
+
+
+        #[tokio::test]
+    pub async fn test_upload_and_download() {
         let (builder,_tmp) = ServerBuilder::temp();
-        let handle = builder.serve();
+        let mut handle = builder.serve();
         let repo = RemoteRepo::default();
+
+        let mut observer = MockPublishObserver::default();
         let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, &mut observer).unwrap();
         repo.submit(&layout, observer).await.unwrap();
 
         let my_slice = repo.get_slice(&MY_SLICE).await.unwrap();
+        drop(handle);
 println!("slice size: {}", my_slice.len());
-
+        let slice_dir = unzip_from_binary_to_temp(my_slice.as_slice()).unwrap();
+        let slice_path= slice_dir.path().to_path_buf();
+        let advice = slice_path.join("advice.txt");
+        let mut stdout = tokio::io::stdout();
+        stdout.flush().await.unwrap();
+        assert!(advice.exists());
     }
 
     fn verify_mock_layout(layout: &PackageLayout) -> Result<(), &'static str> {
