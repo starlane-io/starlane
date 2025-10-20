@@ -12,13 +12,13 @@ use std::{fs, io};
 use thiserror::Error;
 use starlane_space::types::specific::Slice;
 
-pub static MAIN_SLICE: Lazy<Segment> =
-    Lazy::new(|| Segment::Segment(SkewerCase::from_str("main").unwrap()));
+pub static ROOT_SLICE: Lazy<Segment> =
+    Lazy::new(|| Segment::Segment(SkewerCase::from_str("root").unwrap()));
 
 pub static PACKAGE_LAYOUT_EXAMPLE: Lazy<PathBuf> =
     Lazy::new(|| PathBuf::from_str("test/package-layout-example").unwrap());
 
-pub static ROOT_SLICE: Lazy<Slice> = Lazy::new(|| Slice::from_str("uberscott.com:postgres:1.0.1").unwrap() );
+pub static PACKAGE: Lazy<Slice> = Lazy::new(|| Slice::from_str("uberscott.com:postgres:1.0.1").unwrap() );
 pub static MY_SLICE: Lazy<Slice> = Lazy::new(|| Slice::from_str("uberscott.com:postgres:1.0.1::my-slice").unwrap() );
 
 
@@ -188,14 +188,14 @@ impl SliceLayout {
             Ok(directory)
         }
 
-        let mut main = walk_slice(root, Some(MAIN_SLICE.clone()))?;
+        let mut main = walk_slice(root, Some(ROOT_SLICE.clone()))?;
 
         observer.end_pack();
         Ok(main)
     }
 
-    pub fn new_main() -> Self {
-        let name = "main";
+    pub fn new_root() -> Self {
+        let name = "root";
         let segment = Segment::Segment(SkewerCase::from_str(name).unwrap());
         Self {
             segment,
@@ -205,7 +205,7 @@ impl SliceLayout {
     }
 
     pub fn is_main(&self) -> bool {
-        self.segment.is_main()
+        self.segment.is_root()
     }
     pub fn verify_children(&self) -> Result<(), PackageErr> {
         for (_, slice) in &self.slices {
@@ -363,7 +363,7 @@ mod test {
     use crate::remote::RemoteRepo;
     use crate::repo::{Repo, SourceRepo};
     use crate::zip::{unzip_from_binary_to_temp, unzip_from_file_to_temp, zip_slice_dir_to};
-    use crate::{FileEntity, PackObserver, PublishObserver, MAIN_SLICE, MY_SLICE, PACKAGE_LAYOUT_EXAMPLE, ROOT_SLICE};
+    use crate::{FileEntity, PackObserver, PublishObserver, ROOT_SLICE, MY_SLICE, PACKAGE_LAYOUT_EXAMPLE, PACKAGE};
     use starlane_space::parse::SkewerCase;
     use starlane_space::types::scope::Segment;
     use std::fs;
@@ -451,13 +451,12 @@ mod test {
         }
 
         {
-            let zip = source.get_slice(&ROOT_SLICE).await.unwrap();
+            let zip = source.get_slice(&PACKAGE).await.unwrap();
             let dir = unzip_from_binary_to_temp(zip.as_slice()).unwrap();
             let path = dir.path().to_path_buf().join("some-file.txt");
             assert!(path.exists())
         }
     }
-
 
         #[tokio::test]
     pub async fn test_upload_and_download() {
@@ -509,9 +508,9 @@ println!("slice size: {}", my_slice.len());
 
         // main
         {
-            assert_eq!(layout.main.directory.children.len(), 4);
+            assert_eq!(layout.root.directory.children.len(), 4);
             if let FileEntity::Directory(off) = layout
-                .main
+                .root
                 .directory
                 .children
                 .get(&"off".to_string())
@@ -521,7 +520,7 @@ println!("slice size: {}", my_slice.len());
             } else {
                 assert!(false)
             }
-            assert_eq!(3, layout.main.slices.len());
+            assert_eq!(3, layout.root.slices.len());
         }
         Ok(())
     }

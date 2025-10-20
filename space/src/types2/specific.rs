@@ -236,9 +236,11 @@ where
     }
 
     ///
-    pub fn root(self) -> ReleaseDef<Publisher, Package, Version> {
+    pub fn package(self) -> ReleaseDef<Publisher, Package, Version> {
         self.release
     }
+
+
 }
 
 impl<Publisher, Package, Version, SliceSegment> Into<ReleaseDef<Publisher, Package, Version>>
@@ -306,10 +308,20 @@ impl Slice {
     pub fn to_path(&self) -> PathBuf {
         let mut path = String::new();
         path.push_str(self.release.to_path().to_str().unwrap());
-        path.push_str("/");
-        path.push_str(self.slices.filename().as_str());
+
+        if self.slices.is_root() {
+            path.push_str("/root");
+        } else {
+            path.push_str("/");
+            path.push_str(self.slices.filename().as_str());
+        }
+
         PathBuf::from(path)
     }
+    pub fn is_root_slice(&self) -> bool {
+        self.slices.is_root()
+    }
+
 }
 
 

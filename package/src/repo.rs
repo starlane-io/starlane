@@ -56,12 +56,12 @@ impl SourceRepo {
         let release_dir = self.root.join(package.release().to_path());
         fs::create_dir_all(release_dir.clone())?;
         /// first zip main/root which is a special case
-        let main_target = release_dir.join(SlicePath::main().filename());
-        zip_slice_dir_to(&package.root, main_target)?;
+        let main_target = release_dir.join(SlicePath::root().filename());
+        zip_slice_dir_to(&package.path, main_target)?;
 
         let paths = package.gather_slice_paths();
         for p in paths {
-            let source = package.root.join(p.as_path());
+            let source = package.path.join(p.as_path());
             let target = release_dir.join(p.filename());
             zip_slice_dir_to(source, target)?;
         }
@@ -70,7 +70,10 @@ impl SourceRepo {
     }
 
     pub async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>,PackErr> {
+println!("\n\n ! -> getting slice: {}",slice);
+
         let path = self.root.join(slice.to_path());
+
 println!("SLICE PATH: {}",path.display());
         if !path.exists() {
             return Err(PackErr::SliceNotFound(slice.to_string()));

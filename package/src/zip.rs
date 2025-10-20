@@ -126,7 +126,6 @@ pub fn zip_slice_dir_to<P: AsRef<Path>, T: AsRef<Path>>(
             if e.path().is_dir() {
                 let slice_marker = e.path().join(".slice");
                 let rtn = !slice_marker.exists();
-                println!("{} -> {}",slice_marker.display(),rtn);
                 rtn
             } else {
                 // Always include files

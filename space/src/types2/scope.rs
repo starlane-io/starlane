@@ -44,9 +44,9 @@ pub enum ScopeKeyword {
     Root,
 }
 
-static MAIN_PATH: Lazy<SlicePath> = Lazy::new(|| {
+static ROOT_PATH: Lazy<SlicePath> = Lazy::new(|| {
     SlicePath::new(vec![Segment::Segment(
-        SkewerCase::from_str("main").unwrap(),
+        SkewerCase::from_str("root").unwrap(),
     )])
 });
 
@@ -56,8 +56,8 @@ pub struct SlicePath {
 }
 
 impl SlicePath {
-    pub fn main() -> Self {
-        MAIN_PATH.clone()
+    pub fn root() -> Self {
+        ROOT_PATH.clone()
     }
     pub fn as_path(&self) -> PathBuf {
         let mut path = PathBuf::new();
@@ -89,12 +89,8 @@ impl SlicePath {
         self.segments.insert(0, segment);
     }
 
-    pub fn is_main(&self) -> bool {
-        if let Some(segment) = self.segments.first() {
-            segment.is_main()
-        } else {
-            false
-        }
+    pub fn is_root(&self) -> bool {
+        self.is_empty()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -118,10 +114,10 @@ impl SlicePath {
     }
 
     pub fn filename(&self) -> String {
-        if self.is_main() {
-            return "main".to_string();
+        if self.is_root() {
+            return "root".to_string();
         }
-        
+
         let mut rtn = String::new();
         for segment in &self.segments {
             rtn.push_str(&segment.to_string());
@@ -195,9 +191,9 @@ pub enum Segment {
 }
 
 impl Segment {
-    pub fn is_main(&self) -> bool {
+    pub fn is_root(&self) -> bool {
         if let Self::Segment(id) = self {
-            "main" == id.as_str()
+            "root" == id.as_str()
         } else {
             false
         }

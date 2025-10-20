@@ -15,8 +15,8 @@ use thiserror::Error;
 
 pub struct PackageLayout {
     pub config: PackageConfig,
-    pub root: PathBuf,
-    pub main: SliceLayout,
+    pub path: PathBuf,
+    pub root: SliceLayout,
 }
 
 impl PackageLayout {
@@ -29,21 +29,21 @@ impl PackageLayout {
         &self.config.release
     }
 
-    pub fn create(root: &PathBuf, observer: &mut dyn PackObserver) -> Result<Self, PackErr> {
-        let main = SliceLayout::create(root, observer)?;
-        let toml_path = root.join("package.toml");
+    pub fn create(path: &PathBuf, observer: &mut dyn PackObserver) -> Result<Self, PackErr> {
+        let root = SliceLayout::create(path, observer)?;
+        let toml_path = path.join("package.toml");
         let config: PackageConfigRaw = Self::read_toml(&toml_path)?;
         let config: PackageConfig = config.try_into()?;
 
         Ok(Self {
             config,
-            root: root.clone(),
-            main,
+            path: path.clone(),
+            root,
         })
     }
 
     pub fn get_slice(&self, segment: &str ) -> Option<&SliceLayout> {
-            self.main.get_slice(segment)
+            self.root.get_slice(segment)
     }
 
     fn read_toml<T: DeserializeOwned>(toml_path: &PathBuf) -> Result<T, PackErr> {
@@ -61,15 +61,15 @@ impl PackageLayout {
         let indent = " ".repeat(spaces);
         println!(
             "{indent}{}[PackageLayout] -> {}",
-            self.root.display(),
+            self.path.display(),
             self.config.release.to_string()
         );
-        self.main.diagnose_indent(spaces + 2);
+        self.root.diagnose_indent(spaces + 2);
     }
 
     pub fn zip(&self) -> Result<NamedTempFile, PackErr> {
         use crate::zip::zip_directory_to_temp;
-        let path = zip_directory_to_temp(self.root.clone())?;
+        let path = zip_directory_to_temp(self.path.clone())?;
         Ok(path)
     }
 }
@@ -96,7 +96,7 @@ impl Deref for PackageLayout {
     type Target = SliceLayout;
 
     fn deref(&self) -> &Self::Target {
-        &self.main
+        &self.root
     }
 }
 
