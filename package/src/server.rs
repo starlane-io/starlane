@@ -169,7 +169,7 @@ async fn upload_zip(
 
         layout.diagnose();
 
-        state.repo.save_package(layout)?;
+        state.repo.submit(layout)?;
 
         println!("\n\npackage saved...\n\n");
         // Return the file ID to the client
@@ -269,20 +269,5 @@ impl From<axum::extract::multipart::MultipartError> for AppError {
 impl From<ZipError> for AppError {
     fn from(err: ZipError) -> Self {
         AppError::ZipError(err)
-    }
-}
-
-#[cfg(test)]
-pub mod test {
-    use axum_test::TestServer;
-    use crate::server::ServerBuilder;
-
-    #[test]
-    pub fn test() {
-        // must hang on to TempDir ref until test is finished
-        let (server,tmp) = ServerBuilder::temp();
-        let server = TestServer::new( server.router()).unwrap();
-        //server.post("/zip").await.();
-        todo!()
     }
 }

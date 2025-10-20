@@ -391,22 +391,7 @@ mod test {
     }
 
 
-    #[test]
-    pub fn walkdir_filter() {
-        for entry in  WalkDir::new(PACKAGE_LAYOUT_EXAMPLE.clone()).into_iter().filter_entry(|e| {
-            if e.path().is_dir() {
-                let slice = e.path().join(".slice");
-                println!("checking slice: {} -> {}", slice.display(), slice.exists());
-                !slice.exists()
-            } else {
-                true
-            }
-        }) {
-            let entry = entry.unwrap();
-            println!(" -- entry : {}", entry.path().display() );
-        }
 
-    }
 
     #[test]
     pub fn test_slice_membership() {
@@ -442,7 +427,7 @@ mod test {
     pub async fn test_source() {
        let (source,_dir) = SourceRepo::temp();
        let layout = package_layout();
-       source.save_package(layout).unwrap();
+       source.submit(layout).unwrap();
         {
             let zip = source.get_slice(&MY_SLICE).await.unwrap();
             let dir = unzip_from_binary_to_temp(zip.as_slice()).unwrap();
@@ -546,7 +531,7 @@ println!("slice size: {}", my_slice.len());
 
         verify_mock_layout(&layout).unwrap();
 
-        source.save_package(layout).unwrap();
+        source.submit(layout).unwrap();
 
         println!("\n\nzipfile: {:?}", zipfile);
     }

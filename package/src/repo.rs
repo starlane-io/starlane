@@ -12,8 +12,8 @@ use tokio::io::AsyncReadExt;
 
 #[async_trait]
 pub trait Repo {
-    async fn get_slice(&self, specific: &Slice) -> Result<Vec<u8>, PackageErr>;
-    async fn submit<P>(&self, pds: &PackageLayout, observer: P) -> anyhow::Result<(), PackageErr>
+    async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>, PackageErr>;
+    async fn submit<P>(&self, layout: &PackageLayout, observer: P) -> anyhow::Result<(), PackageErr>
     where
         P: PublishObserver + Send + Sync;
 }
@@ -52,7 +52,7 @@ impl SourceRepo {
         },dir)
     }
 
-    pub fn save_package(&self, package: PackageLayout) -> Result<(), PackErr> {
+    pub fn submit(&self, package: PackageLayout) -> Result<(), PackErr> {
         let release_dir = self.root.join(package.release().to_path());
         fs::create_dir_all(release_dir.clone())?;
         /// first zip main/root which is a special case
