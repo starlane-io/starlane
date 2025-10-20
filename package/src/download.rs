@@ -5,6 +5,7 @@ use crate::PackageErr;
 use starlane_space::types::specific::Slice;
 use std::path::PathBuf;
 use strum_macros::Display;
+use tempfile::TempDir;
 use thiserror::Error;
 use tokio::sync::oneshot;
 
@@ -26,14 +27,26 @@ impl Downloader {
     pub fn new(path: PathBuf, repo: RemoteRepo) -> Self {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
 
-        DownloadRunner::new(path.clone(), repo, rx);
+        DownloadRunner::new(path.clone(), repo, rx, None);
+        Self { path, tx }
+    }
+
+    pub fn temp(repo: RemoteRepo) -> Self {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().to_path_buf();
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+
+        DownloadRunner::new(path.clone(), repo, rx, Some(tmp));
         Self { path, tx }
     }
 
     /// return () meaning
-    pub async fn download(&self, slice: Slice) -> Result<(), DownloadErr> {
-        let (request, rtn) = DownloadRequest::new(slice);
-        rtn.await.map_err(|_| DownloadErr::Internal)?
+    pub async fn download(&self, slice: &Slice) -> Result<(), DownloadErr> {
+        let (request, rtn) = DownloadRequest::new(slice.clone());
+println!("sending download request");
+        self.tx.send(request).await.unwrap();
+        rtn.await.map_err(|_| DownloadErr::Internal)?;
+        Ok(())
     }
 }
 
@@ -52,23 +65,30 @@ impl DownloadRequest {
 struct DownloadRunner {
     path: PathBuf,
     repo: RemoteRepo,
+    tmp: Option<TempDir>,
     rx: tokio::sync::mpsc::Receiver<DownloadRequest>,
 }
 
 impl DownloadRunner {
-    pub fn new(path: PathBuf, repo: RemoteRepo, rx: tokio::sync::mpsc::Receiver<DownloadRequest>) {
-        let runner = Self { path, repo, rx };
-        tokio::spawn(runner.run());
+    pub fn new(path: PathBuf, repo: RemoteRepo, rx: tokio::sync::mpsc::Receiver<DownloadRequest>, tmp: Option<TempDir>) {
+        let mut runner = Self { path, repo, rx, tmp };
+        runner.start();
+        println!("returning from DownloadRunner::new");
     }
 
-    pub async fn run(mut self) {
-        while let Some(request) = self.rx.recv().await {
-            // first test if the file is already downloaded
-            request
-                .tx
-                .send(self.download_slice(&request.slice).await)
-                .unwrap();
-        }
+    pub fn start(mut self) {
+        println!("Download Runner STARTED !");
+        tokio::spawn(async move {
+            println!("Download runner running!");
+            while let Some(request) = self.rx.recv().await {
+                println!("received download request!");
+                // first test if the file is already downloaded
+                request
+                    .tx
+                    .send(self.download_slice(&request.slice).await)
+                    .unwrap();
+            }
+        });
     }
 
     async fn download_slice(&self, slice: &Slice) -> Result<(), DownloadErr> {

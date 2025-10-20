@@ -59,6 +59,23 @@ impl SourceRepo {
         )
     }
 
+    #[cfg(test)]
+    pub fn mock() -> (Self, TempDir) {
+        let dir = TempDir::new().unwrap();
+        
+        let layout = crate::test::package_layout();
+        let source = Self {
+            root: dir.path().to_path_buf(),
+        };
+        source.submit(layout).unwrap();
+        (
+            source,
+            dir,
+        )
+    }
+    
+    
+
     pub fn submit(&self, package: PackageLayout) -> Result<(), PackErr> {
         let release_dir = self.root.join(package.release().to_path());
         fs::create_dir_all(release_dir.clone())?;

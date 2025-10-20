@@ -42,6 +42,29 @@ impl ServerBuilder {
             dir,
         )
     }
+
+
+    #[cfg(test)]
+    pub fn mock() -> tokio::sync::oneshot::Sender<()> {
+        let (repo, dir) = SourceRepo::mock();
+        let server = Self {
+            bind: "0.0.0.0:3000".to_string(),
+            repo,
+        };
+
+
+        let handle = server.serve();
+        let (tx, rx) = tokio::sync::oneshot::channel();
+
+        tokio::spawn(async move {
+           rx.await.unwrap();
+           drop(handle);
+           drop(dir);
+        });
+
+        tx
+    }
+
     pub fn router(&self) -> Router {
         let state = Arc::new(RepoState::new(self.repo.clone()));
         let router = Router::new()

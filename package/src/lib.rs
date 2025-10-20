@@ -30,6 +30,7 @@ pub mod remote;
 pub mod repo;
 pub mod server;
 pub mod zip;
+mod cache;
 
 #[derive(Error, Debug)]
 pub enum PackageErr {
@@ -368,6 +369,7 @@ mod test {
     use std::str::FromStr;
     use tempfile::NamedTempFile;
     use tokio::io::AsyncWriteExt;
+    use crate::download::Downloader;
 
     pub struct MockPublishObserver();
 
@@ -380,7 +382,7 @@ mod test {
     impl PublishObserver for MockPublishObserver {}
     impl PackObserver for MockPublishObserver {}
 
-    fn package_layout() -> PackageLayout {
+    pub fn package_layout() -> PackageLayout {
         let mut observer = MockPublishObserver::default();
         PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, &mut observer).unwrap()
     }
@@ -452,6 +454,18 @@ mod test {
         let mut stdout = tokio::io::stdout();
         stdout.flush().await.unwrap();
         assert!(advice.exists());
+    }
+
+
+    #[tokio::test]
+    pub async fn test_downloader() {
+        let handle= ServerBuilder::mock();
+println!("Server started");
+        let repo = RemoteRepo::default();
+
+        let downloader = Downloader::temp(repo);
+
+        downloader.download(&MY_SLICE).await.unwrap();
     }
 
     fn verify_mock_layout(layout: &PackageLayout) -> Result<(), &'static str> {
