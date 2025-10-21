@@ -38,7 +38,6 @@ pub mod specific;
 
 pub mod archetype;
 pub mod def;
-pub mod package;
 pub mod parse;
 pub mod property;
 pub mod scope;
@@ -157,11 +156,14 @@ impl Absolute {
         )
     }
 
+    /*
     pub fn mock_root() -> Self {
         let mut mock = Self::mock_default();
         mock.specific = mock.specific.package();
         mock
     }
+
+     */
 }
 
 impl Serialize for Absolute {
@@ -559,11 +561,11 @@ pub mod test2 {
     pub fn test_specific() {
         let specific = result(Slice::parser(new_span("contrib:package:1.0.0"))).unwrap();
 
-        assert_eq!("contrib", specific.release().publisher().as_str());
-        assert_eq!("package", specific.release().package().as_str());
+        assert_eq!("contrib", specific.package().publisher().as_str());
+        assert_eq!("package", specific.package().package().as_str());
         assert_eq!(
             "1.0.0",
-            specific.release().version().clone().to_string().as_str()
+            specific.package().version().clone().to_string().as_str()
         );
         assert!(specific.slices().is_empty())
     }

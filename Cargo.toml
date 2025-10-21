@@ -33,7 +33,7 @@ starlane-package = { package="starlane-package", path="package" }
 lazy_static = "1.5.0"
 uuid = { version="1.17.0" }
 chrono = { version="0.4.41" }
-tokio = "1.45.1"
+tokio = "1.48.0"
 tokio-rustls = "0.26.2"
 getset = "0.1.6"
 toml = "0.9.8"

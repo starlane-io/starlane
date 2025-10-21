@@ -272,7 +272,7 @@ pub enum StateDetail {
     /// before the [Provider] [State] is queried and reported by the [Provider::synchronize]
     /// the state is not known
     Unknown,
-    /// stage progression is halted until the depdendency conditions of [StateDetail::Pending]
+    /// stage progression is halted until the dependency conditions of [StateDetail::Pending]
     /// are rectified
     Pending(PendingDetail),
     /// [StatusProbe] is halted described by [StateErrDetail]
@@ -298,7 +298,7 @@ pub enum StageDetail {
     Unknown,
     ///
     None,
-    /// the meaning of [StageDetail::Cached] differs by implementation. It's most base meaning
+    /// the meaning of [StageDetail::Cached] differs by implementation. Its most base meaning
     /// signifies that all fetching/downloading stages have completed... and of course
     /// some providers don't have a cached stage at all
     Cached,

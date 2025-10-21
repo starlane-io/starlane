@@ -37,7 +37,7 @@ use strum_macros::EnumDiscriminants;
 pub enum Class {
     Root,
     #[strum(disabled)]
-    #[strum(to_string = "Service<{0}>")]
+    #[strum(to_string = "Service::{0}")]
     Service(Service),
     Platform,
     Foundation,

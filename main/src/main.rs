@@ -57,7 +57,6 @@ use starlane_macros::{create_mark, ToBase};
 use starlane_package::create::PackageLayout;
 use starlane_package::remote::RemoteRepo;
 use starlane_package::repo::Repo;
-use starlane_package::server::start_package_server;
 use starlane_package::{PackObserver, PackageErr, PublishObserver, PACKAGE_LAYOUT_EXAMPLE};
 use starlane_space::err::PrintErr;
 use starlane_space::loc::ToBaseKind;
@@ -79,6 +78,7 @@ use tokio::sync::mpsc;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::{FileOptionExtension, FileOptions};
+use starlane_package::server::ServerBuilder;
 /*
 let config = Default::default();
 
@@ -218,7 +218,7 @@ pub async fn main() -> Result<(), anyhow::Error> {
                     todo!();
                 }
                 PackCmd::Serve => {
-                    start_package_server().await;
+                    ServerBuilder::default();
                     Ok(())
                 }
             },

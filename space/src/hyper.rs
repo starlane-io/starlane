@@ -52,7 +52,6 @@ impl Location {
         match self {
             Location::Nowhere => Err("Particle is presently nowhere".into()),
             Location::Somewhere(point) => Ok(point.clone()),
-
             Location::Central => Ok(Point::central()),
         }
     }

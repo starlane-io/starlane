@@ -21,8 +21,8 @@ use std::hash::Hash;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-pub type Release = ReleaseDef<Publisher, Package, Version>;
-pub type Slice = SliceDef<Publisher, Package, Version, SlicePath>;
+pub type Package = PackageDef<Publisher, PackageId, Version>;
+pub type Slice = SliceDef<Publisher, PackageId, Version, SlicePath>;
 pub type PackFile = PackFileDef<Slice, FilePath>;
 
 impl FromStr for PackFile {
@@ -43,7 +43,7 @@ impl FromStr for Slice {
     }
 }
 
-impl FromStr for Release {
+impl FromStr for Package {
     type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -53,7 +53,7 @@ impl FromStr for Release {
     }
 }
 
-pub fn release<S>(i: S) -> Res<S, Release>
+pub fn release<S>(i: S) -> Res<S, Package>
 where
     S: Span,
 {
@@ -62,7 +62,7 @@ where
         .map(|(next, (publisher, _, package, _, version))| {
             (
                 next,
-                Release {
+                Package {
                     publisher,
                     package,
                     version,
@@ -77,16 +77,16 @@ fn test() {
     Slice::mock_default();
     Slice::mock_0();
     Slice::mock_1();
-    println!("SpecificLoc::mock_default() -> {}", Slice::mock_default());
-    println!("SpecificLoc::mock_0() -> {}", Slice::mock_1());
-    println!("SpecificLoc::mock_1() -> {}", Slice::mock_0());
+    println!("Slice::mock_default() -> {}", Slice::mock_default());
+    println!("Slice::mock_0() -> {}", Slice::mock_1());
+    println!("Slice::mock_1() -> {}", Slice::mock_0());
 }
 
 #[cfg(test)]
 impl Slice {
     pub fn mock_default() -> Self {
         result(Self::parser(new_span(
-            "starlane.io:uberscott:1.0.1::main:7.0.7",
+            "starlane.io:uberscott:1.0.1::7.0.7",
         )))
         .unwrap()
     }
@@ -107,28 +107,28 @@ impl Slice {
 }
 
 pub type Publisher = Domain;
-pub type Package = SkewerCase;
+pub type PackageId = SkewerCase;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Hash, Getters)]
 #[get = "pub"]
-pub struct ReleaseDef<Publisher, Package, Version>
+pub struct PackageDef<Publisher, PackageId, Version>
 where
     Publisher: Archetype,
-    Package: Archetype,
+    PackageId: Archetype,
     Version: Archetype,
 {
     publisher: Publisher,
-    package: Package,
+    package: PackageId,
     version: Version,
 }
 
-impl Release {
+impl Package {
     pub fn filename(&self) -> String {
         format!("{}_{}_{}", self.publisher, self.package, self.version)
     }
 }
 
-impl<Publisher, Package, Version> Display for ReleaseDef<Publisher, Package, Version>
+impl<Publisher, Package, Version> Display for PackageDef<Publisher, Package, Version>
 where
     Publisher: Archetype,
     Package: Archetype,
@@ -140,7 +140,7 @@ where
     }
 }
 
-impl<Publisher, Package, Version> ReleaseDef<Publisher, Package, Version>
+impl<Publisher, Package, Version> PackageDef<Publisher, Package, Version>
 where
     Publisher: Archetype,
     Package: Archetype,
@@ -164,7 +164,7 @@ where
     Version: Archetype,
     SlicePath: Archetype,
 {
-    release: ReleaseDef<Publisher, Package, Version>,
+    package: PackageDef<Publisher, Package, Version>,
     slices: SlicePath,
 }
 
@@ -177,7 +177,7 @@ where
     SliceSegment: Archetype,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.release)?;
+        write!(f, "{}", self.package)?;
         let slices = self.slices.to_string();
 
         if !slices.is_empty() {
@@ -213,7 +213,7 @@ where
             (
                 next,
                 SliceDef {
-                    release: ReleaseDef {
+                    package: PackageDef {
                         publisher: contributor,
                         package,
                         version,
@@ -234,7 +234,7 @@ where
 {
     pub fn new(contributor: Publisher, package: Package, version: Version, slices: Slices) -> Self {
         Self {
-            release: ReleaseDef {
+            package: PackageDef {
                 publisher: contributor,
                 package,
                 version,
@@ -243,13 +243,9 @@ where
         }
     }
 
-    ///
-    pub fn package(self) -> ReleaseDef<Publisher, Package, Version> {
-        self.release
-    }
 }
 
-impl<Publisher, Package, Version, SliceSegment> Into<ReleaseDef<Publisher, Package, Version>>
+impl<Publisher, Package, Version, SliceSegment> Into<PackageDef<Publisher, Package, Version>>
     for SliceDef<Publisher, Package, Version, SliceSegment>
 where
     Publisher: Archetype,
@@ -257,8 +253,8 @@ where
     Version: Archetype,
     SliceSegment: Archetype,
 {
-    fn into(self) -> ReleaseDef<Publisher, Package, Version> {
-        self.release
+    fn into(self) -> PackageDef<Publisher, Package, Version> {
+        self.package
     }
 }
 
@@ -298,7 +294,7 @@ where
     }
 }
 
-impl Release {
+impl Package {
     pub fn to_path(&self) -> PathBuf {
         let mut path = String::new();
         path.push_str(&self.publisher.to_string());
@@ -313,7 +309,7 @@ impl Release {
 impl Slice {
     pub fn to_path(&self) -> PathBuf {
         let mut path = String::new();
-        path.push_str(self.release.to_path().to_str().unwrap());
+        path.push_str(self.package.to_path().to_str().unwrap());
 
         if self.slices.is_root() {
             path.push_str("/root");
@@ -330,6 +326,14 @@ impl Slice {
 }
 
 impl PackFile {
+    #[cfg(test)]
+    pub fn mock() -> Self {
+        result(Self::parser(new_span(
+            "starlane.io:uberscott:1.0.1::7.0.7/file.conf",
+        )))
+            .unwrap()
+    }
+
     pub fn to_path(&self) -> PathBuf {
         let mut path = String::new();
         path.push_str(self.slice.to_path().to_str().unwrap());
@@ -341,7 +345,7 @@ impl PackFile {
 pub type SliceSelector = SliceDef<PublisherSelector, PackageSelector, VersionPattern, SlicePattern>;
 
 pub type PublisherSelector = Pattern<Publisher>;
-pub type PackageSelector = Pattern<Package>;
+pub type PackageSelector = Pattern<PackageId>;
 pub type VersionPattern = Pattern<VersionReq>;
 pub type SlicePattern = Pattern<SlicePath>;
 

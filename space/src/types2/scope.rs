@@ -66,6 +66,10 @@ impl SlicePath {
         }
         path
     }
+
+    pub fn len(&self) -> usize {
+        self.segments.len()
+    }
 }
 
 impl Default for SlicePath {
