@@ -159,7 +159,6 @@ impl Absolute {
 
     pub fn mock_root() -> Self {
         let mut mock = Self::mock_default();
-        mock.specific = mock.specific.package();
         mock
     }
 }

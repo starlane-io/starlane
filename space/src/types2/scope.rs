@@ -59,6 +59,11 @@ impl SlicePath {
     pub fn root() -> Self {
         ROOT_PATH.clone()
     }
+
+    pub fn len(&self) -> usize {
+        self.segments.len()
+    }
+
     pub fn as_path(&self) -> PathBuf {
         let mut path = PathBuf::new();
         for segment in &self.segments {
