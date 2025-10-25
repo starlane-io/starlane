@@ -414,7 +414,7 @@ fn run() -> Result<(), anyhow::Error> {
             spinner.next("configuration loaded.","launching registry [this may take a while]");
 
             console.long_delay();
-            let starlane = Starlane::new(config,StandAloneFoundation()).await.map_err(|e|{println!("{}",e.to_string()); e}).unwrap();
+            let starlane = Starlane::new(config,StandAloneFoundation).await.map_err(|e|{println!("{}",e.to_string()); e}).unwrap();
 
             spinner.next("registry status: [Ready]","acquiring machine API");
 

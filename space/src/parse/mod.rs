@@ -219,6 +219,8 @@ pub enum ErrCtx {
     UnrecognizedTypeDelimeter(&'static str),
     #[error(transparent)]
     Primitive(#[from] PrimitiveErrCtx),
+    #[error("expecting = {0}")]
+    Expected(&'static str)
 }
 
 #[derive(Debug, Clone, Error)]
@@ -309,6 +311,7 @@ impl BraceKindErrCtx {}
 pub type NomErr<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErrs0>;
 
 use nom::error::VerboseError;
+use crate::parse;
 
 pub type Res<I: Span, O> = IResult<I, O, NomErr<I>>;
 
@@ -6565,6 +6568,7 @@ where
         ErrorKind::AlphaNumeric,
     )
 }
+
 
 pub fn skewer_or_snake<T>(i: T) -> Res<T, T>
 where

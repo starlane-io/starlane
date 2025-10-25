@@ -43,7 +43,7 @@ repository.workspace = true
 [features]
 default=["std","chumsky","types2"]
 chumsky=[]
-types2=["parse2"]
+types2=[]
 parse2=[]
 std=[]
 test=[]

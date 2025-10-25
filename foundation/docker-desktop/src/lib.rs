@@ -8,11 +8,11 @@ use starlane_space::status::{EntityReadier, StatusDetail, StatusResult, StatusWa
 
 mod concrete {}
 
-pub struct DockerDaemonFoundation();
+pub struct DockerDaemonFoundation;
 
 impl DockerDaemonFoundation {
     pub fn new() -> Self {
-        Self()
+        Self
     }
 }
 impl BaseSub for DockerDaemonFoundation {}
