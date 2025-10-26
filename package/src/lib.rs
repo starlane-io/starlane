@@ -440,7 +440,7 @@ mod test {
     #[tokio::test]
     pub async fn test_upload_and_download() {
         let (builder, _tmp) = ServerBuilder::temp();
-        let mut handle = builder.serve();
+        let mut handle = builder.start_with_termination_handle();
         let repo = RemoteRepo::default();
 
         let mut observer = MockPublishObserver::default();

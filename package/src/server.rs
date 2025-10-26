@@ -14,6 +14,7 @@ use starlane_space::types::specific::Slice;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use tempfile::TempDir;
 use thiserror::Error;
 
@@ -43,7 +44,6 @@ impl ServerBuilder {
         )
     }
 
-
     #[cfg(test)]
     pub fn mock() -> tokio::sync::oneshot::Sender<()> {
         let (repo, dir) = SourceRepo::mock();
@@ -52,14 +52,13 @@ impl ServerBuilder {
             repo,
         };
 
-
-        let handle = server.serve();
+        let handle = server.start_with_termination_handle();
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         tokio::spawn(async move {
-           rx.await.unwrap();
-           drop(handle);
-           drop(dir);
+            rx.await.unwrap();
+            drop(handle);
+            drop(dir);
         });
 
         tx
@@ -75,7 +74,28 @@ impl ServerBuilder {
         router
     }
 
-    pub fn serve(self) -> tokio::sync::oneshot::Sender<()> {
+    /// start this server and manage the handler
+    pub fn start(self) {
+        let handle = self.start_with_termination_handle();
+        tokio::spawn(async move {
+            /// used to move handle into this async block
+            let handle = handle;
+            loop {
+                tokio::time::sleep(Duration::from_secs(u64::MAX)).await;
+            }
+        });
+    }
+
+    /// exactly like [ServerBuilder::start] except it then automatically idles
+    /// the current task until the program is externally killed
+    pub async fn run(self) {
+        let handle = self.start_with_termination_handle();
+        loop {
+            tokio::time::sleep(Duration::from_secs(u64::MAX)).await;
+        }
+    }
+
+    pub fn start_with_termination_handle(self) -> tokio::sync::oneshot::Sender<()> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         tokio::spawn(async move {
             let router = self.router();
