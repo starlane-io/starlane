@@ -1,6 +1,4 @@
-use starlane_base::env::{
-    config_save, enviro, Enviro, GlobalMode, StdEnviro, STARLANE_GLOBAL_SETTINGS, STARLANE_HOME,
-};
+use starlane_base::env::{config, config_save, enviro, Enviro, GlobalMode, StdEnviro, STARLANE_GLOBAL_SETTINGS, STARLANE_HOME};
 
 use crate::{COOL, ERR, IMPORTANT, OK, UNDERSTATED, VERSION};
 use anyhow::anyhow;
@@ -26,6 +24,7 @@ use std::time::Duration;
 use std::{io, thread};
 use text_to_ascii_art::to_art;
 use textwrap::Options;
+use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
 //use starlane::base::foundation::implementation::docker_daemon_foundation::DockerDaemonFoundation;
 
 #[tokio::main]
@@ -160,8 +159,6 @@ impl StandaloneInstaller {
         Self { console }
     }
     async fn start(self) -> Result<(), anyhow::Error> {
-        todo!();
-        /*
         let mut spinner = self.console.spinner();
         spinner.start("starting Standalone installer");
         self.console.long_delay();
@@ -171,7 +168,6 @@ impl StandaloneInstaller {
         env::config_save(config.clone())?;
         spinner.stop("config saved");
         let foundation = DockerDaemonFoundation::new();
-
         let mut spinner = self.console.spinner();
         match &config.registry {
             PgRegistryConfig::Embedded(db) => {

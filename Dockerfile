@@ -15,4 +15,4 @@ RUN cd cosmic/cosmic-cli && cargo install --path . --root /target cosmic-cli
 FROM ubuntu
 COPY --from=0 /target/bin/starlane /usr/bin/
 COPY --from=0 /target/bin/cosmic /usr/bin/
-CMD starlane
+CMD starlane run

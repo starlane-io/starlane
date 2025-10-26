@@ -56,7 +56,7 @@ mod concrete {
     }
 
     use crate::database::concrete::my::PostgresDatabaseConnectionPoolProvider;
-    use crate::service::config::PostgresUtilizationConfig;
+    use crate::service::config::PostgresConnectionConfig;
     use crate::service::{Pool, PostgresServiceHandle};
     use async_trait::async_trait;
     use sqlx::postgres::PgConnectOptions;
@@ -73,7 +73,7 @@ mod concrete {
     #[derive(Clone, Eq, PartialEq)]
     pub struct Config {
         database: String,
-        connection: PostgresUtilizationConfig,
+        connection: PostgresConnectionConfig,
     }
 
     impl Config {
@@ -85,7 +85,7 @@ mod concrete {
         #[cfg(test)]
         pub fn mock() -> Self {
             let database = "registry".to_string();
-            let connection = PostgresUtilizationConfig::mock();
+            let connection = PostgresConnectionConfig::mock();
 
             Self {
                 database,
@@ -228,8 +228,3 @@ pub mod partial {
     }
 }
 
-#[cfg(test)]
-pub mod tests {
-    #[tokio::test]
-    pub async fn test_handle_deref() {}
-}

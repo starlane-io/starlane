@@ -62,6 +62,10 @@ pub static STARLANE_CONTROL_PORT: Lazy<u16> = Lazy::new(|| {
         .unwrap_or(4343)
 });
 
+pub static STARLANE_CONTEXTS: Lazy<String> = Lazy::new(|| {
+    format!("{}/contexts", *STARLANE_HOME)
+});
+
 #[cfg(not(test))]
 pub static STARLANE_HOME: Lazy<String> = Lazy::new(|| {
     std::env::var("STARLANE_HOME").unwrap_or_else(|e| {
@@ -79,6 +83,8 @@ pub static STARLANE_HOME: Lazy<String> = Lazy::new(|| {
     fs::create_dir_all(dir).unwrap();
     dir.to_string()
 });
+
+
 
 pub static STARLANE_GLOBAL_SETTINGS: Lazy<GlobalSettings> = Lazy::new(|| ensure_global_settings());
 
@@ -169,7 +175,7 @@ pub fn config_path() -> String {
 }
 
 pub fn config_path_context(context: String) -> String {
-    format!("{}/{}/config.yaml", STARLANE_HOME.as_str(), context).to_string()
+    format!("{}/contexts/{}/config.yaml", STARLANE_HOME.as_str(), context).to_string()
 }
 
 pub fn config_exists(context: String) -> bool {

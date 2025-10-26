@@ -24,8 +24,8 @@ use starlane_space::status::Status;
 #[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
 pub enum ProviderKind {
     /// [Provider::probe] should ascertain if the docker daemon is installed and running.
-    /// If the DockerDaemon is accessible set [Status::Ready].
-    /// If not accessible set [Status::Pending] with an [ActionRequest] providing helpful guidance
+    /// If the DockerDaemon is accessible, set [Status::Ready].
+    /// If not accessible, set [Status::Pending] with an [ActionRequest] providing helpful guidance
     /// to the Starlane admin on how to rectify the issue.
     ///
     /// Note: that the DockerDaemon [Provider] should take any steps to install or start Docker
@@ -70,16 +70,16 @@ pub enum PostgresDatabaseKindDef {
     /// just a plain, empty postgres database full of potential
     Default,
     /// a variant of [ProviderKind::PostgresDatabase] that is initialized with the [Registry]
-    /// sql schema to be utilized by a
+    /// SQL schema to be utilized by a
     Registry,
     _Ext(CamelCase),
 }
 
-/// indicates which architecture layer manages this dependency or if management is external
+/// Indicates which architecture layer manages this dependency or if management is external
 /// to starlane itself.  Managing entails: downloading, installing and starting the [StatusProbe]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Strata {
-    /// the [StatusProbe] is managed by Starlane's Foundation.  For example a running Starlane
+    /// The [StatusProbe] is managed by Starlane's Foundation.  For example, a running Starlane
     /// local development cluster might use DockerDesktopFoundation to provide services like
     /// Postgres.
     Foundation,

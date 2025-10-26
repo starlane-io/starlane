@@ -2,7 +2,7 @@
 
 //! # BASE STRATA
 //! Trait definitions and abstract support implementations for the first two
-//! rungs of `Starlane's` layered  architecture: [Foundation] and [Platform]
+//! rungs of `Starlane's` layered architecture: [Foundation] and [Platform]
 //!
 //! Starlane `Base Strata` provides `utilization` and `management` of services
 //! and resources that are external to and not native of Starlane.
@@ -29,7 +29,7 @@
 //!  supply the connection info and credentials in [crate::src::platform::prelude::Platform::Config]
 //!  and simply omit the [Foundation] dependency.  The important concept to grasp is that the
 //!  Base layers provide
-//!  a separation between `utilization` [Platform] , and `management` [Foundation]. Because
+//!  a separation between `utilization` [Platform], and `management` [Foundation]. Because
 //!  of this separation of concerns the same [crate::src::platform::prelude::Platform::Config] that
 //!  was created for the
 //!  development environment be used when deployed to production. Let's say, for example,
@@ -43,7 +43,7 @@
 //
 // * [Space](starlane_space) -- APIs and utilities for driving and extending `Starlane` with
 //   [Particle]'s ([Particle] is an abstract enterprise resource in Starlane parlance).
-//   An enterprise's  `Value Adding Code` can be developed in to run in the [Space](starlane_space)
+//   An enterprise's `Value Adding Code` can be developed in to run in the [Space](starlane_space)
 //   layer which is designed to minimize or eliminate the friction of writing infrastructure
 //   code.
 //
@@ -55,11 +55,11 @@
 //
 // * [Base](crate::base) -- A support layer which provides starlane with non-native functionality
 //   that can also be extended through the use of [Provider] (which is an abstract trait defined in
-//   [HyperSpace](starlane_hyperspace), yet implemented almost exclusively int the base layers.
-//    [Base](crate::base) is actually comprised of two layers: [Platform] and [crate::Foundation]
+//   [HyperSpace](starlane_hyperspace), yet implemented almost exclusively in the base layers.
+//    [Base](crate::base) actually consists of two layers: [Platform] and [crate::Foundation]
 //
 // * [Platform] -- A layer that supplies [Provider]'s which understand how to connect,
-//   communicate and utilize external non-native support elements for Starlane.  For example:
+//   communicate and utilize external non-native support elements for Starlane.  For example,
 //   [Platform] may have a [Provider] implementation for a Postgres Service (or cluster).
 //   The [Provider::Config] implementation for `PostgresServiceProvider` contains the cluster.
 //
@@ -67,13 +67,13 @@
 //   [Handle<PostgresServiceStub>] which contains a database connection pool.
 //
 //  * [crate::Foundation] -- Starlane's lowest architectural layer.  When a user installs a new Starlane
-//    Context he must select a specific [crate::Foundation] implementation.  For local development
+//    Context, he must select a specific [crate::Foundation] implementation.  For local development
 //    the [DockerDaemonFoundation] is recommended (and at the time of this writing the only
 //    [crate::Foundation] implementation available!).
 //
 //    So why is the [crate::Foundation] needed and how does it differ from [Platform]'s role? You remember
 //    that the [Platform] layer can create connection pools to external services... a more abstract
-//    way to think of it is that the [Platform]'s [Provider]'s can `utilize` external services, yet
+//    way to think of it is that the [Platform]'s [Provider] can `utilize` external services, yet
 //    it does not `manage` anything.
 //
 //    [crate::Foundation] level [Provider] implementations actively `manage` the lifecycle of non-native

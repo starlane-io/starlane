@@ -516,8 +516,8 @@ pub enum StateErrDetail {
     /// A Panic state indicates that the Entity has Not reached the desired
     /// [State::Ready] state and is now idle.
     ///
-    /// An [StatusProbe] may recover from a Panic if the panic issue is externally resolved and then
-    /// `Entity::synchronize()` is invoked trigger another try-again loop.
+    /// An [StatusProbe] may recover from a Panic if the panic issue is externally resolved, and then
+    /// `Entity::synchronize()` is invoked to trigger another try-again loop.
     Panic(String),
     /// [StateErr::Fatal] signals an error condition that cannot be recovered from.
     /// Depending upon the context of the status [StatusProbe] reporting [StateErr::Fatal] possible

@@ -46,10 +46,7 @@ use once_cell::sync::Lazy;
 use shadow_rs::shadow;
 use starlane::starlane::Starlane;
 use starlane_base::env;
-use starlane_base::env::{
-    config_exists, ensure_global_settings, enviro, enviro_dir, save_global_settings, set_enviro,
-    STARLANE_HOME,
-};
+use starlane_base::env::{config_exists, ensure_global_settings, enviro, enviro_dir, save_global_settings, set_enviro, STARLANE_CONTEXTS, STARLANE_HOME};
 use starlane_foundation_for_docker_desktop::DockerDaemonFoundation;
 pub use starlane_hyperspace::base::Platform;
 use starlane_hyperspace::shutdown::shutdown;
@@ -181,7 +178,7 @@ pub async fn main() -> Result<(), anyhow::Error> {
                 }
                 ContextCmd::List => {
                     let context = context();
-                    let dir = std::fs::read_dir(STARLANE_HOME.to_string())?;
+                    let dir = std::fs::read_dir(*STARLANE_CONTEXTS)?;
                     for dir in dir.into_iter() {
                         let dir = dir?;
                         if dir.metadata()?.is_dir() {
@@ -251,8 +248,6 @@ pub type StandAloneFoundation = DockerDaemonFoundation;
 
 async fn run() -> Result<(), anyhow::Error> {
     let console = Console::new();
-    console.info("starlane started.")?;
-
     console.intro("RUN STARLANE").unwrap_or_default();
 
     async fn runner(console: &Console) -> Result<(), anyhow::Error> {

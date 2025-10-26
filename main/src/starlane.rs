@@ -4,7 +4,7 @@ use base::env::{config_path, STARLANE_CONTROL_PORT};
 use base::foundation::StarlaneConfig;
 use hyperspace::base::BaseSub;
 use hyperspace::registry;
-use hyperspace::registry::Registry;
+use hyperspace::registry::{Registry, RegistryWrapper};
 use hyperspace::service::STARLANE_DATA_DIR;
 use port_check::is_local_ipv4_port_free;
 use serde::{Deserialize, Serialize};
@@ -31,6 +31,9 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
+use starlane_platform_for_postgres::database::PostgresDatabase;
+use starlane_platform_for_postgres_registry::registry::PostgresRegistry;
+use starlane_space::status::Handle;
 
 pub mod prelude {
     /// abstract
@@ -133,37 +136,15 @@ impl Starlane {
         config: StarlaneConfig,
         foundation: DockerDaemonFoundation,
     ) -> Result<Starlane, HypErr> {
-        todo!();
-        /*
         let artifacts = Artifacts::just_builtins();
 
-        let db = match config.clone().registry {
-            PgRegistryConfig::Embedded(db) => {
-                let rtn = config.provision_registry(&config).await?;
-                rtn
-            }
-            PgRegistryConfig::External(db) => {
-                let (handle, mut rx) = tokio::sync::mpsc::channel(1);
-                tokio::spawn(async move {
-                    while let Some(_) = rx.recv().await {
-                        // do nothing until sender goes out of scope
-                    }
-                });
 
-                LiveDatabase::new(db, handle)
-            }
-        };
-
-        let lookups = PostgresLookups::new(config.registry.clone());
-        let mut set = HashSet::new();
-        set.insert(db.database.clone());
-        let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookups.clone())).await?);
-        let handle = PostgresRegistryContextHandle::new(&db.database, ctx, db.handle);
+        let database = PostgresDatabase::
 
         let logger = logger!(&Point::global_registry());
 
         let registry = Arc::new(RegistryWrapper::new(Arc::new(
-            PostgresRegistry::new(handle, Box::new(lookups), logger).await?,
+            PostgresRegistry::new(handle, logger).await?,
         )));
 
         Ok(Self {

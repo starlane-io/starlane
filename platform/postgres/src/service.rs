@@ -62,9 +62,9 @@ use tokio::sync::Mutex;
 /// final [starlane::config::ProviderConfig] trait definitions for [concrete::PostgresProviderConfig]
 #[async_trait]
 pub trait ProviderConfig: config::ProviderConfig {
-    fn utilization_config(&self) -> &config::PostgresUtilizationConfig;
+    fn utilization_config(&self) -> &config::PostgresConnectionConfig;
 
-    /// reexport [config::PostgresUtilizationConfig::connect_options]
+    /// reexport [config::PostgresConnectionConfig::connect_options]
     fn connect_options(&self) -> PgConnectOptions {
         self.utilization_config().connect_options()
     }
@@ -117,14 +117,14 @@ pub mod config {
     pub trait ProviderConfig: starlane_hyperspace::base::config::ProviderConfig {}
 
     #[derive(Clone, Eq, PartialEq)]
-    pub struct PostgresUtilizationConfig {
+    pub struct PostgresConnectionConfig {
         pub host: my::Hostname,
         pub port: u16,
         pub username: my::Username,
         pub password: String,
     }
 
-    impl PostgresUtilizationConfig {
+    impl PostgresConnectionConfig {
         pub fn new<User, Pass>(
             host: my::Hostname,
             port: u16,
@@ -206,7 +206,7 @@ mod concrete {
     use std::sync::Arc;
 
     use crate::service::concrete::my::{Error, PostgresConnectionProvider};
-    use config::PostgresUtilizationConfig;
+    use config::PostgresConnectionConfig;
     use starlane_hyperspace::base::config::{BaseSubConfig, ProviderConfig};
     use starlane_hyperspace::base::BaseSub;
 
@@ -291,7 +291,6 @@ mod concrete {
         }
 
         #[cfg(test)]
-        #[cfg(feature = "test")]
         pub fn mock() -> Self {
             let connection = Arc::new(PgConnection::default());
             let config = PostgresProviderConfig::mock();
@@ -308,27 +307,27 @@ mod concrete {
 
     #[derive(Clone, Eq, PartialEq)]
     pub struct PostgresProviderConfig {
-        connection_info: my::config::PostgresUtilizationConfig,
+        connection_info: my::config::PostgresConnectionConfig,
     }
 
     #[cfg(test)]
     impl PostgresProviderConfig {
         pub fn mock() -> Self {
             Self {
-                connection_info: PostgresUtilizationConfig::mock(),
+                connection_info: PostgresConnectionConfig::mock(),
             }
         }
     }
 
     #[async_trait]
     impl my::ProviderConfig for PostgresProviderConfig {
-        fn utilization_config(&self) -> &PostgresUtilizationConfig {
+        fn utilization_config(&self) -> &PostgresConnectionConfig {
             &self.connection_info
         }
     }
 
     impl Deref for PostgresProviderConfig {
-        type Target = my::config::PostgresUtilizationConfig;
+        type Target = my::config::PostgresConnectionConfig;
 
         fn deref(&self) -> &Self::Target {
             &self.connection_info
@@ -389,8 +388,8 @@ pub(crate) mod tests {
         }
     }
 
+    #[cfg(test)]
     #[tokio::test]
-    #[cfg(feature = "test")]
     pub async fn test_handle_deref() {
         let service = PostgresService::mock();
         let handle = Handle::mock(service);
