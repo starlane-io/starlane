@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 use serde_derive::Deserialize;
 use starlane_space::err::ParseErrs0;
 use starlane_space::types::scope::Segment;
-use starlane_space::types::specific::Release;
+use starlane_space::types::specific::Package;
 use std::ops::Deref;
 use std::path::{PathBuf, StripPrefixError};
 use std::str::FromStr;
@@ -25,7 +25,7 @@ impl PackageLayout {
         path
     }
 
-    pub fn release(&self) -> &Release {
+    pub fn release(&self) -> &Package {
         &self.config.release
     }
 
@@ -80,14 +80,14 @@ struct PackageConfigRaw {
 }
 
 struct PackageConfig {
-    release: Release,
+    release: Package,
 }
 
 impl TryFrom<PackageConfigRaw> for PackageConfig {
     type Error = ParseErrs0;
 
     fn try_from(raw: PackageConfigRaw) -> Result<Self, Self::Error> {
-        let specific = Release::from_str(raw.release.as_str())?;
+        let specific = Package::from_str(raw.release.as_str())?;
         Ok(Self { release: specific })
     }
 }

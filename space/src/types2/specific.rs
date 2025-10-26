@@ -21,8 +21,8 @@ use std::hash::Hash;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-pub type Release = ReleaseDef<Publisher, Package, Version>;
-pub type Slice = SliceDef<Publisher, Package, Version, SlicePath>;
+pub type Package = PackageDef<Publisher, PackageId, Version>;
+pub type Slice = SliceDef<Publisher, PackageId, Version, SlicePath>;
 pub type PackFile = PackFileDef<Slice, FilePath>;
 
 impl FromStr for PackFile {
@@ -43,7 +43,7 @@ impl FromStr for Slice {
     }
 }
 
-impl FromStr for Release {
+impl FromStr for Package {
     type Err = ParseErrs0;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -53,7 +53,7 @@ impl FromStr for Release {
     }
 }
 
-pub fn release<S>(i: S) -> Res<S, Release>
+pub fn release<S>(i: S) -> Res<S, Package>
 where
     S: Span,
 {
@@ -62,9 +62,9 @@ where
         .map(|(next, (publisher, _, package, _, version))| {
             (
                 next,
-                Release {
+                Package {
                     publisher,
-                    package,
+                    id: package,
                     version,
                 },
             )
@@ -107,77 +107,63 @@ impl Slice {
 }
 
 pub type Publisher = Domain;
-pub type Package = SkewerCase;
+pub type PackageId = SkewerCase;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Hash, Getters)]
 #[get = "pub"]
-pub struct ReleaseDef<Publisher, Package, Version>
+pub struct PackageDef<Publisher, Id, Version>
 where
     Publisher: Archetype,
-    Package: Archetype,
+    Id: Archetype,
     Version: Archetype,
 {
     publisher: Publisher,
-    package: Package,
+    id: Id,
     version: Version,
 }
 
-impl Release {
+impl Package {
     pub fn filename(&self) -> String {
-        format!("{}_{}_{}", self.publisher, self.package, self.version)
+        format!("{}_{}_{}", self.publisher, self.id, self.version)
     }
 }
 
-impl<Publisher, Package, Version> Display for ReleaseDef<Publisher, Package, Version>
+impl<Publisher, PackageId, Version> Display for PackageDef<Publisher, PackageId, Version>
 where
     Publisher: Archetype,
-    Package: Archetype,
+    PackageId: Archetype,
     Version: Archetype,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}:{}", self.publisher, self.package, self.version)?;
+        write!(f, "{}:{}:{}", self.publisher, self.id, self.version)?;
         Ok(())
     }
 }
 
-impl<Publisher, Package, Version> ReleaseDef<Publisher, Package, Version>
-where
-    Publisher: Archetype,
-    Package: Archetype,
-    Version: Archetype,
-{
-    pub fn new(contributor: Publisher, package: Package, version: Version) -> Self {
-        Self {
-            publisher: contributor,
-            package,
-            version,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Hash, Getters)]
 #[get = "pub"]
-pub struct SliceDef<Publisher, Package, Version, SlicePath>
+pub struct SliceDef<Publisher, PackageId, Version, SlicePath>
 where
     Publisher: Archetype,
-    Package: Archetype,
+    PackageId: Archetype,
     Version: Archetype,
     SlicePath: Archetype,
 {
-    release: ReleaseDef<Publisher, Package, Version>,
+    package: PackageDef<Publisher, PackageId, Version>,
     slices: SlicePath,
 }
 
-impl<Publisher, Package, Version, SliceSegment> Display
-    for SliceDef<Publisher, Package, Version, SliceSegment>
+impl<Publisher, PackageId, Version, SliceSegment> Display
+    for SliceDef<Publisher, PackageId, Version, SliceSegment>
 where
     Publisher: Archetype,
-    Package: Archetype,
+    PackageId: Archetype,
     Version: Archetype,
     SliceSegment: Archetype,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.release)?;
+        write!(f, "{}", self.package)?;
         let slices = self.slices.to_string();
 
         if !slices.is_empty() {
@@ -188,11 +174,11 @@ where
     }
 }
 
-impl<Publisher, Package, Version, SlicePath> Archetype
-    for SliceDef<Publisher, Package, Version, SlicePath>
+impl<Publisher, PackageId, Version, SlicePath> Archetype
+    for SliceDef<Publisher, PackageId, Version, SlicePath>
 where
     Publisher: Archetype,
-    Package: Archetype,
+    PackageId: Archetype,
     Version: Archetype,
     SlicePath: Archetype + Default,
 {
@@ -203,7 +189,7 @@ where
         tuple((
             Publisher::parser,
             tag(":"),
-            Package::parser,
+            PackageId::parser,
             tag(":"),
             Version::parser,
             opt(preceded(tag("::"), SlicePath::parser)),
@@ -213,9 +199,9 @@ where
             (
                 next,
                 SliceDef {
-                    release: ReleaseDef {
+                    package: PackageDef {
                         publisher: contributor,
-                        package,
+                        id: package,
                         version,
                     },
                     slices,
@@ -225,40 +211,36 @@ where
     }
 }
 
-impl<Publisher, Package, Version, Slices> SliceDef<Publisher, Package, Version, Slices>
+impl<Publisher, PackageId, Version, Slices> SliceDef<Publisher, PackageId, Version, Slices>
 where
     Publisher: Archetype,
-    Package: Archetype,
+    PackageId: Archetype,
     Version: Archetype,
     Slices: Archetype,
 {
-    pub fn new(contributor: Publisher, package: Package, version: Version, slices: Slices) -> Self {
+    pub fn new(contributor: Publisher, package: PackageId, version: Version, slices: Slices) -> Self {
         Self {
-            release: ReleaseDef {
+            package: PackageDef {
                 publisher: contributor,
-                package,
+                id: package,
                 version,
             },
             slices,
         }
     }
 
-    ///
-    pub fn package(self) -> ReleaseDef<Publisher, Package, Version> {
-        self.release
-    }
 }
 
-impl<Publisher, Package, Version, SliceSegment> Into<ReleaseDef<Publisher, Package, Version>>
-    for SliceDef<Publisher, Package, Version, SliceSegment>
+impl<Publisher, PackageId, Version, SliceSegment> Into<PackageDef<Publisher, PackageId, Version>>
+    for SliceDef<Publisher, PackageId, Version, SliceSegment>
 where
     Publisher: Archetype,
-    Package: Archetype,
+    PackageId: Archetype,
     Version: Archetype,
     SliceSegment: Archetype,
 {
-    fn into(self) -> ReleaseDef<Publisher, Package, Version> {
-        self.release
+    fn into(self) -> PackageDef<Publisher, PackageId, Version> {
+        self.package
     }
 }
 
@@ -298,12 +280,12 @@ where
     }
 }
 
-impl Release {
+impl Package {
     pub fn to_path(&self) -> PathBuf {
         let mut path = String::new();
         path.push_str(&self.publisher.to_string());
         path.push_str("/");
-        path.push_str(&self.package.to_string());
+        path.push_str(&self.id.to_string());
         path.push_str("/");
         path.push_str(&self.version.to_string());
         PathBuf::from(path)
@@ -313,7 +295,7 @@ impl Release {
 impl Slice {
     pub fn to_path(&self) -> PathBuf {
         let mut path = String::new();
-        path.push_str(self.release.to_path().to_str().unwrap());
+        path.push_str(self.package.to_path().to_str().unwrap());
 
         if self.slices.is_root() {
             path.push_str("/root");
@@ -338,10 +320,10 @@ impl PackFile {
     }
 }
 
-pub type SliceSelector = SliceDef<PublisherSelector, PackageSelector, VersionPattern, SlicePattern>;
+pub type SliceSelector = SliceDef<PublisherSelector, PackageIdSelector, VersionPattern, SlicePattern>;
 
 pub type PublisherSelector = Pattern<Publisher>;
-pub type PackageSelector = Pattern<Package>;
+pub type PackageIdSelector = Pattern<PackageId>;
 pub type VersionPattern = Pattern<VersionReq>;
 pub type SlicePattern = Pattern<SlicePath>;
 
