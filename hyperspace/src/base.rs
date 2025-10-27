@@ -2,8 +2,9 @@ pub mod config;
 pub mod err;
 pub mod provider;
 
+use std::collections::{HashMap, HashSet};
 use crate::base::config::{BaseConfig, BaseSubConfig, FoundationConfig, ProviderConfig};
-use crate::base::provider::{Provider, ProviderFactory, ProviderKind, ProviderKindDisc};
+use crate::base::provider::{Provider,  ProviderKind, ProviderKindDisc};
 use crate::driver::DriversBuilder;
 use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
@@ -28,6 +29,7 @@ use starlane_space::status::{Entity, Status, StatusDetail, StatusProbe, StatusRe
 use starlane_space::types::property::{PropertiesConfig, PropertiesConfigBuilder};
 use std::str::FromStr;
 use std::sync::Arc;
+use itertools::Itertools;
 
 pub trait BaseSub: Send + Sync {}
 
@@ -238,5 +240,64 @@ pub trait PlatformConfig: BaseSubConfig {
 }
 
 pub struct Foundation {
-    providers: Vec<Box<dyn ProviderFactory>>
+    providers: HashMap<ProviderKind,Box<dyn Provider>>
 }
+
+impl Foundation {
+    fn new(providers: HashMap<ProviderKind,Box<dyn Provider>>) -> Self {
+        Self {
+            providers
+        }
+    }
+}
+
+pub struct FoundationBuilder {
+    providers: HashMap<ProviderKind,Box<dyn Provider>>
+}
+
+
+impl FoundationBuilder {
+    pub fn add(& mut self, provider: Box<dyn Provider>) -> anyhow::Result<()>{
+        let kind = provider.kind();
+        if self.providers.contains_key(&kind) {
+            return Err(anyhow!("duplicate provider kind not allowed for'{}'", kind));
+        }
+
+        self.providers.insert( kind, provider );
+        Ok(())
+    }
+
+    pub fn build(self) -> anyhow::Result<Foundation> {
+
+        let mut verified= HashSet::default();
+        for kind  in self.providers.keys() {
+            let stack = HashSet::default();
+            self.verify(kind,& mut verified, & stack )?;
+        }
+
+        let foundation = Foundation::new(self.providers);
+        Ok(foundation)
+    }
+
+    fn verify(&self, kind: &ProviderKind, verified: & mut HashSet<ProviderKind>, stack: & HashSet<ProviderKind>) -> anyhow::Result<()> {
+        if verified.contains(kind) {
+            return Ok(())
+        }
+       let provider =  self.providers.get(kind).ok_or_else(|| anyhow!("provider kind '{}' not found", kind))?;
+       for dep in provider.dependencies() {
+           if !verified.contains(&dep) {
+               if stack.contains(&dep) {
+                   return Err(anyhow!("provider {} has a circular dependency to {}", kind, dep ))
+               }
+               let mut stack = stack.clone();
+               stack.insert(dep.clone());
+               self.verify(&dep, verified, & mut stack)?;
+               /// dep passed verification so add it to verified
+               verified.insert(dep.clone());
+           }
+       }
+
+      Ok(())
+    }
+}
+

@@ -17,3 +17,4 @@ starlane-space= { workspace = true }
 starlane-base = { workspace = true }
 async-trait = "0.1.88"
 bollard = {workspace = true}
+anyhow = { workspace = true }

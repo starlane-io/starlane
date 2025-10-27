@@ -10,7 +10,7 @@ use starlane_space::status::{Entity, PendingDetail, StatusDetail, StatusProbe};
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::sync::Arc;
-use strum_macros::EnumDiscriminants;
+use strum_macros::{Display, EnumDiscriminants, EnumString};
 use thiserror::Error;
 use tokio::sync::{mpsc, watch};
 use crate::base::config::{BaseConfig, ProviderConfig};
@@ -18,7 +18,7 @@ use crate::base::BaseSub;
 use crate::registry::Registry;
 use starlane_space::status::Status;
 
-#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Display,EnumDiscriminants, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ProviderKindDisc))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
@@ -36,10 +36,12 @@ pub enum ProviderKind {
     /// Represents a postgres cluster instance that serves [ProviderKind::PostgresDatabase]
     PostgresService,
     /// depends upon a readied [ProviderKind::PostgresService]
-    PostgresDatabase(PostgresDatabaseKind),
+    #[strum(to_string = "PostgresDatabase<{0}>")]
+    PostgresDatabase(PostgresDatabaseKindDef),
     /// depends upon [ProviderKind::PostgresDatabase]::[PostgresDatabaseKindDef::Registry]
     Registry,
     /// [ProviderKind::_Ext] defines a new [ProviderKindDisc] that is not builtin to Starlane
+    #[strum(to_string = "{0}")]
     _Ext(CamelCase),
 }
 
@@ -62,7 +64,7 @@ impl Hash for ProviderKindDef {
 
  */
 
-#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
+#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize,Display, Eq, PartialEq, Hash)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(PostgresDatabaseKind))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize))]
@@ -70,9 +72,10 @@ pub enum PostgresDatabaseKindDef {
     /// just a plain, empty postgres database full of potential
     Default,
     /// a variant of [ProviderKind::PostgresDatabase] that is initialized with the [Registry]
-    /// sql schema to be utilized by a
+    /// SQL schema to be utilized by a
     Registry,
-    _Ext(CamelCase),
+    #[strum(to_string = "{0}")]
+   _Ext(CamelCase),
 }
 
 /// indicates which architecture layer manages this dependency or if management is external
@@ -98,7 +101,7 @@ pub enum Strata {
 /// downloaded, installed, initialized and started... and [Platform] [Provider]s typically
 /// make a contextual connection available for the [Provider]'s service...
 #[async_trait]
-pub trait Provider: BaseSub + StatusProbe + Send + Sync + Sized {
+pub trait Provider: BaseSub + StatusProbe + Send + Sync {
 
     fn kind(&self) -> ProviderKind;
 
@@ -106,11 +109,8 @@ pub trait Provider: BaseSub + StatusProbe + Send + Sync + Sized {
     fn dependencies(&self) -> Vec<ProviderKind> {
         vec![]
     }
-}
 
-pub trait ProviderFactory {
-    fn kind(&self) -> ProviderKind;
-    fn create<P>(&self, config: impl ProviderConfig) -> Result<Box<P>,anyhow::Error> where Self: Sized, P: Provider;
+    async fn start(&self) -> StatusDetail;
 }
 
 

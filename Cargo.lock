@@ -3877,6 +3877,7 @@ dependencies = [
 name = "starlane-foundation-for-docker-desktop"
 version = "0.3.20"
 dependencies = [
+ "anyhow",
  "async-trait",
  "bollard",
  "starlane-base",
