@@ -3,8 +3,7 @@ pub mod err;
 pub mod provider;
 
 use crate::base::config::{BaseConfig, BaseSubConfig, FoundationConfig, ProviderConfig};
-use crate::base::provider::context::FoundationContext;
-use crate::base::provider::{Provider, ProviderKind, ProviderKindDisc};
+use crate::base::provider::{Provider, ProviderFactory, ProviderKind, ProviderKindDisc};
 use crate::driver::DriversBuilder;
 use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
@@ -25,9 +24,7 @@ use starlane_space::log::Logger;
 use starlane_space::progress::Progress;
 use starlane_space::settings::Timeouts;
 use starlane_space::status;
-use starlane_space::status::{
-    Entity, EntityReadier, Status, StatusProbe, StatusReporter, StatusResult, StatusWatcher,
-};
+use starlane_space::status::{Entity, Status, StatusDetail, StatusProbe, StatusReporter, StatusWatcher};
 use starlane_space::types::property::{PropertiesConfig, PropertiesConfigBuilder};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -240,26 +237,6 @@ pub trait PlatformConfig: BaseSubConfig {
     fn enviro(&self) -> &String;
 }
 
-#[async_trait]
-pub trait Foundation: BaseSub {
-    fn status(&self) -> StatusResult {
-        self.status_watcher().borrow().clone()
-    }
-    async fn status_detail(&self) -> status::StatusDetail;
-
-    fn status_watcher(&self) -> &StatusWatcher;
-
-    /// [crate::Foundation::probe] synchronize [crate::Foundation]'s model from that of the external services
-    /// and return a [Status].  [crate::Foundation::probe] should also rebuild the [Provider][StatusDetail]
-    /// model and update [StatusReporter]
-    async fn probe(&self) -> StatusResult;
-
-    /// Take action to bring this [crate::Foundation] to [Status::Ready] if not already. A [crate::Foundation]
-    /// is considered ready when all [Provider] dependencies are [Status::Ready].
-    async fn ready(&self, progress: Progress) -> StatusResult;
-
-    /// Returns a [Provider] by this [Foundation]
-    fn provider<P>(&self, kind: &ProviderKind) -> Result<Option<&P>, BaseErr>
-    where
-        P: Provider + EntityReadier;
+pub struct Foundation {
+    providers: Vec<Box<dyn ProviderFactory>>
 }

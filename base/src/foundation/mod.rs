@@ -47,7 +47,6 @@ use starlane_hyperspace::base::config::BaseSubConfig;
 use starlane_hyperspace::registry::{Registry, RegistryConfig};
 use starlane_hyperspace::base::provider::{PostgresDatabaseKind, PostgresDatabaseKindDef, Provider, ProviderKindDisc, ProviderKind};
 use starlane_space::parse::CamelCase;
-use starlane_space::status::{ActionRequest, Status};
 use crate::env::{STARLANE_CONTROL_PORT, STARLANE_HOME};
 
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize,Eq,PartialEq,Hash)]
@@ -82,7 +81,11 @@ pub struct StarlaneConfig {
     //    pub foundation: ProtoFoundationSettings,
 }
 
-impl BaseSubConfig for StarlaneConfig {}
+impl BaseSubConfig for StarlaneConfig {
+    fn get(&self, key: impl AsRef<str>) -> Option<String> {
+        todo!()
+    }
+}
 
 impl RegistryConfig for StarlaneConfig {}
 

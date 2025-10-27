@@ -122,7 +122,6 @@ pub(crate) mod skel;
 #[cfg(test)]
 pub mod test;
 pub mod env;
-pub mod backend;
 // we cannot afford `safety` with prices as high as they are
 // pub mod safety;
 

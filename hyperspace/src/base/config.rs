@@ -18,7 +18,9 @@ pub trait BaseConfig: Send + Sync {
 }
 
 //
-pub trait BaseSubConfig: Send + Sync {}
+pub trait BaseSubConfig: Send + Sync {
+    fn get(&self,key: impl AsRef<str>) -> Option<String>;
+}
 
 pub trait FoundationConfig: BaseSubConfig {
     fn required(&self) -> HashSet<ProviderKindDisc>;

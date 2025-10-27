@@ -6,14 +6,14 @@ pub mod err;
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::parse::CamelCase;
-use starlane_space::status::{
-    Action, ActionRequest, Entity, EntityReadier, EntityResult, PendingDetail, StatusProbe,
-};
+use starlane_space::status::{Entity, PendingDetail, StatusDetail, StatusProbe};
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 use std::sync::Arc;
 use strum_macros::EnumDiscriminants;
-
-use crate::base::config::BaseConfig;
+use thiserror::Error;
+use tokio::sync::{mpsc, watch};
+use crate::base::config::{BaseConfig, ProviderConfig};
 use crate::base::BaseSub;
 use crate::registry::Registry;
 use starlane_space::status::Status;
@@ -98,35 +98,21 @@ pub enum Strata {
 /// downloaded, installed, initialized and started... and [Platform] [Provider]s typically
 /// make a contextual connection available for the [Provider]'s service...
 #[async_trait]
-pub trait Provider: BaseSub + StatusProbe + Send + Sync {
-    fn provider_kind(&self) -> &ProviderKindDisc {
-        todo!()
+pub trait Provider: BaseSub + StatusProbe + Send + Sync + Sized {
+
+    fn kind(&self) -> ProviderKind;
+
+    /// other [Provider] types as prerequisites to this one
+    fn dependencies(&self) -> Vec<ProviderKind> {
+        vec![]
     }
-
-    /*
-    /// Returns an interface clone for [Provider::Entity] when it reaches [Status::Ready].
-    ///
-    /// If [Provider::Entity] is NOT ready [Provider::ready] will start the `readying` tasks
-    /// and will not return until the [Status::Ready] state is reached or if a [ProviderErr]
-    /// is encountered.
-    ///
-    /// The [Provider::ready] should be reentrant--meaning it can be called multiple times without
-    /// causing an error. A [Provider::ready] implementation should always first call
-    /// [Provider::probe] to determine the last completed successful [Stage] and continue its
-    /// remaining stages if possible.
-    ///
-    /// Calling [Provider::ready] on a [Provider] that's current [StateDetail]'s variant is
-    /// [StateDetail::Pending] should `un-panic` the [Provider] and cause it to retry readying
-    /// [Provider::Entity]. A [Provider::ready] invocation on a [Provider] that is
-    /// [StateDetail::Fatal] should fail immediately.
-    ///
-    /// Progress [Status] of [Self::ready] can be tracked using: [Self::status_watcher]
-
-    DISABLED for now... trying to get project compiling and passing tests first
-    async fn ready(&self) -> EntityResult<Self::Entity>;
-
-     */
 }
+
+pub trait ProviderFactory {
+    fn kind(&self) -> ProviderKind;
+    fn create<P>(&self, config: impl ProviderConfig) -> Result<Box<P>,anyhow::Error> where Self: Sized, P: Provider;
+}
+
 
 /*
 
@@ -178,3 +164,26 @@ pub trait Provider: BaseSub + StatusProbe + Send + Sync {
 
 
  */
+
+
+enum ProviderCommand {
+   Start
+}
+
+struct ProviderProxy<P> where P: Provider {
+    watch: watch::Receiver<StatusDetail>,
+    tx: mpsc::Sender<ProviderCommand>,
+    phantom: PhantomData<P>
+}
+
+#[async_trait]
+impl <P> StatusProbe for ProviderProxy<P> where P: Provider{
+    async fn probe(&self) -> StatusDetail {
+        StatusDetail::Unknown
+    }
+}
+impl<P> BaseSub for ProviderProxy<P> where P: Provider, {}
+
+
+
+

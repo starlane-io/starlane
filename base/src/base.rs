@@ -7,9 +7,9 @@ mod root {
 }
 
 
-pub struct Base<P,F> where P:root::Platform<Err=(), RemoteStarConnectionFactory=(), StarAuth=()>, F: Foundation{
+pub struct Base<P> where P:root::Platform<Err=(), RemoteStarConnectionFactory=(), StarAuth=()>{
   platform: P,
-  foundation: F
+  foundation: Foundation
 }
 
 

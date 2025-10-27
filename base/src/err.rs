@@ -7,7 +7,6 @@ use std::sync::Arc;
 use thiserror::Error;
 use starlane_hyperspace::base::provider::ProviderKindDisc;
 use crate::foundation::FoundationKind;
-use crate::status::ActionRequest;
 
 impl BaseErr {
     /*
@@ -162,8 +161,6 @@ impl BaseErr {
 
 #[derive(Error, Clone, Debug)]
 pub enum BaseErr {
-    #[error("{0}")]
-    ActionRequired(ActionRequest),
     #[error("Foundation State is unknown when calling Foundation::{0} ... platform should call Foundation::synchronize() first. "
     )]
     UnknownState(String),

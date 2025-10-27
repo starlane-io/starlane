@@ -6,13 +6,6 @@ use indexmap::IndexMap;
 use starlane_space::particle::Details;
 use starlane_space::selector::KindSelector;
 
-#[derive(Clone, Debug)]
-pub struct FoundationContext<F>
-where
-    F: Foundation,
-{
-    foundation: F,
-}
 
 #[async_trait]
 pub trait ProviderContext: Send + Sync {
