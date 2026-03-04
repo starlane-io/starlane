@@ -77,13 +77,12 @@ pub trait Provider: provider::Provider {
 }
 
 /// trait implementation [Provider::Entity]
-#[async_trait]
 pub trait PostgresService:
     status::Entity + StatusProbe + Send + Sync + PostgresConnectionProvider
 {
 }
 
-pub type PostgresServiceHandle = Handle<dyn PostgresService>;
+pub type PostgresServiceHandle = Handle<concrete::PostgresService>;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct DbKey {
@@ -190,7 +189,7 @@ pub mod partial {
 }
 
 mod concrete {
-    use super::config;
+    use super::{concrete, config};
     use super::{base, PgConnection};
     use async_trait::async_trait;
     use sqlx;
@@ -238,7 +237,7 @@ mod concrete {
 
     #[async_trait]
     impl EntityReadier for PostgresServiceProvider {
-        type Entity = dyn my::PostgresService;
+        type Entity = concrete::PostgresService;
 
         async fn ready(&self) -> EntityResult<Self::Entity> {
             todo!()
@@ -248,13 +247,19 @@ mod concrete {
     impl BaseSub for PostgresServiceProvider {}
 
     #[async_trait]
-    impl Provider for PostgresServiceProvider {}
+    impl Provider for PostgresServiceProvider {
+        fn kind(&self) -> ProviderKind {
+            todo!()
+        }
+
+        async fn start(&self) -> StatusDetail {
+            todo!()
+        }
+    }
 
     #[async_trait]
     impl StatusProbe for PostgresServiceProvider {
-        async fn probe(&self) -> status::StatusResult {
-            todo!()
-        }
+
     }
 
     /// the [StatusProbe] implementation which tracks with a Postgres Connection [Pool].
@@ -301,9 +306,6 @@ mod concrete {
 
     #[async_trait]
     impl StatusProbe for PostgresService {
-        async fn probe(&self) -> StatusResult {
-            todo!()
-        }
     }
 
     #[derive(Clone, Eq, PartialEq)]
@@ -337,7 +339,11 @@ mod concrete {
 
     impl starlane_hyperspace::base::provider::config::ProviderConfig for PostgresProviderConfig {}
 
-    impl BaseSubConfig for PostgresProviderConfig {}
+    impl BaseSubConfig for PostgresProviderConfig {
+        fn get(&self, key: impl AsRef<str>) -> Option<String> {
+            todo!()
+        }
+    }
 
     #[async_trait]
     impl starlane_hyperspace::base::config::ProviderConfig for PostgresProviderConfig {}

@@ -65,10 +65,11 @@ mod concrete {
     use starlane_base::status::{Entity, EntityReadier, EntityResult, StatusResult};
     use starlane_base::status::{Status, StatusProbe};
     use starlane_hyperspace::base::config::BaseSubConfig;
-    use starlane_hyperspace::base::provider::Provider;
+    use starlane_hyperspace::base::provider::{Provider, ProviderKind};
     use starlane_hyperspace::base::{provider, BaseSub};
     use std::ops::Deref;
     use std::sync::Arc;
+    use starlane_space::status::StatusDetail;
 
     #[derive(Clone, Eq, PartialEq)]
     pub struct Config {
@@ -96,7 +97,11 @@ mod concrete {
 
     impl provider::config::ProviderConfig for Config {}
 
-    impl BaseSubConfig for Config {}
+    impl BaseSubConfig for Config {
+        fn get(&self, key: impl AsRef<str>) -> Option<String> {
+            todo!()
+        }
+    }
 
     impl starlane_hyperspace::base::config::ProviderConfig for Config {}
 
@@ -150,11 +155,19 @@ mod concrete {
     impl BaseSub for PostgresDatabaseProvider {}
 
     #[async_trait]
-    impl Provider for PostgresDatabaseProvider {}
+    impl Provider for PostgresDatabaseProvider {
+        fn kind(&self) -> ProviderKind {
+            todo!()
+        }
+
+        async fn start(&self) -> StatusDetail {
+            todo!()
+        }
+    }
 
     #[async_trait]
     impl StatusProbe for PostgresDatabaseProvider {
-        async fn probe(&self) -> StatusResult {
+        async fn probe(&self) -> StatusDetail{
             todo!()
         }
     }
@@ -195,7 +208,7 @@ mod concrete {
 
     #[async_trait]
     impl StatusProbe for PostgresDatabase {
-        async fn probe(&self) -> StatusResult {
+        async fn probe(&self) -> StatusDetail {
             #[cfg(not(test))]
             async fn ping(pool: &Pool) -> Result<Status, sqlx::Error> {
                 pool.acquire().await?.ping().await.map(|_| Status::Ready)

@@ -14,6 +14,8 @@ mod concrete {}
 pub fn create_docker_foundation() {
 }
 
+pub struct DockerDaemonFoundation();
+
 pub struct DockerDaemonProvider;
 
 #[async_trait]

@@ -25,7 +25,7 @@ use strum_macros::EnumDiscriminants;
 ///
 /// [starlane_hyperspace]: ../../starlane_hyperspace
 /// [Provider]: ../../starlane_hyperspace/src/provider.rs
-pub trait Entity: Send + Sync {
+pub trait Entity: Send + Sync + Sized {
     //fn kind(&self) -> &Self::Kind;
 }
 
@@ -52,7 +52,9 @@ pub trait StatusProbe {
     ///
     /// [StatusProbe::probe] should synchronize the internal [StatusDetail] model to
     /// describe the status of its target entity
-    async fn probe(&self) -> StatusDetail;
+    async fn probe(&self) -> StatusDetail {
+        todo!()
+    }
 }
 
 /*
@@ -73,7 +75,7 @@ where
 
 /// [Handle] contains [E]--which implements the [Entity] trait--and a private
 /// `hold` reference which is a [tokio::sync::mpsc::Sender] created from the [StatusProbe]'s
-/// internal `runner`.  The Runner should stay alive until it has no more hold references
+/// internal `runner`.  The Runner should stay alive until it has no more hold references,
 /// at which time it is up to the Runner to stop itself or ignore a reference count of 0
 #[derive(Clone)]
 pub struct Handle<E>
@@ -202,8 +204,18 @@ impl Default for StatusDetail {
 
 
 
+#[async_trait]
+pub trait EntityReadier {
+    type Entity: Entity;
 
+    async fn ready(&self) -> EntityResult<Self::Entity> {
+        todo!()
+    }
+}
 
+pub type EntityResult<E> = Result<E,()>;
+
+pub type StatusResult = Result<StatusDetail,()>;
 
 
 
