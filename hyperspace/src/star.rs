@@ -1138,7 +1138,7 @@ impl HyperStar {
             // The reason for this is that it is the Hyperway that handles things like Priority, Urgency
             // and hopefully in the future durability, whereas within the star itself all waves are
             // treated equally.
-            logger.result(
+            logger.result::<(),_>(
                 self.hyperway_transmitter
                     .direct(
                         transport.wrap_in_hop(
@@ -1151,7 +1151,7 @@ impl HyperStar {
             Ok(())
         } else if self.skel.adjacents.contains_key(&transport.to.point) {
             let to = transport.to.clone();
-            logger.result(
+            logger.result::<(),_>(
                 self.hyperway_transmitter
                     .direct(transport.wrap_in_hop(self.gravity.clone(), to))
                     .await,
@@ -1159,7 +1159,7 @@ impl HyperStar {
             Ok(())
         } else if self.forwarders.len() == 1 {
             let to = self.forwarders.first().unwrap().clone().to_surface();
-            logger.result(
+            logger.result::<(),_>(
                 self.hyperway_transmitter
                     .direct(transport.wrap_in_hop(self.gravity.clone(), to))
                     .await,
