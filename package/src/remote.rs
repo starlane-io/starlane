@@ -1,12 +1,13 @@
-use crate::create::PackageLayout;
-use crate::repo::Repo;
+use crate::create::{PackErr, PackageLayout};
+pub(crate) use crate::repo::Repo;
 use crate::{PackageErr, PublishObserver};
 use anyhow::Result;
 use async_trait::async_trait;
 use reqwest;
-use reqwest::Client;
+use reqwest::{Client, Error, Response};
 use starlane_space::types::specific::Slice;
 use std::path::PathBuf;
+use crate::repo::{RepoPanic, RepoStatus};
 
 pub struct RemoteRepo {
     pub url: String,
@@ -15,6 +16,7 @@ pub struct RemoteRepo {
 
 #[async_trait]
 impl Repo for RemoteRepo {
+
     async fn get_slice(&self, slice: &Slice) -> std::result::Result<Vec<u8>, PackageErr> {
         Ok(self
             .client
@@ -28,14 +30,18 @@ impl Repo for RemoteRepo {
             .into())
     }
 
-    /// Upload a zip file to the package-server
-    async fn submit<P>(&self, pds: &PackageLayout, observer: P) -> anyhow::Result<(), PackageErr>
+    async fn publish<P>(
+        &self,
+        layout: &PackageLayout,
+        observer: P,
+    ) -> Result<(), PackageErr>
     where
-        P: PublishObserver + Send + Sync,
-    {
+        P: PublishObserver + Send + Sync {
+    /// Upload a zip file to the package-server
+
         observer.start_upload(&self.url);
 
-        let tmp_file = pds.zip()?;
+        let tmp_file = layout.zip()?;
         let zip_path = tmp_file.path().to_path_buf();
         // Read the zip file
         let file_bytes = tokio::fs::read(&zip_path).await?;
@@ -71,6 +77,18 @@ impl Repo for RemoteRepo {
             Err(PackageErr::UploadErr(
                 format!("Upload failed with status {}: {}", status, error_text).to_string(),
             ))
+        }
+    }
+
+    async fn status(&self) -> RepoStatus {
+        match self.client
+            .get(format!("http://{}/status", self.url)).send().await {
+            Ok(response) => {
+                response.status().into()
+            }
+            Err(err) => {
+                err.into()
+            }
         }
     }
 }

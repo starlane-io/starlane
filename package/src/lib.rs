@@ -361,7 +361,7 @@ mod test {
     use crate::repo::{Repo, SourceRepo};
     use crate::server::ServerBuilder;
     use crate::zip::{unzip_from_binary_to_temp, unzip_from_file_to_temp, zip_slice_dir_to};
-    use crate::{FileEntity, PackObserver, PublishObserver, ADVICE_FILE, MY_SLICE, PACKAGE, PACKAGE_LAYOUT_EXAMPLE};
+    use crate::{FileEntity, PackObserver, PublishObserver, MY_SLICE, PACKAGE, PACKAGE_LAYOUT_EXAMPLE};
     use starlane_space::parse::SkewerCase;
     use starlane_space::types::scope::Segment;
     use std::fs;
@@ -372,11 +372,69 @@ mod test {
     use crate::cache::PackageCache;
     use crate::download::Downloader;
 
-    pub struct MockPublishObserver();
+    #[cfg(test)]
+    mod server {
+        use tokio::io::AsyncWriteExt;
+        use crate::create::PackageLayout;
+        use crate::{ADVICE_FILE, MY_SLICE, PACKAGE_LAYOUT_EXAMPLE};
+        use crate::cache::{CacheErr, PackageCache};
+        use crate::download::Downloader;
+        use crate::remote::{RemoteRepo, Repo};
+        use crate::server::ServerBuilder;
+        use crate::test::MockPublishObserver;
+        use crate::zip::unzip_from_binary_to_temp;
+
+        #[tokio::test]
+        pub async fn test_downloader() {
+            let control = ServerBuilder::mock().await;
+            println!("Server started");
+            let repo = RemoteRepo::default();
+
+            let downloader = Downloader::temp(repo);
+
+            downloader.download(&MY_SLICE).await.unwrap();
+
+            control.stop().await;
+        }
+
+        #[tokio::test]
+        pub async fn test_upload_and_download() {
+            let builder = ServerBuilder::temp();
+            let mut control= builder.start();
+            let repo = RemoteRepo::default();
+
+            let mut observer = MockPublishObserver::default();
+            let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, &mut observer).unwrap();
+            repo.publish(&layout, observer).await.unwrap();
+
+            let my_slice = repo.get_slice(&MY_SLICE).await.unwrap();
+
+            control.stop().await;
+
+            let slice_dir = unzip_from_binary_to_temp(my_slice.as_slice()).unwrap();
+            let slice_path = slice_dir.path().to_path_buf();
+            let advice = slice_path.join("advice.txt");
+            let mut stdout = tokio::io::stdout();
+            stdout.flush().await.unwrap();
+            assert!(advice.exists());
+        }
+
+
+        #[tokio::test]
+        pub async fn test_cache() {
+            let control = ServerBuilder::mock().await;
+            let cache = PackageCache::unique_with_keep(true);
+            cache.get_file(&ADVICE_FILE).await.unwrap();
+            control.stop().await;
+        }
+
+    }
+
+    pub struct MockPublishObserver;
 
     impl Default for MockPublishObserver {
         fn default() -> Self {
-            Self()
+            Self
         }
     }
 
@@ -403,7 +461,7 @@ mod test {
         let in_dir = PACKAGE_LAYOUT_EXAMPLE.join("hierarchy");
         let layout = package_layout();
         let hierarchy = layout.get_slice("hierarchy").unwrap();
-        let tmp_file = NamedTempFile::new().unwrap();
+        let mut tmp_file = NamedTempFile::new().unwrap();
         let out_file = tmp_file.path().to_path_buf();
         zip_slice_dir_to(&in_dir, &out_file).unwrap();
         let unzip_temp = unzip_from_file_to_temp(&out_file).unwrap();
@@ -417,11 +475,12 @@ mod test {
         assert!(!sub2.exists());
     }
 
+    /*
     #[tokio::test]
     pub async fn test_source() {
         let (source, _dir) = SourceRepo::temp();
         let layout = package_layout();
-        source.submit(layout).unwrap();
+        source.publish(layout).unwrap();
         {
             let zip = source.get_slice(&MY_SLICE).await.unwrap();
             let dir = unzip_from_binary_to_temp(zip.as_slice()).unwrap();
@@ -437,45 +496,45 @@ mod test {
         }
     }
 
-    #[tokio::test]
-    pub async fn test_upload_and_download() {
-        let (builder, _tmp) = ServerBuilder::temp();
-        let mut handle = builder.start_with_termination_handle();
-        let repo = RemoteRepo::default();
+     */
 
-        let mut observer = MockPublishObserver::default();
-        let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, &mut observer).unwrap();
-        repo.submit(&layout, observer).await.unwrap();
 
-        let my_slice = repo.get_slice(&MY_SLICE).await.unwrap();
-        drop(handle);
-        let slice_dir = unzip_from_binary_to_temp(my_slice.as_slice()).unwrap();
-        let slice_path = slice_dir.path().to_path_buf();
-        let advice = slice_path.join("advice.txt");
-        let mut stdout = tokio::io::stdout();
-        stdout.flush().await.unwrap();
-        assert!(advice.exists());
+     /// test if local calls from a [SourceRepo] created via [SourceRepo::mock] will deliver the
+     /// slices in the proper zip format and spot checks for certain files in those slices.
+     ///
+     /// This test is run locally without a network server mechanism.
+     #[tokio::test]
+    pub async fn test_mock_source() {
+        let repo = SourceRepo::mock().await;
+
+        {
+            let zip = repo.get_slice(&MY_SLICE).await.unwrap();
+            let dir = unzip_from_binary_to_temp(zip.as_slice()).unwrap();
+            let path = dir.path().to_path_buf().join("advice.txt");
+            assert!(path.exists())
+        }
+
+        {
+            let zip = repo.get_slice(&PACKAGE).await.unwrap();
+            let dir = unzip_from_binary_to_temp(zip.as_slice()).unwrap();
+            let path = dir.path().to_path_buf().join("some-file.txt");
+            assert!(path.exists())
+        }
+
+        {
+            let zip = repo.get_slice(&MY_SLICE).await.unwrap();
+            let dir = unzip_from_binary_to_temp(zip.as_slice()).unwrap();
+            let path = dir.path().to_path_buf().join("this-file-should-not-exist.txt");
+            assert!(!path.exists())
+        }
+
     }
 
 
-    #[tokio::test]
-    pub async fn test_downloader() {
-        let handle= ServerBuilder::mock();
-println!("Server started");
-        let repo = RemoteRepo::default();
 
-        let downloader = Downloader::temp(repo);
 
-        downloader.download(&MY_SLICE).await.unwrap();
-    }
 
-    #[tokio::test]
-    pub async fn test_cache() {
-        let handle= ServerBuilder::mock();
-        println!("Server started");
-        let cache = PackageCache::temp();
-        cache.get_file(&ADVICE_FILE).await.unwrap();
-    }
+
 
 
 
@@ -526,15 +585,15 @@ println!("Server started");
         Ok(())
     }
 
-    #[test]
-    pub fn test_create() {
+    #[tokio::test]
+    pub async fn test_publish() {
         let mut observer = MockPublishObserver::default();
         let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, &mut observer).unwrap();
         layout.diagnose();
 
         verify_mock_layout(&layout).unwrap();
 
-        let (source, tmp_dir) = SourceRepo::temp();
+        let repo = SourceRepo::temp();
 
         let zipfile = layout.zip().expect("expecting zip");
         let data = fs::read(zipfile.path()).expect("expecting zipfile");
@@ -547,7 +606,7 @@ println!("Server started");
 
         verify_mock_layout(&layout).unwrap();
 
-        source.submit(layout).unwrap();
+        repo.publish(&layout,MockPublishObserver).await.unwrap();
 
         println!("\n\nzipfile: {:?}", zipfile);
     }

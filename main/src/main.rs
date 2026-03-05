@@ -220,7 +220,7 @@ pub async fn main() -> Result<(), anyhow::Error> {
                 }
                 PackCmd::Serve => {
                     let server = ServerBuilder::default();
-                    server.run().await;
+                    server.start_no_controller().await;
                     Ok(())
                 }
             },
@@ -779,5 +779,5 @@ async fn publish(path: &PathBuf) -> Result<(), PackageErr> {
     let mut observer = PackPubObserver::new(console.clone());
     let remote = RemoteRepo::default();
     let pds = PackageLayout::create(&path, &mut observer)?;
-    remote.submit(&pds, observer).await
+    remote.publish(&pds, observer).await
 }

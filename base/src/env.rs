@@ -103,13 +103,13 @@ pub static STARLANE_CACHE_DIR: Lazy<String> = Lazy::new(|| {
         .unwrap_or(format!("{}/cache", STARLANE_HOME.to_string()).to_string())
 });
 
-pub static STARLANE_PACKAGE_SOURCE: Lazy<String> = Lazy::new(|| {
-    std::env::var("STARLANE_PACKAGE_SOURCE")
-        .unwrap_or(format!("{}/package/source", STARLANE_HOME.to_string()).to_string())
+pub static STARLANE_PACKAGE_SOURCE: Lazy<PathBuf> = Lazy::new(|| {
+    PathBuf::from(std::env::var("STARLANE_PACKAGE_SOURCE")
+        .unwrap_or(format!("{}/package/source", STARLANE_HOME.to_string())))
 });
 
-pub fn get_starlane_package_source() -> String {
-    let dir = STARLANE_PACKAGE_SOURCE.to_string();
+pub fn get_starlane_package_source() -> PathBuf {
+    let dir = STARLANE_PACKAGE_SOURCE.clone();
     fs::create_dir_all(&dir).unwrap();
     dir
 }

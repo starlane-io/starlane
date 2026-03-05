@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use crate::create::{PackErr, PackageLayout};
 use crate::zip::zip_slice_dir_to;
 use crate::{PackageErr, PublishObserver};
@@ -5,32 +6,148 @@ use async_trait::async_trait;
 use starlane_base::env::get_starlane_package_source;
 use starlane_space::types::scope::SlicePath;
 use starlane_space::types::specific::Slice;
-use std::fs;
+use std::{fs, io};
 use std::path::PathBuf;
+use std::sync::Arc;
+use reqwest::{Error, Response, StatusCode};
 use tempfile::TempDir;
+use thiserror::Error;
 use tokio::io::AsyncReadExt;
+use crate::test::MockPublishObserver;
 
 #[async_trait]
 pub trait Repo {
     async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>, PackageErr>;
-    async fn submit<P>(
+    async fn publish<P>(
         &self,
         layout: &PackageLayout,
         observer: P,
-    ) -> anyhow::Result<(), PackageErr>
+    ) -> Result<(), PackageErr>
     where
         P: PublishObserver + Send + Sync;
+
+    async fn status(&self) -> RepoStatus;
+}
+
+#[derive(Error,Debug)]
+pub enum RepoStatus {
+    #[error("Unknown")]
+    Unknown,
+    #[error("Ready")]
+    Ready,
+    #[error("Panic({0})")]
+    Panic(#[from] RepoPanic)
+}
+
+#[derive(Error,Debug)]
+pub enum RepoPanic {
+    #[error("Unreachable ({0})")]
+    Unreachable(String),
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error("Timeout")]
+    Timeout,
+    #[error("StatusCode({0})")]
+    StatusCode(reqwest::StatusCode),
+    #[error("Panic({0})")]
+    Error(String)
+}
+
+impl From<Result<reqwest::Response,reqwest::Error>> for RepoStatus{
+    fn from(result: Result<Response, Error>) -> Self {
+        match result {
+            Ok(response) => {
+                response.into()
+            }
+            Err(err) =>  {
+                err.into()
+            }
+        }
+    }
+}
+
+impl From<reqwest::Error> for RepoStatus {
+    fn from(err: Error) -> Self {
+        Self::Panic(err.into())
+    }
+}
+
+impl From<reqwest::Error> for RepoPanic {
+    fn from(err: Error) -> Self {
+        RepoPanic::Unreachable(err.to_string())
+    }
+}
+
+impl From<reqwest::Response> for RepoStatus {
+    fn from(response: Response) -> Self {
+        /// right now we just go by StatusCode
+        response.status().into()
+    }
+}
+
+impl From<reqwest::StatusCode> for RepoStatus {
+    fn from(code: StatusCode) -> Self {
+        match code.is_success() {
+            true => RepoStatus::Ready,
+            false => RepoStatus::Panic(code.into())
+        }
+    }
+}
+
+impl From<reqwest::StatusCode> for RepoPanic {
+    fn from(code: reqwest::StatusCode) -> Self {
+        match code {
+            StatusCode::UNAUTHORIZED => Self::Unauthorized,
+            StatusCode::REQUEST_TIMEOUT=> Self::Timeout,
+            code => code.into()
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum RepoDir {
+    Path(PathBuf),
+    Temp(Arc<TempDir>)
+}
+
+impl From<TempDir> for RepoDir {
+    fn from(dir: TempDir) -> Self {
+        Self::Temp(Arc::new(dir))
+    }
+}
+
+impl From<PathBuf> for RepoDir {
+    fn from(path: PathBuf) -> Self {
+        Self::Path(path)
+    }
+}
+
+impl RepoDir {
+    pub fn temp() -> Result<Self,io::Error> {
+        TempDir::new().map(Into::into)
+    }
+
+    pub fn path( path: PathBuf ) -> Self {
+        Self::Path(path)
+    }
+
+    pub fn as_path_buf(&self) -> PathBuf {
+        match self {
+            RepoDir::Path(path) =>path.clone(),
+            RepoDir::Temp(temp) => temp.path().to_path_buf()
+        }
+    }
 }
 
 #[derive(Clone)]
 pub struct SourceRepo {
-    root: PathBuf,
+    root: RepoDir,
 }
 
 impl Default for SourceRepo {
     fn default() -> Self {
         Self {
-            root: PathBuf::from(get_starlane_package_source()),
+            root: get_starlane_package_source().into()
         }
     }
 }
@@ -40,64 +157,42 @@ impl SourceRepo {
         if !path.exists() {
             fs::create_dir_all(&path).unwrap();
         }
-        Self { root: path }
+        Self { root: path.into() }
     }
 
     pub fn nuke(&self) -> Result<(), PackageErr> {
-        fs::remove_dir_all(&self.root)?;
-        fs::create_dir_all(&self.root)?;
+        fs::remove_dir_all(&self.root.as_path_buf())?;
+        fs::create_dir_all(&self.root.as_path_buf())?;
         Ok(())
     }
 
-    pub fn temp() -> (Self, TempDir) {
-        let dir = TempDir::new().unwrap();
-        (
+    pub fn temp() -> Self {
             Self {
-                root: dir.path().to_path_buf(),
-            },
-            dir,
-        )
+                root: RepoDir::temp().unwrap()
+            }
     }
 
     #[cfg(test)]
-    pub fn mock() -> (Self, TempDir) {
-        let dir = TempDir::new().unwrap();
-        
+    pub async fn mock() -> Self {
         let layout = crate::test::package_layout();
         let source = Self {
-            root: dir.path().to_path_buf(),
+            root: RepoDir::temp().unwrap()
         };
-        source.submit(layout).unwrap();
-        (
-            source,
-            dir,
-        )
-    }
-    
-    
-
-    pub fn submit(&self, package: PackageLayout) -> Result<(), PackErr> {
-        let release_dir = self.root.join(package.release().to_path());
-        fs::create_dir_all(release_dir.clone())?;
-        /// first zip main/root which is a special case
-        let main_target = release_dir.join(SlicePath::root().filename());
-        zip_slice_dir_to(&package.path, main_target)?;
-
-        let paths = package.gather_slice_paths();
-        for p in paths {
-            let source = package.path.join(p.as_path());
-            let target = release_dir.join(p.filename());
-            zip_slice_dir_to(source, target)?;
-        }
-
-        Ok(())
+        source.publish(&layout,MockPublishObserver).await.unwrap();
+        source
     }
 
-    pub async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>, PackErr> {
-        let path = self.root.join(slice.to_path());
+
+
+}
+
+#[async_trait]
+impl Repo for SourceRepo {
+    async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>, PackageErr> {
+        let path = self.root.as_path_buf().join(slice.to_path().to_str().unwrap());
 
         if !path.exists() {
-            return Err(PackErr::SliceNotFound(slice.to_string()));
+            return Err(PackErr::SliceNotFound(slice.to_string()).into());
         }
 
         let mut file = tokio::fs::File::open(&path).await?;
@@ -105,5 +200,33 @@ impl SourceRepo {
         file.read_to_end(&mut contents).await?;
 
         Ok(contents)
+    }
+
+    async fn publish<P>(
+        &self,
+        layout: &PackageLayout,
+        observer: P,
+    ) -> Result<(), PackageErr>
+    where
+        P: PublishObserver + Send + Sync {
+
+        let release_dir = self.root.as_path_buf().join(layout.release().to_path());
+        fs::create_dir_all(release_dir.clone())?;
+        /// first zip main/root which is a special case
+        let main_target = release_dir.join(SlicePath::root().filename());
+        zip_slice_dir_to(&layout.path, main_target).map_err(Into::<PackErr>::into)?;
+
+        let paths = layout.gather_slice_paths();
+        for p in paths {
+            let source = layout.path.join(p.as_path());
+            let target = release_dir.join(p.filename());
+            zip_slice_dir_to(source, target).map_err(Into::<PackErr>::into)?;
+        }
+
+        Ok(())
+    }
+
+    async fn status(&self) -> RepoStatus {
+       RepoStatus::Ready
     }
 }

@@ -19,9 +19,28 @@ pub struct PackageCache {
 
 impl PackageCache {
 
-    pub fn temp(  ) -> Self {
+    /// create a temporary unique cache directory that will be deleted on process termination
+    pub fn temporary() -> Self {
+        Self::unique_with_keep(false)
+    }
+
+    /// create a unique cache directory that will not be deleted when the process terminates.
+    /// Developers should use this constructor if they are running unit tests and wish to examine
+    /// the contents of the cache after the test.
+    pub fn unique() -> Self {
+        Self::unique_with_keep(true)
+    }
+
+    /// creates a unique cache directory with a `keep` flag to preserve cache directory after the process terminates.
+    pub fn unique_with_keep( keep: bool ) -> Self {
         let repo = RemoteRepo::default();
-        let tmp = TempDir::new().unwrap();
+        let mut tmp = TempDir::new().unwrap();
+
+        if keep {
+            tmp.disable_cleanup(true);
+            println!("Temp Cache Location: '{}'", tmp.path().to_str().unwrap() )
+        }
+
         let path = tmp.path().to_path_buf();
         let layout = CacheLayout::new(path.clone());
         let tmp = Some(Arc::new(tmp));
@@ -33,16 +52,19 @@ impl PackageCache {
         }
     }
 
+
+
     pub fn is_file_cached(&self, file: &PackFile) -> bool {
         self.layout.file_path(file).exists()
     }
     pub async fn get_file(&self, file: &PackFile) -> Result<Vec<u8>,CacheErr> {
         let path = self.layout.file_path(file);
+println!("EXPECTED PATH FILE: '{}'", path.to_str().unwrap());
         if !path.exists() {
-println!("downloading slice: {}", file.slice() );
+println!("downloading slice: {} for cache file: '{}'", file.slice(), path.to_str().unwrap());
             self.downloader.download(file.slice()).await?;
         }
-println!("FILE EXISTS? {} -> {}", path.exists(), path.to_str().unwrap() );
+
         let data = tokio::fs::read(path).await?;
         Ok(data)
     }
@@ -74,6 +96,8 @@ impl CacheLayout {
 pub enum CacheErr {
     #[error("Not Found")]
     NotFound,
+    #[error("Download operation cache directory miss for file: {0} with expected cache directory of: {1}")]
+    DownloadCacheMiss(PackFile,PathBuf),
     #[error("Error downloading slice: {0}")]
     DownloadErr(#[from] DownloadErr),
     #[error("{0}")]

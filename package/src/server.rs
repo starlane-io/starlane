@@ -1,7 +1,9 @@
+use std::cell::{Cell, OnceCell, RefCell};
+use std::io;
 use crate::create::{PackErr, PackageLayout};
-use crate::repo::SourceRepo;
+use crate::repo::{Repo, SourceRepo};
 use crate::zip::{unzip_from_binary_to_temp, ZipError};
-use crate::IgnoreObserver;
+use crate::{IgnoreObserver, PackageErr};
 use axum::extract::multipart::Multipart;
 use axum::extract::{Query, State};
 use axum::routing::method_routing::{get, post};
@@ -15,56 +17,52 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use axum::response::sse::KeepAlive;
+use port_check::free_local_port;
 use tempfile::TempDir;
 use thiserror::Error;
+use tokio::net::TcpListener;
+use tokio::sync::{oneshot, watch};
+use tokio::task::spawn_blocking;
+use crate::test::MockPublishObserver;
 
 pub struct ServerBuilder {
-    pub bind: String,
+    pub bind: ServerBind,
     pub repo: SourceRepo,
 }
 
 impl Default for ServerBuilder {
     fn default() -> Self {
         Self {
-            bind: "0.0.0.0:3000".to_string(),
+            bind: ServerBind::default(),
             repo: SourceRepo::default(),
         }
     }
 }
 
 impl ServerBuilder {
-    pub fn temp() -> (Self, TempDir) {
-        let (repo, dir) = SourceRepo::temp();
-        (
+    pub fn temp() -> Self {
+        let repo = SourceRepo::temp();
             Self {
-                bind: "0.0.0.0:3000".to_string(),
+                bind: ServerBind::RandomAvailable,
                 repo,
-            },
-            dir,
-        )
+            }
     }
 
     #[cfg(test)]
-    pub fn mock() -> tokio::sync::oneshot::Sender<()> {
-        let (repo, dir) = SourceRepo::mock();
+    pub async fn mock() -> ServerControl {
+        let repo = SourceRepo::mock().await;
         let server = Self {
-            bind: "0.0.0.0:3000".to_string(),
+            bind: ServerBind::RandomAvailable,
             repo,
         };
 
-        let handle = server.start_with_termination_handle();
-        let (tx, rx) = tokio::sync::oneshot::channel();
+        let control = server.start();
 
-        tokio::spawn(async move {
-            rx.await.unwrap();
-            drop(handle);
-            drop(dir);
-        });
-
-        tx
+        control
     }
 
-    pub fn router(&self) -> Router {
+    fn router(&self) -> Router {
         let state = Arc::new(RepoState::new(self.repo.clone()));
         let router = Router::new()
             .route("/package", post(upload_zip))
@@ -74,46 +72,166 @@ impl ServerBuilder {
         router
     }
 
-    /// start this server and manage the handler
-    pub fn start(self) {
-        let handle = self.start_with_termination_handle();
-        tokio::spawn(async move {
-            /// used to move handle into this async block
-            let handle = handle;
-            loop {
-                tokio::time::sleep(Duration::from_secs(u64::MAX)).await;
-            }
-        });
-    }
-
-    /// exactly like [ServerBuilder::start] except it then automatically idles
-    /// the current task until the program is externally killed
-    pub async fn run(self) {
-        let handle = self.start_with_termination_handle();
+    /// start a server that will run until the process is terminated
+    pub async fn start_no_controller(self) {
+        let handle = self.start();
         loop {
             tokio::time::sleep(Duration::from_secs(u64::MAX)).await;
         }
     }
 
-    pub fn start_with_termination_handle(self) -> tokio::sync::oneshot::Sender<()> {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        tokio::spawn(async move {
-            let router = self.router();
-            // Run the server
-            let listener = tokio::net::TcpListener::bind(self.bind.clone())
-                .await
-                .expect("Failed to bind to address");
+    pub fn start(self) -> ServerControl {
+        let (mut signals, control) = ServerSignals::new();
+            async fn run(this:&ServerBuilder, keep_alive: oneshot::Receiver<()>, status: watch::Sender<ServerStatus>) -> Result<(),ServerErr> {
+                let router = this.router();
+                // Run the server
+                let listener = this.bind.create().await?;
 
-            async fn stop(rx: tokio::sync::oneshot::Receiver<()>) {
-                rx.await.unwrap()
+                axum::serve(listener, router)
+                    .with_graceful_shutdown(stop(keep_alive))
+                    .await?;
+                Ok(())
             }
 
-            axum::serve(listener, router)
-                .with_graceful_shutdown(stop(rx))
-                .await
-                .expect("Failed to start server");
+            async fn stop(rx: tokio::sync::oneshot::Receiver<()>) {
+                rx.await.unwrap();
+            }
+
+        let keep_alive = signals.keep_alive.take().unwrap();
+
+        signals.status.send(ServerStatus::Pending).unwrap();
+        let mut status = signals.status.clone();
+
+        tokio::spawn(async move {
+            if let Err(err) = run(&self, keep_alive,status.clone()).await {
+               status.send(err.into()).unwrap();
+            }
+            else {
+               status.send(ServerStatus::Terminated).unwrap();
+            }
         });
-        tx
+
+        let mut status_listener = signals.status.subscribe();
+
+        tokio::spawn( async move {
+           while let Ok(_) = status_listener.changed().await {
+               let status = status_listener.borrow().clone();
+               match status {
+                   ServerStatus::Pending => {
+                   }
+                   _ => break
+               }
+           }
+        });
+
+
+        control
+    }
+}
+
+struct ServerSignals {
+    /// receiver tracking the [ServerControl]'s desire to keep the server running
+    keep_alive: Option<oneshot::Receiver<()>>,
+    /// will send or drop after the server has stopped
+    terminated: oneshot::Sender<()>,
+    /// report the present [ServerStatus]
+    status: watch::Sender<ServerStatus>,
+
+}
+
+impl ServerSignals {
+    fn new() -> (Self, ServerControl) {
+        let (keep_alive_tx, keep_alive_rx) = oneshot::channel();
+        let (alive_tx,alive_rx) = oneshot::channel();
+        let (status_tx,status_rx) = watch::channel(ServerStatus::Unknown);
+        (
+            Self { keep_alive: Some(keep_alive_rx), terminated:alive_tx, status: status_tx },
+            ServerControl { keep_alive: keep_alive_tx, terminated: alive_rx, status: status_rx }
+        )
+    }
+}
+
+enum ServerBind {
+   Port(u16),
+   RandomAvailable
+}
+
+impl ServerBind {
+    pub(crate) async fn create(&self) ->  Result<TcpListener,ServerErr> {
+        match self {
+            ServerBind::Port(port) => {
+                TcpListener::bind(format!("0.0.0.0:{}",port)).await.map_err(|e|e.into())
+            }
+            ServerBind::RandomAvailable => {
+                let port = free_local_port().ok_or(ServerErr::FreePortNotFound)?;
+                TcpListener::bind(format!("0.0.0.0:{}",port)).await.map_err(|e|e.into())
+            }
+        }
+
+    }
+}
+
+impl Default for ServerBind {
+    fn default() -> Self {
+        Self::Port(3000)
+    }
+}
+
+#[derive(Error,Debug)]
+pub enum ServerErr {
+    #[error("{0}")]
+    Io(#[from] io::Error),
+    #[error("port_check::free_local_port(): could not find a free port")]
+    FreePortNotFound
+}
+
+
+#[derive(Clone,Debug)]
+pub enum ServerStatus {
+    Unknown,
+    Pending,
+    Ready {
+        port: u16
+    },
+    Terminated,
+    Panic(Arc<ServerErr>)
+}
+
+impl ServerStatus {
+    pub fn ready(port: u16) -> Self {
+        Self::Ready {
+            port
+        }
+    }
+}
+
+
+
+impl From<ServerErr> for ServerStatus {
+    fn from(err: ServerErr) -> Self {
+        ServerStatus::Panic(err.into())
+    }
+}
+
+
+pub struct ServerControl {
+    /// when dropped signals the server to stop
+    keep_alive: oneshot::Sender<()>,
+    /// completes when the server has stopped from a termination request
+    terminated: oneshot::Receiver<()>,
+    /// display the current status of the server
+    status: watch::Receiver<ServerStatus>,
+}
+
+impl ServerControl {
+    pub async fn stop(self) {
+        let terminated = self.terminated;
+        self.keep_alive.send(()).unwrap();
+        terminated.await.unwrap_or_default();
+    }
+
+    pub async fn await_termination(self)  {
+        self.terminated.await.unwrap_or_default();
     }
 }
 
@@ -190,11 +308,11 @@ async fn upload_zip(
 
         let mut observer = IgnoreObserver;
         let path = dir.path().to_path_buf();
-        let layout = PackageLayout::create(&path, &mut observer)?;
+        let layout = PackageLayout::create(&path, &mut observer).map_err(Into::<PackageErr>::into)?;
 
         layout.diagnose();
 
-        state.repo.submit(layout)?;
+        state.repo.publish(&layout,MockPublishObserver).await?;
 
         // Return the file ID to the client
         return Ok((StatusCode::CREATED, format!("File uploaded successfully.")).into_response());
@@ -244,14 +362,15 @@ enum AppError {
     ZipError(ZipError),
     #[allow(dead_code)]
     #[error("{0}")]
-    PackErr(PackErr),
+    PackErr(#[from] PackageErr),
+    #[allow(dead_code)]
+    #[error("{0}")]
+    ServerErr(#[from] ServerErr),
+
 }
 
-impl From<PackErr> for AppError {
-    fn from(err: PackErr) -> Self {
-        AppError::PackErr(err)
-    }
-}
+
+
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
@@ -282,6 +401,12 @@ impl IntoResponse for AppError {
                 StatusCode::BAD_REQUEST,
                 format!("Illegal Slice Name: '{}'", err),
             ),
+            AppError::ServerErr(err) => {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Internal Server Error: '{}'", err),
+                )
+            }
         };
 
         (status, message).into_response()

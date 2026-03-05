@@ -116,6 +116,8 @@ pub enum PackErr {
     ZipError(ZipError),
     #[error("TOML parse error in '{0}': {1}")]
     TomlParseErr(PathBuf, String),
+    #[error("Network Error: {0}")]
+    NetworkErr(#[from] reqwest::Error)
 }
 
 impl From<ZipError> for PackErr {

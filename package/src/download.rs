@@ -54,12 +54,11 @@ impl Downloader {
         &self.path
     }
 
-    /// return () meaning
+    /// return () meaning that the file is where it should be
     pub async fn download(&self, slice: &Slice) -> Result<(), DownloadErr> {
         let (request, rtn) = DownloadRequest::new(slice.clone());
         self.tx.send(request).await.unwrap();
-        rtn.await.map_err(|_| DownloadErr::Internal)?;
-        Ok(())
+        rtn.await.map(|r| ()).map_err(|_|DownloadErr::Internal)
     }
 }
 
@@ -95,17 +94,17 @@ impl DownloadRunner {
         tokio::spawn(async move {
             println!("Download runner running!");
             while let Some(request) = self.rx.recv().await {
-                println!("received download request!");
-                // first test if the file is already downloaded
+                let result = self.download_slice(&request.slice).await;
                 request
                     .tx
-                    .send(self.download_slice(&request.slice).await)
+                    .send(result)
                     .unwrap();
             }
         });
     }
 
     async fn download_slice(&self, slice: &Slice) -> Result<(), DownloadErr> {
+println!("START DOWNLOAD SLICE: {}",slice);
         let path = self.layout.slice_path(slice);
         println!("slice path: '{}'", path.to_str().unwrap());
         if path.exists() {
@@ -114,10 +113,13 @@ impl DownloadRunner {
         }
 
         let data = self.repo.get_slice(slice).await?;
-        println!("got data....");
-        let dir = unzip_from_binary_to_temp(data.as_slice())?;
+        println!("got slice data.  {} ",data.len());
+        let dir = unzip_from_binary_to_temp(data.as_slice()).unwrap();
+        println!("slice data saved to: '{}'", dir.path().to_str().unwrap());
+
         println!("unzipped slice....");
-        tokio::fs::create_dir_all(path.parent().unwrap()).await?;
+        tokio::fs::create_dir_all(path.clone()).await?;
+        println!("created SLICE cache directory: '{}'",path.to_str().unwrap() );
         tokio::fs::rename(dir.path(), path.clone()).await?;
         println!("slice renamed.... to {}", path.display() );
         Ok(())

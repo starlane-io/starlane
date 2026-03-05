@@ -17,6 +17,7 @@ use zip::{CompressionMethod, ZipWriter};
 /// # Example
 /// ```rust
 /// use std::path::Path;
+/// use starlane_package::zip::unzip_from_binary_to_temp;
 ///
 /// let temp_zip = zip_directory_to_temp(Path::new("./my_folder"))?;
 /// println!("Created zip at: {:?}", temp_zip);
@@ -261,8 +262,9 @@ mod tests {
 ///
 /// # Example
 /// ```rust
-/// let zip_data = std::fs::read("archive.zip")?;
-/// let temp_dir = unzip_from_binary_to_temp(&zip_data)?;
+/// use starlane_package::zip::unzip_from_binary_to_temp;
+/// let zip_data = std::fs::read("archive.zip").unwrap();
+/// let temp_dir = unzip_from_binary_to_temp(&zip_data).unwrap();
 /// println!("Unzipped to: {:?}", temp_dir.path());
 /// ```
 pub fn unzip_from_binary_to_temp(zip_bytes: &[u8]) -> Result<tempfile::TempDir, ZipError> {
