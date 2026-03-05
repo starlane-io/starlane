@@ -9,6 +9,9 @@ use starlane_space::types::specific::Slice;
 use std::path::PathBuf;
 use crate::repo::{RepoPanic, RepoStatus};
 
+pub const DEFAULT_PORT: u16 = 3000u16;
+
+#[derive(Clone)]
 pub struct RemoteRepo {
     pub url: String,
     pub client: Client,
@@ -30,16 +33,13 @@ impl Repo for RemoteRepo {
             .into())
     }
 
-    async fn publish<P>(
+    async fn publish(
         &self,
         layout: &PackageLayout,
-        observer: P,
-    ) -> Result<(), PackageErr>
-    where
-        P: PublishObserver + Send + Sync {
+    ) -> Result<(), PackageErr> {
     /// Upload a zip file to the package-server
 
-        observer.start_upload(&self.url);
+        //observer.start_upload(&self.url);
 
         let tmp_file = layout.zip()?;
         let zip_path = tmp_file.path().to_path_buf();
@@ -61,8 +61,7 @@ impl Repo for RemoteRepo {
         );
 
         // Send the POST request
-        let client = reqwest::Client::new();
-        let response = client
+        let response = self.client
             .post(format!("http://{}/package", self.url))
             .multipart(form)
             .send()
@@ -121,14 +120,18 @@ impl RemoteRepo {
             anyhow::bail!("Download failed with status {}: {}", status, error_text);
         }
     }
+
+    pub fn local_with_port(port: u16) -> Self {
+        let client = reqwest::Client::new();
+        Self {
+            url: format!("localhost:{}",port).to_string(),
+            client,
+        }
+    }
 }
 
 impl Default for RemoteRepo {
     fn default() -> Self {
-        let client = reqwest::Client::new();
-        Self {
-            url: "localhost:3000".to_string(),
-            client,
-        }
+        Self::local_with_port(DEFAULT_PORT)
     }
 }

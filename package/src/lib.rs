@@ -380,36 +380,44 @@ mod test {
         use crate::cache::{CacheErr, PackageCache};
         use crate::download::Downloader;
         use crate::remote::{RemoteRepo, Repo};
-        use crate::server::ServerBuilder;
+        use crate::server::{ServerBuilder, ServerControl};
         use crate::test::MockPublishObserver;
         use crate::zip::unzip_from_binary_to_temp;
 
+        pub struct RemoteTest {
+            pub server_control: ServerControl,
+            pub remote_repo: RemoteRepo
+        }
+
+        impl RemoteTest {
+            pub async fn mock() -> Self {
+                let server_control = ServerBuilder::mock().await;
+                let port = server_control.get_port().await.unwrap();
+                println!("Server started");
+                let remote_repo = RemoteRepo::local_with_port(port);
+
+                Self {
+                    server_control,
+                    remote_repo
+                }
+            }
+        }
+
         #[tokio::test]
         pub async fn test_downloader() {
-            let control = ServerBuilder::mock().await;
-            println!("Server started");
-            let repo = RemoteRepo::default();
-
-            let downloader = Downloader::temp(repo);
-
+            let test = RemoteTest::mock().await;
+            let downloader = Downloader::temp(test.remote_repo.clone());
             downloader.download(&MY_SLICE).await.unwrap();
-
-            control.stop().await;
         }
 
         #[tokio::test]
         pub async fn test_upload_and_download() {
-            let builder = ServerBuilder::temp();
-            let mut control= builder.start();
-            let repo = RemoteRepo::default();
-
+            let test = RemoteTest::mock().await;
             let mut observer = MockPublishObserver::default();
             let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, &mut observer).unwrap();
-            repo.publish(&layout, observer).await.unwrap();
+            test.remote_repo.publish(&layout).await.unwrap();
 
-            let my_slice = repo.get_slice(&MY_SLICE).await.unwrap();
-
-            control.stop().await;
+            let my_slice = test.remote_repo.get_slice(&MY_SLICE).await.unwrap();
 
             let slice_dir = unzip_from_binary_to_temp(my_slice.as_slice()).unwrap();
             let slice_path = slice_dir.path().to_path_buf();
@@ -422,10 +430,9 @@ mod test {
 
         #[tokio::test]
         pub async fn test_cache() {
-            let control = ServerBuilder::mock().await;
-            let cache = PackageCache::unique_with_keep(true);
+            let test = RemoteTest::mock().await;
+            let cache = PackageCache::unique_with_keep(test.remote_repo.clone(), true );
             cache.get_file(&ADVICE_FILE).await.unwrap();
-            control.stop().await;
         }
 
     }
@@ -606,7 +613,7 @@ mod test {
 
         verify_mock_layout(&layout).unwrap();
 
-        repo.publish(&layout,MockPublishObserver).await.unwrap();
+        repo.publish(&layout).await.unwrap();
 
         println!("\n\nzipfile: {:?}", zipfile);
     }

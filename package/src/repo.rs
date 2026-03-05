@@ -16,15 +16,12 @@ use tokio::io::AsyncReadExt;
 use crate::test::MockPublishObserver;
 
 #[async_trait]
-pub trait Repo {
+pub trait Repo : Send+Sync{
     async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>, PackageErr>;
-    async fn publish<P>(
+    async fn publish(
         &self,
-        layout: &PackageLayout,
-        observer: P,
-    ) -> Result<(), PackageErr>
-    where
-        P: PublishObserver + Send + Sync;
+        layout: &PackageLayout
+    ) -> Result<(), PackageErr>;
 
     async fn status(&self) -> RepoStatus;
 }
@@ -178,7 +175,7 @@ impl SourceRepo {
         let source = Self {
             root: RepoDir::temp().unwrap()
         };
-        source.publish(&layout,MockPublishObserver).await.unwrap();
+        source.publish(&layout).await.unwrap();
         source
     }
 
@@ -202,14 +199,11 @@ impl Repo for SourceRepo {
         Ok(contents)
     }
 
-    async fn publish<P>(
+    async fn publish(
         &self,
         layout: &PackageLayout,
-        observer: P,
     ) -> Result<(), PackageErr>
-    where
-        P: PublishObserver + Send + Sync {
-
+    {
         let release_dir = self.root.as_path_buf().join(layout.release().to_path());
         fs::create_dir_all(release_dir.clone())?;
         /// first zip main/root which is a special case

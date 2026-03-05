@@ -35,7 +35,7 @@ impl Default for Downloader {
 }
 
 impl Downloader {
-    pub fn new(path: PathBuf, repo: RemoteRepo) -> Self {
+    pub fn new(path: PathBuf, repo: impl Repo+'static ) -> Self {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         DownloadRunner::new(path.clone(), repo, rx, None);
         Self { path, tx }
@@ -76,13 +76,14 @@ impl DownloadRequest {
 
 struct DownloadRunner {
     layout: CacheLayout,
-    repo: RemoteRepo,
+    repo: Box<dyn Repo>,
     tmp: Option<TempDir>,
     rx: tokio::sync::mpsc::Receiver<DownloadRequest>,
 }
 
 impl DownloadRunner {
-    pub fn new(path: PathBuf, repo: RemoteRepo, rx: tokio::sync::mpsc::Receiver<DownloadRequest>, tmp: Option<TempDir>) {
+    pub fn new(path: PathBuf, repo: impl Repo+'static, rx: tokio::sync::mpsc::Receiver<DownloadRequest>, tmp: Option<TempDir>) {
+        let repo = Box::new(repo);
         let layout = CacheLayout{ path };
         let mut runner = Self { layout, repo, rx, tmp };
         runner.start();

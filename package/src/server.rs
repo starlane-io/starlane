@@ -23,7 +23,11 @@ use tempfile::TempDir;
 use thiserror::Error;
 use tokio::net::TcpListener;
 use tokio::sync::{oneshot, watch};
+use tokio::sync::oneshot::error::RecvError;
 use tokio::task::spawn_blocking;
+use tokio::time::error::Elapsed;
+use tokio::time::Timeout;
+use crate::remote::DEFAULT_PORT;
 use crate::test::MockPublishObserver;
 
 pub struct ServerBuilder {
@@ -81,14 +85,17 @@ impl ServerBuilder {
     }
 
     pub fn start(self) -> ServerControl {
+        let (port_tx,port_rx) = oneshot::channel();
         let (mut signals, control) = ServerSignals::new();
-            async fn run(this:&ServerBuilder, keep_alive: oneshot::Receiver<()>, status: watch::Sender<ServerStatus>) -> Result<(),ServerErr> {
+            async fn run(this:&ServerBuilder, request_terminate: oneshot::Receiver<()>, status: watch::Sender<ServerStatus>, port_tx: oneshot::Sender<u16>) -> Result<(),ServerErr> {
                 let router = this.router();
                 // Run the server
-                let listener = this.bind.create().await?;
+                let (listener,port) = this.bind.create().await?;
+
+                port_tx.send(port);
 
                 axum::serve(listener, router)
-                    .with_graceful_shutdown(stop(keep_alive))
+                    .with_graceful_shutdown(stop(request_terminate))
                     .await?;
                 Ok(())
             }
@@ -97,13 +104,13 @@ impl ServerBuilder {
                 rx.await.unwrap();
             }
 
-        let keep_alive = signals.keep_alive.take().unwrap();
+        let request_terminate = signals.request_terminate.take().unwrap();
 
         signals.status.send(ServerStatus::Pending).unwrap();
         let mut status = signals.status.clone();
 
         tokio::spawn(async move {
-            if let Err(err) = run(&self, keep_alive,status.clone()).await {
+            if let Err(err) = run(&self, request_terminate,status.clone(),port_tx).await {
                status.send(err.into()).unwrap();
             }
             else {
@@ -111,17 +118,38 @@ impl ServerBuilder {
             }
         });
 
-        let mut status_listener = signals.status.subscribe();
 
+
+        /// this block of code will set the status to [ServerStatus::Ready] as soon as the server health is confirmed.
+        /// I found this necessary in order to make the testing framework pass because sometimes servers take a while
+        /// to get started...
         tokio::spawn( async move {
-           while let Ok(_) = status_listener.changed().await {
-               let status = status_listener.borrow().clone();
-               match status {
-                   ServerStatus::Pending => {
-                   }
-                   _ => break
-               }
-           }
+
+            let port = match tokio::time::timeout( Duration::from_secs(30),port_rx).await {
+                Ok(Ok(port)) => port,
+                _ => {
+                   signals.status.send(ServerStatus::panic(ServerErr::HealthcheckTimeout)).unwrap_or_default();
+                   return;
+                }
+            };
+
+
+            let client = reqwest::Client::builder().build().unwrap();
+            const interval: u64 = 250u64;
+            const retry_seconds: u64 = 100;
+
+            let mut count = retry_seconds/interval;
+            loop {
+                if let Ok(response) = client.get(format!("http://localhost:{}/status", port)).send().await {
+                    signals.status.send(ServerStatus::ready(port)).unwrap();
+                } else {
+                    tokio::time::sleep(Duration::from_millis(250u64)).await;
+                    count = count - 1;
+                }
+                if count < 0 {
+                    signals.status.send(ServerStatus::Panic(ServerErr::HealthcheckTimeout.into()));
+                }
+            }
         });
 
 
@@ -131,22 +159,21 @@ impl ServerBuilder {
 
 struct ServerSignals {
     /// receiver tracking the [ServerControl]'s desire to keep the server running
-    keep_alive: Option<oneshot::Receiver<()>>,
+    request_terminate: Option<oneshot::Receiver<()>>,
     /// will send or drop after the server has stopped
     terminated: oneshot::Sender<()>,
     /// report the present [ServerStatus]
     status: watch::Sender<ServerStatus>,
-
 }
 
 impl ServerSignals {
     fn new() -> (Self, ServerControl) {
-        let (keep_alive_tx, keep_alive_rx) = oneshot::channel();
+        let (request_terminate_tx, request_terminate_rx) = oneshot::channel();
         let (alive_tx,alive_rx) = oneshot::channel();
         let (status_tx,status_rx) = watch::channel(ServerStatus::Unknown);
         (
-            Self { keep_alive: Some(keep_alive_rx), terminated:alive_tx, status: status_tx },
-            ServerControl { keep_alive: keep_alive_tx, terminated: alive_rx, status: status_rx }
+            Self { request_terminate: Some(request_terminate_rx), terminated:alive_tx, status: status_tx },
+            ServerControl { request_terminate: request_terminate_tx, terminated: alive_rx, status: status_rx }
         )
     }
 }
@@ -157,14 +184,14 @@ enum ServerBind {
 }
 
 impl ServerBind {
-    pub(crate) async fn create(&self) ->  Result<TcpListener,ServerErr> {
+    pub(crate) async fn create(&self) ->  Result<(TcpListener,u16),ServerErr> {
         match self {
             ServerBind::Port(port) => {
-                TcpListener::bind(format!("0.0.0.0:{}",port)).await.map_err(|e|e.into())
+                TcpListener::bind(format!("0.0.0.0:{}",port)).await.map_err(|e|e.into()).map(|listener|(listener,port.clone()))
             }
             ServerBind::RandomAvailable => {
                 let port = free_local_port().ok_or(ServerErr::FreePortNotFound)?;
-                TcpListener::bind(format!("0.0.0.0:{}",port)).await.map_err(|e|e.into())
+                TcpListener::bind(format!("0.0.0.0:{}",port)).await.map_err(|e|e.into()).map(|listener|(listener,port))
             }
         }
 
@@ -173,7 +200,7 @@ impl ServerBind {
 
 impl Default for ServerBind {
     fn default() -> Self {
-        Self::Port(3000)
+        Self::Port(DEFAULT_PORT)
     }
 }
 
@@ -182,7 +209,9 @@ pub enum ServerErr {
     #[error("{0}")]
     Io(#[from] io::Error),
     #[error("port_check::free_local_port(): could not find a free port")]
-    FreePortNotFound
+    FreePortNotFound,
+    #[error("HealthcheckTimeout")]
+    HealthcheckTimeout
 }
 
 
@@ -197,11 +226,16 @@ pub enum ServerStatus {
     Panic(Arc<ServerErr>)
 }
 
+
 impl ServerStatus {
     pub fn ready(port: u16) -> Self {
         Self::Ready {
             port
         }
+    }
+
+    pub fn panic(err:ServerErr) -> Self {
+        Self::Panic(Arc::new(err))
     }
 }
 
@@ -216,22 +250,55 @@ impl From<ServerErr> for ServerStatus {
 
 pub struct ServerControl {
     /// when dropped signals the server to stop
-    keep_alive: oneshot::Sender<()>,
+    request_terminate: oneshot::Sender<()>,
     /// completes when the server has stopped from a termination request
     terminated: oneshot::Receiver<()>,
     /// display the current status of the server
     status: watch::Receiver<ServerStatus>,
 }
 
+
 impl ServerControl {
-    pub async fn stop(self) {
-        let terminated = self.terminated;
-        self.keep_alive.send(()).unwrap();
-        terminated.await.unwrap_or_default();
+    pub async fn stop(mut self) {
+        self.request_terminate.send(()).unwrap();
+        self.terminated.await.unwrap_or_default();
     }
 
     pub async fn await_termination(self)  {
         self.terminated.await.unwrap_or_default();
+    }
+
+    pub async fn await_ready(&self) -> ServerStatus {
+        let mut status = self.status.clone();
+        while let Ok(_) = status.changed().await {
+            let status  = self.status.borrow().clone();
+            match &status {
+                /// this is what we want!
+                ServerStatus::Ready { .. } => {
+                    return status;
+                },
+                ServerStatus::Terminated => {
+                    return ServerStatus::panic(ServerErr::HealthcheckTimeout.into());
+                }
+                ServerStatus::Panic(panic) => {
+                    return status;
+                }
+                /// in all other cases keep waiting...
+                _ => {}
+            }
+        }
+
+        ServerStatus::panic(ServerErr::HealthcheckTimeout.into())
+    }
+
+    pub async fn get_port(&self) -> Result<u16,ServerStatus> {
+        let status = self.await_ready().await;
+        match status {
+            ServerStatus::Ready { port } => {
+                Ok(port)
+            }
+            status => Err(status)
+        }
     }
 }
 
@@ -312,7 +379,7 @@ async fn upload_zip(
 
         layout.diagnose();
 
-        state.repo.publish(&layout,MockPublishObserver).await?;
+        state.repo.publish(&layout).await?;
 
         // Return the file ID to the client
         return Ok((StatusCode::CREATED, format!("File uploaded successfully.")).into_response());

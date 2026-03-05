@@ -20,20 +20,19 @@ pub struct PackageCache {
 impl PackageCache {
 
     /// create a temporary unique cache directory that will be deleted on process termination
-    pub fn temporary() -> Self {
-        Self::unique_with_keep(false)
+    pub fn temporary(repo: impl Repo+'static) -> Self {
+        Self::unique_with_keep(repo, false)
     }
 
     /// create a unique cache directory that will not be deleted when the process terminates.
     /// Developers should use this constructor if they are running unit tests and wish to examine
     /// the contents of the cache after the test.
-    pub fn unique() -> Self {
-        Self::unique_with_keep(true)
+    pub fn unique(repo: impl Repo+'static) -> Self {
+        Self::unique_with_keep(repo,true)
     }
 
     /// creates a unique cache directory with a `keep` flag to preserve cache directory after the process terminates.
-    pub fn unique_with_keep( keep: bool ) -> Self {
-        let repo = RemoteRepo::default();
+    pub fn unique_with_keep( repo: impl Repo+'static, keep: bool ) -> Self {
         let mut tmp = TempDir::new().unwrap();
 
         if keep {
