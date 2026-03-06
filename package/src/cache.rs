@@ -1,14 +1,11 @@
+use crate::download::{DownloadErr, Downloader};
+use crate::repo::Repo;
+use crate::PackageErr;
+use starlane_space::types::specific::{PackFile, Slice};
 use std::path::PathBuf;
 use std::sync::Arc;
-use strum_macros::Display;
 use tempfile::TempDir;
 use thiserror::Error;
-use starlane_base::env;
-use starlane_space::types::specific::{PackFile, Slice};
-use crate::download::{DownloadErr, Downloader};
-use crate::PackageErr;
-use crate::remote::RemoteRepo;
-use crate::repo::Repo;
 
 #[derive(Clone)]
 pub struct PackageCache {

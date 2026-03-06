@@ -1,34 +1,27 @@
-use std::cell::{Cell, OnceCell, RefCell};
-use std::io;
-use crate::create::{PackErr, PackageLayout};
+use crate::create::PackageLayout;
 use crate::repo::{Repo, SourceRepo};
 use crate::zip::{unzip_from_binary_to_temp, ZipError};
-use crate::{IgnoreObserver, PackageErr};
+use crate::{new_ignorant_observer, IgnoreObserver, PackObserver, PackageErr};
 use axum::extract::multipart::Multipart;
 use axum::extract::{Query, State};
 use axum::routing::method_routing::{get, post};
 use axum::routing::Router;
 use axum_core::response::{IntoResponse, Response};
+use port_check::free_local_port;
 use reqwest::{header, StatusCode};
 use serde_derive::Deserialize;
 use starlane_space::err::ParseErrs0;
 use starlane_space::types::specific::Slice;
+use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use axum::response::sse::KeepAlive;
-use port_check::free_local_port;
-use tempfile::TempDir;
 use thiserror::Error;
 use tokio::net::TcpListener;
 use tokio::sync::{oneshot, watch};
-use tokio::sync::oneshot::error::RecvError;
-use tokio::task::spawn_blocking;
-use tokio::time::error::Elapsed;
-use tokio::time::Timeout;
+
 use crate::remote::DEFAULT_PORT;
-use crate::test::MockPublishObserver;
 
 pub struct ServerBuilder {
     pub bind: ServerBind,
@@ -373,13 +366,13 @@ async fn upload_zip(
         let data = field.bytes().await?;
         let dir = unzip_from_binary_to_temp(data.as_ref())?;
 
-        let mut observer = IgnoreObserver;
+        let mut observer: Box<dyn PackObserver> = new_ignorant_observer() ;
         let path = dir.path().to_path_buf();
-        let layout = PackageLayout::create(&path, &mut observer).map_err(Into::<PackageErr>::into)?;
+        let layout = PackageLayout::create(&path, &*observer).map_err(Into::<PackageErr>::into)?;
 
         layout.diagnose();
 
-        state.repo.publish(&layout).await?;
+        state.repo.publish(&layout, ).await?;
 
         // Return the file ID to the client
         return Ok((StatusCode::CREATED, format!("File uploaded successfully.")).into_response());

@@ -779,5 +779,5 @@ async fn publish(path: &PathBuf) -> Result<(), PackageErr> {
     let mut observer = PackPubObserver::new(console.clone());
     let remote = RemoteRepo::default();
     let pds = PackageLayout::create(&path, &mut observer)?;
-    remote.publish(&pds, observer).await
+    remote.publish(&pds, ).await
 }

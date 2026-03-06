@@ -116,7 +116,7 @@ impl SliceLayout {
         }
     }
 
-    pub fn create(root: &PathBuf, observer: &mut dyn PackObserver) -> Result<Self, PackErr> {
+    pub fn create(root: &PathBuf, observer: &dyn PackObserver) -> Result<Self, PackErr> {
         observer.start_pack(&root);
 
         observer.start_verify_layout();
@@ -354,14 +354,32 @@ impl FileEntity {
     }
 }
 
+
+/// this fella basically ignores all events
+struct IgnorantPublishObserver;
+
+impl Default for IgnorantPublishObserver {
+    fn default() -> Self {
+        Self
+    }
+}
+
+impl IgnorantPublishObserver {
+    pub fn new() -> Box<Self> {
+        Box::new(Self)
+    }
+}
+
+impl PublishObserver for IgnorantPublishObserver {}
+impl PackObserver for IgnorantPublishObserver {}
+
+
 #[cfg(test)]
 mod test {
     use crate::create::PackageLayout;
-    use crate::remote::RemoteRepo;
     use crate::repo::{Repo, SourceRepo};
-    use crate::server::ServerBuilder;
     use crate::zip::{unzip_from_binary_to_temp, unzip_from_file_to_temp, zip_slice_dir_to};
-    use crate::{FileEntity, PackObserver, PublishObserver, MY_SLICE, PACKAGE, PACKAGE_LAYOUT_EXAMPLE};
+    use crate::{IgnorantPublishObserver, FileEntity, PackObserver, PublishObserver, MY_SLICE, PACKAGE, PACKAGE_LAYOUT_EXAMPLE, new_ignorant_observer};
     use starlane_space::parse::SkewerCase;
     use starlane_space::types::scope::Segment;
     use std::fs;
@@ -369,20 +387,17 @@ mod test {
     use std::str::FromStr;
     use tempfile::NamedTempFile;
     use tokio::io::AsyncWriteExt;
-    use crate::cache::PackageCache;
-    use crate::download::Downloader;
 
     #[cfg(test)]
     mod server {
-        use tokio::io::AsyncWriteExt;
+        use crate::cache::PackageCache;
         use crate::create::PackageLayout;
-        use crate::{ADVICE_FILE, MY_SLICE, PACKAGE_LAYOUT_EXAMPLE};
-        use crate::cache::{CacheErr, PackageCache};
         use crate::download::Downloader;
         use crate::remote::{RemoteRepo, Repo};
         use crate::server::{ServerBuilder, ServerControl};
-        use crate::test::MockPublishObserver;
         use crate::zip::unzip_from_binary_to_temp;
+        use crate::{new_ignorant_observer, IgnorantPublishObserver, PackObserver, ADVICE_FILE, MY_SLICE, PACKAGE_LAYOUT_EXAMPLE};
+        use tokio::io::AsyncWriteExt;
 
         pub struct RemoteTest {
             pub server_control: ServerControl,
@@ -413,8 +428,8 @@ mod test {
         #[tokio::test]
         pub async fn test_upload_and_download() {
             let test = RemoteTest::mock().await;
-            let mut observer = MockPublishObserver::default();
-            let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, &mut observer).unwrap();
+            let observer: Box<dyn PackObserver> = new_ignorant_observer();
+            let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, &*observer).unwrap();
             test.remote_repo.publish(&layout).await.unwrap();
 
             let my_slice = test.remote_repo.get_slice(&MY_SLICE).await.unwrap();
@@ -437,20 +452,10 @@ mod test {
 
     }
 
-    pub struct MockPublishObserver;
-
-    impl Default for MockPublishObserver {
-        fn default() -> Self {
-            Self
-        }
-    }
-
-    impl PublishObserver for MockPublishObserver {}
-    impl PackObserver for MockPublishObserver {}
 
     pub fn package_layout() -> PackageLayout {
-        let mut observer = MockPublishObserver::default();
-        PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, &mut observer).unwrap()
+        let observer = new_ignorant_observer();
+        PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, &*observer).unwrap()
     }
 
     #[test]
@@ -594,7 +599,7 @@ mod test {
 
     #[tokio::test]
     pub async fn test_publish() {
-        let mut observer = MockPublishObserver::default();
+        let mut observer = IgnorantPublishObserver::default();
         let layout = PackageLayout::create(&PACKAGE_LAYOUT_EXAMPLE, &mut observer).unwrap();
         layout.diagnose();
 
@@ -613,7 +618,7 @@ mod test {
 
         verify_mock_layout(&layout).unwrap();
 
-        repo.publish(&layout).await.unwrap();
+        repo.publish(&layout, ).await.unwrap();
 
         println!("\n\nzipfile: {:?}", zipfile);
     }
@@ -640,4 +645,8 @@ pub trait PackObserver: Send + Sync {
 pub trait PublishObserver: PackObserver {
     fn start_upload(&self, server: &String) {}
     fn end_upload(&self) {}
+}
+
+fn new_ignorant_observer() -> Box<dyn PublishObserver> {
+    IgnorantPublishObserver::new()
 }

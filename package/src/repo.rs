@@ -1,27 +1,35 @@
-use std::fmt::Display;
 use crate::create::{PackErr, PackageLayout};
 use crate::zip::zip_slice_dir_to;
-use crate::{PackageErr, PublishObserver};
+use crate::{new_ignorant_observer, PackageErr, PublishObserver};
 use async_trait::async_trait;
+use reqwest::{Error, Response, StatusCode};
 use starlane_base::env::get_starlane_package_source;
 use starlane_space::types::scope::SlicePath;
 use starlane_space::types::specific::Slice;
-use std::{fs, io};
+use std::fmt::Display;
 use std::path::PathBuf;
 use std::sync::Arc;
-use reqwest::{Error, Response, StatusCode};
+use std::{fs, io};
 use tempfile::TempDir;
 use thiserror::Error;
 use tokio::io::AsyncReadExt;
-use crate::test::MockPublishObserver;
 
 #[async_trait]
 pub trait Repo : Send+Sync{
     async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>, PackageErr>;
     async fn publish(
         &self,
-        layout: &PackageLayout
+        package: &PackageLayout,
+    ) -> Result<(), PackageErr> {
+        self.publish_with_listener(package, &new_ignorant_observer()).await
+    }
+
+    async fn publish_with_listener(
+        &self,
+        layout: &PackageLayout,
+        listener: &Box<dyn PublishObserver>
     ) -> Result<(), PackageErr>;
+
 
     async fn status(&self) -> RepoStatus;
 }
@@ -175,7 +183,7 @@ impl SourceRepo {
         let source = Self {
             root: RepoDir::temp().unwrap()
         };
-        source.publish(&layout).await.unwrap();
+        source.publish(&layout, ).await.unwrap();
         source
     }
 
@@ -199,11 +207,15 @@ impl Repo for SourceRepo {
         Ok(contents)
     }
 
-    async fn publish(
+    async fn publish_with_listener
+    (
         &self,
         layout: &PackageLayout,
+        // need a strategy for listener on the source side
+        _: &Box<dyn PublishObserver>,
     ) -> Result<(), PackageErr>
     {
+
         let release_dir = self.root.as_path_buf().join(layout.release().to_path());
         fs::create_dir_all(release_dir.clone())?;
         /// first zip main/root which is a special case

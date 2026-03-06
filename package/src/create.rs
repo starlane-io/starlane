@@ -29,7 +29,7 @@ impl PackageLayout {
         &self.config.release
     }
 
-    pub fn create(path: &PathBuf, observer: &mut dyn PackObserver) -> Result<Self, PackErr> {
+    pub fn create(path: &PathBuf, observer: & dyn PackObserver) -> Result<Self, PackErr> {
         let root = SliceLayout::create(path, observer)?;
         let toml_path = path.join("package.toml");
         let config: PackageConfigRaw = Self::read_toml(&toml_path)?;

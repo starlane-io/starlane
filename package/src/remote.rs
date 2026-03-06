@@ -1,13 +1,13 @@
-use crate::create::{PackErr, PackageLayout};
+use crate::create::PackageLayout;
 pub(crate) use crate::repo::Repo;
+use crate::repo::RepoStatus;
 use crate::{PackageErr, PublishObserver};
 use anyhow::Result;
 use async_trait::async_trait;
 use reqwest;
-use reqwest::{Client, Error, Response};
+use reqwest::Client;
 use starlane_space::types::specific::Slice;
 use std::path::PathBuf;
-use crate::repo::{RepoPanic, RepoStatus};
 
 pub const DEFAULT_PORT: u16 = 3000u16;
 
@@ -33,13 +33,14 @@ impl Repo for RemoteRepo {
             .into())
     }
 
-    async fn publish(
+    async fn publish_with_listener(
         &self,
         layout: &PackageLayout,
+        listener: &Box<dyn PublishObserver>,
     ) -> Result<(), PackageErr> {
     /// Upload a zip file to the package-server
 
-        //observer.start_upload(&self.url);
+        listener.start_upload(&self.url);
 
         let tmp_file = layout.zip()?;
         let zip_path = tmp_file.path().to_path_buf();
