@@ -4021,6 +4021,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "starlane-postgres-platform"
+version = "0.3.20"
+
+[[package]]
 name = "starlane-space"
 version = "0.3.20"
 dependencies = [
