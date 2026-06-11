@@ -72,7 +72,6 @@ where
 
 /// trait that can bring a [StatusProbe] into a [Status::Ready] state
 
-
 /// [Handle] contains [E]--which implements the [Entity] trait--and a private
 /// `hold` reference which is a [tokio::sync::mpsc::Sender] created from the [StatusProbe]'s
 /// internal `runner`.  The Runner should stay alive until it has no more hold references,
@@ -150,7 +149,7 @@ impl<E> StatusProbe for Handle<E>
 where
     E: StatusProbe + Entity + Send + Sync,
 {
-    async fn probe(&self) -> StatusDetail{
+    async fn probe(&self) -> StatusDetail {
         self.entity.probe().await
     }
 }
@@ -160,17 +159,11 @@ where
 /// and if that is the [Status] then there isn't a need to drill any deeper into
 /// the [StatusDetail]
 #[derive(
-    Clone,
-    Debug,
-    Serialize,
-    Deserialize,
-    strum_macros::Display,
-    strum_macros::EnumDiscriminants,
+    Clone, Debug, Serialize, Deserialize, strum_macros::Display, strum_macros::EnumDiscriminants,
 )]
-
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(Status))]
-#[strum_discriminants(derive(Hash, Serialize, Deserialize,strum_macros::Display))]
+#[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
 pub enum StatusDetail {
     /// [Status::Unknown] is the default status
     Unknown,
@@ -194,15 +187,11 @@ impl Default for Status {
     }
 }
 
-
-
 impl Default for StatusDetail {
     fn default() -> Self {
         Self::Unknown
     }
 }
-
-
 
 #[async_trait]
 pub trait EntityReadier {
@@ -213,14 +202,9 @@ pub trait EntityReadier {
     }
 }
 
-pub type EntityResult<E> = Result<E,()>;
+pub type EntityResult<E> = Result<E, ()>;
 
-pub type StatusResult = Result<StatusDetail,()>;
-
-
-
-
-
+pub type StatusResult = Result<StatusDetail, ()>;
 
 /// [Actor] can be an [Agent], [Particle], etc.
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
@@ -240,8 +224,6 @@ pub enum Probe<S> {
     Ok(S),
     Unreachable,
 }
-
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PendingDetail {
@@ -266,7 +248,6 @@ pub enum StateErrDetail {
     /// Starlane process
     Fatal(String),
 }
-
 
 #[cfg(feature = "test")]
 #[cfg(test)]

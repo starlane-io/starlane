@@ -27,12 +27,12 @@ pub static ADVICE_FILE: Lazy<PackFile> =
 
 pub mod create;
 
+mod cache;
 pub mod download;
 pub mod remote;
 pub mod repo;
 pub mod server;
 pub mod zip;
-mod cache;
 
 #[derive(Error, Debug)]
 pub enum PackageErr {
@@ -354,7 +354,6 @@ impl FileEntity {
     }
 }
 
-
 /// this fella basically ignores all events
 struct IgnorantPublishObserver;
 
@@ -373,13 +372,15 @@ impl IgnorantPublishObserver {
 impl PublishObserver for IgnorantPublishObserver {}
 impl PackObserver for IgnorantPublishObserver {}
 
-
 #[cfg(test)]
 mod test {
     use crate::create::PackageLayout;
     use crate::repo::{Repo, SourceRepo};
     use crate::zip::{unzip_from_binary_to_temp, unzip_from_file_to_temp, zip_slice_dir_to};
-    use crate::{IgnorantPublishObserver, FileEntity, PackObserver, PublishObserver, MY_SLICE, PACKAGE, PACKAGE_LAYOUT_EXAMPLE, new_ignorant_observer};
+    use crate::{
+        new_ignorant_observer, FileEntity, IgnorantPublishObserver, PackObserver, PublishObserver,
+        MY_SLICE, PACKAGE, PACKAGE_LAYOUT_EXAMPLE,
+    };
     use starlane_space::parse::SkewerCase;
     use starlane_space::types::scope::Segment;
     use std::fs;
@@ -396,12 +397,15 @@ mod test {
         use crate::remote::{RemoteRepo, Repo};
         use crate::server::{ServerBuilder, ServerControl};
         use crate::zip::unzip_from_binary_to_temp;
-        use crate::{new_ignorant_observer, IgnorantPublishObserver, PackObserver, ADVICE_FILE, MY_SLICE, PACKAGE_LAYOUT_EXAMPLE};
+        use crate::{
+            new_ignorant_observer, IgnorantPublishObserver, PackObserver, ADVICE_FILE, MY_SLICE,
+            PACKAGE_LAYOUT_EXAMPLE,
+        };
         use tokio::io::AsyncWriteExt;
 
         pub struct RemoteTest {
             pub server_control: ServerControl,
-            pub remote_repo: RemoteRepo
+            pub remote_repo: RemoteRepo,
         }
 
         impl RemoteTest {
@@ -413,7 +417,7 @@ mod test {
 
                 Self {
                     server_control,
-                    remote_repo
+                    remote_repo,
                 }
             }
         }
@@ -442,16 +446,13 @@ mod test {
             assert!(advice.exists());
         }
 
-
         #[tokio::test]
         pub async fn test_cache() {
             let test = RemoteTest::mock().await;
-            let cache = PackageCache::unique_with_keep(test.remote_repo.clone(), true );
+            let cache = PackageCache::unique_with_keep(test.remote_repo.clone(), true);
             cache.get_file(&ADVICE_FILE).await.unwrap();
         }
-
     }
-
 
     pub fn package_layout() -> PackageLayout {
         let observer = new_ignorant_observer();
@@ -510,12 +511,11 @@ mod test {
 
      */
 
-
-     /// test if local calls from a [SourceRepo] created via [SourceRepo::mock] will deliver the
-     /// slices in the proper zip format and spot checks for certain files in those slices.
-     ///
-     /// This test is run locally without a network server mechanism.
-     #[tokio::test]
+    /// test if local calls from a [SourceRepo] created via [SourceRepo::mock] will deliver the
+    /// slices in the proper zip format and spot checks for certain files in those slices.
+    ///
+    /// This test is run locally without a network server mechanism.
+    #[tokio::test]
     pub async fn test_mock_source() {
         let repo = SourceRepo::mock().await;
 
@@ -536,20 +536,13 @@ mod test {
         {
             let zip = repo.get_slice(&MY_SLICE).await.unwrap();
             let dir = unzip_from_binary_to_temp(zip.as_slice()).unwrap();
-            let path = dir.path().to_path_buf().join("this-file-should-not-exist.txt");
+            let path = dir
+                .path()
+                .to_path_buf()
+                .join("this-file-should-not-exist.txt");
             assert!(!path.exists())
         }
-
     }
-
-
-
-
-
-
-
-
-
 
     fn verify_mock_layout(layout: &PackageLayout) -> Result<(), &'static str> {
         // hierarchy
@@ -618,7 +611,7 @@ mod test {
 
         verify_mock_layout(&layout).unwrap();
 
-        repo.publish(&layout, ).await.unwrap();
+        repo.publish(&layout).await.unwrap();
 
         println!("\n\nzipfile: {:?}", zipfile);
     }

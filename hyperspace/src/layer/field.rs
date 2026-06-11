@@ -360,7 +360,7 @@ impl PipeEx {
                 }
             }
             DirectedKind::Signal => {
-                transmitter.direct::<_,()>(proto).await?;
+                transmitter.direct::<_, ()>(proto).await?;
                 Ok(())
             }
         }

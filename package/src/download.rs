@@ -30,12 +30,12 @@ impl Default for Downloader {
     fn default() -> Self {
         let path = PathBuf::from(env::get_starlane_package_cache());
         let repo = RemoteRepo::default();
-        Self::new( path, repo )
+        Self::new(path, repo)
     }
 }
 
 impl Downloader {
-    pub fn new(path: PathBuf, repo: impl Repo+'static ) -> Self {
+    pub fn new(path: PathBuf, repo: impl Repo + 'static) -> Self {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         DownloadRunner::new(path.clone(), repo, rx, None);
         Self { path, tx }
@@ -58,7 +58,7 @@ impl Downloader {
     pub async fn download(&self, slice: &Slice) -> Result<(), DownloadErr> {
         let (request, rtn) = DownloadRequest::new(slice.clone());
         self.tx.send(request).await.unwrap();
-        rtn.await.map(|r| ()).map_err(|_|DownloadErr::Internal)
+        rtn.await.map(|r| ()).map_err(|_| DownloadErr::Internal)
     }
 }
 
@@ -82,10 +82,20 @@ struct DownloadRunner {
 }
 
 impl DownloadRunner {
-    pub fn new(path: PathBuf, repo: impl Repo+'static, rx: tokio::sync::mpsc::Receiver<DownloadRequest>, tmp: Option<TempDir>) {
+    pub fn new(
+        path: PathBuf,
+        repo: impl Repo + 'static,
+        rx: tokio::sync::mpsc::Receiver<DownloadRequest>,
+        tmp: Option<TempDir>,
+    ) {
         let repo = Box::new(repo);
-        let layout = CacheLayout{ path };
-        let mut runner = Self { layout, repo, rx, tmp };
+        let layout = CacheLayout { path };
+        let mut runner = Self {
+            layout,
+            repo,
+            rx,
+            tmp,
+        };
         runner.start();
         println!("returning from DownloadRunner::new");
     }
@@ -96,16 +106,13 @@ impl DownloadRunner {
             println!("Download runner running!");
             while let Some(request) = self.rx.recv().await {
                 let result = self.download_slice(&request.slice).await;
-                request
-                    .tx
-                    .send(result)
-                    .unwrap();
+                request.tx.send(result).unwrap();
             }
         });
     }
 
     async fn download_slice(&self, slice: &Slice) -> Result<(), DownloadErr> {
-println!("START DOWNLOAD SLICE: {}",slice);
+        println!("START DOWNLOAD SLICE: {}", slice);
         let path = self.layout.slice_path(slice);
         println!("slice path: '{}'", path.to_str().unwrap());
         if path.exists() {
@@ -114,15 +121,18 @@ println!("START DOWNLOAD SLICE: {}",slice);
         }
 
         let data = self.repo.get_slice(slice).await?;
-        println!("got slice data.  {} ",data.len());
+        println!("got slice data.  {} ", data.len());
         let dir = unzip_from_binary_to_temp(data.as_slice()).unwrap();
         println!("slice data saved to: '{}'", dir.path().to_str().unwrap());
 
         println!("unzipped slice....");
         tokio::fs::create_dir_all(path.clone()).await?;
-        println!("created SLICE cache directory: '{}'",path.to_str().unwrap() );
+        println!(
+            "created SLICE cache directory: '{}'",
+            path.to_str().unwrap()
+        );
         tokio::fs::rename(dir.path(), path.clone()).await?;
-        println!("slice renamed.... to {}", path.display() );
+        println!("slice renamed.... to {}", path.display());
         Ok(())
     }
 }

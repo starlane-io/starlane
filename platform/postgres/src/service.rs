@@ -189,8 +189,8 @@ pub mod partial {
 }
 
 mod concrete {
-    use super::{concrete, config};
     use super::{base, PgConnection};
+    use super::{concrete, config};
     use async_trait::async_trait;
     use sqlx;
     use sqlx::{Acquire, ConnectOptions, Connection, Postgres};
@@ -258,9 +258,7 @@ mod concrete {
     }
 
     #[async_trait]
-    impl StatusProbe for PostgresServiceProvider {
-
-    }
+    impl StatusProbe for PostgresServiceProvider {}
 
     /// the [StatusProbe] implementation which tracks with a Postgres Connection [Pool].
     /// With any [StatusProbe] the goal is to get to a [Status::Ready] state.  [PostgresService]
@@ -305,8 +303,7 @@ mod concrete {
     }
 
     #[async_trait]
-    impl StatusProbe for PostgresService {
-    }
+    impl StatusProbe for PostgresService {}
 
     #[derive(Clone, Eq, PartialEq)]
     pub struct PostgresProviderConfig {

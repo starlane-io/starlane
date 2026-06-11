@@ -131,7 +131,10 @@ reqwest = "0.12.23"
 axum = "0.8.6"
 axum-core = "0.5.5"
 axum-test = "18.1.0"
+wit-bindgen = "0.58.0"
 
+wasmer = "7.1.0"
+wasmer-compiler-singlepass = "=7.1.0"
 # dependencies currently in the `Penalty Box`:
 #retry-if = "0.2.3"
 #wasmer = "5.0.4"

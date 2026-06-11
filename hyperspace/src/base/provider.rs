@@ -3,9 +3,13 @@ pub mod context;
 mod detail;
 pub mod err;
 
+use crate::base::config::{BaseConfig, ProviderConfig};
+use crate::base::BaseSub;
+use crate::registry::Registry;
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::parse::CamelCase;
+use starlane_space::status::Status;
 use starlane_space::status::{Entity, PendingDetail, StatusDetail, StatusProbe};
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
@@ -13,12 +17,8 @@ use std::sync::Arc;
 use strum_macros::{Display, EnumDiscriminants, EnumString};
 use thiserror::Error;
 use tokio::sync::{mpsc, watch};
-use crate::base::config::{BaseConfig, ProviderConfig};
-use crate::base::BaseSub;
-use crate::registry::Registry;
-use starlane_space::status::Status;
 
-#[derive(Clone, Debug, Display,EnumDiscriminants, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Display, EnumDiscriminants, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(ProviderKindDisc))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
@@ -64,7 +64,7 @@ impl Hash for ProviderKindDef {
 
  */
 
-#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize,Display, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize, Display, Eq, PartialEq, Hash)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(PostgresDatabaseKind))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize))]
@@ -75,7 +75,7 @@ pub enum PostgresDatabaseKindDef {
     /// SQL schema to be utilized by a
     Registry,
     #[strum(to_string = "{0}")]
-   _Ext(CamelCase),
+    _Ext(CamelCase),
 }
 
 /// indicates which architecture layer manages this dependency or if management is external
@@ -102,7 +102,6 @@ pub enum Strata {
 /// make a contextual connection available for the [Provider]'s service...
 #[async_trait]
 pub trait Provider: BaseSub + StatusProbe + Send + Sync {
-
     fn kind(&self) -> ProviderKind;
 
     /// other [Provider] types as prerequisites to this one
@@ -112,7 +111,6 @@ pub trait Provider: BaseSub + StatusProbe + Send + Sync {
 
     async fn start(&self) -> StatusDetail;
 }
-
 
 /*
 
@@ -165,25 +163,26 @@ pub trait Provider: BaseSub + StatusProbe + Send + Sync {
 
  */
 
-
 enum ProviderCommand {
-   Start
+    Start,
 }
 
-struct ProviderProxy<P> where P: Provider {
+struct ProviderProxy<P>
+where
+    P: Provider,
+{
     watch: watch::Receiver<StatusDetail>,
     tx: mpsc::Sender<ProviderCommand>,
-    phantom: PhantomData<P>
+    phantom: PhantomData<P>,
 }
 
 #[async_trait]
-impl <P> StatusProbe for ProviderProxy<P> where P: Provider{
+impl<P> StatusProbe for ProviderProxy<P>
+where
+    P: Provider,
+{
     async fn probe(&self) -> StatusDetail {
         StatusDetail::Unknown
     }
 }
-impl<P> BaseSub for ProviderProxy<P> where P: Provider, {}
-
-
-
-
+impl<P> BaseSub for ProviderProxy<P> where P: Provider {}

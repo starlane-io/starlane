@@ -19,7 +19,7 @@ pub trait BaseConfig: Send + Sync {
 
 //
 pub trait BaseSubConfig: Send + Sync {
-    fn get(&self,key: impl AsRef<str>) -> Option<String> {
+    fn get(&self, key: impl AsRef<str>) -> Option<String> {
         unimplemented!()
     }
 }

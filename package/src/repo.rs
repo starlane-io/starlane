@@ -15,36 +15,33 @@ use thiserror::Error;
 use tokio::io::AsyncReadExt;
 
 #[async_trait]
-pub trait Repo : Send+Sync{
+pub trait Repo: Send + Sync {
     async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>, PackageErr>;
-    async fn publish(
-        &self,
-        package: &PackageLayout,
-    ) -> Result<(), PackageErr> {
-        self.publish_with_listener(package, &new_ignorant_observer()).await
+    async fn publish(&self, package: &PackageLayout) -> Result<(), PackageErr> {
+        self.publish_with_listener(package, &new_ignorant_observer())
+            .await
     }
 
     async fn publish_with_listener(
         &self,
         layout: &PackageLayout,
-        listener: &Box<dyn PublishObserver>
+        listener: &Box<dyn PublishObserver>,
     ) -> Result<(), PackageErr>;
-
 
     async fn status(&self) -> RepoStatus;
 }
 
-#[derive(Error,Debug)]
+#[derive(Error, Debug)]
 pub enum RepoStatus {
     #[error("Unknown")]
     Unknown,
     #[error("Ready")]
     Ready,
     #[error("Panic({0})")]
-    Panic(#[from] RepoPanic)
+    Panic(#[from] RepoPanic),
 }
 
-#[derive(Error,Debug)]
+#[derive(Error, Debug)]
 pub enum RepoPanic {
     #[error("Unreachable ({0})")]
     Unreachable(String),
@@ -55,18 +52,14 @@ pub enum RepoPanic {
     #[error("StatusCode({0})")]
     StatusCode(reqwest::StatusCode),
     #[error("Panic({0})")]
-    Error(String)
+    Error(String),
 }
 
-impl From<Result<reqwest::Response,reqwest::Error>> for RepoStatus{
+impl From<Result<reqwest::Response, reqwest::Error>> for RepoStatus {
     fn from(result: Result<Response, Error>) -> Self {
         match result {
-            Ok(response) => {
-                response.into()
-            }
-            Err(err) =>  {
-                err.into()
-            }
+            Ok(response) => response.into(),
+            Err(err) => err.into(),
         }
     }
 }
@@ -94,7 +87,7 @@ impl From<reqwest::StatusCode> for RepoStatus {
     fn from(code: StatusCode) -> Self {
         match code.is_success() {
             true => RepoStatus::Ready,
-            false => RepoStatus::Panic(code.into())
+            false => RepoStatus::Panic(code.into()),
         }
     }
 }
@@ -103,8 +96,8 @@ impl From<reqwest::StatusCode> for RepoPanic {
     fn from(code: reqwest::StatusCode) -> Self {
         match code {
             StatusCode::UNAUTHORIZED => Self::Unauthorized,
-            StatusCode::REQUEST_TIMEOUT=> Self::Timeout,
-            code => code.into()
+            StatusCode::REQUEST_TIMEOUT => Self::Timeout,
+            code => code.into(),
         }
     }
 }
@@ -112,7 +105,7 @@ impl From<reqwest::StatusCode> for RepoPanic {
 #[derive(Clone)]
 pub enum RepoDir {
     Path(PathBuf),
-    Temp(Arc<TempDir>)
+    Temp(Arc<TempDir>),
 }
 
 impl From<TempDir> for RepoDir {
@@ -128,18 +121,18 @@ impl From<PathBuf> for RepoDir {
 }
 
 impl RepoDir {
-    pub fn temp() -> Result<Self,io::Error> {
+    pub fn temp() -> Result<Self, io::Error> {
         TempDir::new().map(Into::into)
     }
 
-    pub fn path( path: PathBuf ) -> Self {
+    pub fn path(path: PathBuf) -> Self {
         Self::Path(path)
     }
 
     pub fn as_path_buf(&self) -> PathBuf {
         match self {
-            RepoDir::Path(path) =>path.clone(),
-            RepoDir::Temp(temp) => temp.path().to_path_buf()
+            RepoDir::Path(path) => path.clone(),
+            RepoDir::Temp(temp) => temp.path().to_path_buf(),
         }
     }
 }
@@ -152,7 +145,7 @@ pub struct SourceRepo {
 impl Default for SourceRepo {
     fn default() -> Self {
         Self {
-            root: get_starlane_package_source().into()
+            root: get_starlane_package_source().into(),
         }
     }
 }
@@ -172,29 +165,29 @@ impl SourceRepo {
     }
 
     pub fn temp() -> Self {
-            Self {
-                root: RepoDir::temp().unwrap()
-            }
+        Self {
+            root: RepoDir::temp().unwrap(),
+        }
     }
 
     #[cfg(test)]
     pub async fn mock() -> Self {
         let layout = crate::test::package_layout();
         let source = Self {
-            root: RepoDir::temp().unwrap()
+            root: RepoDir::temp().unwrap(),
         };
-        source.publish(&layout, ).await.unwrap();
+        source.publish(&layout).await.unwrap();
         source
     }
-
-
-
 }
 
 #[async_trait]
 impl Repo for SourceRepo {
     async fn get_slice(&self, slice: &Slice) -> Result<Vec<u8>, PackageErr> {
-        let path = self.root.as_path_buf().join(slice.to_path().to_str().unwrap());
+        let path = self
+            .root
+            .as_path_buf()
+            .join(slice.to_path().to_str().unwrap());
 
         if !path.exists() {
             return Err(PackErr::SliceNotFound(slice.to_string()).into());
@@ -207,15 +200,12 @@ impl Repo for SourceRepo {
         Ok(contents)
     }
 
-    async fn publish_with_listener
-    (
+    async fn publish_with_listener(
         &self,
         layout: &PackageLayout,
         // need a strategy for listener on the source side
         _: &Box<dyn PublishObserver>,
-    ) -> Result<(), PackageErr>
-    {
-
+    ) -> Result<(), PackageErr> {
         let release_dir = self.root.as_path_buf().join(layout.release().to_path());
         fs::create_dir_all(release_dir.clone())?;
         /// first zip main/root which is a special case
@@ -233,6 +223,6 @@ impl Repo for SourceRepo {
     }
 
     async fn status(&self) -> RepoStatus {
-       RepoStatus::Ready
+        RepoStatus::Ready
     }
 }

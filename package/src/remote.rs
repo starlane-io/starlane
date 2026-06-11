@@ -19,7 +19,6 @@ pub struct RemoteRepo {
 
 #[async_trait]
 impl Repo for RemoteRepo {
-
     async fn get_slice(&self, slice: &Slice) -> std::result::Result<Vec<u8>, PackageErr> {
         Ok(self
             .client
@@ -38,8 +37,7 @@ impl Repo for RemoteRepo {
         layout: &PackageLayout,
         listener: &Box<dyn PublishObserver>,
     ) -> Result<(), PackageErr> {
-    /// Upload a zip file to the package-server
-
+        /// Upload a zip file to the package-server
         listener.start_upload(&self.url);
 
         let tmp_file = layout.zip()?;
@@ -62,7 +60,8 @@ impl Repo for RemoteRepo {
         );
 
         // Send the POST request
-        let response = self.client
+        let response = self
+            .client
             .post(format!("http://{}/package", self.url))
             .multipart(form)
             .send()
@@ -81,14 +80,14 @@ impl Repo for RemoteRepo {
     }
 
     async fn status(&self) -> RepoStatus {
-        match self.client
-            .get(format!("http://{}/status", self.url)).send().await {
-            Ok(response) => {
-                response.status().into()
-            }
-            Err(err) => {
-                err.into()
-            }
+        match self
+            .client
+            .get(format!("http://{}/status", self.url))
+            .send()
+            .await
+        {
+            Ok(response) => response.status().into(),
+            Err(err) => err.into(),
         }
     }
 }
@@ -125,7 +124,7 @@ impl RemoteRepo {
     pub fn local_with_port(port: u16) -> Self {
         let client = reqwest::Client::new();
         Self {
-            url: format!("localhost:{}",port).to_string(),
+            url: format!("localhost:{}", port).to_string(),
             client,
         }
     }

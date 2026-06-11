@@ -40,6 +40,7 @@ use cliclack::{intro, outro, spinner};
 use colored::Colorize;
 use crossterm::execute;
 use crossterm::style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor, Stylize};
+use hyperspace::shutdown::add_shutdown_hook;
 use lerp::Lerp;
 use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
@@ -57,7 +58,7 @@ use starlane_macros::{create_mark, ToBase};
 use starlane_package::create::PackageLayout;
 use starlane_package::remote::RemoteRepo;
 use starlane_package::repo::Repo;
-use starlane_package::server::{ServerBuilder};
+use starlane_package::server::ServerBuilder;
 use starlane_package::{PackObserver, PackageErr, PublishObserver, PACKAGE_LAYOUT_EXAMPLE};
 use starlane_space::err::PrintErr;
 use starlane_space::loc::ToBaseKind;
@@ -79,7 +80,6 @@ use tokio::sync::mpsc;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::{FileOptionExtension, FileOptions};
-use hyperspace::shutdown::add_shutdown_hook;
 /*
 let config = Default::default();
 
@@ -779,5 +779,5 @@ async fn publish(path: &PathBuf) -> Result<(), PackageErr> {
     let mut observer = PackPubObserver::new(console.clone());
     let remote = RemoteRepo::default();
     let pds = PackageLayout::create(&path, &mut observer)?;
-    remote.publish(&pds, ).await
+    remote.publish(&pds).await
 }

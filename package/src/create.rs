@@ -29,7 +29,7 @@ impl PackageLayout {
         &self.config.release
     }
 
-    pub fn create(path: &PathBuf, observer: & dyn PackObserver) -> Result<Self, PackErr> {
+    pub fn create(path: &PathBuf, observer: &dyn PackObserver) -> Result<Self, PackErr> {
         let root = SliceLayout::create(path, observer)?;
         let toml_path = path.join("package.toml");
         let config: PackageConfigRaw = Self::read_toml(&toml_path)?;
@@ -117,7 +117,7 @@ pub enum PackErr {
     #[error("TOML parse error in '{0}': {1}")]
     TomlParseErr(PathBuf, String),
     #[error("Network Error: {0}")]
-    NetworkErr(#[from] reqwest::Error)
+    NetworkErr(#[from] reqwest::Error),
 }
 
 impl From<ZipError> for PackErr {

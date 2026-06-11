@@ -1,0 +1,422 @@
+
+package starlane:hyperspace@0.1.0;
+
+world registry {
+   export registry-api;
+   import status-api;
+}
+
+world status-host{
+  export status-api;
+}
+
+interface registry-api {
+  // Import all core types from the space crate
+  use space.{
+  point,
+  selector,
+  status,
+  kind,
+  properties,
+  set-properties-op,
+  stub,
+  details,
+  particle-location,
+  particle-record,
+  access,
+  access-grant,
+  indexed-access-grant,
+  create-strategy,
+  set-registry,
+  delete,
+  query,
+  query-result,
+  select,
+  sub-select,
+  substance-list,
+  };
+
+  // ============================================================================
+  // Hyperspace-specific Types
+  // ============================================================================
+
+  /// Registration information for creating a new particle
+  /// Defined in hyperspace crate (registry.rs)
+  record registration {
+    point: point,
+    kind: kind,
+    registry: set-registry,
+    properties: set-properties-op,
+    owner: point,
+    strategy: create-strategy,
+    status: status,
+  }
+
+  /// Registry error - specific to hyperspace registry operations
+  /// Defined in hyperspace/src/registry/err.rs
+  variant reg-err {
+    /// Parse error
+    parse(string),
+    /// Duplicate particle
+    dupe,
+    /// Particle not found
+    not-found(point),
+    /// Space error wrapper
+    space-err(string),
+    /// Expected parent for point
+    expected-parent(point),
+    /// Registry does not handle GetOp::State operations
+    no-get-op-state-operations,
+    /// Database setup failed
+    registry-setup-failed,
+    /// Point-specific error with message
+    point-error(tuple<point, string>),
+    /// Generic message error
+    msg(string),
+    /// PostgreSQL error
+    sqlx-err(string),
+    /// PostgreSQL connection pool not found
+    pool-not-found(string),
+    /// IO error
+    io-err(string),
+    /// Scorch guard is enabled
+    no-scorch,
+    /// Expected embedded registry but got remote
+    expected-embedded-registry,
+  }
+
+  // ============================================================================
+  // Registry API Functions
+  // ============================================================================
+
+  /// Clear all registry data (destructive operation)
+  scorch: func() -> result<_, reg-err>;
+
+  /// Register a new particle
+  register: func(registration: registration) -> result<_, reg-err>;
+
+  /// Assign a star to a particle
+  assign-star: func(point: point, star: point) -> result<_, reg-err>;
+
+  /// Assign a host to a particle
+  assign-host: func(point: point, host: point) -> result<_, reg-err>;
+
+  /// Set the status of a particle
+  set-status: func(point: point, status: status) -> result<_, reg-err>;
+
+  /// Set properties on a particle
+  set-properties: func(point: point, properties: set-properties-op) -> result<_, reg-err>;
+
+  /// Get the sequence number for a particle
+  sequence: func(point: point) -> result<u64, reg-err>;
+
+  /// Get properties of a particle
+  get-properties: func(point: point) -> result<properties, reg-err>;
+
+  /// Get complete particle record
+  get-record: func(point: point) -> result<particle-record, reg-err>;
+
+  /// Query particle information
+  do-query: func(point: point, query: query) -> result<query-result, reg-err>;
+
+  /// Delete particles matching selector
+  do-delete: func(delete: delete) -> result<substance-list, reg-err>;
+
+  /// Select particles matching pattern
+  do-select: func(select: select) -> result<substance-list, reg-err>;
+
+  /// Sub-select for recursive queries
+  do-sub-select: func(sub-select: sub-select) -> result<list<stub>, reg-err>;
+
+  /// Grant access
+  do-grant: func(access-grant: access-grant) -> result<_, reg-err>;
+
+  /// Check access rights
+  do-access: func(to: point, on: point) -> result<access, reg-err>;
+
+  /// Change ownership of particles
+  do-chown: func(on: selector, owner: point, by: point) -> result<_, reg-err>;
+
+  /// List access grants
+  list-access: func(to: option<point>, on: selector) -> result<list<indexed-access-grant>, reg-err>;
+
+  /// Remove an access grant
+  do-remove-access: func(id: s32, to: point) -> result<_, reg-err>;
+}
+
+interface status-api {
+  use space.{status};
+  update: func(status: status);
+}
+
+interface space {
+  // ============================================================================
+  // Point - Address/identifier system
+  // ============================================================================
+
+  /// A Point is an address/identifier for particles in the system
+  /// Format examples: "space:users:scott", "localhost:app:myapp"
+  type point = string;
+
+  // ============================================================================
+  // Status - Particle lifecycle state
+  // ============================================================================
+
+  /// Status represents the lifecycle state of a particle
+  enum status {
+    /// initial status or when status cannot be determined
+    unknown,
+    /// initial status
+    pending,
+    /// undergoing custom initialization
+    init,
+    /// something is wrong - all requests are blocked
+    panic,
+    /// unrecoverable panic
+    fatal,
+    /// ready to take requests
+    ready,
+    /// cannot receive requests (waiting for updates)
+    paused,
+    /// resuming after pause
+    resuming,
+    /// completed successfully, no longer receiving requests
+    done,
+  }
+
+  // ============================================================================
+  // Kind - Particle type system
+  // ============================================================================
+
+  /// Base kind enumeration for particles
+  enum base-kind {
+    root,
+    space,
+    user-base,
+    base,
+    user,
+    app,
+    mechtron,
+    file-store,
+    file,
+    database,
+    repo,
+    bundle-series,
+    bundle,
+    artifact,
+    control,
+    portal,
+    star,
+    driver,
+    global,
+    host,
+    guest,
+    registry,
+    web-server,
+    foundation,
+    dependency,
+    provider,
+  }
+
+  /// Full kind representation (base + optional sub-kind + optional specific)
+  /// Simplified as string for WIT interface
+  type kind = string;
+
+  // ============================================================================
+  // Properties - Key-value metadata
+  // ============================================================================
+
+  /// A single property
+  record property {
+    key: string,
+    value: string,
+    locked: bool,
+  }
+
+  /// Properties are key-value pairs attached to particles
+  type properties = list<property>;
+
+  /// Property modification for updates
+  variant property-mod {
+    /// Set a property to a value
+    set(property),
+    /// Unset/remove a property
+    unset(string),
+  }
+
+  /// SetProperties represents property modifications
+  type set-properties-op = list<property-mod>;
+
+  // ============================================================================
+  // Particle structures
+  // ============================================================================
+
+  /// Stub is a lightweight particle reference
+  record stub {
+    point: point,
+    kind: kind,
+    status: status,
+  }
+
+  /// Details about a particle (stub + properties)
+  record details {
+    stub: stub,
+    properties: properties,
+  }
+
+  // ============================================================================
+  // Particle location and records
+  // ============================================================================
+
+  /// Location information for a particle
+  record particle-location {
+    star: option<point>,
+    host: option<point>,
+  }
+
+  /// Complete particle record
+  record particle-record {
+    details: details,
+    location: particle-location,
+  }
+
+  // ============================================================================
+  // Selector system - Pattern matching for points and kinds
+  // ============================================================================
+
+  /// A Selector is a pattern for matching points and kinds
+  /// Examples: "space:**", "localhost:app:*"
+  type selector = string;
+
+  // ============================================================================
+  // Security and Access Control
+  // ============================================================================
+
+  /// Access level for a particle
+  variant access {
+    /// Super user access
+    super-access,
+    /// Owner access
+    owner,
+    /// Both super and owner
+    super-owner,
+    /// Specific enumerated permissions
+    enumerated(enumerated-access),
+  }
+
+  /// Enumerated access with specific permissions and privileges
+  record enumerated-access {
+    permissions: list<string>,
+    privileges: list<string>,
+  }
+
+  /// Access grant for assigning permissions
+  record access-grant {
+    /// Pattern for what the grant applies to
+    on-point: selector,
+    /// Pattern for who receives the grant
+    to-point: selector,
+    /// Who is granting access
+    by-particle: point,
+    /// Type of access being granted
+    kind: access-grant-kind,
+  }
+
+  /// Kind of access grant
+  variant access-grant-kind {
+    /// Grant specific permissions
+    permissions(list<string>),
+    /// Grant a privilege
+    privilege(string),
+  }
+
+  /// Indexed access grant with database ID
+  record indexed-access-grant {
+    id: s32,
+    grant: access-grant,
+  }
+
+  // ============================================================================
+  // Command system types
+  // ============================================================================
+
+  /// Strategy for creating particles
+  enum create-strategy {
+    /// Ensure particle exists (idempotent)
+    ensure,
+    /// Create new particle (fail if exists)
+    create,
+    /// Override/replace existing particle
+    override,
+  }
+
+  /// Registry label modification
+  variant registry-label {
+    /// Set a label
+    set(string),
+    /// Set a label with a value
+    set-value(tuple<string, string>),
+    /// Unset/remove a label
+    unset(string),
+  }
+
+  /// Registry label modifications
+  type set-registry = list<registry-label>;
+
+  /// Delete command
+  record delete {
+    selector: selector,
+  }
+
+  /// Query types for retrieving specific information
+  enum query {
+    point-hierarchy,
+  }
+
+  /// Point hierarchy result (simplified as string)
+  type point-hierarchy = string;
+
+  /// Query result variant
+  variant query-result {
+    point-hierarchy(point-hierarchy),
+  }
+
+  /// Select command for querying particles
+  record select {
+    pattern: selector,
+  }
+
+  /// SubSelect for recursive queries
+  record sub-select {
+    point: point,
+    pattern: selector,
+    hops: u32,
+  }
+
+  // ============================================================================
+  // Substance - Generic data container
+  // ============================================================================
+
+  /// Substance list - collection of substances
+  /// Simplified representation as list of binary data
+  type substance-list = list<substance>;
+
+  /// Substance represents various data payloads
+  /// Simplified as binary data for WIT interface
+  type substance = list<u8>;
+
+  // ============================================================================
+  // Error types
+  // ============================================================================
+
+  /// Generic space error
+  variant space-err {
+    parse-error(string),
+    not-found(string),
+    already-exists(string),
+    permission-denied(string),
+    invalid-input(string),
+    internal-error(string),
+    server-error(string),
+  }
+}

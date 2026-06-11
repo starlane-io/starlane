@@ -140,7 +140,6 @@ where
     }
 }
 
-
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Hash, Getters)]
 #[get = "pub"]
 pub struct SliceDef<Publisher, PackageId, Version, SlicePath>
@@ -218,7 +217,12 @@ where
     Version: Archetype,
     Slices: Archetype,
 {
-    pub fn new(contributor: Publisher, package: PackageId, version: Version, slices: Slices) -> Self {
+    pub fn new(
+        contributor: Publisher,
+        package: PackageId,
+        version: Version,
+        slices: Slices,
+    ) -> Self {
         Self {
             package: PackageDef {
                 publisher: contributor,
@@ -228,7 +232,6 @@ where
             slices,
         }
     }
-
 }
 
 impl<Publisher, PackageId, Version, SliceSegment> Into<PackageDef<Publisher, PackageId, Version>>
@@ -320,7 +323,8 @@ impl PackFile {
     }
 }
 
-pub type SliceSelector = SliceDef<PublisherSelector, PackageIdSelector, VersionPattern, SlicePattern>;
+pub type SliceSelector =
+    SliceDef<PublisherSelector, PackageIdSelector, VersionPattern, SlicePattern>;
 
 pub type PublisherSelector = Pattern<Publisher>;
 pub type PackageIdSelector = Pattern<PackageId>;

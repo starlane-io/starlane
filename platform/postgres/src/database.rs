@@ -67,9 +67,9 @@ mod concrete {
     use starlane_hyperspace::base::config::BaseSubConfig;
     use starlane_hyperspace::base::provider::{Provider, ProviderKind};
     use starlane_hyperspace::base::{provider, BaseSub};
+    use starlane_space::status::StatusDetail;
     use std::ops::Deref;
     use std::sync::Arc;
-    use starlane_space::status::StatusDetail;
 
     #[derive(Clone, Eq, PartialEq)]
     pub struct Config {
@@ -167,7 +167,7 @@ mod concrete {
 
     #[async_trait]
     impl StatusProbe for PostgresDatabaseProvider {
-        async fn probe(&self) -> StatusDetail{
+        async fn probe(&self) -> StatusDetail {
             todo!()
         }
     }
