@@ -64,7 +64,7 @@ itertools = "0.13.0"
 mockall = "0.13.1"
 insta = "1.43.1"
 tfhe = "1.2.0"
-serde = "1.0.219"
+serde = { version="1.0.219", features=["serde_derive"] }
 serde_derive = "1.0.219"
 async-recursion = "1.1.1"
 
