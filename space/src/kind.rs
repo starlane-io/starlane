@@ -28,6 +28,8 @@ impl ToBaseKind for KindParts {
     }
 }
 
+
+
 impl Tks for KindParts {
     fn base(&self) -> BaseKind {
         self.base.clone()
@@ -321,6 +323,13 @@ pub enum Kind {
     Foundation,
     Dependency,
     Provider,
+}
+
+impl FromStr for Kind {
+    type Err = ParseErrs0;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        KindParts::from_str(s)?.try_into()
+    }
 }
 
 impl ToBaseKind for Kind {

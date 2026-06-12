@@ -13,6 +13,7 @@ use std::ops::{Deref, DerefMut};
 use tokio::io::AsyncWriteExt;
 
 pub mod err;
+mod registry;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct ExtKey<B>

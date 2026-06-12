@@ -47,6 +47,7 @@ types2=["parse2"]
 parse2=[]
 std=[]
 test=[]
+wit=["dep:wasmtime"]
 
 
 [dependencies]
@@ -93,6 +94,7 @@ derive_builder = { workspace = true }
 derive-name = { workspace = true }
 md5 = { workspace = true }
 regex = "1.11.1"
+wasmtime = { workspace = true, optional = true }
 
 [dev-dependencies]
 #dummy = { workspace = true }

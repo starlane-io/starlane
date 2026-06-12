@@ -23,5 +23,6 @@ pub mod cache;
 //pub mod database;
 pub mod service;
 pub mod template;
-mod wit;
 
+#[cfg(feature = "wit")]
+pub mod wit;
