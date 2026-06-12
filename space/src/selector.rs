@@ -26,6 +26,7 @@ use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelecto
 use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::Deref;
+use serde_with_macros::{DeserializeFromStr, SerializeDisplay};
 use strum_macros::EnumDiscriminants;
 use thiserror::Error;
 
@@ -1104,12 +1105,23 @@ impl KindBaseSelector {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+
+/*
+
+#[derive(Debug, Clone, SerializeDisplay,DeserializeFromStr, Eq, PartialEq)]
 pub struct PortHierarchy {
     pub topic: Topic,
     pub layer: Layer,
     pub point_hierarchy: PointHierarchy,
 }
+
+
+impl Display for PortHierarchy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}@", self.point_hierarchy, )
+    }
+}
+
 
 impl PortHierarchy {
     pub fn new(point_hierarchy: PointHierarchy, layer: Layer, topic: Topic) -> Self {
@@ -1120,6 +1132,8 @@ impl PortHierarchy {
         }
     }
 }
+
+ */
 
 pub type PointHierarchy = PointDef<RouteSeg, PointKindSeg>;
 
@@ -1245,8 +1259,8 @@ impl Into<Point> for PointHierarchy {
     }
 }
 
-impl ToString for PointHierarchy {
-    fn to_string(&self) -> String {
+impl Display for PointHierarchy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut rtn = String::new();
         match &self.route {
             RouteSeg::This => {}
@@ -1265,7 +1279,7 @@ impl ToString for PointHierarchy {
             rtn.push_str(segment.to_string().as_str());
         }
 
-        rtn
+        write!(f, "{}", rtn)
     }
 }
 
@@ -1281,7 +1295,7 @@ impl Into<PointKindSegOpt> for PointKindSeg {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, SerializeDisplay, DeserializeFromStr)]
 pub struct PointKindSegDef<K> {
     pub segment: PointSeg,
     pub kind: K,

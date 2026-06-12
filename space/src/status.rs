@@ -10,6 +10,8 @@ use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::Arc;
 use strum_macros::EnumDiscriminants;
+#[cfg(feature = "wit")]
+use wasmtime::component::{ComponentType, Lift, Lower};
 
 /// [Entity] provides a utilization interface for `anything` that can be described by the [Status]
 /// model be it `resource` or `service` ... anything!
@@ -161,9 +163,13 @@ where
 #[derive(
     Clone, Debug, Serialize, Deserialize, strum_macros::Display, strum_macros::EnumDiscriminants,
 )]
+#[cfg_attr(feature = "wit",derive(ComponentType,Lift,Lower))]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(Status))]
 #[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
+#[cfg_attr(feature = "wit",strum_discriminants(derive(ComponentType,Lift,Lower)))]
+#[cfg_attr(feature = "wit",strum_discriminants(component(variant)))]
+#[cfg_attr(feature = "wit",component(variant))]
 pub enum StatusDetail {
     /// [Status::Unknown] is the default status
     Unknown,
@@ -226,6 +232,8 @@ pub enum Probe<S> {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "wit",derive(wasmtime::component::ComponentType,Lift,Lower))]
+#[cfg_attr(feature = "wit",component(record))]
 pub struct PendingDetail {
     conditions: Vec<String>,
 }

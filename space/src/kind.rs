@@ -325,6 +325,12 @@ pub enum Kind {
     Provider,
 }
 
+impl Into<String> for Kind {
+    fn into(self) -> String {
+        self.to_string()
+    }
+}
+
 impl FromStr for Kind {
     type Err = ParseErrs0;
     fn from_str(s: &str) -> Result<Self, Self::Err> {

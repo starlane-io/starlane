@@ -4,7 +4,6 @@
 extern crate core;
 extern crate self as starlane_space;
 
-use crate::point::Point;
 use once_cell::sync::Lazy;
 use std::str::FromStr;
 
@@ -185,6 +184,7 @@ pub mod test;
 #[cfg(feature = "types2")]
 pub mod package;
 
+
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
 
@@ -192,3 +192,31 @@ pub static HYPERUSER: Lazy<Point> =
     Lazy::new(|| Point::from_str("hyperspace:users:hyperuser").expect("point"));
 pub static ANONYMOUS: Lazy<Point> =
     Lazy::new(|| Point::from_str("hyperspace:users:anonymous").expect("point"));
+
+
+pub use command::common::SetRegistry;
+pub use command::direct::create::Strategy;
+pub use command::direct::delete::Delete;
+pub use command::direct::query::{Query, QueryResult};
+pub use command::direct::select::{Select, SubSelect};
+pub use hyper::{ParticleLocation, ParticleRecord};
+pub use kind::Kind;
+pub use particle::{Details, Properties, Status, Stub, Property};
+pub use point::Point;
+pub use security::{Access, AccessGrant, IndexedAccessGrant};
+pub use selector::Selector;
+pub use substance::SubstanceList;
+pub use types::property::SetProperties;
+pub use command::common::SetLabel;
+pub use parse::SnakeCase;
+pub use parse::SkewerCase;
+pub use parse::CamelCase;
+
+pub use security::AccessGrantKind;
+pub use security::EnumeratedAccess;
+pub use security::Permissions;
+pub use security::Privilege;
+pub use security::Privileges;
+pub use security::ChildPerms;
+pub use security::ParticlePerms;
+

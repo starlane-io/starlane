@@ -19,6 +19,7 @@ use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::path::PathBuf;
+use serde_with_macros::{DeserializeFromStr, SerializeDisplay};
 use strum_macros::EnumDiscriminants;
 
 #[derive(
@@ -172,9 +173,9 @@ impl Into<RouteSegVar> for RouteSeg {
     }
 }
 
-impl ToString for RouteSegVar {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for RouteSegVar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
             Self::This => ".".to_string(),
             Self::Local => "LOCAL".to_string(),
             Self::Remote => "REMOTE".to_string(),
@@ -189,7 +190,8 @@ impl ToString for RouteSegVar {
             Self::Var(var) => {
                 format!("${{{}}}", var.name)
             }
-        }
+        };
+        write!(f, "{}", str)
     }
 }
 
@@ -980,7 +982,7 @@ impl TryFrom<&str> for Point {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, SerializeDisplay, DeserializeFromStr, Eq, PartialEq, Hash)]
 pub struct PointDef<Route, Seg> {
     pub route: Route,
     pub segments: Vec<Seg>,
@@ -1625,3 +1627,7 @@ pub type PointCtx = PointDef<RouteSeg, PointSegCtx>;
 /// let point: Point = point_var.to_resolved(&env)?;
 /// ```
 pub type PointVar = PointDef<RouteSegVar, PointSegVar>;
+
+
+
+

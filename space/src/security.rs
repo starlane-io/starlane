@@ -1,12 +1,13 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::ops;
 use std::ops::Deref;
 use std::str::FromStr;
 
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
-
+use serde_with_macros::{DeserializeFromStr, SerializeDisplay};
 use crate::parse::util::new_span;
 
 use crate::err::ParseErrs0;
@@ -297,11 +298,12 @@ impl ToString for PermissionsMask {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, SerializeDisplay, DeserializeFromStr, Eq, PartialEq, Hash)]
 pub struct Permissions {
     pub child: ChildPerms,
     pub particle: ParticlePerms,
 }
+
 
 impl FromStr for Permissions {
     type Err = ParseErrs0;
@@ -337,18 +339,93 @@ impl Permissions {
     }
 }
 
-impl ToString for Permissions {
-    fn to_string(&self) -> String {
-        format!("{}-{}", self.child.to_string(), self.particle.to_string())
+impl Display for Permissions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", format!("{}-{}", self.child.to_string(), self.particle))
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, SerializeDisplay, DeserializeFromStr, Eq, PartialEq, Hash)]
 pub struct ChildPerms {
     pub create: bool,
     pub select: bool,
     pub delete: bool,
 }
+
+
+fn flag(flag:&bool, t: &'static str, f: &'static str) -> &'static str {
+    if *flag {
+        t
+    } else {
+        f
+    }
+}
+
+impl Display for ChildPerms {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let c = flag(&self.create, "C", "c");
+        let s = flag(&self.select, "S", "s");
+        let d = flag(&self.delete, "D", "d");
+
+        write!(f, "{}", format!("{}{}{}", c, s, d).to_string())
+    }
+}
+
+impl Default for ChildPerms  {
+    fn default() -> Self {
+        Self {
+            create: false,
+            select: false,
+            delete: false,
+        }
+    }
+}
+
+impl FromStr for ChildPerms {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() != 3 {
+            return Err(format!("ChildPerms invalid length: {}",s.len()).to_string())
+        }
+        let mut i = s.chars();
+        let mut rtn = Self::default();
+        if let Some(flag) = i.next() {
+            if flag == 'C' {
+                rtn.create = true;
+            } else if flag == 'c' {
+                rtn.create = false;
+            }
+            else {
+                return Err(format!("ChildPerms invalid create character '{flag}'"));
+            }
+        }
+        if let Some(flag) = i.next() {
+            if flag == 'S' {
+                rtn.select = true;
+            } else if flag == 's' {
+                rtn.select = false;
+            }
+            else {
+                return Err(format!("ChildPerms invalid select character '{flag}'"));
+            }
+        }
+        if let Some(flag) = i.next() {
+            if flag == 'D' {
+                rtn.delete= true;
+            } else if flag == 'd' {
+                rtn.delete = false;
+            }
+            else {
+                return Err(format!("ChildPerms invalid delete character '{flag}'"));
+            }
+        }
+
+        Ok(rtn)
+    }
+
+}
+
 
 impl ChildPerms {
     pub fn full() -> Self {
@@ -380,37 +457,22 @@ impl ChildPerms {
     }
 }
 
-impl ToString for ChildPerms {
-    fn to_string(&self) -> String {
-        let mut rtn = String::new();
 
-        if self.create {
-            rtn.push_str("C");
-        } else {
-            rtn.push_str("c");
-        }
 
-        if self.select {
-            rtn.push_str("S");
-        } else {
-            rtn.push_str("s");
-        }
-
-        if self.delete {
-            rtn.push_str("D");
-        } else {
-            rtn.push_str("d");
-        }
-
-        rtn
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, SerializeDisplay, DeserializeFromStr, Eq, PartialEq, Hash)]
 pub struct ParticlePerms {
     pub read: bool,
     pub write: bool,
     pub execute: bool,
+}
+impl Display for ParticlePerms{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let c = flag(&self.read, "R", "r");
+        let s = flag(&self.write, "W", "w");
+        let d = flag(&self.execute, "X", "x");
+
+        write!(f, "{}", format!("{}{}{}", c, s, d).to_string())
+    }
 }
 
 impl ParticlePerms {
@@ -452,31 +514,6 @@ impl FromStr for ParticlePerms {
     }
 }
 
-impl ToString for ParticlePerms {
-    fn to_string(&self) -> String {
-        let mut rtn = String::new();
-
-        if self.read {
-            rtn.push_str("R");
-        } else {
-            rtn.push_str("r");
-        }
-
-        if self.write {
-            rtn.push_str("W");
-        } else {
-            rtn.push_str("w");
-        }
-
-        if self.execute {
-            rtn.push_str("X");
-        } else {
-            rtn.push_str("x");
-        }
-
-        rtn
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum PermissionsMaskKind {

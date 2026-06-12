@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::err::{ParseErrs0, SpaceErr};
 use crate::kind::{BaseKind, Kind, KindParts};
 use crate::parse::util::{new_span, result, Span};
-use crate::parse::{parse_alpha1_str, point_and_kind, Env, Res};
+use crate::parse::{parse_alpha1_str, point_and_kind, Env, Res, SnakeCase};
 use crate::point::{Point, PointCtx, PointVar};
 use crate::substance::Substance;
 use crate::util::ToResolved;
@@ -155,7 +155,7 @@ pub type Properties = HashMap<String, Property>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Property {
-    pub key: String,
+    pub key: SnakeCase,
     pub value: String,
     pub locked: bool,
 }

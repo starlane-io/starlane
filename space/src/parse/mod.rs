@@ -30,7 +30,7 @@ use crate::loc::StarKey;
 use crate::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, Version};
 use crate::parse::util::unstack;
 use crate::parse::util::{log_parse_err, preceded, recognize, result};
-use crate::particle::PointKindVar;
+use crate::particle::{PointKindVar, Property};
 use crate::point::{
     Point, PointCtx, PointSeg, PointSegCtx, PointSegDelim, PointSegVar, PointVar, RouteSeg,
     RouteSegVar,
@@ -2128,11 +2128,13 @@ pub fn set_property_mod<I: Span>(input: I) -> Res<I, PropertyMod> {
         |(next, (_, key, _, value))| {
             (
                 next,
-                PropertyMod::Set {
-                    key,
-                    value: value.to_string(),
-                    lock: false,
-                },
+                PropertyMod::Set (
+                    Property {
+                        key,
+                        value: value.to_string(),
+                        locked: false
+                    }
+                ),
             )
         },
     )
@@ -2143,11 +2145,10 @@ pub fn set_property_mod_lock<I: Span>(input: I) -> Res<I, PropertyMod> {
         |(next, (_, key, _, value))| {
             (
                 next,
-                PropertyMod::Set {
+                PropertyMod::set(
                     key,
-                    value: value.to_string(),
-                    lock: true,
-                },
+                     value.to_string(),
+                    true)
             )
         },
     )

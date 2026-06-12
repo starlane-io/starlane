@@ -10,6 +10,7 @@ use std::collections::hash_map::Iter;
 use std::collections::HashMap;
 use std::ops::Deref;
 use validator::ValidateEmail;
+use crate::particle::Property;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Getters)]
 #[get = "pub"]
@@ -233,7 +234,7 @@ impl PropertiesConfig {
                 key
             ))?;
             match propmod {
-                PropertyMod::Set { key, value, lock } => {
+                PropertyMod::Set ( Property{ key, value, .. } ) => {
                     if def.constant && def.default.as_ref().unwrap().clone() != value.clone() {
                         return Err(format!(
                             "{} property: '{}' is constant and cannot be set",
@@ -263,7 +264,8 @@ impl PropertiesConfig {
                 .get(key)
                 .ok_or(format!("illegal property: '{}'", key))?;
             match propmod {
-                PropertyMod::Set { key, value, lock } => {
+
+                PropertyMod::Set ( Property{ key, .. } ) => {
                     if def.constant {
                         return Err(
                             format!("property: '{}' is constant and cannot be set", key).into()
@@ -323,11 +325,11 @@ impl PropertiesConfig {
                     .as_ref()
                     .ok_or(format!("expected default property def: {}", &d))?
                     .clone();
-                rtn.push(PropertyMod::Set {
+                rtn.push(PropertyMod::Set (Property{
                     key: d,
                     value,
-                    lock: false,
-                });
+                    locked: false,
+                }));
             }
         }
         Ok(rtn)
@@ -431,27 +433,27 @@ impl PropertiesConfigBuilder {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum PropertyMod {
-    Set {
-        key: SnakeCase,
-        value: String,
-        lock: bool,
-    },
+    Set(Property),
     UnSet(SnakeCase),
 }
 
 impl PropertyMod {
     pub fn set_or<E>(&self, err: E) -> Result<String, E> {
         match self {
-            Self::Set { key, value, lock } => Ok(value.clone()),
+            Self::Set(p) => Ok(p.value.clone()),
             Self::UnSet(_) => Err(err),
         }
     }
 
     pub fn opt(&self) -> Option<String> {
         match self {
-            Self::Set { key, value, lock } => Some(value.clone()),
+            Self::Set (Property{value,..}) => Some(value.clone()),
             Self::UnSet(_) => None,
         }
+    }
+    
+    pub fn set(key: SnakeCase, value: String, locked: bool) -> Self {
+        Self::Set(Property{key, value, locked})
     }
 }
 
@@ -483,7 +485,7 @@ impl SetProperties {
 
     pub fn push(&mut self, property: PropertyMod) {
         match &property {
-            PropertyMod::Set { key, value, lock } => {
+            PropertyMod::Set (Property{key,..}) => {
                 self.map.insert(key.clone(), property);
             }
             PropertyMod::UnSet(key) => {

@@ -1,14 +1,12 @@
 
-package starlane:hyperspace@0.1.0;
+package starlane:hyperspace;
+
 
 world registry {
-   export registry-api;
    import status-api;
+   export registry-api;
 }
 
-world status-host{
-  export status-api;
-}
 
 interface registry-api {
   // Import all core types from the space crate
@@ -32,7 +30,6 @@ interface registry-api {
   query,
   query-result,
   select,
-  sub-select,
   substance-list,
   };
 
@@ -125,9 +122,6 @@ interface registry-api {
   /// Select particles matching pattern
   do-select: func(select: select) -> result<substance-list, reg-err>;
 
-  /// Sub-select for recursive queries
-  do-sub-select: func(sub-select: sub-select) -> result<list<stub>, reg-err>;
-
   /// Grant access
   do-grant: func(access-grant: access-grant) -> result<_, reg-err>;
 
@@ -163,7 +157,7 @@ interface space {
   // ============================================================================
 
   /// Status represents the lifecycle state of a particle
-  enum status {
+  variant status {
     /// initial status or when status cannot be determined
     unknown,
     /// initial status
@@ -324,11 +318,25 @@ interface space {
 
   /// Kind of access grant
   variant access-grant-kind {
+    super,
     /// Grant specific permissions
-    permissions(list<string>),
+    permissions-mask(list<string>),
     /// Grant a privilege
     privilege(string),
   }
+
+  record child-perms {
+     create: bool,
+     select: bool,
+     delete: bool   
+  }
+
+  record particle-perms {
+    read: bool,
+    write: bool,
+    execute: bool
+  }
+
 
   /// Indexed access grant with database ID
   record indexed-access-grant {
@@ -345,7 +353,7 @@ interface space {
     /// Ensure particle exists (idempotent)
     ensure,
     /// Create new particle (fail if exists)
-    create,
+    commit,
     /// Override/replace existing particle
     override,
   }
@@ -386,12 +394,9 @@ interface space {
     pattern: selector,
   }
 
-  /// SubSelect for recursive queries
-  record sub-select {
-    point: point,
-    pattern: selector,
-    hops: u32,
-  }
+
+
+
 
   // ============================================================================
   // Substance - Generic data container
@@ -403,7 +408,7 @@ interface space {
 
   /// Substance represents various data payloads
   /// Simplified as binary data for WIT interface
-  type substance = list<u8>;
+  type substance = string;
 
   // ============================================================================
   // Error types
