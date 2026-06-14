@@ -1,4 +1,5 @@
 #![allow(warnings)]
+#![allow(unused)]
 
 // so macros will work
 extern crate core;

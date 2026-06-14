@@ -1,4 +1,5 @@
 #![allow(warnings)]
+#![allow(unused)]
 #![feature()]
 
 /*

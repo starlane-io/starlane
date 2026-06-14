@@ -2,8 +2,7 @@ use crate::cache::CacheLayout;
 use crate::remote::RemoteRepo;
 use crate::repo::Repo;
 use crate::zip::{unzip_from_binary_to_temp, ZipError};
-use crate::PackageErr;
-use starlane_base::env;
+use crate::{get_starlane_package_cache, PackageErr};
 use starlane_space::types::specific::Slice;
 use std::path::PathBuf;
 use strum_macros::Display;
@@ -28,7 +27,7 @@ pub enum DownloadErr {
 
 impl Default for Downloader {
     fn default() -> Self {
-        let path = PathBuf::from(env::get_starlane_package_cache());
+        let path = PathBuf::from(get_starlane_package_cache());
         let repo = RemoteRepo::default();
         Self::new(path, repo)
     }

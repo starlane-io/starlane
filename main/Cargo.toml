@@ -22,10 +22,10 @@ repository.workspace = true
 
 
 [dependencies]
-starlane-macros = { workspace = true, version = "0.3.21" }
+starlane-macros = { workspace = true, version = "0.3.20" }
 starlane-space = { workspace = true  }
-starlane-hyperspace = { workspace = true, version = "0.3.21" }
-starlane-base = { workspace = true, version = "0.3.21" }
+starlane-hyperspace = { workspace = true, version = "0.3.20" }
+starlane-base = { workspace = true, version = "0.3.20" }
 starlane-platform-for-postgres = {workspace = true }
 starlane-platform-for-postgres-registry = {workspace = true }
 starlane-foundation-for-docker-desktop= {workspace = true }

@@ -1,5 +1,5 @@
 #![allow(warnings)]
-
+#![allow(unused)]
 pub mod err;
 pub mod global;
 pub mod layer;
@@ -26,3 +26,5 @@ pub mod template;
 
 //#[cfg(feature = "wit")]
 pub mod wit;
+
+

@@ -1,20 +1,32 @@
 use crate::download::{DownloadErr, Downloader};
+use crate::remote::RemoteRepo;
 use crate::repo::Repo;
 use crate::PackageErr;
 use starlane_space::types::specific::{PackFile, Slice};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tempfile::TempDir;
 use thiserror::Error;
 
+#[async_trait::async_trait]
+pub trait PackageCache: Send+Sync {
+    async fn get_file(&self, file: &PackFile) -> Result<Vec<u8>, CacheErr>;
+}
+
 #[derive(Clone)]
-pub struct PackageCache {
+pub(crate) struct PackageCacheImpl {
     tmp: Option<Arc<TempDir>>,
     pub layout: CacheLayout,
     pub downloader: Downloader,
 }
 
-impl PackageCache {
+impl Default for PackageCacheImpl {
+    fn default() -> Self {
+        Self::temporary(RemoteRepo::default())
+    }
+}
+
+impl PackageCacheImpl {
     /// create a temporary unique cache directory that will be deleted on process termination
     pub fn temporary(repo: impl Repo + 'static) -> Self {
         Self::unique_with_keep(repo, false)
@@ -50,7 +62,10 @@ impl PackageCache {
     pub fn is_file_cached(&self, file: &PackFile) -> bool {
         self.layout.file_path(file).exists()
     }
-    pub async fn get_file(&self, file: &PackFile) -> Result<Vec<u8>, CacheErr> {
+}
+#[async_trait::async_trait]
+impl PackageCache for PackageCacheImpl {
+    async fn get_file(&self, file: &PackFile) -> Result<Vec<u8>, CacheErr> {
         let path = self.layout.file_path(file);
         println!("EXPECTED PATH FILE: '{}'", path.to_str().unwrap());
         if !path.exists() {
@@ -98,4 +113,10 @@ pub enum CacheErr {
     PackageErr(#[from] PackageErr),
     #[error("{0}")]
     IoErr(#[from] tokio::io::Error),
+}
+
+pub fn cache_singleton() -> &'static Arc<dyn PackageCache> {
+    pub static CACHE: OnceLock<Arc<dyn PackageCache>> = OnceLock::new();
+
+    CACHE.get_or_init(|| Arc::new(PackageCacheImpl::default()))
 }

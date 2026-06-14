@@ -32,3 +32,9 @@ pub fn init() {
             .expect("crypto provider could not be installed");
     }
 }
+
+
+/// reexports
+pub mod package {
+   pub use starlane_package::cache;
+}

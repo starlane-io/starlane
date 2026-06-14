@@ -1,4 +1,5 @@
 #![allow(warnings)]
+#![allow(unused)]
 
 //! # BASE STRATA
 //! Trait definitions and abstract support implementations for the first two

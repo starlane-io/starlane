@@ -25,9 +25,71 @@ pub static MY_SLICE: Lazy<Slice> =
 pub static ADVICE_FILE: Lazy<PackFile> =
     Lazy::new(|| PackFile::from_str("uberscott.com:postgres:1.0.1::my-slice/advice.txt").unwrap());
 
+
+#[cfg(not(test))]
+pub static STARLANE_HOME: Lazy<String> = Lazy::new(|| {
+    std::env::var("STARLANE_HOME").unwrap_or_else(|e| {
+        let home_dir: String = match dirs::home_dir() {
+            None => ".".to_string(),
+            Some(dir) => dir.display().to_string(),
+        };
+        format!("{}/.starlane", home_dir).to_string()
+    })
+});
+
+#[cfg(test)]
+pub static STARLANE_HOME: Lazy<String> = Lazy::new(|| {
+    let dir = ".starlane_test";
+    fs::create_dir_all(dir).unwrap();
+    dir.to_string()
+});
+
+
+pub static STARLANE_PACKAGE_SOURCE: Lazy<PathBuf> = Lazy::new(|| {
+    PathBuf::from(std::env::var("STARLANE_PACKAGE_SOURCE")
+        .unwrap_or(format!("{}/package/source", STARLANE_HOME.to_string())))
+});
+
+pub fn get_starlane_package_source() -> PathBuf {
+    let dir = STARLANE_PACKAGE_SOURCE.clone();
+    fs::create_dir_all(&dir).unwrap();
+    dir
+}
+pub static STARLANE_CACHE_DIR: Lazy<String> = Lazy::new(|| {
+    std::env::var("STARLANE_CACHE_DIR")
+        .unwrap_or(format!("{}/cache", STARLANE_HOME.to_string()).to_string())
+});
+
+
+pub static STARLANE_PACKAGE_REMOTE: Lazy<String> = Lazy::new(|| {
+    let dir = std::env::var("STARLANE_PACKAGE_REMOTE")
+        .unwrap_or(format!("{}/package/remote", STARLANE_HOME.to_string()).to_string());
+    fs::create_dir_all(&dir).unwrap();
+    dir
+});
+
+pub fn get_starlane_package_remote() -> String {
+    let dir = STARLANE_PACKAGE_REMOTE.to_string();
+    fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+pub static STARLANE_PACKAGE_CACHE: Lazy<String> = Lazy::new(|| {
+    let dir = std::env::var("STARLANE_PACKAGE_CACHE")
+        .unwrap_or(format!("{}/package/cache", STARLANE_HOME.to_string()).to_string());
+    fs::create_dir_all(&dir).unwrap();
+    dir
+});
+pub fn get_starlane_package_cache() -> String {
+    let dir = STARLANE_PACKAGE_CACHE.to_string();
+    fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+
 pub mod create;
 
-mod cache;
+pub mod cache;
 pub mod download;
 pub mod remote;
 pub mod repo;
@@ -391,14 +453,14 @@ mod test {
 
     #[cfg(test)]
     mod server {
-        use crate::cache::PackageCache;
+        use crate::cache::PackageCacheImpl;
         use crate::create::PackageLayout;
         use crate::download::Downloader;
         use crate::remote::{RemoteRepo, Repo};
         use crate::server::{ServerBuilder, ServerControl};
         use crate::zip::unzip_from_binary_to_temp;
         use crate::{
-            new_ignorant_observer, IgnorantPublishObserver, PackObserver, ADVICE_FILE, MY_SLICE,
+            new_ignorant_observer, PackObserver, ADVICE_FILE, MY_SLICE,
             PACKAGE_LAYOUT_EXAMPLE,
         };
         use tokio::io::AsyncWriteExt;
@@ -449,7 +511,7 @@ mod test {
         #[tokio::test]
         pub async fn test_cache() {
             let test = RemoteTest::mock().await;
-            let cache = PackageCache::unique_with_keep(test.remote_repo.clone(), true);
+            let cache = PackageCacheImpl::unique_with_keep(test.remote_repo.clone(), true);
             cache.get_file(&ADVICE_FILE).await.unwrap();
         }
     }
@@ -643,3 +705,5 @@ pub trait PublishObserver: PackObserver {
 fn new_ignorant_observer() -> Box<dyn PublishObserver> {
     IgnorantPublishObserver::new()
 }
+
+

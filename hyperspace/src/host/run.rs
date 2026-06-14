@@ -83,7 +83,6 @@ pub mod test {
 
         #[test]
         fn wasi_p2() -> Result<()> {
-
                 // Define the WASI functions globally on the `Config`.
                 let engine = Engine::default();
                 let mut linker = Linker::new(&engine);

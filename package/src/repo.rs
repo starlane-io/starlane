@@ -1,9 +1,8 @@
 use crate::create::{PackErr, PackageLayout};
 use crate::zip::zip_slice_dir_to;
-use crate::{new_ignorant_observer, PackageErr, PublishObserver};
+use crate::{get_starlane_package_source, new_ignorant_observer, PackageErr, PublishObserver};
 use async_trait::async_trait;
 use reqwest::{Error, Response, StatusCode};
-use starlane_base::env::get_starlane_package_source;
 use starlane_space::types::scope::SlicePath;
 use starlane_space::types::specific::Slice;
 use std::fmt::Display;

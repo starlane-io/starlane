@@ -51,7 +51,7 @@ wit=["dep:wasmtime"]
 
 
 [dependencies]
-starlane-macros = { workspace = true, version = "0.3.21" }
+starlane-macros = { workspace = true, version = "0.3.20" }
 thiserror = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 chrono = { workspace = true, features = ["serde"] }
