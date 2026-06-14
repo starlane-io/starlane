@@ -40,7 +40,6 @@ use cliclack::{intro, outro, spinner};
 use colored::Colorize;
 use crossterm::execute;
 use crossterm::style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor, Stylize};
-use hyperspace::shutdown::add_shutdown_hook;
 use lerp::Lerp;
 use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
@@ -102,7 +101,11 @@ fn context() -> String {
 
 #[tokio::main]
 pub async fn main() -> Result<(), anyhow::Error> {
-    ctrlc::set_handler(move || shutdown(1)).unwrap();
+
+    tokio::spawn( async {
+        tokio::signal::ctrl_c().await.unwrap();
+        process::exit(1);
+    });
 
     init();
 
@@ -207,9 +210,7 @@ pub async fn main() -> Result<(), anyhow::Error> {
         }
         Commands::Pack(sub) => match sub {
             PackArgs { command } => match command {
-                PackCmd::
-
-                Publish(args) => {
+                PackCmd::Publish(args) => {
                     let path = args
                         .path
                         .map(|p| PathBuf::from_str(p.as_str()).unwrap())

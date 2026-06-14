@@ -99,7 +99,14 @@ impl ServerBuilder {
         }
 
         async fn stop(rx: tokio::sync::oneshot::Receiver<()>) {
-            rx.await.unwrap();
+            tokio::select! {
+                _ = rx => {
+                    // Termination requested via ServerControl
+                },
+                _ = tokio::signal::ctrl_c() => {
+                    // Ctrl-C signal received
+                }
+            }
         }
 
         let request_terminate = signals.request_terminate.take().unwrap();

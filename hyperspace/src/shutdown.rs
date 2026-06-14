@@ -7,6 +7,8 @@ use std::time::Duration;
 use tokio::join;
 use tokio::task::JoinSet;
 
+/*
+
 static SHUTDOWN_HOOK_TX: Lazy<tokio::sync::mpsc::Sender<ShutdownCall>> = Lazy::new(|| {
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
     tokio::spawn(async move {
@@ -36,22 +38,21 @@ pub fn add_shutdown_hook(f: Pin<Box<dyn Future<Output = ()> + Sync + Send + 'sta
         .try_send(ShutdownCall::AddHook(f))
         .unwrap_or_default();
 }
+ */
 
 pub fn shutdown(code: i32) {
-    SHUTDOWN_HOOK_TX
-        .try_send(ShutdownCall::Shutdown(code))
-        .unwrap_or_default();
+    process::exit(code);
 }
+
 
 pub fn panic_shutdown<M>(msg: M)
 where
     M: AsRef<str>,
 {
     eprintln!("{}", msg.as_ref());
-    SHUTDOWN_HOOK_TX
-        .try_send(ShutdownCall::Shutdown(1))
-        .unwrap_or_default();
+    process::exit(1);
 }
+
 
 pub enum ShutdownCall {
     AddHook(Pin<Box<dyn Future<Output = ()> + Sync + Send + 'static>>),
