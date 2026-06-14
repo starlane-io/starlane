@@ -3,7 +3,6 @@ use crate::create::{PackErr, PackageLayout};
 use once_cell::sync::Lazy;
 use starlane_space::parse::SkewerCase;
 use starlane_space::types::scope::{Segment, SlicePath};
-use starlane_space::types::specific::{PackFile, Slice};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::Error;
@@ -707,3 +706,6 @@ fn new_ignorant_observer() -> Box<dyn PublishObserver> {
 }
 
 
+pub use starlane_space::types::specific::Package;
+pub use starlane_space::types::specific::PackFile;
+pub use starlane_space::types::specific::Slice;

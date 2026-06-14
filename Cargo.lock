@@ -4513,6 +4513,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "starlane-host"
+version = "0.3.20"
+dependencies = [
+ "anyhow",
+ "starlane-package",
+ "tokio",
+ "wasmtime",
+ "wasmtime-wasi",
+]
+
+[[package]]
 name = "starlane-hyperspace"
 version = "0.3.20"
 dependencies = [

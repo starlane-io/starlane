@@ -10,7 +10,7 @@ description.workspace = true
 version.workspace = true
 
 [dependencies]
-starlane-space= { workspace = true }
+starlane-space= { workspace = true, features = ["types2"] }
 thiserror = { workspace = true }
 dirs = { workspace = true }
 zip = { workspace = true, default-features = false, features = ["bzip2"] }

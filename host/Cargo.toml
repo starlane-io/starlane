@@ -1,0 +1,18 @@
+[package]
+name = "starlane-host"
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+description.workspace = true
+version.workspace = true
+
+[dependencies]
+
+starlane-package = {workspace = true}
+wasmtime = {workspace = true}
+wasmtime-wasi = {workspace = true}
+tokio = {workspace = true}
+anyhow = {workspace = true}

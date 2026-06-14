@@ -11,6 +11,8 @@ use thiserror::Error;
 #[async_trait::async_trait]
 pub trait PackageCache: Send+Sync {
     async fn get_file(&self, file: &PackFile) -> Result<Vec<u8>, CacheErr>;
+
+    async fn get_path(&self, file: &PackFile) -> Result<PathBuf,CacheErr>;
 }
 
 #[derive(Clone)]
@@ -80,6 +82,18 @@ impl PackageCache for PackageCacheImpl {
         let data = tokio::fs::read(path).await?;
         Ok(data)
     }
+
+    async fn get_path(&self, file: &PackFile) -> Result<PathBuf, CacheErr> {
+        let path = self.layout.file_path(file);
+
+        match path.exists() {
+            true => Ok(path),
+            false => {
+                self.downloader.download(file.slice()).await?;
+                Ok(path)
+            }
+        }
+    }
 }
 
 /// a utility struct for finding files in the cache using
@@ -104,7 +118,7 @@ impl CacheLayout {
 #[derive(Debug, Error)]
 pub enum CacheErr {
     #[error("Not Found")]
-    NotFound,
+    NotFound(String),
     #[error("Download operation cache directory miss for file: {0} with expected cache directory of: {1}")]
     DownloadCacheMiss(PackFile, PathBuf),
     #[error("Error downloading slice: {0}")]
