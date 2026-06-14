@@ -14,6 +14,7 @@ use tokio::io::AsyncWriteExt;
 
 pub mod err;
 mod registry;
+mod run;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct ExtKey<B>

@@ -7,6 +7,14 @@ world registry {
    export registry-api;
 }
 
+world filter {
+  import status-api;
+  export filter-api;
+}
+
+interface filter-api {
+  filter: func(input: string) -> result<string,string>;
+}
 
 interface registry-api {
   // Import all core types from the space crate
@@ -328,7 +336,7 @@ interface space {
   record child-perms {
      create: bool,
      select: bool,
-     delete: bool   
+     delete: bool
   }
 
   record particle-perms {

@@ -15,7 +15,7 @@ use starlane_space::command::direct::get::{Get, GetOp};
 use starlane_space::command::direct::query::{Query, QueryResult};
 use starlane_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
 use starlane_space::command::direct::set::Set;
-use starlane_space::err::SpaceErr;
+use starlane_space::err::{ParseErrs0, SpaceErr};
 use starlane_space::hyper::{ParticleLocation, ParticleRecord};
 use starlane_space::kind::{BaseKind, Kind, KindParts, Specific};
 use starlane_space::loc::{StarKey, ToBaseKind, Version};
@@ -39,7 +39,7 @@ use starlane_space::status::Handle;
 use starlane_space::substance::{Substance, SubstanceList, SubstanceMap};
 use starlane_space::types::property::{PropertyMod, SetProperties};
 use starlane_space::util::ValuePattern;
-use starlane_space::HYPERUSER;
+use starlane_space::{SnakeCase, HYPERUSER};
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -268,8 +268,8 @@ impl RegistryApi for PostgresRegistry {
 
         for (_, property_mod) in registration.properties.iter() {
             match property_mod {
-                PropertyMod::Set { key, value, lock } => {
-                    let lock: usize = match lock {
+                PropertyMod::Set ( Property{key, value, locked }) => {
+                    let lock: usize = match locked {
                         true => 1,
                         false => 0,
                     };
@@ -371,8 +371,8 @@ impl RegistryApi for PostgresRegistry {
 
         for (_, property_mod) in properties.iter() {
             match property_mod {
-                PropertyMod::Set { key, value, lock } => {
-                    let lock = match *lock {
+                PropertyMod::Set ( Property {key, value, locked }) => {
+                    let lock = match *locked {
                         true => 1,
                         false => 0,
                     };
@@ -438,7 +438,7 @@ impl RegistryApi for PostgresRegistry {
         let properties = sqlx::query_as::<Postgres, LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(&mut *conn).await?;
         let mut map = HashMap::new();
         for p in properties {
-            map.insert(p.key.clone(), p.into());
+            map.insert(p.key.clone(), p.try_into()?);
         }
         Ok(map)
     }
@@ -466,7 +466,7 @@ impl RegistryApi for PostgresRegistry {
         let properties = sqlx::query_as::<Postgres, LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(&mut *conn).await?;
         let mut map = HashMap::new();
         for p in properties {
-            map.insert(p.key.clone(), p.into());
+            map.insert(p.key.clone(), p.try_into()?);
         }
         record.details.properties = map;
 
@@ -972,13 +972,16 @@ struct LocalProperty {
     pub locked: bool,
 }
 
-impl Into<Property> for LocalProperty {
-    fn into(self) -> Property {
-        Property {
-            key: self.key,
+impl TryInto<Property> for LocalProperty {
+
+    type Error = ParseErrs0;
+    fn try_into(self) -> Result<Property,Self::Error> {
+        let key = SnakeCase::from_str(self.key.as_str())?;
+        Ok(Property {
+            key,
             value: self.value,
             locked: self.locked,
-        }
+        })
     }
 }
 

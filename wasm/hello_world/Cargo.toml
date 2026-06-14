@@ -1,0 +1,15 @@
+[package]
+name = "hello_world"
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+description.workspace = true
+version.workspace = true
+
+
+[[bin]]
+name = "hello"
+path = "src/main.rs"

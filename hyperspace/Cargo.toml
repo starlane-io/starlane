@@ -83,6 +83,7 @@ eyre = {workspace = true}
 dirs = {workspace = true}
 wit-bindgen = { workspace = true }
 wasmtime = { workspace = true }
+wasmtime-wasi = { workspace = true, features = ["p2","p1"] }
 
 [dev-dependencies]
 starlane-space = { workspace = true, features = ["test"] }

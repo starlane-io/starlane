@@ -1,6 +1,19 @@
 
 use starlane_space::status::Status;
 
+pub mod filter {
+    mod bindings {
+        use crate::registry::RegistryApi;
+        wasmtime::component::bindgen!({
+        path: "../wit",
+        world: "filter",
+    });
+    }
+
+    pub use bindings::exports::starlane::hyperspace::filter_api::Guest as FilterGuest;
+    pub use bindings::starlane::hyperspace::status_api::{Host as StatusHost,*};
+}
+
 mod bindings {
     use crate::registry::RegistryApi;
     wasmtime::component::bindgen!({

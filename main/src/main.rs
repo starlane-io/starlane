@@ -207,7 +207,9 @@ pub async fn main() -> Result<(), anyhow::Error> {
         }
         Commands::Pack(sub) => match sub {
             PackArgs { command } => match command {
-                PackCmd::Publish(args) => {
+                PackCmd::
+
+                Publish(args) => {
                     let path = args
                         .path
                         .map(|p| PathBuf::from_str(p.as_str()).unwrap())
