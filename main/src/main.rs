@@ -215,6 +215,7 @@ pub async fn main() -> Result<(), anyhow::Error> {
                         .path
                         .map(|p| PathBuf::from_str(p.as_str()).unwrap())
                         .unwrap_or(std::env::current_dir().unwrap());
+
                     publish(&path).await.unwrap();
                     Ok(())
                 }
