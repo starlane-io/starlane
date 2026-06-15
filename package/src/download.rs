@@ -96,13 +96,10 @@ impl DownloadRunner {
             tmp,
         };
         runner.start();
-        println!("returning from DownloadRunner::new");
     }
 
     pub fn start(mut self) {
-        println!("Download Runner STARTED !");
         tokio::spawn(async move {
-            println!("Download runner running!");
             while let Some(request) = self.rx.recv().await {
                 let result = self.download_slice(&request.slice).await;
                 request.tx.send(result).unwrap();
@@ -111,27 +108,17 @@ impl DownloadRunner {
     }
 
     async fn download_slice(&self, slice: &Slice) -> Result<(), DownloadErr> {
-        println!("START DOWNLOAD SLICE: {}", slice);
         let path = self.layout.slice_path(slice);
-        println!("slice path: '{}'", path.to_str().unwrap());
         if path.exists() {
-            println!("slice exists!");
             return Ok(());
         }
 
         let data = self.repo.get_slice(slice).await?;
-        println!("got slice data.  {} ", data.len());
         let dir = unzip_from_binary_to_temp(data.as_slice()).unwrap();
-        println!("slice data saved to: '{}'", dir.path().to_str().unwrap());
 
-        println!("unzipped slice....");
         tokio::fs::create_dir_all(path.clone()).await?;
-        println!(
-            "created SLICE cache directory: '{}'",
-            path.to_str().unwrap()
-        );
+
         tokio::fs::rename(dir.path(), path.clone()).await?;
-        println!("slice renamed.... to {}", path.display());
         Ok(())
     }
 }

@@ -69,13 +69,8 @@ impl PackageCacheImpl {
 impl PackageCache for PackageCacheImpl {
     async fn get_file(&self, file: &PackFile) -> Result<Vec<u8>, CacheErr> {
         let path = self.layout.file_path(file);
-        println!("EXPECTED PATH FILE: '{}'", path.to_str().unwrap());
         if !path.exists() {
-            println!(
-                "downloading slice: {} for cache file: '{}'",
-                file.slice(),
-                path.to_str().unwrap()
-            );
+
             self.downloader.download(file.slice()).await?;
         }
 
