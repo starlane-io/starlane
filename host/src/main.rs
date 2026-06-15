@@ -1,7 +1,7 @@
 #![allow(warnings)]
 #![allow(unused)]
 
-use starlane_host::{ExecState, HostService};
+use starlane_host::{ExecState, Executor, HostService};
 use starlane_package::cache::PackageCache;
 use starlane_package::PackFile;
 use std::str::FromStr;
@@ -54,9 +54,13 @@ async fn _main() -> Result<()> {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let service = HostService::new();
-    service
-        .execute(&PackFile::from_str("starlane.app:examples:0.1.0/hello_wasip2.wasm").unwrap())
-        .await;
+    let executor = service
+        .executor(&PackFile::from_str("starlane.app:examples:0.1.0/hello_wasip2.wasm").unwrap())
+        .await?;
+
+    let blah =  executor.run("Scott").await?;
+
+    println!("BLAH -> {}",blah);
 
     Ok(())
 }
