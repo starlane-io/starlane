@@ -60,6 +60,7 @@ interface registry-api {
   /// Registry error - specific to hyperspace registry operations
   /// Defined in hyperspace/src/registry/err.rs
   variant reg-err {
+    not-implemented,
     /// Parse error
     parse(string),
     /// Duplicate particle
