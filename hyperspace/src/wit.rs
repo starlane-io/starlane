@@ -14,6 +14,7 @@ pub mod filter {
     pub use bindings::starlane::hyperspace::status_api::{Host as StatusHost,*};
 }
 
+
 mod bindings {
     use crate::registry::RegistryApi;
     wasmtime::component::bindgen!({
@@ -23,6 +24,7 @@ mod bindings {
 }
 pub use bindings::starlane::hyperspace::space;
 pub use bindings::exports::starlane::hyperspace::registry_api::Guest as RegistryGuest;
+use crate::wit::filter::FilterGuest;
 
 pub mod convert {
     use itertools::Itertools;

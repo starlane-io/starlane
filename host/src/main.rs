@@ -1,16 +1,14 @@
 #![allow(warnings)]
 #![allow(unused)]
 
-use starlane_host::{ExecState, Executor, HostService};
 use starlane_package::cache::PackageCache;
 use starlane_package::PackFile;
 use std::str::FromStr;
-use std::thread;
-use std::time::Duration;
 use wasmtime::component::{Component, Linker, ResourceTable};
-use wasmtime::{Config, Engine, Result, Store};
+use wasmtime::{Engine, Result, Store};
 use wasmtime_wasi::p2::bindings::Command;
-use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
+use wasmtime_wasi::{WasiCtx, WasiView};
+use starlane_host::exec::{ExecState, Executor, HostService};
 
 // This example is an example shim of executing a component based on the
 // command line arguments provided to this program.
@@ -90,30 +88,4 @@ pub mod test {
         }
     }
 
-    #[test]
-    fn wasi_p2() -> Result<()> {
-        // Define the WASI functions globally on the `Config`.
-        let engine = Engine::default();
-        let mut linker = Linker::new(&engine);
-        wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
-
-        // Create a WASI context and put it in a Store; all instances in the store
-        // share this context. `WasiCtx` provides a number of ways to
-        // configure what the target program will have access to.
-        let wasi = WasiCtx::builder().inherit_stdio().inherit_args().build();
-        let state = ComponentRunStates {
-            wasi_ctx: wasi,
-            resource_table: ResourceTable::new(),
-        };
-        let mut store = Store::new(&engine, state);
-
-        // Instantiate our component with the imports we've created, and run it.
-        let component = Component::from_file(&engine, "../target/wasm/hello_wasip2.wasm").unwrap();
-        let command = Command::instantiate(&mut store, &component, &linker)?;
-        let command = Command::instantiate(&mut store, &component, &linker)?;
-        //        command.wasi_cli_run().call_run(&mut store)?;
-        //        command.wasi_cli_run().call_run(&mut store)?;
-
-        Ok(())
-    }
 }
