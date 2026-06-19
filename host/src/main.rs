@@ -15,6 +15,7 @@ use starlane_host::exec::{ExecState, Executor, HostService};
 #[tokio::main]
 async fn _main() -> Result<()> {
     let file = PackFile::from_str("starlane.app:examples:0.1.0/hello_wasip2.wasm")?;
+
     let cache = starlane_package::cache::cache_singleton();
     let path = cache.get_path(&file).await.unwrap();
     let args = std::env::args().skip(1).collect::<Vec<_>>();
@@ -88,4 +89,95 @@ pub mod test {
         }
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use std::any::Any;
+    use std::str::FromStr;
+    use anyhow::Result;
+    use wasmtime::component::{Component, HasData, HasSelf, Linker, ResourceTable};
+    use wasmtime::{Engine, Store};
+    use wasmtime_wasi::p2::pipe::{MemoryInputPipe, MemoryOutputPipe};
+    use wasmtime_wasi::WasiCtx;
+    use starlane_host::exec::ExecState;
+    use starlane_package::PackFile;
+    use crate::tests::bindings::Filter;
+
+    pub mod bindings {
+        wasmtime::component::bindgen!({
+            path: "../wit",
+            world: "filter",
+        });
+    }
+
+    #[derive(Default)]
+    struct MyState {
+        ctx: WasiCtx,
+        table: ResourceTable
+    }
+
+    mod blah {
+        use wasmtime::component::HasData;
+        use wasmtime_wasi::{WasiCtxView, WasiView};
+        use crate::tests::bindings::starlane::hyperspace::space;
+        use super::bindings::starlane::hyperspace::status_api::{Host, Status};
+
+        use crate::tests::MyState;
+
+        impl space::Host for MyState {}
+
+        impl Host for MyState {
+            fn update(&mut self, status: Status) -> () {
+                todo!()
+            }
+        }
+
+        impl WasiView for MyState {
+            fn ctx(&mut self) -> WasiCtxView<'_> {
+                WasiCtxView {
+                    ctx: &mut self.ctx,
+                    table: &mut self.table,
+                }
+            }
+        }
+
+    }
+
+
+
+
+    #[tokio::test]
+    async fn test() -> Result<()> {
+        let engine = Engine::default();
+
+        let file = PackFile::from_str("starlane.app:examples:0.1.0/email_validator_util.wasm")?;
+        let cache = starlane_package::cache::cache_singleton();
+        let path = cache.get_path(&file).await.unwrap();
+        let component = Component::from_file(&engine, path)?;
+        let mut wasi = WasiCtx::builder();
+        wasi.inherit_stdio();
+        wasi.inherit_stdout();
+
+        let ctx = wasi.build();
+        let state = MyState{
+            ctx,
+            table: ResourceTable::new(),
+        };
+
+
+        let mut linker = Linker::new(&engine);
+        Filter::add_to_linker::<_,HasSelf<_>>(&mut linker, |state: &mut MyState| state)?;
+        wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+
+        let mut store = Store::new(&engine, state);
+
+        println!("Blah");
+
+        let bindings = Filter::instantiate(&mut store, &component, &linker)?;
+
+        let blah = bindings.starlane_hyperspace_filter_api().call_filter( &mut store, "scottmightydevco.com")?.unwrap();
+        println!("answer: '{}'",blah);
+        Ok(())
+    }
 }
