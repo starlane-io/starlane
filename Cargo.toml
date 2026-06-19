@@ -14,7 +14,7 @@ version="0.3.20"
 default-run = "main"
 resolver = "2"
 #members = ["main", "space", "hyperspace", "base","macros", "foundation/docker-desktop", "platform/registry/postgres", "platform/postgres", "ext/service/starlane-cli-local-filestore-service" ]
-members = ["main", "space", "hyperspace", "base","macros", "foundation/docker-desktop", "platform/registry/postgres", "platform/postgres", "package", "platform/wasi-experiment/starlane-postgres-platform", "wasm/hello_world", "wasm/hello_wasip2", "host", "wasm/email_validator_util"]
+members = ["main", "space", "hyperspace", "base","macros", "foundation/docker-desktop", "platform/registry/postgres", "platform/postgres", "package", "platform/wasi-experiment/starlane-postgres-platform", "wasm/hello_world", "wasm/hello_wasip2", "host", "wasm/email_validator_util","wasm/email_validator_util_stateful"]
 
 exclude = [ ]
 

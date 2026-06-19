@@ -103,6 +103,7 @@ mod tests {
     use starlane_host::exec::ExecState;
     use starlane_package::PackFile;
     use crate::tests::bindings::Filter;
+    use crate::tests::bindings::starlane::hyperspace::space::Status;
 
     pub mod bindings {
         wasmtime::component::bindgen!({
@@ -111,10 +112,36 @@ mod tests {
         });
     }
 
-    #[derive(Default)]
     struct MyState {
+        pub status: Status,
         ctx: WasiCtx,
         table: ResourceTable
+    }
+
+    impl MyState {
+        pub fn status(&self) -> &'static str {
+            match self.status {
+                Status::Unknown => "unknown",
+                Status::Pending => "pending",
+                Status::Init => "init",
+                Status::Panic => "panic",
+                Status::Fatal => "fatal",
+                Status::Ready => "ready",
+                Status::Paused => "paused",
+                Status::Resuming => "resuming",
+                Status::Done => "done",
+            }
+        }
+    }
+
+    impl Default for MyState {
+        fn default() -> Self {
+            Self {
+                status: Status::Unknown,
+                ctx: WasiCtx::default(),
+                table: ResourceTable::default(),
+            }
+        }
     }
 
     mod blah {
@@ -129,7 +156,8 @@ mod tests {
 
         impl Host for MyState {
             fn update(&mut self, status: Status) -> () {
-                todo!()
+
+                self.status = status;
             }
         }
 
@@ -156,15 +184,9 @@ mod tests {
         let path = cache.get_path(&file).await.unwrap();
         let component = Component::from_file(&engine, path)?;
         let mut wasi = WasiCtx::builder();
-        wasi.inherit_stdio();
-        wasi.inherit_stdout();
 
         let ctx = wasi.build();
-        let state = MyState{
-            ctx,
-            table: ResourceTable::new(),
-        };
-
+        let state = MyState::default();
 
         let mut linker = Linker::new(&engine);
         Filter::add_to_linker::<_,HasSelf<_>>(&mut linker, |state: &mut MyState| state)?;
@@ -176,8 +198,43 @@ mod tests {
 
         let bindings = Filter::instantiate(&mut store, &component, &linker)?;
 
-        let blah = bindings.starlane_hyperspace_filter_api().call_filter( &mut store, "scottmightydevco.com")?.unwrap();
-        println!("answer: '{}'",blah);
+        let blah = bindings.starlane_hyperspace_filter_api().call_filter( &mut store, "scott@mightydevco.com")?.unwrap();
+        println!("ok: '{}'",blah);
+
+        let naw = bindings.starlane_hyperspace_filter_api().call_filter( &mut store, "scottAmightydevco.com")?.unwrap_err();
+        println!("err: '{}'",naw);
+        Ok(())
+    }
+    #[tokio::test]
+    async fn test_stateful() -> Result<()> {
+        let engine = Engine::default();
+
+        let file = PackFile::from_str("starlane.app:examples:0.1.0/email_validator_util_stateful.wasm")?;
+        let cache = starlane_package::cache::cache_singleton();
+        let path = cache.get_path(&file).await.unwrap();
+        let component = Component::from_file(&engine, path)?;
+        let mut wasi = WasiCtx::builder();
+        wasi.inherit_stdio();
+        wasi.inherit_stdout();
+
+        let ctx = wasi.build();
+        let state = MyState::default();
+
+        let mut linker = Linker::new(&engine);
+        Filter::add_to_linker::<_,HasSelf<_>>(&mut linker, |state: &mut MyState| state)?;
+        wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+
+        let mut store = Store::new(&engine, state);
+
+        println!("Blah");
+
+        let bindings = Filter::instantiate(&mut store, &component, &linker)?;
+
+        let blah = bindings.starlane_hyperspace_filter_api().call_filter( &mut store, "scott@mightydevco.com")?.unwrap();
+        println!("ok: '{}' status {} ",blah, store.data().status());
+
+        let naw = bindings.starlane_hyperspace_filter_api().call_filter( &mut store, "scottAmightydevco.com")?.unwrap_err();
+        println!("err: '{}' status: {}",naw, store.data().status() );
         Ok(())
     }
 }

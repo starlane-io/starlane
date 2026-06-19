@@ -1493,6 +1493,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "email_validator_util_stateful"
+version = "0.3.20"
+dependencies = [
+ "email_address",
+ "wit-bindgen 0.58.0",
+]
+
+[[package]]
 name = "embedded-io"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
