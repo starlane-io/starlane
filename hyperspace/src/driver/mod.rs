@@ -16,7 +16,7 @@ use crate::driver::control::ControlErr;
 use crate::driver::star::StarDriverFactory;
 use crate::executor::dialect::filestore::FileStoreErr;
 use crate::machine::MachineErr;
-use starlane_space::registry::err::RegErr;
+use crate::registry::RegErr;
 use crate::registry::Registry;
 use crate::service::{
     Service, ServiceErr, ServiceKind, ServiceRunnerConf, ServiceSelector, ServiceTemplate,
@@ -74,7 +74,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
-use starlane_space::registry::Registration;
+use crate::registry::Registration;
 
 pub struct DriversBuilder {
     factories: Vec<Arc<dyn HyperDriverFactory>>,

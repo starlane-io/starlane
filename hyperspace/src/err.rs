@@ -3,7 +3,7 @@ use std::io::Error;
 use std::sync::Arc;
 use thiserror::Error;
 
-use starlane_space::registry::err::RegErr;
+use crate::registry::RegErr;
 use starlane_space::err::{CoreReflector, HyperSpatialError, SpaceErr, SpatialError};
 use starlane_space::wave::core::http2::StatusCode;
 use starlane_space::wave::core::ReflectedCore;

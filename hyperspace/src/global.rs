@@ -1,5 +1,5 @@
-use starlane_space::registry::err::RegErr;
-use starlane_space::registry::Registration;
+use crate::registry::RegErr;
+use crate::registry::Registration;
 use crate::star::{HyperStarSkel, SmartLocator, StarErr};
 use once_cell::sync::Lazy;
 use starlane_macros::{handler, push_mark, route, DirectedHandler};

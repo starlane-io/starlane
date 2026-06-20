@@ -185,7 +185,6 @@ pub mod test;
 #[cfg(feature = "types2")]
 pub mod package;
 
-pub mod registry;
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());

@@ -8,7 +8,7 @@ use crate::hyperlane::{
 use crate::layer::field::Field;
 use crate::layer::shell::{Shell, ShellState};
 use crate::machine::{MachineApi, MachineErr, MachineSkel};
-use starlane_space::registry::err::RegErr;
+use crate::registry::RegErr;
 use crate::registry::Registry;
 use crate::service::ServiceTemplate;
 use crate::template::Templates;
@@ -58,7 +58,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
-use starlane_space::registry::Registration;
+use crate::registry::Registration;
 
 #[derive(Clone)]
 pub struct ParticleStates {
