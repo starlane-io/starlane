@@ -14,6 +14,7 @@ use tokio::io::AsyncWriteExt;
 
 pub mod err;
 mod registry;
+mod registry_async;
 mod run;
 
 #[derive(Clone, Eq, PartialEq, Hash)]

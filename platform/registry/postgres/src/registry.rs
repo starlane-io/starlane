@@ -4,8 +4,8 @@ use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::Pool;
 use sqlx::{Acquire, Executor, Postgres, Row, Transaction};
-use starlane_hyperspace::registry::err::RegErr;
-use starlane_hyperspace::registry::{Registration, RegistryApi};
+use starlane_space::registry::err::RegErr;
+use starlane_hyperspace::registry::RegistryApi;
 use starlane_macros::push_loc;
 use starlane_platform_for_postgres::database::{PostgresDatabase, PostgresDatabaseHandle};
 use starlane_platform_for_postgres::service::{DbKey, PostgresService, PostgresServiceHandle};
@@ -45,6 +45,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
+use starlane_space::registry::Registration;
 
 /// embedded postgres for local development environments is slated to be removed in favor of
 /// Postgres provided by `DockerDesktopFoundation`

@@ -83,8 +83,8 @@ eyre = {workspace = true}
 # added this as a hack for 'service_conf()' to work ... hopefully can be removed later
 dirs = {workspace = true}
 wit-bindgen = { workspace = true }
-wasmtime = { workspace = true }
-wasmtime-wasi = { workspace = true, features = ["p2","p1"] }
+wasmtime = { workspace = true, features=["async"] }
+wasmtime-wasi = { workspace = true, features = ["p2","p1","p3"] }
 
 [dev-dependencies]
 starlane-space = { workspace = true, features = ["test"] }

@@ -9,6 +9,10 @@ use crate::exports::starlane::hyperspace::registry_api::Registration;
 use crate::starlane::hyperspace::space;
 
 impl crate::exports::starlane::hyperspace::registry_api::Guest for Registry {
+    fn scorch() -> Result<(), RegErr> {
+        Ok(())
+    }
+    
     fn assign_host(_: String, _: String) -> Result<(), RegErr> {
         Err(RegErr::NotImplemented)
     }
@@ -48,9 +52,7 @@ impl crate::exports::starlane::hyperspace::registry_api::Guest for Registry {
     fn register(_: Registration) -> Result<(), RegErr> {
         Err(RegErr::NotImplemented)
     }
-    fn scorch() -> Result<(), RegErr> {
-        Err(RegErr::NotImplemented)
-    }
+
     fn sequence(_: String) -> Result<u64, RegErr> {
         Err(RegErr::NotImplemented)
     }

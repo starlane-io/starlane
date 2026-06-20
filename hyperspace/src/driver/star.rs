@@ -3,7 +3,7 @@ use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory,
     Particle, ParticleSphere, ParticleSphereInner, ParticleStarErr,
 };
-use crate::registry::Registration;
+use starlane_space::registry::Registration;
 use crate::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
 use async_trait::async_trait;
 use dashmap::DashMap;

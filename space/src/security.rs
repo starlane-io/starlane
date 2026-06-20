@@ -17,7 +17,7 @@ use crate::point::Point;
 use crate::selector::{PointHierarchy, Selector};
 use crate::wave::{Agent, ScopeGrant};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone,Debug,Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum Access {
     Super,
     Owner,
@@ -79,7 +79,7 @@ impl Access {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone,Debug,Serialize, Deserialize, Eq, PartialEq,strum_macros::Display)]
 pub enum Privileges {
     Full,
     Enumerated(EnumeratedPrivileges),
@@ -156,7 +156,7 @@ impl ops::BitOr<&Privilege> for Privileges {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone,Debug,Serialize, Deserialize, Eq, PartialEq)]
 pub struct EnumeratedPrivileges {
     set: HashSet<String>,
 }
@@ -226,7 +226,7 @@ impl FromStr for Privilege {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone,Debug,Serialize, Deserialize, Eq, PartialEq)]
 pub struct EnumeratedAccess {
     pub permissions: Permissions,
     pub privileges: Privileges,
@@ -521,7 +521,8 @@ pub enum PermissionsMaskKind {
     And,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+
+#[derive(Clone,Debug,Serialize, Deserialize, Eq, PartialEq)]
 pub struct AccessGrantDef<Priv, PermMask, PointSelector, Point> {
     pub kind: AccessGrantKindDef<Priv, PermMask>,
     pub on_point: PointSelector,
@@ -550,7 +551,7 @@ impl GrantTo {
 pub type AccessGrant = AccessGrantDef<Privilege, PermissionsMask, Selector, Point>;
 pub type AccessGrantKind = AccessGrantKindDef<Privilege, PermissionsMask>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone,Debug,Serialize, Deserialize, Eq, PartialEq)]
 pub enum AccessGrantKindDef<Priv, PermMask> {
     Super,
     Privilege(Priv),
@@ -579,7 +580,7 @@ impl Ord for IndexedAccessGrant {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone,Debug,Serialize, Deserialize)]
 pub struct IndexedAccessGrant {
     pub id: i32,
     pub access_grant: AccessGrant,

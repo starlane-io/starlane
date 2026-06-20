@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::str::FromStr;
 use anyhow::Result;
 use wasmtime::{
@@ -7,6 +8,7 @@ use wasmtime::{
 };
 use wasmtime::component::{Component, HasSelf, Linker, ResourceTable};
 use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
+use wasmtime_wasi::p2::bindings::Command;
 use starlane_space::types::specific::PackFile;
 use bindings::starlane::hyperspace::space::Status;
 
@@ -14,6 +16,9 @@ mod bindings {
     wasmtime::component::bindgen!({
             path: "../wit",
             world: "registry",
+
+    imports: { default: async | trappable },
+    exports: { default: async },
         });
 }
 
@@ -28,8 +33,8 @@ pub mod wit {
 
 pub use bindings::starlane::hyperspace::space;
 pub use bindings::starlane::hyperspace::status_api::Host as StatusHost;
-use crate::host::registry::bindings::exports::starlane::hyperspace::registry_api::RegErr;
-use crate::wit::RegistryGuest;
+use bindings::exports::starlane::hyperspace::registry_api::RegErr;
+use bindings::Registry;
 
 struct RegistryState {
     pub status: Status,
@@ -64,8 +69,8 @@ impl Default for RegistryState {
 }
 
     impl wit::StatusHost for RegistryState {
-        fn update(&mut self, status: bindings::starlane::hyperspace::status_api::Status) -> () {
-            self.status = status.into();
+        async fn update(&mut self, status: bindings::starlane::hyperspace::status_api::Status) -> wasmtime::Result<()>{
+            todo!()
         }
     }
 
@@ -92,15 +97,61 @@ mod state {
     }   
 }
 
-#[tokio::test]
-async fn test_mock_registry() -> Result<()> {
-    let engine = Engine::default();
 
-    let file = PackFile::from_str("starlane.app:examples:0.1.0/mock_registry.wasm")?;
+#[tokio::test]
+async fn test_mock_registry_async_main() -> Result<()> {
+    let mut config = Config::default();
+    config.wasm_component_model(true);
+    /*
+    config.wasm_component_model_async(true);
+    config.wasm_component_model_async_stackful(true);
+    config.wasm_component_model_more_async_builtins(true);
+    config.wasm_component_model_threading(true);
+    
+     */
+
+    let engine = Engine::new(&config)?;
+
+    let file = PackFile::from_str("starlane.app:examples:0.1.0/mock_registry_async.wasm")?;
     let cache = starlane_package::cache::cache_singleton();
     let path = cache.get_path(&file).await.unwrap();
     let component = Component::from_file(&engine, path)?;
     let mut wasi = WasiCtx::builder();
+    wasi.inherit_stdout().inherit_stdin().inherit_stderr();
+
+    let ctx = wasi.build();
+    let state = RegistryState::default();
+
+    let mut linker = Linker::new(&engine);
+//    RegistryComponent::add_to_linker::<_,HasSelf<_>>(&mut linker, |state: &mut RegistryState| state)?;
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+
+    let mut store = Store::new(&engine, state);
+
+    let guest = Command::instantiate_async(&mut store, &component, &linker).await?;
+    guest.wasi_cli_run().call_run(&mut store).await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_mock_registry_async() -> Result<()> {
+    let mut config = Config::default();
+    config.wasm_component_model(true);
+    config.wasm_component_model_async(true);
+    config.wasm_component_model_async_stackful(true);
+    config.wasm_component_model_more_async_builtins(true);
+    config.wasm_component_model_threading(true);
+    config.async_support(true);
+
+    let engine = Engine::new(&config)?;
+
+    let file = PackFile::from_str("starlane.app:examples:0.1.0/mock_registry_async.wasm")?;
+    let cache = starlane_package::cache::cache_singleton();
+    let path = cache.get_path(&file).await.unwrap();
+    let component = Component::from_file(&engine, path)?;
+    let mut wasi = WasiCtx::builder();
+    wasi.inherit_stdout().inherit_stdin().inherit_stderr();
 
     let ctx = wasi.build();
     let state = RegistryState::default();
@@ -111,40 +162,22 @@ async fn test_mock_registry() -> Result<()> {
 
     let mut store = Store::new(&engine, state);
 
-    println!("Blah");
-
     let bindings = RegistryComponent::instantiate(&mut store, &component, &linker)?;
     let guest = bindings.starlane_hyperspace_registry_api();
-     match guest.call_assign_host(& mut store, & "hello".to_string(), &"kitty".to_string()).unwrap() {
-         Ok(_) => {
-             assert!(false)
-         }
-         Err(err) => {
-             match err {
-                 RegErr::NotImplemented => {
 
-                 },
-                 _ => {
-                     assert!(false)
-                 }
-             }
-         }
-     }
 
-    match guest.call_scorch(& mut store).unwrap() {
+
+    match guest.call_scorch(& mut store).await.unwrap() {
         Ok(_) => {
             assert!(true)
         }
         Err(err) => {
             assert!(false)
-       }
+        }
     }
 
     Ok(())
 }
-
-
-
 
     
 

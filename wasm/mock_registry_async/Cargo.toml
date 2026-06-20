@@ -1,0 +1,16 @@
+[package]
+name = "mock_registry_async"
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+description.workspace = true
+version.workspace = true
+
+[dependencies]
+#wit-bindgen = { version="0.58.0", features = ["async-spawn", "inter-task-wakeup"] }
+#async-trait = "0.1.89"
+tokio = { version="1.52.3", features = ["time","rt", "macros"] }
+

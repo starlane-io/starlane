@@ -59,7 +59,7 @@ pub enum ArtErr {
         expecting: String,
         found: String,
     },
-    #[error(transparent)]
+    #[error("{0}")]
     ParseErrs(#[from] ParseErrs0),
     #[error("Err({0})")]
     Source(#[source] Arc<anyhow::Error>),

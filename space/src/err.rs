@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use bincode::ErrorKind;
 use nom::error::{FromExternalError, VerboseError};
 use nom_supreme::error::BaseErrorKind;
-use serde::de::Error;
+use serde::de::{Error, StdError};
 use std::convert::Infallible;
 use std::fmt::{Debug, Display, Formatter};
 use std::io;
@@ -33,6 +33,7 @@ use starlane_space::parse::NomErr;
 use starlane_space::status;
 use strum::{IntoEnumIterator, ParseError};
 use thiserror::Error;
+use url::form_urlencoded::Parse;
 /*
 #[macro_export]
 macro_rules! err {
@@ -43,7 +44,8 @@ macro_rules! err {
 
  */
 
-#[derive(Debug, Clone, Error)]
+
+#[derive(Error,Debug,Clone,Serialize, Deserialize, Eq, PartialEq )]
 pub enum SpaceErr {
     #[error("{status}: {message}")]
     Status { status: u16, message: String },
@@ -92,8 +94,10 @@ pub enum SpaceErr {
     )]
     RootLoggerAlreadyInit,
     #[error("{0}")]
-    Anyhow(#[from] Arc<anyhow::Error>),
+    Anyhow(String),
 }
+
+
 
 impl From<status::Status> for SpaceErr {
     fn from(status: Status) -> Self {
@@ -174,7 +178,7 @@ impl SpatialError for SpaceErr {}
 
 impl From<anyhow::Error> for SpaceErr {
     fn from(err: anyhow::Error) -> Self {
-        Arc::new(err).into()
+        err.to_string().into()
     }
 }
 
@@ -588,11 +592,16 @@ impl From<Report> for ParseErrs0 {
     }
 }
 
-#[derive(Debug, Clone, Error, Serialize, Deserialize)]
+
+#[derive(Clone,Debug,Serialize, Deserialize, Eq, PartialEq)]
 pub struct ParseErrs0 {
     pub report: Vec<Report>,
     pub src: String,
 }
+
+impl StdError for ParseErrs0 {}
+
+
 
 impl ParseErrs0 {
     pub fn report(report: Report) -> Self {

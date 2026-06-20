@@ -18,7 +18,9 @@ use crate::wave::{
     Agent, PingCore, ReflectedKind, ReflectedProto, Wave, WaveId, WaveKind, WaveVariantDef,
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use starlane_macros::Autobox;
+use crate::registry::{RegistryRequest, RegistryResponse};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
@@ -58,7 +60,8 @@ impl Location {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+
+#[derive(Debug,Clone,Serialize, Deserialize, Eq, PartialEq)]
 pub struct ParticleRecord {
     pub details: Details,
     pub location: ParticleLocation,
@@ -251,6 +254,9 @@ pub enum HyperSubstance {
     Log(Log),
     Search(Search),
     Discoveries(Discoveries),
+    RegistryRequest(RegistryRequest),
+    RegistryResponse(RegistryResponse),
+
 }
 
 impl HyperSubstance {
@@ -264,6 +270,8 @@ impl HyperSubstance {
             HyperSubstance::Log(_) => HyperSubstanceKind::Log,
             HyperSubstance::Search(_) => HyperSubstanceKind::Search,
             HyperSubstance::Discoveries(_) => HyperSubstanceKind::Discoveries,
+            HyperSubstance::RegistryRequest(_) => HyperSubstanceKind::RegistryRequest,
+            HyperSubstance::RegistryResponse(_) => HyperSubstanceKind::RegistryResponse,
         }
     }
 }
@@ -288,6 +296,8 @@ pub enum HyperSubstanceKind {
     Log,
     Search,
     Discoveries,
+    RegistryRequest,
+    RegistryResponse,
 }
 
 impl Default for HyperSubstanceKind {

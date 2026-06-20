@@ -906,7 +906,7 @@ pub mod direct {
             PointHierarchy,
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize)]
+        #[derive(Debug,Clone,Serialize, Deserialize, Eq, PartialEq)]
         pub enum QueryResult {
             PointHierarchy(PointHierarchy),
         }

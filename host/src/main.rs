@@ -53,8 +53,13 @@ async fn _main() -> Result<()> {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let service = HostService::new();
-    let executor = service
+/*    let executor = service
         .executor(&PackFile::from_str("starlane.app:examples:0.1.0/hello_wasip2.wasm").unwrap())
+        .await?;
+
+ */
+    let executor = service
+        .executor(&PackFile::from_str("starlane.app:examples:0.1.0/mock_registry_async.wasm").unwrap())
         .await?;
 
     let blah =  executor.run("Scott").await?;
@@ -98,6 +103,8 @@ mod tests {
     use anyhow::Result;
     use wasmtime::component::{Component, HasData, HasSelf, Linker, ResourceTable};
     use wasmtime::{Engine, Store};
+    use wasmtime::component::types::ComponentItem;
+    use wasmtime_wasi::p2::bindings::Command;
     use wasmtime_wasi::p2::pipe::{MemoryInputPipe, MemoryOutputPipe};
     use wasmtime_wasi::WasiCtx;
     use starlane_host::exec::ExecState;
@@ -160,6 +167,7 @@ mod tests {
                 self.status = status;
             }
         }
+
 
         impl WasiView for MyState {
             fn ctx(&mut self) -> WasiCtxView<'_> {
@@ -235,6 +243,43 @@ mod tests {
 
         let naw = bindings.starlane_hyperspace_filter_api().call_filter( &mut store, "scottAmightydevco.com")?.unwrap_err();
         println!("err: '{}' status: {}",naw, store.data().status() );
+        Ok(())
+    }
+
+
+    #[tokio::test]
+    async fn blabie() -> Result<()> {
+        let mut config = wasmtime::Config::new();
+//        config.wasm_component_model(true);
+//        config.wasm_component_model_threading(true);
+ //       config.wasm_component_model_async(true);
+        let engine = Engine::new(&config).unwrap();
+
+        let file = PackFile::from_str("starlane.app:examples:0.1.0/mock_registry_async.wasm")?;
+        let cache = starlane_package::cache::cache_singleton();
+        let path = cache.get_path(&file).await.unwrap();
+        let component = Component::from_file(&engine, path)?;
+        let mut wasi = WasiCtx::builder();
+        wasi.inherit_stdio();
+
+        let ctx = wasi.build();
+        let state = MyState {
+            status: Status::Unknown,
+            ctx,
+            table: ResourceTable::default()
+        };
+
+        let mut linker = Linker::new(&engine);
+        wasmtime_wasi::p2::add_to_linker_async(&mut linker).unwrap();
+
+        let mut store = Store::new(&engine, state);
+
+        let command = Command::instantiate_async(&mut store, &component, &linker).await?;
+
+        println!("waiting...");
+        command.wasi_cli_run().call_run(&mut store).await.unwrap();
+        println!("done");
+
         Ok(())
     }
 }
