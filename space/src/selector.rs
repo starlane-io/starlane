@@ -44,6 +44,26 @@ pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, Speci
 pub type KindSelectorVar =
     KindSelectorDef<VarVal<KindBaseSelector>, VarVal<SubKindSelector>, VarVal<SpecificSelector>>;
 
+
+impl PointSegKindHop {
+   pub fn mock()  -> Self {
+       Self {
+           inclusive: false,
+           segment_selector: PointSegSelector::InclusiveAny,
+           kind_selector: KindSelector::any(),
+       }
+   }
+}
+
+impl Selector {
+    pub fn mock() -> Self {
+        Self {
+            always: false,
+            hops: vec![PointSegKindHop::mock()],
+        }
+    }
+}
+
 impl PartialEq<Kind> for KindSelector {
     fn eq(&self, kind: &Kind) -> bool {
         self.is_match(kind).is_ok()
@@ -1137,7 +1157,14 @@ impl PortHierarchy {
 
 pub type PointHierarchy = PointDef<RouteSeg, PointKindSeg>;
 
+
 pub type PointHierarchyOpt = PointDef<RouteSeg, PointKindSegOpt>;
+
+impl PointHierarchy {
+    pub fn mock() -> Self {
+        PointHierarchy::new( RouteSeg::Global, vec![PointKindSeg::mock()] )
+    }
+}
 
 impl From<&PointHierarchy> for PointHierarchyOpt {
     fn from(value: &PointHierarchy) -> Self {
@@ -1285,6 +1312,15 @@ impl Display for PointHierarchy {
 
 pub type PointKindSeg = PointKindSegDef<Kind>;
 pub type PointKindSegOpt = PointKindSegDef<Option<Kind>>;
+
+impl PointKindSeg {
+    pub fn mock() -> Self {
+        Self {
+            segment: PointSeg::Root,
+            kind: Kind::Root,
+        }
+    }
+}
 
 impl Into<PointKindSegOpt> for PointKindSeg {
     fn into(self) -> PointKindSegOpt {

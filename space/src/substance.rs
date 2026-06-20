@@ -433,6 +433,14 @@ pub struct SubstanceList {
     pub list: Vec<Box<Substance>>,
 }
 
+impl Default for SubstanceList {
+    fn default() -> Self {
+        Self {
+            list: vec![],
+        }
+    }
+}
+
 impl ToString for SubstanceList {
     fn to_string(&self) -> String {
         "[]".to_string()

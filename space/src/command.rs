@@ -659,6 +659,18 @@ pub mod direct {
         pub type SelectCtx = SelectDef<PointSegKindHop>;
         pub type SelectVar = SelectDef<PointSegKindHop>;
 
+
+        impl Select {
+            pub fn mock() -> Self {
+                Self {
+                    pattern: Selector::mock(),
+                    properties: Default::default(),
+                    into_substance: SelectIntoSubstance::Stubs,
+                    kind: SelectKind::Initial,
+                }
+            }
+        }
+
         impl ToResolved<Select> for Select {
             fn to_resolved(self, env: &Env) -> Result<Select, ParseErrs0> {
                 Ok(self)
@@ -784,7 +796,7 @@ pub mod direct {
 
     pub mod delete {
         use serde::{Deserialize, Serialize};
-
+        use starlane_space::Selector;
         use crate::command::direct::select::{Select, SelectIntoSubstance};
         use crate::err::ParseErrs0;
         use crate::parse::Env;
@@ -794,6 +806,15 @@ pub mod direct {
         pub type Delete = DeleteDef<PointSegKindHop>;
         pub type DeleteCtx = DeleteDef<PointSegKindHop>;
         pub type DeleteVar = DeleteDef<PointSegKindHop>;
+
+        impl Delete {
+            pub fn mock () -> Self {
+               Self {
+                   selector: Selector::mock(),
+               }
+
+            }
+        }
 
         impl ToResolved<Delete> for Delete {
             fn to_resolved(self, env: &Env) -> Result<Delete, ParseErrs0> {
@@ -805,6 +826,7 @@ pub mod direct {
         pub struct DeleteDef<Hop> {
             pub selector: SelectorDef<Hop>,
         }
+
 
         impl Into<Select> for Delete {
             fn into(self) -> Select {
@@ -906,9 +928,21 @@ pub mod direct {
             PointHierarchy,
         }
 
+        impl Query {
+            pub fn mock() -> Self {
+                Query::PointHierarchy
+            }
+        }
+
         #[derive(Debug,Clone,Serialize, Deserialize, Eq, PartialEq)]
         pub enum QueryResult {
             PointHierarchy(PointHierarchy),
+        }
+
+        impl QueryResult {
+            pub fn mock() -> Self {
+                QueryResult::PointHierarchy(PointHierarchy::mock())
+            }
         }
 
         impl TryInto<PointHierarchy> for QueryResult {

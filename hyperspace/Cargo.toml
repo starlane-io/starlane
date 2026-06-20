@@ -88,6 +88,7 @@ wasmtime-wasi = { workspace = true, features = ["p2","p1","p3"] }
 
 [dev-dependencies]
 starlane-space = { workspace = true, features = ["test"] }
+mockall = {workspace = true}
 
 [build-dependencies]
 shadow-rs = { workspace = true }

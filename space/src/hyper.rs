@@ -64,6 +64,15 @@ pub struct ParticleRecord {
     pub location: ParticleLocation,
 }
 
+impl ParticleRecord {
+    pub fn mock() -> Self {
+        Self {
+            details: Default::default(),
+            location: Default::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ParticleLocation {
     pub star: Option<Point>,

@@ -1,4 +1,5 @@
 use crate::base::config::{BaseConfig, BaseSubConfig};
+use crate::registry::exchange::MuxedRequest;
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::command::direct::delete::Delete;
@@ -18,7 +19,6 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
-use crate::registry::exchange::MuxedRequest;
 
 pub type Registry = Arc<dyn RegistryApi>;
 
@@ -228,12 +228,6 @@ impl RegistryApi for RegistryWrapper {
     }
 }
 
-#[cfg(test)]
-pub mod test {
-    #[test]
-    pub fn test() {}
-}
-
 #[derive(Error, Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum RegErr {
     #[error(transparent)]
@@ -271,18 +265,14 @@ pub enum RegErr {
     #[error("Registry is not reachable")]
     Unreachable,
     #[error("Registry exchanger error")]
-    ExchangeErr
+    ExchangeErr,
 }
 
-
-impl  From<tokio::sync::oneshot::error::RecvError> for RegErr {
+impl From<tokio::sync::oneshot::error::RecvError> for RegErr {
     fn from(value: tokio::sync::oneshot::error::RecvError) -> Self {
         Self::ExchangeErr
     }
 }
-
-
-
 
 impl From<tokio::sync::mpsc::error::SendError<MuxedRequest>> for RegErr {
     fn from(value: SendError<MuxedRequest>) -> Self {
@@ -295,8 +285,6 @@ impl From<tokio::sync::mpsc::error::SendError<RegistryRequest>> for RegErr {
         RegErr::ExchangeErr
     }
 }
-
-
 
 impl From<std::io::Error> for RegErr {
     fn from(value: std::io::Error) -> Self {
@@ -358,6 +346,20 @@ pub struct Registration {
     pub owner: Point,
     pub strategy: Strategy,
     pub status: Status,
+}
+
+impl Registration {
+    pub fn mock() -> Self {
+        Self {
+            point: Point::root(),
+            kind: Kind::Root,
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: Point::hyper_user(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
@@ -573,7 +575,7 @@ pub mod exchange {
             Self {
                 sequence,
                 map,
-                tx: req_tx
+                tx: req_tx,
             }
         }
         pub async fn request(&self, request: RegistryRequest) -> Result<RegistryResponse, RegErr> {
@@ -652,8 +654,8 @@ pub mod exchange {
     }
 
     impl RegistryExchanger {
-        pub fn new(registry: impl Into<Arc<dyn RegistryApi>>) -> Self {
-            let tx = RegistryRunner::new(registry);
+        pub fn new(registry: Arc<dyn RegistryApi>) -> Self {
+            let tx = ExchangeRunner::new(registry);
             Self { tx }
         }
     }
@@ -666,6 +668,7 @@ pub mod exchange {
             if let RegistryResponse::Scorch = rx.await?? {
                 Ok(())
             } else {
+                println!("Scorch Err");
                 Err(RegErr::ExchangeErr)
             }
         }
@@ -673,7 +676,7 @@ pub mod exchange {
         async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr> {
             let (x, rx) = Exchange::new(RegistryRequest::Register(registration.clone()));
             self.tx.send(x).await?;
-            if let RegistryResponse::Register= rx.await?? {
+            if let RegistryResponse::Register = rx.await?? {
                 Ok(())
             } else {
                 Err(RegErr::ExchangeErr)
@@ -690,7 +693,7 @@ pub mod exchange {
                 star: star.clone(),
             });
             self.tx.send(x).await?;
-            if let RegistryResponse::AssignStar= rx.await?? {
+            if let RegistryResponse::AssignStar = rx.await?? {
                 Ok(())
             } else {
                 Err(RegErr::ExchangeErr)
@@ -707,7 +710,7 @@ pub mod exchange {
                 host: host.clone(),
             });
             self.tx.send(x).await?;
-            if let RegistryResponse::AssignHost= rx.await?? {
+            if let RegistryResponse::AssignHost = rx.await?? {
                 Ok(())
             } else {
                 Err(RegErr::ExchangeErr)
@@ -741,7 +744,7 @@ pub mod exchange {
                 properties: properties.clone(),
             });
             self.tx.send(x).await?;
-            if let RegistryResponse::SetProperties= rx.await?? {
+            if let RegistryResponse::SetProperties = rx.await?? {
                 Ok(())
             } else {
                 Err(RegErr::ExchangeErr)
@@ -751,7 +754,7 @@ pub mod exchange {
         async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, RegErr> {
             let (x, rx) = Exchange::new(RegistryRequest::Sequence(point.clone()));
             self.tx.send(x).await?;
-            if let RegistryResponse::Sequence(ret)= rx.await?? {
+            if let RegistryResponse::Sequence(ret) = rx.await?? {
                 Ok(ret)
             } else {
                 Err(RegErr::ExchangeErr)
@@ -761,7 +764,7 @@ pub mod exchange {
         async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, RegErr> {
             let (x, rx) = Exchange::new(RegistryRequest::GetProperties(point.clone()));
             self.tx.send(x).await?;
-            if let RegistryResponse::GetProperties(ret)= rx.await?? {
+            if let RegistryResponse::GetProperties(ret) = rx.await?? {
                 Ok(ret)
             } else {
                 Err(RegErr::ExchangeErr)
@@ -772,7 +775,7 @@ pub mod exchange {
             let (x, rx) = Exchange::new(RegistryRequest::Record(point.clone()));
             self.tx.send(x).await.map_err(|_| RegErr::Unreachable)?;
 
-            if let RegistryResponse::Record(ret)= rx.await?? {
+            if let RegistryResponse::Record(ret) = rx.await?? {
                 Ok(ret)
             } else {
                 Err(RegErr::ExchangeErr)
@@ -789,7 +792,7 @@ pub mod exchange {
                 query: query.clone(),
             });
             self.tx.send(x).await?;
-            if let RegistryResponse::Query(ret)= rx.await?? {
+            if let RegistryResponse::Query(ret) = rx.await?? {
                 Ok(ret)
             } else {
                 Err(RegErr::ExchangeErr)
@@ -799,7 +802,7 @@ pub mod exchange {
         async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, RegErr> {
             let (x, rx) = Exchange::new(RegistryRequest::Delete(delete.clone()));
             self.tx.send(x).await?;
-            if let RegistryResponse::Delete(ret)= rx.await?? {
+            if let RegistryResponse::Delete(ret) = rx.await?? {
                 Ok(ret)
             } else {
                 Err(RegErr::ExchangeErr)
@@ -809,7 +812,7 @@ pub mod exchange {
         async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr> {
             let (x, rx) = Exchange::new(RegistryRequest::Select(select.clone()));
             self.tx.send(x).await?;
-            if let RegistryResponse::Select(ret)= rx.await?? {
+            if let RegistryResponse::Select(ret) = rx.await?? {
                 Ok(ret)
             } else {
                 Err(RegErr::ExchangeErr)
@@ -819,7 +822,7 @@ pub mod exchange {
         async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), RegErr> {
             let (x, rx) = Exchange::new(RegistryRequest::Grant(access_grant.clone()));
             self.tx.send(x).await?;
-            if let RegistryResponse::Grant= rx.await?? {
+            if let RegistryResponse::Grant = rx.await?? {
                 Ok(())
             } else {
                 Err(RegErr::ExchangeErr)
@@ -832,7 +835,7 @@ pub mod exchange {
                 on: on.clone(),
             });
             self.tx.send(x).await?;
-            if let RegistryResponse::Access(ret)= rx.await?? {
+            if let RegistryResponse::Access(ret) = rx.await?? {
                 Ok(ret)
             } else {
                 Err(RegErr::ExchangeErr)
@@ -851,7 +854,7 @@ pub mod exchange {
                 by: by.clone(),
             });
             self.tx.send(x).await?;
-            if let RegistryResponse::Chown= rx.await?? {
+            if let RegistryResponse::Chown = rx.await?? {
                 Ok(())
             } else {
                 Err(RegErr::ExchangeErr)
@@ -868,7 +871,7 @@ pub mod exchange {
                 on: on.clone(),
             });
             self.tx.send(x).await?;
-            if let RegistryResponse::ListAccess(ret)= rx.await?? {
+            if let RegistryResponse::ListAccess(ret) = rx.await?? {
                 Ok(ret)
             } else {
                 Err(RegErr::ExchangeErr)
@@ -878,7 +881,7 @@ pub mod exchange {
         async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), RegErr> {
             let (x, rx) = Exchange::new(RegistryRequest::RemoveAccess { id, to: to.clone() });
             self.tx.send(x).await?;
-            if let RegistryResponse::RemoveAccess= rx.await?? {
+            if let RegistryResponse::RemoveAccess = rx.await?? {
                 Ok(())
             } else {
                 Err(RegErr::ExchangeErr)
@@ -909,16 +912,18 @@ pub mod exchange {
         }
     }
 
-    struct RegistryRunner {
+    struct ExchangeRunner {
         rx: tokio::sync::mpsc::Receiver<Exchange>,
         registry: Arc<dyn RegistryApi>,
     }
 
-    impl RegistryRunner {
-        pub fn new(registry: impl Into<Arc<dyn RegistryApi>>) -> tokio::sync::mpsc::Sender<Exchange> {
+    impl ExchangeRunner {
+        pub fn new(registry: Arc<dyn RegistryApi>) -> tokio::sync::mpsc::Sender<Exchange> {
             let (tx, rx) = tokio::sync::mpsc::channel(128);
-            let registry = registry.into();
-            let runner = Self { rx, registry };
+            let mut runner = Self { rx, registry };
+            tokio::spawn(async move {
+                runner.start().await;
+            });
             tx
         }
         pub async fn start(mut self) {
@@ -998,5 +1003,143 @@ pub mod exchange {
                 });
             }
         }
+    }
+}
+#[cfg(test)]
+pub mod test {
+    use super::*;
+    use crate::hyperlane::HyperwayKind::Mount;
+    use crate::registry::exchange::RegistryExchanger;
+    use mockall::mock;
+    use starlane_space::wave::exchange::asynch::Exchanger;
+
+    mock! {
+        pub Registry{
+        }
+
+        #[async_trait]
+        impl RegistryApi for Registry{
+        async fn scorch<'a>(&'a self) -> Result<(), RegErr>;
+
+        async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr>;
+
+        async fn assign_star<'a>(&'a self, point: &'a Point, star: &'a Point) -> Result<(), RegErr>;
+
+        async fn assign_host<'a>(&'a self, point: &'a Point, host: &'a Point) -> Result<(), RegErr>;
+
+        async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), RegErr>;
+
+        async fn set_properties<'a>(
+            &'a self,
+            point: &'a Point,
+            properties: &'a SetProperties,
+        ) -> Result<(), RegErr>;
+
+        async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, RegErr>;
+
+        async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, RegErr>;
+
+        async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, RegErr>;
+
+        async fn query<'a>(&'a self, point: &'a Point, query: &'a Query)
+            -> Result<QueryResult, RegErr>;
+
+        async fn delete<'a>(&'a self, d: &'a Delete) -> Result<SubstanceList, RegErr>;
+
+        //    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr>;
+
+        async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr>;
+
+        //async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, RegErr>;
+
+        async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), RegErr>;
+
+        async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, RegErr>;
+
+        async fn chown<'a>(
+            &'a self,
+            on: &'a Selector,
+            owner: &'a Point,
+            by: &'a Point,
+        ) -> Result<(), RegErr>;
+
+        async fn list_access<'a>(
+            &'a self,
+            to: &'a Option<&'a Point>,
+            on: &'a Selector,
+        ) -> Result<Vec<IndexedAccessGrant>, RegErr>;
+
+        async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), RegErr>;
+        }
+    }
+    #[tokio::test]
+    pub async fn test_mock() {
+        let mock = mock();
+        //        let registry = RegistryExchanger::new(mock);
+        test_registry(mock).await.unwrap();
+    }
+
+    #[tokio::test]
+    pub async fn test_exchanger() {
+        let mock = Arc::new(mock());
+        let registry = RegistryExchanger::new(mock.clone());
+        test_registry(registry).await.unwrap();
+        drop(mock);
+    }
+
+
+    pub fn mock() -> MockRegistry {
+        let mut mock = MockRegistry::new();
+        mock.expect_scorch().times(1).returning(|| Ok(()));
+        mock.expect_register().times(1).returning(|x| Ok(()));
+
+        mock.expect_assign_host().times(1).returning(|_, _| Ok(()));
+        mock.expect_assign_star().times(1).returning(|_, _| Ok(()));
+        mock.expect_delete()
+            .times(1)
+            .returning(|_| Ok(SubstanceList::default()));
+        mock.expect_select()
+            .times(1)
+            .returning(|_| Ok(SubstanceList::default()));
+        mock.expect_query()
+            .times(1)
+            .returning(|_, _| Ok(QueryResult::mock()));
+        mock.expect_get_properties()
+            .times(1)
+            .returning(|_| Ok(Properties::new()));
+        mock.expect_sequence().times(1).returning(|_| Ok(64u64));
+        mock.expect_set_properties()
+            .times(1)
+            .returning(|_, _| Ok(()));
+        mock.expect_set_status().times(1).returning(|_, _| Ok(()));
+        mock.expect_record()
+            .times(1)
+            .returning(|_| Ok(ParticleRecord::mock()));
+
+        mock
+    }
+
+    async fn test_registry(mock: impl RegistryApi + Send + Sync + 'static) -> anyhow::Result<()>{
+        mock.scorch().await.unwrap();
+        mock.register(&Registration::mock()).await.unwrap();
+        mock.assign_host(&Point::root(), &Point::root())
+            .await
+            .unwrap();
+        mock.assign_star(&Point::root(), &Point::root())
+            .await
+            .unwrap();
+        mock.delete(&Delete::mock()).await.unwrap();
+        mock.select(&mut Select::mock()).await.unwrap();
+        mock.query(&Point::root(), &Query::mock()).await.unwrap();
+        mock.get_properties(&Point::root()).await.unwrap();
+        mock.sequence(&Point::root()).await.unwrap();
+        mock.set_properties(&Point::root(), &SetProperties::new())
+            .await
+            .unwrap();
+        mock.set_status(&Point::hyper_user(), &Status::Ready)
+            .await
+            .unwrap();
+        mock.record(&Point::global_depedencies()).await.unwrap();
+        Ok(())
     }
 }
