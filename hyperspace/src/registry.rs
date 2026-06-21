@@ -1,5 +1,4 @@
 use crate::base::config::{BaseConfig, BaseSubConfig};
-use crate::registry::exchange::MuxedRequest;
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::command::direct::delete::Delete;
@@ -573,11 +572,11 @@ impl TryInto<Result<Vec<IndexedAccessGrant>, RegErr>> for RegistryResponse {
 }
 
 pub mod exchange {
-    use crate::registry::{RegErr, Registration, RegistryApi, RegistryRequest, RegistryResponse};
+    use crate::registry::{ RegErr, Registration, RegistryApi, RegistryRequest, RegistryResponse};
     use anyhow::anyhow;
     use async_trait::async_trait;
     use dashmap::DashMap;
-    use futures::{Sink, SinkExt, Stream, StreamExt};
+    use futures::{ Sink, SinkExt, Stream, StreamExt};
     use itertools::Itertools;
     use mockall::PredicateBoxExt;
     use starlane_space::types::registry::Registry;
@@ -598,7 +597,9 @@ pub mod exchange {
     use std::time::Duration;
     use nom::AsBytes;
     use serde::{Deserialize, Serialize};
+    use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
     use tokio::sync::mpsc::error::SendError;
+    use tokio_pipe::PipeWrite;
     use tokio_util::bytes::{BufMut, BytesMut};
     use tokio_util::codec::{
         Decoder, Encoder, Framed, FramedRead, FramedWrite, LengthDelimitedCodec, LinesCodec,
@@ -755,9 +756,21 @@ pub mod exchange {
     impl<T, S> MuxFramedWriter<T, S>
     where
         T: Send + Sync + 'static,
-        S: SinkExt<T> + Sink<T, Error = anyhow::Error> + Send + Sync + std::marker::Unpin + 'static,
-    {
-        pub fn new(sink: S) -> tokio::sync::mpsc::Sender<T> {
+        S:  Sink<T, Error = anyhow::Error> + Send + Sync + std::marker::Unpin + 'static {
+
+
+        /*
+        pub fn from_write<W>( write: W ) -> tokio::sync::mpsc::Sender<T> where W: AsyncWrite + Send + Sync + Unpin+'static, T: serde::Serialize+serde::de::DeserializeOwned + Sync + 'static+ Display, {
+            let codec: SerdeCodec<T> = SerdeCodec::default();
+            let sink = FramedWrite::new( write, codec);
+            Self::new(sink)
+        }
+
+         */
+
+        pub fn new(sink: S) -> tokio::sync::mpsc::Sender<T>     where
+            T: Send + Sync,
+            S:  Sink<T, Error = anyhow::Error> + Send + Sync + std::marker::Unpin,{
             let (tx, rx) = tokio::sync::mpsc::channel(128);
             let writer = Self { rx, sink };
             tokio::spawn(async move { writer.start().await });
@@ -788,6 +801,14 @@ pub mod exchange {
         T: Send + Sync + Display,
         S: StreamExt<Item = Result<T, anyhow::Error>> + Send + Sync + std::marker::Unpin + 'static,
     {
+        /*
+        pub fn from_read( read: impl AsyncReadExt ) -> tokio::sync::mpsc::Receiver<T>where T: Display+serde::Serialize+serde::de::DeserializeOwned {
+            let stream = FramedRead::new(read, SerdeCodec::default());
+            Self::new(stream)
+        }
+
+         */
+
         pub fn new(stream: S) -> tokio::sync::mpsc::Receiver<T> {
             let (tx, rx) = tokio::sync::mpsc::channel(128);
             let reader = Self { tx, stream };
@@ -823,6 +844,15 @@ pub mod exchange {
 
             Self::new(client_request_sink, server_response_stream)
         }
+
+        pub fn from_connection<R,W>( read: R, write: W ) -> Self where R: AsyncRead  + Send + Sync +Unpin+'static, W: AsyncWrite + AsyncRead + Send + Sync + Unpin+'static, {
+            let sink= MuxFramedWriter::new(FramedWrite::new(write,MuxedRequestCodec::default()));
+            let stream = MuxFramedReader::new(FramedRead::new(read,MuxedResultCodec::default()));
+            Self::new(sink, stream)
+        }
+
+
+
 
         pub fn new(
             sink: tokio::sync::mpsc::Sender<MuxedRequest>,
@@ -956,17 +986,28 @@ pub mod exchange {
         result: RegistryResult,
     }
 
+    impl Display for MuxedResult {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", format!("{}(result) -> {}", self.id, RegistryResultType::from(&self.result).to_string()))
+        }
+    }
+
     impl MuxedResult {
         pub fn new(result: RegistryResult, id: u64) -> Self {
             Self { id, result }
         }
     }
 
-    #[derive(Debug, Serialize, Deserialize, Clone)]
+    #[derive(Debug, Serialize, Deserialize, Clone,strum_macros::EnumDiscriminants)]
+    #[strum_discriminants(vis(pub))]
+    #[strum_discriminants(name(RegistryResultType))]
+    #[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
     pub enum RegistryResult {
         Ok(RegistryResponse),
         Err(RegErr),
     }
+
+
 
     impl From<Result<RegistryResponse, RegErr>> for RegistryResult {
         fn from(result: Result<RegistryResponse, RegErr>) -> Self {
@@ -1373,7 +1414,7 @@ pub mod test {
     use std::time::Duration;
     use super::*;
     use crate::hyperlane::HyperwayKind::Mount;
-    use crate::registry::exchange::{MuxRegistryClient, RegistryExchanger};
+    use crate::registry::exchange::{MuxRegistryClient, MuxedRequest, RegistryExchanger};
     use mockall::mock;
     use tokio_util::codec::{FramedRead, FramedWrite};
     use starlane_space::wave::exchange::asynch::Exchanger;
@@ -1526,11 +1567,12 @@ pub mod test {
         let REQUEST: MuxedRequest = MuxedRequest::new(RegistryRequest::Scorch, 1_u64);
 
         let tx = {
-            let write = FramedWrite::new(write, crate::registry::exchange::MuxedRequestCodec::default());
+            let write= FramedWrite::new(write, crate::registry::exchange::MuxedRequestCodec::default());
             crate::registry::exchange::MuxFramedWriter::new(write)
         };
 
         let mut read = FramedRead::new(read, crate::registry::exchange::MuxedRequestCodec::default());
+
 
         let mut read = crate::registry::exchange::MuxFramedReader::new(read);
 
