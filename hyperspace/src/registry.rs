@@ -575,6 +575,7 @@ pub mod exchange {
     use async_trait::async_trait;
     use dashmap::DashMap;
     use itertools::Itertools;
+    use serde_derive::{Deserialize, Serialize};
     use starlane_space::types::registry::Registry;
     use starlane_space::wave::exchange::asynch::Exchanger;
     use starlane_space::{
@@ -585,7 +586,6 @@ pub mod exchange {
     use std::marker::PhantomData;
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
     use std::sync::Arc;
-    use serde_derive::{Deserialize, Serialize};
     use tokio::sync::mpsc::error::SendError;
 
     trait RegistryResponseHolder {
@@ -742,81 +742,121 @@ pub mod exchange {
     pub struct MuxExchanger {
         sequence: AtomicU64,
         map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>,
-        sink: Box<dyn MuxSink>
+        sink: Box<dyn MuxSink<MuxedRequest>>,
     }
 
     #[async_trait]
-    pub trait MuxSink: Send+Sync {
-        async fn write(&self, x: MuxedRequest) -> Result<(),RegErr>;
+    pub trait MuxSink<F>: Send + Sync {
+        async fn write(&self, x: F) -> Result<(), RegErr>;
     }
 
     #[async_trait]
-    pub trait MuxStream: Send+Sync{
-        async fn read(&self) -> Result<Option<MuxedResult>,RegErr>;
+    pub trait MuxStream<F>: Send + Sync {
+        async fn read(&self) -> Option<F>;
     }
-
 
     impl MuxExchanger {
-        pub fn new(sink: Box<dyn MuxSink>,stream: Box<dyn MuxStream>) -> Self {
+        pub fn new(sink: Box<dyn MuxSink<MuxedRequest>>, stream: Box<dyn MuxStream<MuxedResult>>) -> Self {
             /// start the receiver
             let map = Arc::new(DashMap::new());
-            MuxReceiver::new(stream, map.clone());
+            MuxResultReceiver::new(stream, map.clone());
 
             let sequence = AtomicU64::new(0u64);
             Self {
                 sequence,
                 map,
-                sink
+                sink,
             }
-
         }
-
     }
 
     #[async_trait]
     impl Sender for MuxExchanger {
         async fn send<R, F>(&self, request: RegistryRequest, expect: F) -> Result<R, RegErr>
         where
-            F: Fn(RegistryResponse) -> Result<R, RegErr> + Send + Sync
+            F: Fn(RegistryResponse) -> Result<R, RegErr> + Send + Sync,
         {
             let id = self.sequence.fetch_add(1u64, Ordering::Relaxed);
             let request = MuxedRequest::new(request, id);
             let (res_tx, res_rx) = tokio::sync::oneshot::channel();
             self.map.insert(id, res_tx);
             self.sink.write(request).await?;
-            let response= res_rx .await??;
+            let response = res_rx.await??;
             expect(response)
         }
     }
 
-
-    struct MuxReceiver {
-        stream: Box<dyn MuxStream>,
+    struct MuxResultReceiver {
+        stream: Box<dyn MuxStream<MuxedResult>>,
         map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>,
     }
 
-    impl MuxReceiver {
+    impl MuxResultReceiver {
         pub fn new(
-            stream: Box<dyn MuxStream>,
-            map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>
+            stream: Box<dyn MuxStream<MuxedResult>>,
+            map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>,
         ) {
-            let mut runner = Self {
-                stream,
-                map,
-            };
+            let mut runner = Self { stream, map };
 
             tokio::spawn(async move { runner.start().await });
         }
 
         async fn start(mut self) {
-            while let Ok(Some(res)) = self.stream.read().await {
-                if let Some((_,tx)) = self.map.remove(&res.id) {
-                   tx.send(res.result.into());
+            while let Some(res) = self.stream.read().await {
+                if let Some((_, tx)) = self.map.remove(&res.id) {
+                    tx.send(res.result.into());
                 }
             }
         }
     }
 
+    pub struct MuxedRegistryServer {
+        sink_tx: tokio::sync::mpsc::Sender<MuxedResult>,
+        stream: Box<dyn MuxStream<MuxedRequest>>,
+        tx: tokio::sync::mpsc::Sender<Exchange>,
+    }
+
+    impl MuxedRegistryServer {
+        pub fn new(
+            registry: Arc<dyn RegistryApi>,
+            stream: Box<dyn MuxStream<MuxedRequest>>,
+            sink: Box<dyn MuxSink<MuxedResult>>,
+        ) -> Self {
+            let tx = ExchangeRunner::new(registry);
+            let (sink_tx,mut sink_rx) = tokio::sync::mpsc::channel(100);
+            tokio::spawn(async move {
+                while let Some(frame) = sink_rx.recv().await {
+                    if let Err(_) = sink.write(frame).await {
+                        break;
+                    }
+                }
+            });
+            Self { stream, sink_tx, tx }
+        }
+
+        async fn start(mut self) {
+            while let Some(req) = self.stream.read().await {
+                let tx = self.tx.clone();
+                let sink = self.sink_tx.clone();
+                tokio::spawn(async move {
+                    let res = RegistryResult::from(send(tx, req.request).await);
+                    let res = MuxedResult::new(res, req.id);
+                    sink.send(res).await;
+
+                    async fn send(
+                        tx: tokio::sync::mpsc::Sender<Exchange>,
+                        req: RegistryRequest,
+                    ) -> Result<RegistryResponse, RegErr> {
+                        let (exchange, mut rx) = Exchange::new(req);
+                        tx.send(exchange).await?;
+                        rx.await?
+                    }
+                });
+            }
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
     pub struct MuxedRequest {
         id: u64,
         request: RegistryRequest,
@@ -828,15 +868,31 @@ pub mod exchange {
         }
     }
 
+    #[derive(Serialize, Deserialize)]
     pub struct MuxedResult {
         id: u64,
         result: RegistryResult,
     }
 
-    #[derive(Debug,Serialize,Deserialize,Clone)]
+    impl MuxedResult {
+        pub fn new(result: RegistryResult, id: u64) -> Self {
+            Self { id, result }
+        }
+    }
+
+    #[derive(Debug, Serialize, Deserialize, Clone)]
     pub enum RegistryResult {
         Ok(RegistryResponse),
-        Err(RegErr)
+        Err(RegErr),
+    }
+
+    impl From<Result<RegistryResponse, RegErr>> for RegistryResult {
+        fn from(result: Result<RegistryResponse, RegErr>) -> Self {
+            match result {
+                Ok(result) => Self::Ok(result),
+                Err(err) => Self::Err(err),
+            }
+        }
     }
 
     impl Into<Result<RegistryResponse, RegErr>> for RegistryResult {
@@ -849,18 +905,14 @@ pub mod exchange {
     }
 
     #[async_trait]
-    trait Sender: Send+Sync {
-
-        async fn send<R,F>(
-            &self,
-            request: RegistryRequest,
-            expect: F,
-        ) -> Result<R, RegErr> where F: Fn(RegistryResponse) -> Result<R, RegErr>+Send+Sync;
-
+    trait Sender: Send + Sync {
+        async fn send<R, F>(&self, request: RegistryRequest, expect: F) -> Result<R, RegErr>
+        where
+            F: Fn(RegistryResponse) -> Result<R, RegErr> + Send + Sync;
     }
 
     #[async_trait]
-    impl <S: Sender> RegistryApi for S  {
+    impl<S: Sender> RegistryApi for S {
         async fn scorch<'a>(&'a self) -> Result<(), RegErr> {
             self.send(RegistryRequest::Scorch, transform::scorch).await
         }
@@ -882,7 +934,7 @@ pub mod exchange {
                 RegistryRequest::AssignStar { point, star },
                 transform::assign_star,
             )
-                .await
+            .await
         }
 
         async fn assign_host<'a>(
@@ -896,7 +948,7 @@ pub mod exchange {
                 RegistryRequest::AssignHost { point, host },
                 transform::assign_host,
             )
-                .await
+            .await
         }
 
         async fn set_status<'a>(
@@ -910,7 +962,7 @@ pub mod exchange {
                 RegistryRequest::SetStatus { point, status },
                 transform::set_status,
             )
-                .await
+            .await
         }
 
         async fn set_properties<'a>(
@@ -1035,7 +1087,7 @@ pub mod exchange {
     impl Sender for OldRegistryExchanger {
         async fn send<R, F>(&self, request: RegistryRequest, expect: F) -> Result<R, RegErr>
         where
-            F: Fn(RegistryResponse) -> Result<R, RegErr> +Send+Sync
+            F: Fn(RegistryResponse) -> Result<R, RegErr> + Send + Sync,
         {
             let (exchange, mut rx) = Exchange::new(request);
             self.tx.send(exchange).await?;
