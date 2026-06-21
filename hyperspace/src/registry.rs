@@ -580,7 +580,6 @@ pub mod exchange {
     use futures::{Sink, SinkExt, Stream, StreamExt};
     use itertools::Itertools;
     use mockall::PredicateBoxExt;
-    use serde_derive::{Deserialize, Serialize};
     use starlane_space::types::registry::Registry;
     use starlane_space::wave::exchange::asynch::Exchanger;
     use starlane_space::{
@@ -598,6 +597,7 @@ pub mod exchange {
     use std::task::{Context, Poll};
     use std::time::Duration;
     use nom::AsBytes;
+    use serde::{Deserialize, Serialize};
     use tokio::sync::mpsc::error::SendError;
     use tokio_util::bytes::{BufMut, BytesMut};
     use tokio_util::codec::{
@@ -743,7 +743,7 @@ pub mod exchange {
         }
     }
 
-    struct MuxFramedWriter<T, S>
+    pub struct MuxFramedWriter<T, S>
     where
         T: Send + Sync,
         S: SinkExt<T> + Sink<T, Error = anyhow::Error> + Send + Sync + std::marker::Unpin,
@@ -774,7 +774,7 @@ pub mod exchange {
         }
     }
 
-    struct MuxFramedReader<T, S>
+    pub struct MuxFramedReader<T, S>
     where
         T: Display + Send + Sync + 'static,
         S: StreamExt<Item = Result<T, anyhow::Error>> + Send + Sync + std::marker::Unpin + 'static,
@@ -805,34 +805,7 @@ pub mod exchange {
         }
     }
 
-    #[tokio::test]
-    pub async fn test_mux_framed_writer() {
-        let x = LengthDelimitedCodec::new();
 
-        let (read, write) = tokio_pipe::pipe().unwrap();
-
-        let REQUEST: MuxedRequest = MuxedRequest::new(RegistryRequest::Scorch, 1_u64);
-
-        let tx = {
-            let write = FramedWrite::new(write, MuxedRequestCodec::default());
-            MuxFramedWriter::new(write)
-        };
-
-        let mut read = FramedRead::new(read, MuxedRequestCodec::default());
-
-        let mut read = MuxFramedReader::new(read);
-
-        tx.send(REQUEST.clone()).await.unwrap();
-
-        let from_read = tokio::time::timeout(Duration::from_secs(1), read.recv())
-            .await
-            .unwrap()
-            .unwrap();
-
-        println!("Received FROM! {}", from_read.request.to_string());
-
-        assert_eq!(REQUEST, from_read);
-    }
 
     pub struct MuxRegistryClient {
         sequence: AtomicU64,
@@ -961,8 +934,8 @@ pub mod exchange {
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub struct MuxedRequest {
-        id: u64,
-        request: RegistryRequest,
+        pub id: u64,
+        pub request: RegistryRequest,
     }
 
     impl Display for MuxedRequest {
@@ -1013,10 +986,9 @@ pub mod exchange {
         }
     }
 
+    /*
     #[derive(Default)]
     struct MuxedRequestCodec(LengthDelimitedCodec);
-    #[derive(Default)]
-    struct MuxedResultCodec;
 
     impl Decoder for MuxedRequestCodec {
         type Item = MuxedRequest;
@@ -1039,37 +1011,59 @@ pub mod exchange {
             Ok(())
         }
     }
-    impl Decoder for MuxedResultCodec {
-        type Item = MuxedResult;
-        type Error = anyhow::Error;
 
-        fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-            Ok(Some(bincode::deserialize_from(&**src)?))
+     */
+    pub type MuxedRequestCodec = SerdeCodec<MuxedRequest>;
+    pub type MuxedResultCodec = SerdeCodec<MuxedResult>;
+
+    pub struct SerdeCodec<T> where T: Display+serde::Serialize+serde::de::DeserializeOwned {
+        length_codec: LengthDelimitedCodec,
+        _phantom: PhantomData<T>,
+    }
+
+    impl <T> Default for SerdeCodec<T> where T: Display+serde::Serialize+serde::de::DeserializeOwned {
+        fn default() -> Self {
+            Self {
+                length_codec: LengthDelimitedCodec::default(),
+                _phantom: PhantomData::default()
+            }
         }
     }
 
-    impl Encoder<MuxedResult> for MuxedResultCodec {
+    impl <T> Encoder<T> for SerdeCodec<T> where T: Display+serde::Serialize+serde::de::DeserializeOwned {
         type Error = anyhow::Error;
 
-        fn encode(&mut self, item: MuxedResult, dst: &mut BytesMut) -> Result<(), Self::Error> {
-            bincode::serialize_into(&mut **dst, &item)?;
+        fn encode(&mut self, item: T, dst: &mut BytesMut) -> Result<(), Self::Error> {
+            println!("encode");
+            let data = bincode::serialize(& item)?;
+            println!("encoded data: {}", data.len());
+            self.length_codec.encode(data.into(),dst)?;
+            println!("final encoded data: {}", dst.len());
             Ok(())
         }
     }
+    impl <T> Decoder for SerdeCodec<T> where T: Display+serde::Serialize+serde::de::DeserializeOwned{
 
-    type MuxedRequestFrameWrite<T> = FramedWrite<T, MuxedRequestCodec>;
-    type MuxedRequestFrameRead<T> = FramedRead<T, MuxedRequestCodec>;
+        type Item = T;
+        type Error = anyhow::Error;
 
-    type MuxedResultFrameWrite<T> = FramedWrite<T, MuxedResultCodec>;
-    type MuxedResultFrameRead<T> = FramedRead<T, MuxedResultCodec>;
-
-    struct FramedSink<T, S, C>
-    where
-        C: Encoder<T>,
-    {
-        writer: FramedWrite<S, C>,
-        _phantom: PhantomData<T>,
+        fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+            println!("DECODE");
+            use tokio_util::bytes::Buf;
+            let mut data = self.length_codec.decode(src)?.ok_or(anyhow::Error::msg("No data"))?;
+            println!("DATA: {}",data.len());
+            let t= bincode::deserialize(& mut data)?;
+            println!("Got T: {}",t);
+            Ok(Some(t))
+        }
     }
+
+
+
+
+
+
+
 
     #[async_trait]
     trait Sender: Send + Sync {
@@ -1376,10 +1370,12 @@ pub mod exchange {
 
 #[cfg(test)]
 pub mod test {
+    use std::time::Duration;
     use super::*;
     use crate::hyperlane::HyperwayKind::Mount;
     use crate::registry::exchange::{MuxRegistryClient, RegistryExchanger};
     use mockall::mock;
+    use tokio_util::codec::{FramedRead, FramedWrite};
     use starlane_space::wave::exchange::asynch::Exchanger;
 
     mock! {
@@ -1518,5 +1514,35 @@ pub mod test {
             .unwrap();
         mock.record(&Point::global_depedencies()).await.unwrap();
         Ok(())
+    }
+
+
+    #[tokio::test]
+    pub async fn test_mux_framed_writer() {
+
+
+        let (read, write) = tokio_pipe::pipe().unwrap();
+
+        let REQUEST: MuxedRequest = MuxedRequest::new(RegistryRequest::Scorch, 1_u64);
+
+        let tx = {
+            let write = FramedWrite::new(write, crate::registry::exchange::MuxedRequestCodec::default());
+            crate::registry::exchange::MuxFramedWriter::new(write)
+        };
+
+        let mut read = FramedRead::new(read, crate::registry::exchange::MuxedRequestCodec::default());
+
+        let mut read = crate::registry::exchange::MuxFramedReader::new(read);
+
+        tx.send(REQUEST.clone()).await.unwrap();
+
+        let from_read = tokio::time::timeout(Duration::from_secs(1), read.recv())
+            .await
+            .unwrap()
+            .unwrap();
+
+        println!("Received FROM! {}", from_read.request.to_string());
+
+        assert_eq!(REQUEST, from_read);
     }
 }
