@@ -35,9 +35,10 @@ starlane-host= { package="starlane-host", path= "host" }
 lazy_static = "1.5.0"
 uuid = { version="1.17.0" }
 chrono = { version="0.4.41" }
-tokio = "1.45.1"
+tokio = "1.52.1"
 tokio-pipe = "0.2.12"
 tokio-rustls = "0.26.2"
+tokio-util = "0.7.18"
 getset = "0.1.6"
 toml = "0.9.8"
 bollard = "0.19.3"

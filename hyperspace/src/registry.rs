@@ -590,11 +590,8 @@ pub mod exchange {
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
     use std::sync::Arc;
     use tokio::sync::mpsc::error::SendError;
-
-    trait RegistryResponseHolder {
-        fn response(self) -> RegistryResponse;
-        fn response_ref(&self) -> &RegistryResponse;
-    }
+    use tokio_util::bytes::BytesMut;
+    use tokio_util::codec::{Decoder, Encoder, Framed, FramedRead, FramedWrite};
 
     mod transform {
         use super::*;
@@ -735,12 +732,8 @@ pub mod exchange {
         }
     }
 
-    /*
-    fn transform<X,R>( result: Result<X,RegErr>, expect: impl Fn(&RegistryResponse) -> Result<R,RegErr>) -> Result<R,RegErr> {
-        expect()
-    }
 
-     */
+
 
     pub struct MuxRegistryClient {
         sequence: AtomicU64,
@@ -785,7 +778,7 @@ pub mod exchange {
     where
         T: Send + Sync,
     {
-        async fn write(&self, x: T) -> Result<(), RegErr> {
+        async fn write(&mut self, x: T) -> Result<(), RegErr> {
             self.0.send(x).await?;
             Ok(())
         }
@@ -972,6 +965,59 @@ pub mod exchange {
             }
         }
     }
+
+    #[derive(Default)]
+    struct MuxedRequestCodec;
+    #[derive(Default)]
+    struct MuxedResultCodec;
+
+    impl Decoder for MuxedRequestCodec {
+        type Item = MuxedRequest;
+        type Error = anyhow::Error;
+
+        fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+            Ok(Some(bincode::deserialize_from(& **src)?))
+        }
+    }
+
+    impl Encoder<MuxedRequest> for MuxedRequestCodec {
+        type Error = anyhow::Error;
+
+        fn encode(&mut self, item: MuxedRequest, dst: &mut BytesMut) -> Result<(), Self::Error> {
+            bincode::serialize_into(&mut **dst,&item)?;
+            Ok(())
+        }
+    }
+    impl Decoder for MuxedResultCodec {
+        type Item = MuxedResult;
+        type Error = anyhow::Error;
+
+        fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+            Ok(Some(bincode::deserialize_from(& **src)?))
+        }
+    }
+
+    impl Encoder<MuxedResult> for MuxedResultCodec {
+        type Error = anyhow::Error;
+
+        fn encode(&mut self, item: MuxedResult, dst: &mut BytesMut) -> Result<(), Self::Error> {
+            bincode::serialize_into(&mut **dst,&item)?;
+            Ok(())
+        }
+    }
+
+    type MuxedRequestFrameWrite<T> = FramedWrite<T,MuxedRequestCodec>;
+    type MuxedRequestFrameRead<T> = FramedRead<T,MuxedRequestCodec>;
+
+    type MuxedResultFrameWrite<T> = FramedWrite<T,MuxedResultCodec>;
+    type MuxedResultFrameRead<T> = FramedRead<T,MuxedResultCodec>;
+
+    struct FramedSink<T,S,C> where C: Encoder<T> {
+         writer: FramedWrite<S,C>,
+         _phantom: PhantomData<T>
+    }
+
+
 
     #[async_trait]
     trait Sender: Send + Sync {
@@ -1164,159 +1210,6 @@ pub mod exchange {
             expect(result)
         }
     }
-
-    /*
-    #[async_trait::async_trait]
-    impl RegistryApi for OldRegistryExchanger {
-        async fn scorch<'a>(&'a self) -> Result<(), RegErr> {
-            self.send(RegistryRequest::Scorch, transform::scorch).await
-        }
-
-        async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr> {
-            let registration = registration.clone();
-            self.send(RegistryRequest::Register(registration), transform::register)
-                .await
-        }
-
-        async fn assign_star<'a>(
-            &'a self,
-            point: &'a Point,
-            star: &'a Point,
-        ) -> Result<(), RegErr> {
-            let point = point.clone();
-            let star = star.clone();
-            self.send(
-                RegistryRequest::AssignStar { point, star },
-                transform::assign_star,
-            )
-            .await
-        }
-
-        async fn assign_host<'a>(
-            &'a self,
-            point: &'a Point,
-            host: &'a Point,
-        ) -> Result<(), RegErr> {
-            let point = point.clone();
-            let host = host.clone();
-            self.send(
-                RegistryRequest::AssignHost { point, host },
-                transform::assign_host,
-            )
-            .await
-        }
-
-        async fn set_status<'a>(
-            &'a self,
-            point: &'a Point,
-            status: &'a Status,
-        ) -> Result<(), RegErr> {
-            let point = point.clone();
-            let status = status.clone();
-            self.send(
-                RegistryRequest::SetStatus { point, status },
-                transform::set_status,
-            )
-            .await
-        }
-
-        async fn set_properties<'a>(
-            &'a self,
-            point: &'a Point,
-            properties: &'a SetProperties,
-        ) -> Result<(), RegErr> {
-            let point = point.clone();
-            let properties = properties.clone();
-            let request = RegistryRequest::SetProperties { point, properties };
-            self.send(request, transform::set_properties).await
-        }
-
-        async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, RegErr> {
-            let point = point.clone();
-            let request = RegistryRequest::Sequence(point);
-            self.send(request, transform::sequence).await
-        }
-
-        async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, RegErr> {
-            let point = point.clone();
-            let request = RegistryRequest::GetProperties(point);
-            self.send(request, transform::get_properties).await
-        }
-
-        async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, RegErr> {
-            let point = point.clone();
-            let request = RegistryRequest::Record(point);
-            self.send(request, transform::record).await
-        }
-
-        async fn query<'a>(
-            &'a self,
-            point: &'a Point,
-            query: &'a Query,
-        ) -> Result<QueryResult, RegErr> {
-            let point = point.clone();
-            let query = query.clone();
-            let request = RegistryRequest::Query { point, query };
-            self.send(request, transform::query).await
-        }
-
-        async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, RegErr> {
-            let delete = delete.clone();
-            let request = RegistryRequest::Delete(delete);
-            self.send(request, transform::delete).await
-        }
-
-        async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr> {
-            let select = select.clone();
-            let request = RegistryRequest::Select(select);
-            self.send(request, transform::select).await
-        }
-
-        async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), RegErr> {
-            let access_grant = access_grant.clone();
-            let request = RegistryRequest::Grant(access_grant);
-            self.send(request, transform::grant).await
-        }
-
-        async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, RegErr> {
-            let to = to.clone();
-            let on = on.clone();
-            let request = RegistryRequest::Access { to, on };
-            self.send(request, transform::access).await
-        }
-
-        async fn chown<'a>(
-            &'a self,
-            on: &'a Selector,
-            owner: &'a Point,
-            by: &'a Point,
-        ) -> Result<(), RegErr> {
-            let on = on.clone();
-            let owner = owner.clone();
-            let by = by.clone();
-            let request = RegistryRequest::Chown { on, owner, by };
-            self.send(request, transform::chown).await
-        }
-
-        async fn list_access<'a>(
-            &'a self,
-            to: &'a Option<&'a Point>,
-            on: &'a Selector,
-        ) -> Result<Vec<IndexedAccessGrant>, RegErr> {
-            let to = to.map(|p| p.clone());
-            let on = on.clone();
-            let request = RegistryRequest::ListAccess { to, on };
-            self.send(request, transform::list_access).await
-        }
-
-        async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), RegErr> {
-            let to = to.clone();
-            let request = RegistryRequest::RemoveAccess { id, to };
-            self.send(request, transform::remove_access).await
-        }
-    }
-
-     */
 
     struct Exchange {
         pub request: RegistryRequest,

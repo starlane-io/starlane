@@ -4667,6 +4667,7 @@ dependencies = [
  "tokio",
  "tokio-pipe",
  "tokio-rustls",
+ "tokio-util",
  "tracing",
  "tracing-core",
  "url",
