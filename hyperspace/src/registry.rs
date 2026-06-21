@@ -574,8 +574,10 @@ impl TryInto<Result<Vec<IndexedAccessGrant>, RegErr>> for RegistryResponse {
 
 pub mod exchange {
     use crate::registry::{RegErr, Registration, RegistryApi, RegistryRequest, RegistryResponse};
+    use anyhow::anyhow;
     use async_trait::async_trait;
     use dashmap::DashMap;
+    use futures::{Sink, SinkExt, Stream, StreamExt};
     use itertools::Itertools;
     use mockall::PredicateBoxExt;
     use serde_derive::{Deserialize, Serialize};
@@ -586,12 +588,21 @@ pub mod exchange {
         QueryResult, Select, Selector, SetProperties, Status, Stub, SubSelect, SubstanceList,
     };
     use std::collections::HashMap;
+    use std::fmt::Display;
+    use std::io;
+    use std::io::Write;
     use std::marker::PhantomData;
+    use std::pin::Pin;
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::task::{Context, Poll};
+    use std::time::Duration;
+    use nom::AsBytes;
     use tokio::sync::mpsc::error::SendError;
-    use tokio_util::bytes::BytesMut;
-    use tokio_util::codec::{Decoder, Encoder, Framed, FramedRead, FramedWrite};
+    use tokio_util::bytes::{BufMut, BytesMut};
+    use tokio_util::codec::{
+        Decoder, Encoder, Framed, FramedRead, FramedWrite, LengthDelimitedCodec, LinesCodec,
+    };
 
     mod transform {
         use super::*;
@@ -732,78 +743,108 @@ pub mod exchange {
         }
     }
 
+    struct MuxFramedWriter<T, S>
+    where
+        T: Send + Sync,
+        S: SinkExt<T> + Sink<T, Error = anyhow::Error> + Send + Sync + std::marker::Unpin,
+    {
+        rx: tokio::sync::mpsc::Receiver<T>,
+        sink: S,
+    }
 
+    impl<T, S> MuxFramedWriter<T, S>
+    where
+        T: Send + Sync + 'static,
+        S: SinkExt<T> + Sink<T, Error = anyhow::Error> + Send + Sync + std::marker::Unpin + 'static,
+    {
+        pub fn new(sink: S) -> tokio::sync::mpsc::Sender<T> {
+            let (tx, rx) = tokio::sync::mpsc::channel(128);
+            let writer = Self { rx, sink };
+            tokio::spawn(async move { writer.start().await });
+            tx
+        }
 
+        async fn start(mut self) {
+            while let Some(frame) = self.rx.recv().await {
+                if let Err(err) = self.sink.send(frame).await {
+                    println!("error sending frame: {}", err);
+                    break;
+                }
+            }
+        }
+    }
+
+    struct MuxFramedReader<T, S>
+    where
+        T: Display + Send + Sync + 'static,
+        S: StreamExt<Item = Result<T, anyhow::Error>> + Send + Sync + std::marker::Unpin + 'static,
+    {
+        tx: tokio::sync::mpsc::Sender<T>,
+        stream: S,
+    }
+
+    impl<T, S> MuxFramedReader<T, S>
+    where
+        T: Send + Sync + Display,
+        S: StreamExt<Item = Result<T, anyhow::Error>> + Send + Sync + std::marker::Unpin + 'static,
+    {
+        pub fn new(stream: S) -> tokio::sync::mpsc::Receiver<T> {
+            let (tx, rx) = tokio::sync::mpsc::channel(128);
+            let reader = Self { tx, stream };
+            tokio::spawn(async move { reader.start().await });
+            rx
+        }
+
+        async fn start(mut self) {
+            while let Some(Ok(t)) = self.stream.next().await {
+                if let Err(err) = self.tx.send(t).await {
+                    println!("read send err...{}", err);
+                    break;
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    pub async fn test_mux_framed_writer() {
+        let x = LengthDelimitedCodec::new();
+
+        let (read, write) = tokio_pipe::pipe().unwrap();
+
+        let REQUEST: MuxedRequest = MuxedRequest::new(RegistryRequest::Scorch, 1_u64);
+
+        let tx = {
+            let write = FramedWrite::new(write, MuxedRequestCodec::default());
+            MuxFramedWriter::new(write)
+        };
+
+        let mut read = FramedRead::new(read, MuxedRequestCodec::default());
+
+        let mut read = MuxFramedReader::new(read);
+
+        tx.send(REQUEST.clone()).await.unwrap();
+
+        let from_read = tokio::time::timeout(Duration::from_secs(1), read.recv())
+            .await
+            .unwrap()
+            .unwrap();
+
+        println!("Received FROM! {}", from_read.request.to_string());
+
+        assert_eq!(REQUEST, from_read);
+    }
 
     pub struct MuxRegistryClient {
         sequence: AtomicU64,
         map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>,
-        sink: Box<dyn MuxSink<MuxedRequest>>,
-    }
-
-    #[async_trait]
-    pub trait MuxSink<F>: Send + Sync {
-        async fn write(&self, x: F) -> Result<(), RegErr>;
-    }
-
-    pub struct StreamRx<T>(tokio::sync::mpsc::Receiver<T>)
-    where
-        T: Send + Sync;
-
-    #[async_trait]
-    impl<T> MuxStream<T> for StreamRx<T>
-    where
-        T: Send + Sync,
-    {
-        async fn read(&mut self) -> Option<T> {
-            self.0.recv().await
-        }
-    }
-
-    pub struct SinkTx<T>(tokio::sync::mpsc::Sender<T>)
-    where
-        T: Send + Sync;
-    impl<T> SinkTx<T>
-    where
-        T: Send + Sync,
-    {
-        pub fn channel() -> (SinkTx<T>, StreamRx<T>) {
-            let (tx, rx) = tokio::sync::mpsc::channel(100);
-            (SinkTx(tx), StreamRx(rx))
-        }
-    }
-
-    #[async_trait]
-    impl<T> MuxSink<T> for SinkTx<T>
-    where
-        T: Send + Sync,
-    {
-        async fn write(&mut self, x: T) -> Result<(), RegErr> {
-            self.0.send(x).await?;
-            Ok(())
-        }
-    }
-
-    #[async_trait]
-    pub trait MuxStream<F>: Send + Sync {
-        async fn read(&mut self) -> Option<F>;
+        sink: tokio::sync::mpsc::Sender<MuxedRequest>,
     }
 
     impl MuxRegistryClient {
         pub fn local(registry: Arc<dyn RegistryApi>) -> Self {
-            let (client_request_sink, client_request_stream): (
-                SinkTx<MuxedRequest>,
-                StreamRx<MuxedRequest>,
-            ) = SinkTx::channel();
-            let (server_response_sink, server_response_stream): (
-                SinkTx<MuxedResult>,
-                StreamRx<MuxedResult>,
-            ) = SinkTx::channel();
+            let (client_request_sink, client_request_stream) = tokio::sync::mpsc::channel(128);
 
-            let client_request_sink = Box::new(client_request_sink);
-            let client_request_stream = Box::new(client_request_stream);
-            let server_response_sink = Box::new(server_response_sink);
-            let server_response_stream = Box::new(server_response_stream);
+            let (server_response_sink, server_response_stream) = tokio::sync::mpsc::channel(128);
 
             MuxRegistryServer::new(registry, client_request_stream, server_response_sink);
 
@@ -811,8 +852,8 @@ pub mod exchange {
         }
 
         pub fn new(
-            sink: Box<dyn MuxSink<MuxedRequest>>,
-            stream: Box<dyn MuxStream<MuxedResult>>,
+            sink: tokio::sync::mpsc::Sender<MuxedRequest>,
+            stream: tokio::sync::mpsc::Receiver<MuxedResult>,
         ) -> Self {
             /// start the receiver
             let map = Arc::new(DashMap::new());
@@ -837,20 +878,20 @@ pub mod exchange {
             let request = MuxedRequest::new(request, id);
             let (res_tx, res_rx) = tokio::sync::oneshot::channel();
             self.map.insert(id, res_tx);
-            self.sink.write(request).await?;
+            self.sink.send(request).await?;
             let response = res_rx.await??;
             expect(response)
         }
     }
 
     struct MuxResultReceiver {
-        stream: Box<dyn MuxStream<MuxedResult>>,
+        stream: tokio::sync::mpsc::Receiver<MuxedResult>,
         map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>,
     }
 
     impl MuxResultReceiver {
         pub fn new(
-            stream: Box<dyn MuxStream<MuxedResult>>,
+            stream: tokio::sync::mpsc::Receiver<MuxedResult>,
             map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>,
         ) {
             let mut runner = Self { stream, map };
@@ -859,7 +900,7 @@ pub mod exchange {
         }
 
         async fn start(mut self) {
-            while let Some(res) = self.stream.read().await {
+            while let Some(res) = self.stream.recv().await {
                 if let Some((_, tx)) = self.map.remove(&res.id) {
                     tx.send(res.result.into());
                 }
@@ -869,21 +910,21 @@ pub mod exchange {
 
     pub struct MuxRegistryServer {
         sink_tx: tokio::sync::mpsc::Sender<MuxedResult>,
-        stream: Box<dyn MuxStream<MuxedRequest>>,
+        stream: tokio::sync::mpsc::Receiver<MuxedRequest>,
         tx: tokio::sync::mpsc::Sender<Exchange>,
     }
 
     impl MuxRegistryServer {
         pub fn new(
             registry: Arc<dyn RegistryApi>,
-            stream: Box<dyn MuxStream<MuxedRequest>>,
-            sink: Box<dyn MuxSink<MuxedResult>>,
+            stream: tokio::sync::mpsc::Receiver<MuxedRequest>,
+            sink: tokio::sync::mpsc::Sender<MuxedResult>,
         ) {
             let tx = ExchangeRunner::new(registry);
             let (sink_tx, mut sink_rx) = tokio::sync::mpsc::channel(100);
             tokio::spawn(async move {
                 while let Some(frame) = sink_rx.recv().await {
-                    if let Err(_) = sink.write(frame).await {
+                    if let Err(_) = sink.send(frame).await {
                         break;
                     }
                 }
@@ -897,7 +938,7 @@ pub mod exchange {
         }
 
         async fn start(mut self) {
-            while let Some(req) = self.stream.read().await {
+            while let Some(req) = self.stream.recv().await {
                 let tx = self.tx.clone();
                 let sink = self.sink_tx.clone();
                 tokio::spawn(async move {
@@ -918,10 +959,16 @@ pub mod exchange {
         }
     }
 
-    #[derive(Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub struct MuxedRequest {
         id: u64,
         request: RegistryRequest,
+    }
+
+    impl Display for MuxedRequest {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{} -> {}", self.id, self.request)
+        }
     }
 
     impl MuxedRequest {
@@ -967,7 +1014,7 @@ pub mod exchange {
     }
 
     #[derive(Default)]
-    struct MuxedRequestCodec;
+    struct MuxedRequestCodec(LengthDelimitedCodec);
     #[derive(Default)]
     struct MuxedResultCodec;
 
@@ -976,7 +1023,10 @@ pub mod exchange {
         type Error = anyhow::Error;
 
         fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-            Ok(Some(bincode::deserialize_from(& **src)?))
+            use tokio_util::bytes::Buf;
+            let mut data = self.0.decode(src)?.ok_or(anyhow::Error::msg("No data"))?;
+            let read = bincode::deserialize(& mut data)?;
+            Ok(Some(read))
         }
     }
 
@@ -984,7 +1034,8 @@ pub mod exchange {
         type Error = anyhow::Error;
 
         fn encode(&mut self, item: MuxedRequest, dst: &mut BytesMut) -> Result<(), Self::Error> {
-            bincode::serialize_into(&mut **dst,&item)?;
+            let data = bincode::serialize(& item)?;
+            self.0.encode(data.into(),dst)?;
             Ok(())
         }
     }
@@ -993,7 +1044,7 @@ pub mod exchange {
         type Error = anyhow::Error;
 
         fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-            Ok(Some(bincode::deserialize_from(& **src)?))
+            Ok(Some(bincode::deserialize_from(&**src)?))
         }
     }
 
@@ -1001,23 +1052,24 @@ pub mod exchange {
         type Error = anyhow::Error;
 
         fn encode(&mut self, item: MuxedResult, dst: &mut BytesMut) -> Result<(), Self::Error> {
-            bincode::serialize_into(&mut **dst,&item)?;
+            bincode::serialize_into(&mut **dst, &item)?;
             Ok(())
         }
     }
 
-    type MuxedRequestFrameWrite<T> = FramedWrite<T,MuxedRequestCodec>;
-    type MuxedRequestFrameRead<T> = FramedRead<T,MuxedRequestCodec>;
+    type MuxedRequestFrameWrite<T> = FramedWrite<T, MuxedRequestCodec>;
+    type MuxedRequestFrameRead<T> = FramedRead<T, MuxedRequestCodec>;
 
-    type MuxedResultFrameWrite<T> = FramedWrite<T,MuxedResultCodec>;
-    type MuxedResultFrameRead<T> = FramedRead<T,MuxedResultCodec>;
+    type MuxedResultFrameWrite<T> = FramedWrite<T, MuxedResultCodec>;
+    type MuxedResultFrameRead<T> = FramedRead<T, MuxedResultCodec>;
 
-    struct FramedSink<T,S,C> where C: Encoder<T> {
-         writer: FramedWrite<S,C>,
-         _phantom: PhantomData<T>
+    struct FramedSink<T, S, C>
+    where
+        C: Encoder<T>,
+    {
+        writer: FramedWrite<S, C>,
+        _phantom: PhantomData<T>,
     }
-
-
 
     #[async_trait]
     trait Sender: Send + Sync {
@@ -1321,6 +1373,7 @@ pub mod exchange {
         }
     }
 }
+
 #[cfg(test)]
 pub mod test {
     use super::*;
