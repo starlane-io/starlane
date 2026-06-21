@@ -585,6 +585,7 @@ pub mod exchange {
     use std::marker::PhantomData;
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
     use std::sync::Arc;
+    use serde_derive::{Deserialize, Serialize};
     use tokio::sync::mpsc::error::SendError;
 
     trait RegistryResponseHolder {
@@ -741,57 +742,66 @@ pub mod exchange {
     pub struct MuxExchanger {
         sequence: AtomicU64,
         map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>,
-        tx: tokio::sync::mpsc::Sender<MuxedRequest>,
+        sink: Box<dyn MuxSink>
     }
 
+    #[async_trait]
+    pub trait MuxSink: Send+Sync {
+        async fn write(&self, x: MuxedRequest) -> Result<(),RegErr>;
+    }
+
+    #[async_trait]
+    pub trait MuxStream: Send+Sync{
+        async fn read(&self) -> Result<Option<MuxedResult>,RegErr>;
+    }
+
+
     impl MuxExchanger {
-        pub fn new(exchange_tx: tokio::sync::mpsc::Sender<Exchange>) -> Self {
+        pub fn new(sink: Box<dyn MuxSink>,stream: Box<dyn MuxStream>) -> Self {
+            /// start the receiver
             let map = Arc::new(DashMap::new());
+            MuxReceiver::new(stream, map.clone());
+
             let sequence = AtomicU64::new(0u64);
-            let (req_tx, req_rx) = tokio::sync::mpsc::channel(128);
-            MuxRunner::new(exchange_tx, map.clone(), req_rx);
             Self {
                 sequence,
                 map,
-                tx: req_tx,
+                sink
             }
+
         }
-        async fn send<R>(
-            &self,
-            request: RegistryRequest,
-            expect: impl Fn(RegistryResponse) -> Result<R, RegErr>,
-        ) -> Result<R, RegErr> {
+
+    }
+
+    #[async_trait]
+    impl Sender for MuxExchanger {
+        async fn send<R, F>(&self, request: RegistryRequest, expect: F) -> Result<R, RegErr>
+        where
+            F: Fn(RegistryResponse) -> Result<R, RegErr> + Send + Sync
+        {
             let id = self.sequence.fetch_add(1u64, Ordering::Relaxed);
             let request = MuxedRequest::new(request, id);
             let (res_tx, res_rx) = tokio::sync::oneshot::channel();
             self.map.insert(id, res_tx);
-            self.tx
-                .send(request)
-                .await?;
-
+            self.sink.write(request).await?;
             let response= res_rx .await??;
             expect(response)
         }
-
     }
 
 
-
-    struct MuxRunner {
-        mux_rx: tokio::sync::mpsc::Receiver<MuxedRequest>,
-        exchange_tx: tokio::sync::mpsc::Sender<Exchange>,
+    struct MuxReceiver {
+        stream: Box<dyn MuxStream>,
         map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>,
     }
 
-    impl MuxRunner {
+    impl MuxReceiver {
         pub fn new(
-            exchange_tx: tokio::sync::mpsc::Sender<Exchange>,
-            map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>,
-            mux_rx: tokio::sync::mpsc::Receiver<MuxedRequest>,
+            stream: Box<dyn MuxStream>,
+            map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>
         ) {
             let mut runner = Self {
-                mux_rx,
-                exchange_tx,
+                stream,
                 map,
             };
 
@@ -799,19 +809,10 @@ pub mod exchange {
         }
 
         async fn start(mut self) {
-            while let Some(mux_req) = self.mux_rx.recv().await {
-                let (exchange, mut rx) = Exchange::new(mux_req.request);
-                let map = self.map.clone();
-                self.exchange_tx.send(exchange).await;
-                tokio::spawn(async move {
-                    let result = rx
-                        .await
-                        .map_err(|_| RegErr::Unreachable)
-                        .map(|r| r.unwrap());
-                    if let Some((_, tx)) = map.remove(&mux_req.id) {
-                        tx.send(result).unwrap_or_default()
-                    }
-                });
+            while let Ok(Some(res)) = self.stream.read().await {
+                if let Some((_,tx)) = self.map.remove(&res.id) {
+                   tx.send(res.result.into());
+                }
             }
         }
     }
@@ -829,7 +830,22 @@ pub mod exchange {
 
     pub struct MuxedResult {
         id: u64,
-        result: Result<RegistryResponse, RegErr>,
+        result: RegistryResult,
+    }
+
+    #[derive(Debug,Serialize,Deserialize,Clone)]
+    pub enum RegistryResult {
+        Ok(RegistryResponse),
+        Err(RegErr)
+    }
+
+    impl Into<Result<RegistryResponse, RegErr>> for RegistryResult {
+        fn into(self) -> Result<RegistryResponse, RegErr> {
+            match self {
+                RegistryResult::Ok(value) => Ok(value),
+                RegistryResult::Err(value) => Err(value),
+            }
+        }
     }
 
     #[async_trait]
