@@ -362,7 +362,19 @@ impl Registration {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    strum_macros::Display,
+    strum_macros::EnumDiscriminants,
+)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(RegistryRequestType))]
+#[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
 pub enum RegistryRequest {
     Scorch,
     Register(Registration),
@@ -412,7 +424,19 @@ pub enum RegistryRequest {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    strum_macros::Display,
+    strum_macros::EnumDiscriminants,
+)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(name(RegistryResponseType))]
+#[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
 pub enum RegistryResponse {
     Scorch,
     Register,
@@ -548,17 +572,171 @@ impl TryInto<Result<Vec<IndexedAccessGrant>, RegErr>> for RegistryResponse {
 
 pub mod exchange {
     use crate::registry::{RegErr, Registration, RegistryApi, RegistryRequest, RegistryResponse};
+    use async_trait::async_trait;
     use dashmap::DashMap;
     use itertools::Itertools;
     use starlane_space::types::registry::Registry;
+    use starlane_space::wave::exchange::asynch::Exchanger;
     use starlane_space::{
         Access, AccessGrant, Delete, IndexedAccessGrant, ParticleRecord, Point, Properties, Query,
         QueryResult, Select, Selector, SetProperties, Status, Stub, SubSelect, SubstanceList,
     };
     use std::collections::HashMap;
+    use std::marker::PhantomData;
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
     use std::sync::Arc;
     use tokio::sync::mpsc::error::SendError;
+
+    trait RegistryResponseHolder {
+        fn response(self) -> RegistryResponse;
+        fn response_ref(&self) -> &RegistryResponse;
+    }
+
+    mod transform {
+        use super::*;
+
+        pub fn scorch(result: RegistryResponse) -> Result<(), RegErr> {
+            if let RegistryResponse::Scorch = result {
+                Ok(())
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn register(res: RegistryResponse) -> Result<(), RegErr> {
+            if let RegistryResponse::Register = res {
+                Ok(())
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn assign_star(res: RegistryResponse) -> Result<(), RegErr> {
+            if let RegistryResponse::AssignStar = res {
+                Ok(())
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+        pub fn assign_host(res: RegistryResponse) -> Result<(), RegErr> {
+            if let RegistryResponse::AssignHost = res {
+                Ok(())
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn set_status(res: RegistryResponse) -> Result<(), RegErr> {
+            if let RegistryResponse::SetStatus = res {
+                Ok(())
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn set_properties(res: RegistryResponse) -> Result<(), RegErr> {
+            if let RegistryResponse::SetProperties = res {
+                Ok(())
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn sequence(res: RegistryResponse) -> Result<u64, RegErr> {
+            if let RegistryResponse::Sequence(ret) = res {
+                Ok(ret)
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn get_properties(res: RegistryResponse) -> Result<Properties, RegErr> {
+            if let RegistryResponse::GetProperties(ret) = res {
+                Ok(ret)
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn record(res: RegistryResponse) -> Result<ParticleRecord, RegErr> {
+            if let RegistryResponse::Record(ret) = res {
+                Ok(ret)
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn query(res: RegistryResponse) -> Result<QueryResult, RegErr> {
+            if let RegistryResponse::Query(ret) = res {
+                Ok(ret)
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn delete(res: RegistryResponse) -> Result<SubstanceList, RegErr> {
+            if let RegistryResponse::Delete(ret) = res {
+                Ok(ret)
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn select(res: RegistryResponse) -> Result<SubstanceList, RegErr> {
+            if let RegistryResponse::Select(ret) = res {
+                Ok(ret)
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn grant(res: RegistryResponse) -> Result<(), RegErr> {
+            if let RegistryResponse::Grant = res {
+                Ok(())
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn access(res: RegistryResponse) -> Result<Access, RegErr> {
+            if let RegistryResponse::Access(ret) = res {
+                Ok(ret)
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn chown(res: RegistryResponse) -> Result<(), RegErr> {
+            if let RegistryResponse::Chown = res {
+                Ok(())
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn list_access(res: RegistryResponse) -> Result<Vec<IndexedAccessGrant>, RegErr> {
+            if let RegistryResponse::ListAccess(ret) = res {
+                Ok(ret)
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        pub fn remove_access(res: RegistryResponse) -> Result<(), RegErr> {
+            if let RegistryResponse::RemoveAccess = res {
+                Ok(())
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+    }
+
+    /*
+    fn transform<X,R>( result: Result<X,RegErr>, expect: impl Fn(&RegistryResponse) -> Result<R,RegErr>) -> Result<R,RegErr> {
+        expect()
+    }
+
+     */
 
     pub struct MuxExchanger {
         sequence: AtomicU64,
@@ -591,6 +769,110 @@ pub mod exchange {
                 .await
                 .map_err(|_| RegErr::Unreachable)
                 .map(|res| res.unwrap())
+        }
+    }
+
+    #[async_trait]
+    impl RegistryApi for MuxExchanger {
+        async fn scorch(&self) -> Result<(), RegErr> {
+            if let RegistryResponse::Scorch = self.request(RegistryRequest::Scorch).await? {
+                Ok(())
+            } else {
+                Err(RegErr::ExchangeErr)
+            }
+        }
+
+        async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr> {
+            todo!()
+        }
+
+        async fn assign_star<'a>(
+            &'a self,
+            point: &'a Point,
+            star: &'a Point,
+        ) -> Result<(), RegErr> {
+            todo!()
+        }
+
+        async fn assign_host<'a>(
+            &'a self,
+            point: &'a Point,
+            host: &'a Point,
+        ) -> Result<(), RegErr> {
+            todo!()
+        }
+
+        async fn set_status<'a>(
+            &'a self,
+            point: &'a Point,
+            status: &'a Status,
+        ) -> Result<(), RegErr> {
+            todo!()
+        }
+
+        async fn set_properties<'a>(
+            &'a self,
+            point: &'a Point,
+            properties: &'a SetProperties,
+        ) -> Result<(), RegErr> {
+            todo!()
+        }
+
+        async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, RegErr> {
+            todo!()
+        }
+
+        async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, RegErr> {
+            todo!()
+        }
+
+        async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, RegErr> {
+            todo!()
+        }
+
+        async fn query<'a>(
+            &'a self,
+            point: &'a Point,
+            query: &'a Query,
+        ) -> Result<QueryResult, RegErr> {
+            todo!()
+        }
+
+        async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, RegErr> {
+            todo!()
+        }
+
+        async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr> {
+            todo!()
+        }
+
+        async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), RegErr> {
+            todo!()
+        }
+
+        async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, RegErr> {
+            todo!()
+        }
+
+        async fn chown<'a>(
+            &'a self,
+            on: &'a Selector,
+            owner: &'a Point,
+            by: &'a Point,
+        ) -> Result<(), RegErr> {
+            todo!()
+        }
+
+        async fn list_access<'a>(
+            &'a self,
+            to: &'a Option<&'a Point>,
+            on: &'a Selector,
+        ) -> Result<Vec<IndexedAccessGrant>, RegErr> {
+            todo!()
+        }
+
+        async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), RegErr> {
+            todo!()
         }
     }
 
@@ -658,29 +940,29 @@ pub mod exchange {
             let tx = ExchangeRunner::new(registry);
             Self { tx }
         }
+
+        async fn send<R>(
+            &self,
+            request: RegistryRequest,
+            expect: impl Fn(RegistryResponse) -> Result<R, RegErr>,
+        ) -> Result<R, RegErr> {
+            let (exchange, mut rx) = Exchange::new(request);
+            self.tx.send(exchange).await?;
+            let result = rx.await??;
+            expect(result)
+        }
     }
 
     #[async_trait::async_trait]
     impl RegistryApi for RegistryExchanger {
         async fn scorch<'a>(&'a self) -> Result<(), RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::Scorch);
-            self.tx.send(x).await?;
-            if let RegistryResponse::Scorch = rx.await?? {
-                Ok(())
-            } else {
-                println!("Scorch Err");
-                Err(RegErr::ExchangeErr)
-            }
+            self.send(RegistryRequest::Scorch, transform::scorch).await
         }
 
         async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::Register(registration.clone()));
-            self.tx.send(x).await?;
-            if let RegistryResponse::Register = rx.await?? {
-                Ok(())
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let registration = registration.clone();
+            self.send(RegistryRequest::Register(registration), transform::register)
+                .await
         }
 
         async fn assign_star<'a>(
@@ -688,16 +970,13 @@ pub mod exchange {
             point: &'a Point,
             star: &'a Point,
         ) -> Result<(), RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::AssignStar {
-                point: point.clone(),
-                star: star.clone(),
-            });
-            self.tx.send(x).await?;
-            if let RegistryResponse::AssignStar = rx.await?? {
-                Ok(())
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let point = point.clone();
+            let star = star.clone();
+            self.send(
+                RegistryRequest::AssignStar { point, star },
+                transform::assign_star,
+            )
+            .await
         }
 
         async fn assign_host<'a>(
@@ -705,16 +984,13 @@ pub mod exchange {
             point: &'a Point,
             host: &'a Point,
         ) -> Result<(), RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::AssignHost {
-                point: point.clone(),
-                host: host.clone(),
-            });
-            self.tx.send(x).await?;
-            if let RegistryResponse::AssignHost = rx.await?? {
-                Ok(())
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let point = point.clone();
+            let host = host.clone();
+            self.send(
+                RegistryRequest::AssignHost { point, host },
+                transform::assign_host,
+            )
+            .await
         }
 
         async fn set_status<'a>(
@@ -722,16 +998,13 @@ pub mod exchange {
             point: &'a Point,
             status: &'a Status,
         ) -> Result<(), RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::SetStatus {
-                point: point.clone(),
-                status: status.clone(),
-            });
-            self.tx.send(x).await?;
-            if let RegistryResponse::SetStatus = rx.await?? {
-                Ok(())
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let point = point.clone();
+            let status = status.clone();
+            self.send(
+                RegistryRequest::SetStatus { point, status },
+                transform::set_status,
+            )
+            .await
         }
 
         async fn set_properties<'a>(
@@ -739,47 +1012,28 @@ pub mod exchange {
             point: &'a Point,
             properties: &'a SetProperties,
         ) -> Result<(), RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::SetProperties {
-                point: point.clone(),
-                properties: properties.clone(),
-            });
-            self.tx.send(x).await?;
-            if let RegistryResponse::SetProperties = rx.await?? {
-                Ok(())
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let point = point.clone();
+            let properties = properties.clone();
+            let request = RegistryRequest::SetProperties { point, properties };
+            self.send(request, transform::set_properties).await
         }
 
         async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::Sequence(point.clone()));
-            self.tx.send(x).await?;
-            if let RegistryResponse::Sequence(ret) = rx.await?? {
-                Ok(ret)
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let point = point.clone();
+            let request = RegistryRequest::Sequence(point);
+            self.send(request, transform::sequence).await
         }
 
         async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::GetProperties(point.clone()));
-            self.tx.send(x).await?;
-            if let RegistryResponse::GetProperties(ret) = rx.await?? {
-                Ok(ret)
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let point = point.clone();
+            let request = RegistryRequest::GetProperties(point);
+            self.send(request, transform::get_properties).await
         }
 
         async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::Record(point.clone()));
-            self.tx.send(x).await.map_err(|_| RegErr::Unreachable)?;
-
-            if let RegistryResponse::Record(ret) = rx.await?? {
-                Ok(ret)
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let point = point.clone();
+            let request = RegistryRequest::Record(point);
+            self.send(request, transform::record).await
         }
 
         async fn query<'a>(
@@ -787,59 +1041,35 @@ pub mod exchange {
             point: &'a Point,
             query: &'a Query,
         ) -> Result<QueryResult, RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::Query {
-                point: point.clone(),
-                query: query.clone(),
-            });
-            self.tx.send(x).await?;
-            if let RegistryResponse::Query(ret) = rx.await?? {
-                Ok(ret)
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let point = point.clone();
+            let query = query.clone();
+            let request = RegistryRequest::Query { point, query };
+            self.send(request, transform::query).await
         }
 
         async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::Delete(delete.clone()));
-            self.tx.send(x).await?;
-            if let RegistryResponse::Delete(ret) = rx.await?? {
-                Ok(ret)
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let delete = delete.clone();
+            let request = RegistryRequest::Delete(delete);
+            self.send(request, transform::delete).await
         }
 
         async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::Select(select.clone()));
-            self.tx.send(x).await?;
-            if let RegistryResponse::Select(ret) = rx.await?? {
-                Ok(ret)
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let select = select.clone();
+            let request = RegistryRequest::Select(select);
+            self.send(request, transform::select).await
         }
 
         async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::Grant(access_grant.clone()));
-            self.tx.send(x).await?;
-            if let RegistryResponse::Grant = rx.await?? {
-                Ok(())
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let access_grant = access_grant.clone();
+            let request = RegistryRequest::Grant(access_grant);
+            self.send(request, transform::grant).await
         }
 
         async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::Access {
-                to: to.clone(),
-                on: on.clone(),
-            });
-            self.tx.send(x).await?;
-            if let RegistryResponse::Access(ret) = rx.await?? {
-                Ok(ret)
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let to = to.clone();
+            let on = on.clone();
+            let request = RegistryRequest::Access { to, on };
+            self.send(request, transform::access).await
         }
 
         async fn chown<'a>(
@@ -848,17 +1078,11 @@ pub mod exchange {
             owner: &'a Point,
             by: &'a Point,
         ) -> Result<(), RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::Chown {
-                on: on.clone(),
-                owner: owner.clone(),
-                by: by.clone(),
-            });
-            self.tx.send(x).await?;
-            if let RegistryResponse::Chown = rx.await?? {
-                Ok(())
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let on = on.clone();
+            let owner = owner.clone();
+            let by = by.clone();
+            let request = RegistryRequest::Chown { on, owner, by };
+            self.send(request, transform::chown).await
         }
 
         async fn list_access<'a>(
@@ -866,26 +1090,16 @@ pub mod exchange {
             to: &'a Option<&'a Point>,
             on: &'a Selector,
         ) -> Result<Vec<IndexedAccessGrant>, RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::ListAccess {
-                to: to.map(|p| p.clone()),
-                on: on.clone(),
-            });
-            self.tx.send(x).await?;
-            if let RegistryResponse::ListAccess(ret) = rx.await?? {
-                Ok(ret)
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let to = to.map(|p| p.clone());
+            let on = on.clone();
+            let request = RegistryRequest::ListAccess { to, on };
+            self.send(request, transform::list_access).await
         }
 
         async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), RegErr> {
-            let (x, rx) = Exchange::new(RegistryRequest::RemoveAccess { id, to: to.clone() });
-            self.tx.send(x).await?;
-            if let RegistryResponse::RemoveAccess = rx.await?? {
-                Ok(())
-            } else {
-                Err(RegErr::ExchangeErr)
-            }
+            let to = to.clone();
+            let request = RegistryRequest::RemoveAccess { id, to };
+            self.send(request, transform::remove_access).await
         }
     }
 
@@ -1087,7 +1301,6 @@ pub mod test {
         drop(mock);
     }
 
-
     pub fn mock() -> MockRegistry {
         let mut mock = MockRegistry::new();
         mock.expect_scorch().times(1).returning(|| Ok(()));
@@ -1119,7 +1332,7 @@ pub mod test {
         mock
     }
 
-    async fn test_registry(mock: impl RegistryApi + Send + Sync + 'static) -> anyhow::Result<()>{
+    async fn test_registry(mock: impl RegistryApi + Send + Sync + 'static) -> anyhow::Result<()> {
         mock.scorch().await.unwrap();
         mock.register(&Registration::mock()).await.unwrap();
         mock.assign_host(&Point::root(), &Point::root())
