@@ -85,6 +85,7 @@ dirs = {workspace = true}
 wit-bindgen = { workspace = true }
 wasmtime = { workspace = true, features=["async"] }
 wasmtime-wasi = { workspace = true, features = ["p2","p1","p3"] }
+tokio-pipe = { workspace = true }
 
 [dev-dependencies]
 starlane-space = { workspace = true, features = ["test"] }

@@ -268,23 +268,27 @@ pub enum RegErr {
     ExchangeErr,
 }
 
+impl <T> From<tokio::sync::mpsc::error::SendError<T>> for RegErr {
+    fn from(value: SendError<T>) -> Self {
+        Self::ExchangeErr
+    }
+}
+
 impl From<tokio::sync::oneshot::error::RecvError> for RegErr {
     fn from(value: tokio::sync::oneshot::error::RecvError) -> Self {
         Self::ExchangeErr
     }
 }
 
-impl From<tokio::sync::mpsc::error::SendError<MuxedRequest>> for RegErr {
-    fn from(value: SendError<MuxedRequest>) -> Self {
-        RegErr::ExchangeErr
-    }
-}
 
-impl From<tokio::sync::mpsc::error::SendError<RegistryRequest>> for RegErr {
+
+/*impl From<tokio::sync::mpsc::error::SendError<RegistryRequest>> for RegErr {
     fn from(value: SendError<RegistryRequest>) -> Self {
         RegErr::ExchangeErr
     }
 }
+
+ */
 
 impl From<std::io::Error> for RegErr {
     fn from(value: std::io::Error) -> Self {
@@ -586,6 +590,7 @@ pub mod exchange {
     use std::marker::PhantomData;
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
     use std::sync::Arc;
+    use mockall::PredicateBoxExt;
     use tokio::sync::mpsc::error::SendError;
 
     trait RegistryResponseHolder {
@@ -739,7 +744,7 @@ pub mod exchange {
 
      */
 
-    pub struct MuxExchanger {
+    pub struct MuxRegistryClient {
         sequence: AtomicU64,
         map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>,
         sink: Box<dyn MuxSink<MuxedRequest>>,
@@ -750,12 +755,56 @@ pub mod exchange {
         async fn write(&self, x: F) -> Result<(), RegErr>;
     }
 
+
+
+    pub struct StreamRx<T>(tokio::sync::mpsc::Receiver<T>) where T: Send+Sync;
+
     #[async_trait]
-    pub trait MuxStream<F>: Send + Sync {
-        async fn read(&self) -> Option<F>;
+    impl <T> MuxStream<T> for StreamRx<T> where T: Send+Sync {
+        async fn read(&mut self) -> Option<T> {
+            self.0.recv().await
+        }
     }
 
-    impl MuxExchanger {
+    pub struct SinkTx<T>(tokio::sync::mpsc::Sender<T>) where T: Send+Sync;
+    impl <T> SinkTx<T> where T: Send+Sync{
+        pub fn channel() -> (SinkTx<T>,StreamRx<T>) {
+            let (tx,rx) = tokio::sync::mpsc::channel(100);
+            (SinkTx(tx),StreamRx(rx))
+        }
+    }
+
+    #[async_trait]
+    impl <T> MuxSink<T> for SinkTx<T> where T: Send+Sync{
+        async fn write(&self, x: T) -> Result<(), RegErr> {
+           self.0.send(x).await?;
+           Ok(())
+        }
+    }
+
+    #[async_trait]
+    pub trait MuxStream<F>: Send + Sync {
+        async fn read(&mut self) -> Option<F>;
+    }
+
+    impl MuxRegistryClient {
+        pub fn local(registry: Arc<dyn RegistryApi>) -> Self {
+            let (client_request_sink,client_request_stream):( SinkTx<MuxedRequest>, StreamRx<MuxedRequest> ) = SinkTx::channel();
+            let (server_response_sink,server_response_stream):( SinkTx<MuxedResult>, StreamRx<MuxedResult> ) = SinkTx::channel();
+
+            let client_request_sink = Box::new(client_request_sink);
+            let client_request_stream= Box::new(client_request_stream);
+            let server_response_sink= Box::new(server_response_sink);
+            let server_response_stream= Box::new(server_response_stream);
+
+            MuxRegistryServer::new(registry, client_request_stream, server_response_sink);
+
+            Self::new(client_request_sink, server_response_stream)
+        }
+
+
+
+
         pub fn new(sink: Box<dyn MuxSink<MuxedRequest>>, stream: Box<dyn MuxStream<MuxedResult>>) -> Self {
             /// start the receiver
             let map = Arc::new(DashMap::new());
@@ -771,7 +820,7 @@ pub mod exchange {
     }
 
     #[async_trait]
-    impl Sender for MuxExchanger {
+    impl Sender for MuxRegistryClient {
         async fn send<R, F>(&self, request: RegistryRequest, expect: F) -> Result<R, RegErr>
         where
             F: Fn(RegistryResponse) -> Result<R, RegErr> + Send + Sync,
@@ -810,18 +859,20 @@ pub mod exchange {
         }
     }
 
-    pub struct MuxedRegistryServer {
+    pub struct MuxRegistryServer {
         sink_tx: tokio::sync::mpsc::Sender<MuxedResult>,
         stream: Box<dyn MuxStream<MuxedRequest>>,
         tx: tokio::sync::mpsc::Sender<Exchange>,
     }
 
-    impl MuxedRegistryServer {
+    impl MuxRegistryServer {
+
+
         pub fn new(
             registry: Arc<dyn RegistryApi>,
             stream: Box<dyn MuxStream<MuxedRequest>>,
-            sink: Box<dyn MuxSink<MuxedResult>>,
-        ) -> Self {
+            sink: Box<dyn MuxSink<MuxedResult>>
+        ) {
             let tx = ExchangeRunner::new(registry);
             let (sink_tx,mut sink_rx) = tokio::sync::mpsc::channel(100);
             tokio::spawn(async move {
@@ -831,7 +882,8 @@ pub mod exchange {
                     }
                 }
             });
-            Self { stream, sink_tx, tx }
+            let mut server = Self { stream, sink_tx, tx };
+            tokio::spawn( async move { server.start().await } );
         }
 
         async fn start(mut self) {
@@ -1254,11 +1306,6 @@ pub mod exchange {
         pub tx: tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>,
     }
 
-    impl From<tokio::sync::mpsc::error::SendError<Exchange>> for RegErr {
-        fn from(value: SendError<Exchange>) -> Self {
-            RegErr::ExchangeErr
-        }
-    }
 
     impl Exchange {
         pub fn new(

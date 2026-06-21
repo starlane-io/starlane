@@ -4665,6 +4665,7 @@ dependencies = [
  "thiserror 2.0.18",
  "thiserror-context",
  "tokio",
+ "tokio-pipe",
  "tokio-rustls",
  "tracing",
  "tracing-core",
@@ -5095,6 +5096,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbae76ab933c85776efabc971569dd6119c580d8f5d448769dec1764bf796ef2"
 dependencies = [
  "native-tls",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-pipe"
+version = "0.2.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f213a84bffbd61b8fa0ba8a044b4bbe35d471d0b518867181e82bd5c15542784"
+dependencies = [
+ "libc",
  "tokio",
 ]
 
