@@ -39,16 +39,45 @@ impl Entity for () {}
 /// changes vi [StatusWatcher::changed]
 pub type StatusWatcher = tokio::sync::watch::Receiver<StatusDetail>;
 pub type StatusReporter = tokio::sync::watch::Sender<StatusDetail>;
-#[derive( Clone, Debug, Serialize, Deserialize)]
+
+#[derive(Clone,Debug, Serialize, Deserialize)]
 pub struct StatusReport {
-    pub name: String,
-    pub status: StatusDetail
+  elements: HashMap<String,StatusDetail>
 }
+
 impl StatusReport {
-    pub fn new(name: String, status: StatusDetail) -> Self {
-        Self { name, status }
+    pub fn insert( &mut self, key: String, value: StatusDetail ) {
+        self.elements.insert( key, value );
+    }
+
+    pub fn from( map: &HashMap<String,tokio::sync::watch::Receiver<StatusDetail>> ) -> Self {
+        let mut elements = HashMap::new();
+        for (key,rx) in map {
+            elements.insert(key.clone(),rx.borrow().clone());
+        }
+        Self {
+            elements
+        }
     }
 }
+
+impl Default for StatusReport {
+    fn default() -> Self {
+        Self {
+            elements: Default::default()
+        }
+    }
+}
+
+
+impl StatusReport {
+    pub fn status(&self) -> Status {
+        /// need to amalgomate at some point...
+       Status::Unknown
+    }
+}
+
+
 
 
 

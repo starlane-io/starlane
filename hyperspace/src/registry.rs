@@ -594,6 +594,58 @@ impl TryInto<Result<Vec<IndexedAccessGrant>, RegErr>> for RegistryResponse {
     }
 }
 
+pub mod status {
+    use std::collections::HashMap;
+    use futures::StreamExt;
+    use tokio_stream::StreamMap;
+    use tokio_stream::wrappers::WatchStream;
+    use starlane_space::status::{StatusDetail, StatusReport};
+
+    
+
+    struct StatusMonitor {
+        report: StatusReport,
+        stream_map: StreamMap<String,WatchStream<StatusDetail>>,
+        tx: tokio::sync::watch::Sender<StatusReport>,
+        add_element_rx: tokio::sync::mpsc::Receiver<(String,tokio::sync::watch::Receiver<StatusDetail>)>,
+    }
+    
+    impl StatusMonitor {
+        fn new() -> (tokio::sync::mpsc::Sender<(String,tokio::sync::watch::Receiver<StatusDetail>)>,tokio::sync::watch::Receiver<StatusReport>) {
+            let (tx,watch_rx) = tokio::sync::watch::channel(Default::default());
+            let (add_element_tx,add_element_rx) = tokio::sync::mpsc::channel(1);
+
+
+            let monitor = Self {
+                tx,
+                report: Default::default(),
+                stream_map: Default::default(),
+                add_element_rx
+            };
+            tokio::spawn(async move {monitor.start().await});
+            (add_element_tx,watch_rx)
+        }
+        async fn start(mut self) {
+            loop {
+                tokio::select! {
+                    Some((key,status)) = self.stream_map.next() => {
+                        self.report.insert(key,status);
+                    }
+                    Some((key,rx)) = self.add_element_rx.recv() => {
+                        self.report.insert(key.clone(),rx.borrow().clone() );
+                        self.stream_map.insert(key, WatchStream::new(rx));
+                    }
+                    else => break
+                }
+                if let Err(_) = self.tx.send(self.report.clone()) {
+                   break;
+                }
+            }
+        }
+    }
+
+}
+
 pub mod exchange {
     use crate::registry::{RegErr, Registration, RegistryApi, RegistryRequest, RegistryResponse};
     use anyhow::{anyhow, Error};
@@ -1324,18 +1376,7 @@ pub mod exchange {
 
     #[async_trait]
     impl Sender for RegistryExchanger {
-        /*
-        async fn send<R, F>(&self, request: RegistryRequest, expect: F) -> Result<R, RegErr>
-        where
-            F: Fn(RegistryResponse) -> Result<R, RegErr> + Send + Sync,
-        {
-            let (exchange, mut rx) = Exchange::request(request);
-            self.tx.send(exchange).await?;
-            let result = rx.await?;
-            expect(result)
-        }
 
-         */
 
         async fn signal<R, F>(
             &self,
@@ -1361,7 +1402,7 @@ pub mod exchange {
 
     #[derive(Clone, Debug, Serialize, Deserialize,strum_macros::Display)]
     pub enum Report {
-        Status(Vec<StatusReport>),
+        Status(HashMap<String,StatusDetail>),
         Trace(Vec<String>)
     }
 
