@@ -1356,6 +1356,13 @@ pub mod exchange {
     pub enum Signal<T> {
         Probe(Probe),
         Transport(T),
+        Report(Report)
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize,strum_macros::Display)]
+    pub enum Report {
+        Status(Vec<StatusReport>),
+        Trace(Vec<String>)
     }
 
     impl<T> Display for Signal<T>
@@ -1365,10 +1372,14 @@ pub mod exchange {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             match self {
                 Signal::Probe(t) => {
-                    write!(f, "Signal::Trace({})", t)
+                    write!(f, "Signal::Probe({})", t)
                 }
                 Signal::Transport(t) => {
                     write!(f, "Signal::Transport({})", t)
+                }
+                Signal::Report(report) => {
+
+                    write!(f, "Signal::Report({})", report)
                 }
             }
         }
@@ -1398,32 +1409,14 @@ pub mod exchange {
         }
     }
 
-    #[derive(Clone, Debug, Serialize, Deserialize)]
+    #[derive(Clone, Debug, Serialize, Deserialize,strum_macros::Display)]
     pub enum Probe {
-        /// return a stack of names
-        Status(Vec<String>),
-        Report(Vec<StatusReport>),
+        Status,
+        Trace
     }
 
-    impl Display for Probe {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Probe::Status(_) => write!(f, "Probe::Probe"),
-                Probe::Report(_) => write!(f, "Probe::Return"),
-            }
-        }
-    }
 
-    impl Probe {
-        pub fn push(mut self, name: &str) -> anyhow::Result<Self> {
-            if let Self::Status(mut stack) = self {
-                stack.push(name.to_string());
-                Ok(Self::Status(stack))
-            } else {
-                Err(anyhow!("not a probe"))
-            }
-        }
-    }
+
 
     pub struct Exchange {
         pub signal: Signal<RegistryRequest>,
@@ -1538,9 +1531,10 @@ pub mod exchange {
                             let result = Signal::Transport(RegistryResult::from(result));
                             x.tx.send(result).unwrap();
                         }
-                        Signal::Probe(Trace) => {
+                        Signal::Probe(probe) => {
                             panic!("cannot handle Signal::Probe yet")
                         }
+                        _ => {}
                     }
                 });
             }
