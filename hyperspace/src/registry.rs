@@ -595,35 +595,36 @@ impl TryInto<Result<Vec<IndexedAccessGrant>, RegErr>> for RegistryResponse {
 }
 
 pub mod status {
-    use std::collections::HashMap;
     use futures::StreamExt;
-    use tokio_stream::StreamMap;
-    use tokio_stream::wrappers::WatchStream;
     use starlane_space::status::{StatusDetail, StatusReport};
-
-    
+    use std::collections::HashMap;
+    use tokio_stream::wrappers::WatchStream;
+    use tokio_stream::StreamMap;
 
     struct StatusMonitor {
         report: StatusReport,
-        stream_map: StreamMap<String,WatchStream<StatusDetail>>,
+        stream_map: StreamMap<String, WatchStream<StatusDetail>>,
         tx: tokio::sync::watch::Sender<StatusReport>,
-        add_element_rx: tokio::sync::mpsc::Receiver<(String,tokio::sync::watch::Receiver<StatusDetail>)>,
+        add_element_rx:
+            tokio::sync::mpsc::Receiver<(String, tokio::sync::watch::Receiver<StatusDetail>)>,
     }
-    
-    impl StatusMonitor {
-        fn new() -> (tokio::sync::mpsc::Sender<(String,tokio::sync::watch::Receiver<StatusDetail>)>,tokio::sync::watch::Receiver<StatusReport>) {
-            let (tx,watch_rx) = tokio::sync::watch::channel(Default::default());
-            let (add_element_tx,add_element_rx) = tokio::sync::mpsc::channel(1);
 
+    impl StatusMonitor {
+        fn new() -> (
+            tokio::sync::mpsc::Sender<(String, tokio::sync::watch::Receiver<StatusDetail>)>,
+            tokio::sync::watch::Receiver<StatusReport>,
+        ) {
+            let (tx, watch_rx) = tokio::sync::watch::channel(Default::default());
+            let (add_element_tx, add_element_rx) = tokio::sync::mpsc::channel(1);
 
             let monitor = Self {
                 tx,
                 report: Default::default(),
                 stream_map: Default::default(),
-                add_element_rx
+                add_element_rx,
             };
-            tokio::spawn(async move {monitor.start().await});
-            (add_element_tx,watch_rx)
+            tokio::spawn(async move { monitor.start().await });
+            (add_element_tx, watch_rx)
         }
         async fn start(mut self) {
             loop {
@@ -638,12 +639,11 @@ pub mod status {
                     else => break
                 }
                 if let Err(_) = self.tx.send(self.report.clone()) {
-                   break;
+                    break;
                 }
             }
         }
     }
-
 }
 
 pub mod exchange {
@@ -1376,8 +1376,6 @@ pub mod exchange {
 
     #[async_trait]
     impl Sender for RegistryExchanger {
-
-
         async fn signal<R, F>(
             &self,
             signal: Signal<RegistryRequest>,
@@ -1395,15 +1393,15 @@ pub mod exchange {
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum Signal<T> {
-        Probe(Probe),
         Transport(T),
-        Report(Report)
+        Probe(Probe),
+        Report(Report),
     }
 
-    #[derive(Clone, Debug, Serialize, Deserialize,strum_macros::Display)]
+    #[derive(Clone, Debug, Serialize, Deserialize, strum_macros::Display)]
     pub enum Report {
-        Status(HashMap<String,StatusDetail>),
-        Trace(Vec<String>)
+        Status(HashMap<String, StatusDetail>),
+        Trace(Vec<String>),
     }
 
     impl<T> Display for Signal<T>
@@ -1419,7 +1417,6 @@ pub mod exchange {
                     write!(f, "Signal::Transport({})", t)
                 }
                 Signal::Report(report) => {
-
                     write!(f, "Signal::Report({})", report)
                 }
             }
@@ -1450,14 +1447,11 @@ pub mod exchange {
         }
     }
 
-    #[derive(Clone, Debug, Serialize, Deserialize,strum_macros::Display)]
+    #[derive(Clone, Debug, Serialize, Deserialize, strum_macros::Display)]
     pub enum Probe {
         Status,
-        Trace
+        Trace,
     }
-
-
-
 
     pub struct Exchange {
         pub signal: Signal<RegistryRequest>,
@@ -1755,7 +1749,7 @@ pub mod test {
     pub async fn test_mux_framed_writer() {
         let (read, write) = tokio_pipe::pipe().unwrap();
 
-        let REQUEST: MuxedRequest = MuxedRequest::transport(1_u64,RegistryRequest::Scorch, );
+        let REQUEST: MuxedRequest = MuxedRequest::transport(1_u64, RegistryRequest::Scorch);
 
         let tx = {
             let write = FramedWrite::new(
@@ -1781,7 +1775,7 @@ pub mod test {
 
         println!("Received FROM! {}", from_read.signal.to_string());
 
-//        assert_eq!(REQUEST, from_read);
+        //        assert_eq!(REQUEST, from_read);
     }
 
     #[test]
