@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::point::Point;
 use crate::wave::Agent;
 use async_trait::async_trait;
@@ -38,6 +39,18 @@ impl Entity for () {}
 /// changes vi [StatusWatcher::changed]
 pub type StatusWatcher = tokio::sync::watch::Receiver<StatusDetail>;
 pub type StatusReporter = tokio::sync::watch::Sender<StatusDetail>;
+#[derive( Clone, Debug, Serialize, Deserialize)]
+pub struct StatusReport {
+    pub name: String,
+    pub status: StatusDetail
+}
+impl StatusReport {
+    pub fn new(name: String, status: StatusDetail) -> Self {
+        Self { name, status }
+    }
+}
+
+
 
 /// get a [StatusWatcher] via [StatusReporter::subscribe]
 pub fn status_reporter() -> StatusReporter {
@@ -186,6 +199,8 @@ pub enum StatusDetail {
     /// the desired state
     Ready,
 }
+
+
 
 impl Default for Status {
     fn default() -> Self {

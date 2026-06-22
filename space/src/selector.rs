@@ -1447,6 +1447,7 @@ impl ToResolved<PayloadBlock> for PayloadBlockVar {
 #[cfg(test)]
 mod test {
     use crate::kind::BaseKind;
+    use crate::Query;
     use crate::selector::{PointSegKindHop, PointSelector};
     use crate::util::ValueMatcher;
 
@@ -1462,5 +1463,10 @@ mod test {
         let selector = PointSegKindHop::always();
         let point = BaseKind::Driver.bind();
         assert!(selector.is_match(point.segments.first().unwrap()).is_ok());
+    }
+
+    #[test]
+    pub fn test_query_serialize() {
+        bincode::serialize(&PointSelector::always()).unwrap();
     }
 }

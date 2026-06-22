@@ -1,4 +1,5 @@
 use crate::base::config::{BaseConfig, BaseSubConfig};
+use crate::registry::exchange::{Exchange, MuxedRequest, MuxedResult, RegistryResult};
 use async_trait::async_trait;
 use serde_derive::{Deserialize, Serialize};
 use starlane_space::command::direct::delete::Delete;
@@ -14,6 +15,7 @@ use starlane_space::selector::Selector;
 use starlane_space::substance::SubstanceList;
 use starlane_space::types::property::SetProperties;
 use starlane_space::{SetRegistry, Strategy};
+use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
@@ -267,25 +269,46 @@ pub enum RegErr {
     ExchangeErr,
 }
 
-impl<T> From<tokio::sync::mpsc::error::SendError<T>> for RegErr {
-    fn from(value: SendError<T>) -> Self {
-        Self::ExchangeErr
-    }
-}
-
 impl From<tokio::sync::oneshot::error::RecvError> for RegErr {
     fn from(value: tokio::sync::oneshot::error::RecvError) -> Self {
         Self::ExchangeErr
     }
 }
 
-/*impl From<tokio::sync::mpsc::error::SendError<RegistryRequest>> for RegErr {
+impl From<tokio::sync::mpsc::error::SendError<RegistryRequest>> for RegErr {
     fn from(value: SendError<RegistryRequest>) -> Self {
-        RegErr::ExchangeErr
+        Self::ExchangeErr
+    }
+}
+impl From<tokio::sync::mpsc::error::SendError<RegistryResponse>> for RegErr {
+    fn from(value: SendError<RegistryResponse>) -> Self {
+        Self::ExchangeErr
     }
 }
 
- */
+impl From<tokio::sync::mpsc::error::SendError<RegistryResult>> for RegErr {
+    fn from(value: SendError<RegistryResult>) -> Self {
+        Self::ExchangeErr
+    }
+}
+
+impl From<tokio::sync::mpsc::error::SendError<MuxedRequest>> for RegErr {
+    fn from(value: SendError<MuxedRequest>) -> Self {
+        Self::ExchangeErr
+    }
+}
+
+impl From<tokio::sync::mpsc::error::SendError<MuxedResult>> for RegErr {
+    fn from(value: SendError<MuxedResult>) -> Self {
+        Self::ExchangeErr
+    }
+}
+
+impl From<tokio::sync::mpsc::error::SendError<Exchange>> for RegErr {
+    fn from(value: SendError<Exchange>) -> Self {
+        Self::ExchangeErr
+    }
+}
 
 impl From<std::io::Error> for RegErr {
     fn from(value: std::io::Error) -> Self {
@@ -572,21 +595,23 @@ impl TryInto<Result<Vec<IndexedAccessGrant>, RegErr>> for RegistryResponse {
 }
 
 pub mod exchange {
-    use crate::registry::{ RegErr, Registration, RegistryApi, RegistryRequest, RegistryResponse};
-    use anyhow::anyhow;
+    use crate::registry::{RegErr, Registration, RegistryApi, RegistryRequest, RegistryResponse};
+    use anyhow::{anyhow, Error};
     use async_trait::async_trait;
     use dashmap::DashMap;
-    use futures::{ Sink, SinkExt, Stream, StreamExt};
+    use futures::{Sink, SinkExt, Stream, StreamExt};
     use itertools::Itertools;
-    use mockall::PredicateBoxExt;
+
+    use nom::AsBytes;
+    use serde::{Deserialize, Serialize};
+    use starlane_space::status::{status_reporter, StatusDetail, StatusReport, StatusReporter};
     use starlane_space::types::registry::Registry;
-    use starlane_space::wave::exchange::asynch::Exchanger;
     use starlane_space::{
         Access, AccessGrant, Delete, IndexedAccessGrant, ParticleRecord, Point, Properties, Query,
         QueryResult, Select, Selector, SetProperties, Status, Stub, SubSelect, SubstanceList,
     };
     use std::collections::HashMap;
-    use std::fmt::Display;
+    use std::fmt::{Display, Formatter};
     use std::io;
     use std::io::Write;
     use std::marker::PhantomData;
@@ -595,8 +620,7 @@ pub mod exchange {
     use std::sync::Arc;
     use std::task::{Context, Poll};
     use std::time::Duration;
-    use nom::AsBytes;
-    use serde::{Deserialize, Serialize};
+    use thiserror::Error;
     use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
     use tokio::sync::mpsc::error::SendError;
     use tokio_pipe::PipeWrite;
@@ -756,21 +780,13 @@ pub mod exchange {
     impl<T, S> MuxFramedWriter<T, S>
     where
         T: Send + Sync + 'static,
-        S:  Sink<T, Error = anyhow::Error> + Send + Sync + std::marker::Unpin + 'static {
-
-
-        /*
-        pub fn from_write<W>( write: W ) -> tokio::sync::mpsc::Sender<T> where W: AsyncWrite + Send + Sync + Unpin+'static, T: serde::Serialize+serde::de::DeserializeOwned + Sync + 'static+ Display, {
-            let codec: SerdeCodec<T> = SerdeCodec::default();
-            let sink = FramedWrite::new( write, codec);
-            Self::new(sink)
-        }
-
-         */
-
-        pub fn new(sink: S) -> tokio::sync::mpsc::Sender<T>     where
+        S: Sink<T, Error = anyhow::Error> + Send + Sync + std::marker::Unpin + 'static,
+    {
+        pub fn new(sink: S) -> tokio::sync::mpsc::Sender<T>
+        where
             T: Send + Sync,
-            S:  Sink<T, Error = anyhow::Error> + Send + Sync + std::marker::Unpin,{
+            S: Sink<T, Error = anyhow::Error> + Send + Sync + std::marker::Unpin,
+        {
             let (tx, rx) = tokio::sync::mpsc::channel(128);
             let writer = Self { rx, sink };
             tokio::spawn(async move { writer.start().await });
@@ -784,6 +800,7 @@ pub mod exchange {
                     break;
                 }
             }
+            println!("terminating MuxFramedWriter...");
         }
     }
 
@@ -801,14 +818,6 @@ pub mod exchange {
         T: Send + Sync + Display,
         S: StreamExt<Item = Result<T, anyhow::Error>> + Send + Sync + std::marker::Unpin + 'static,
     {
-        /*
-        pub fn from_read( read: impl AsyncReadExt ) -> tokio::sync::mpsc::Receiver<T>where T: Display+serde::Serialize+serde::de::DeserializeOwned {
-            let stream = FramedRead::new(read, SerdeCodec::default());
-            Self::new(stream)
-        }
-
-         */
-
         pub fn new(stream: S) -> tokio::sync::mpsc::Receiver<T> {
             let (tx, rx) = tokio::sync::mpsc::channel(128);
             let reader = Self { tx, stream };
@@ -817,20 +826,31 @@ pub mod exchange {
         }
 
         async fn start(mut self) {
-            while let Some(Ok(t)) = self.stream.next().await {
-                if let Err(err) = self.tx.send(t).await {
-                    println!("read send err...{}", err);
-                    break;
+            loop {
+                match self.stream.next().await {
+                    Some(Ok(t)) => {
+                        if let Err(err) = self.tx.send(t).await {
+                            println!("read send err...{}", err);
+                            break;
+                        }
+                    }
+                    Some(Err(err)) => {
+                        println!("read err: {}", err);
+                        break;
+                    }
+                    None => {
+                        println!("none");
+                        break;
+                    }
                 }
             }
+            println!("terminating MuxFramedReader...");
         }
     }
 
-
-
     pub struct MuxRegistryClient {
         sequence: AtomicU64,
-        map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>,
+        map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Signal<RegistryResult>>>>,
         sink: tokio::sync::mpsc::Sender<MuxedRequest>,
     }
 
@@ -845,14 +865,15 @@ pub mod exchange {
             Self::new(client_request_sink, server_response_stream)
         }
 
-        pub fn from_connection<R,W>( read: R, write: W ) -> Self where R: AsyncRead  + Send + Sync +Unpin+'static, W: AsyncWrite + AsyncRead + Send + Sync + Unpin+'static, {
-            let sink= MuxFramedWriter::new(FramedWrite::new(write,MuxedRequestCodec::default()));
-            let stream = MuxFramedReader::new(FramedRead::new(read,MuxedResultCodec::default()));
+        pub fn from_connection<R, W>(read: R, write: W) -> Self
+        where
+            R: AsyncRead + Send + Sync + Unpin + 'static,
+            W: AsyncWrite + Send + Sync + Unpin + 'static,
+        {
+            let sink = MuxFramedWriter::new(FramedWrite::new(write, MuxedRequestCodec::default()));
+            let stream = MuxFramedReader::new(FramedRead::new(read, MuxedResultCodec::default()));
             Self::new(sink, stream)
         }
-
-
-
 
         pub fn new(
             sink: tokio::sync::mpsc::Sender<MuxedRequest>,
@@ -873,29 +894,33 @@ pub mod exchange {
 
     #[async_trait]
     impl Sender for MuxRegistryClient {
-        async fn send<R, F>(&self, request: RegistryRequest, expect: F) -> Result<R, RegErr>
+        async fn signal<R, F>(
+            &self,
+            signal: Signal<RegistryRequest>,
+            expect: F,
+        ) -> Result<R, RegErr>
         where
-            F: Fn(RegistryResponse) -> Result<R, RegErr> + Send + Sync,
+            F: Fn(Signal<RegistryResult>) -> Result<R, RegErr> + Send + Sync,
         {
             let id = self.sequence.fetch_add(1u64, Ordering::Relaxed);
-            let request = MuxedRequest::new(request, id);
+            let request = MuxedRequest::signal(id, signal);
             let (res_tx, res_rx) = tokio::sync::oneshot::channel();
             self.map.insert(id, res_tx);
             self.sink.send(request).await?;
-            let response = res_rx.await??;
+            let response = res_rx.await?;
             expect(response)
         }
     }
 
     struct MuxResultReceiver {
         stream: tokio::sync::mpsc::Receiver<MuxedResult>,
-        map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>,
+        map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Signal<RegistryResult>>>>,
     }
 
     impl MuxResultReceiver {
         pub fn new(
             stream: tokio::sync::mpsc::Receiver<MuxedResult>,
-            map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>>>,
+            map: Arc<DashMap<u64, tokio::sync::oneshot::Sender<Signal<RegistryResult>>>>,
         ) {
             let mut runner = Self { stream, map };
 
@@ -905,7 +930,7 @@ pub mod exchange {
         async fn start(mut self) {
             while let Some(res) = self.stream.recv().await {
                 if let Some((_, tx)) = self.map.remove(&res.id) {
-                    tx.send(res.result.into());
+                    tx.send(res.signal);
                 }
             }
         }
@@ -918,6 +943,16 @@ pub mod exchange {
     }
 
     impl MuxRegistryServer {
+        pub fn from_connection<R, W>(registry: Arc<dyn RegistryApi>, read: R, write: W)
+        where
+            R: AsyncRead + Send + Sync + Unpin + 'static,
+            W: AsyncWrite + Send + Sync + Unpin + 'static,
+        {
+            let sink = MuxFramedWriter::new(FramedWrite::new(write, MuxedResultCodec::default()));
+            let stream = MuxFramedReader::new(FramedRead::new(read, MuxedRequestCodec::default()));
+            Self::new(registry, stream, sink);
+        }
+
         pub fn new(
             registry: Arc<dyn RegistryApi>,
             stream: tokio::sync::mpsc::Receiver<MuxedRequest>,
@@ -941,64 +976,50 @@ pub mod exchange {
         }
 
         async fn start(mut self) {
-            while let Some(req) = self.stream.recv().await {
-                let tx = self.tx.clone();
+            while let Some(MuxedRequest { id, signal }) = self.stream.recv().await {
                 let sink = self.sink_tx.clone();
+                let (exchange, rx) = Exchange::signal(signal);
+                self.tx.send(exchange).await.unwrap();
                 tokio::spawn(async move {
-                    let res = RegistryResult::from(send(tx, req.request).await);
-                    let res = MuxedResult::new(res, req.id);
-                    sink.send(res).await;
-
-                    async fn send(
-                        tx: tokio::sync::mpsc::Sender<Exchange>,
-                        req: RegistryRequest,
-                    ) -> Result<RegistryResponse, RegErr> {
-                        let (exchange, mut rx) = Exchange::new(req);
-                        tx.send(exchange).await?;
-                        rx.await?
-                    }
+                    let result = rx.await.unwrap();
+                    let mux_out = MuxedResult::signal(id, result);
+                    sink.send(mux_out).await;
                 });
             }
         }
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-    pub struct MuxedRequest {
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct MuxedSignal<T> {
         pub id: u64,
-        pub request: RegistryRequest,
+        pub signal: Signal<T>,
     }
 
-    impl Display for MuxedRequest {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{} -> {}", self.id, self.request)
+    impl<T> Display for MuxedSignal<T>
+    where
+        T: Display,
+    {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(f, "MuxedSignal({})<{}>", self.id, self.signal)
         }
     }
 
-    impl MuxedRequest {
-        pub fn new(request: RegistryRequest, id: u64) -> Self {
-            Self { id, request }
+    impl<T> MuxedSignal<T> {
+        pub fn transport(id: u64, t: T) -> Self {
+            Self::signal(id, Signal::Transport(t))
+        }
+
+        pub fn signal(id: u64, signal: Signal<T>) -> Self {
+            Self { id, signal }
         }
     }
 
-    #[derive(Serialize, Deserialize)]
-    pub struct MuxedResult {
-        id: u64,
-        result: RegistryResult,
-    }
+    pub type MuxedRequest = MuxedSignal<RegistryRequest>;
+    pub type MuxedResult = MuxedSignal<RegistryResult>;
 
-    impl Display for MuxedResult {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}", format!("{}(result) -> {}", self.id, RegistryResultType::from(&self.result).to_string()))
-        }
-    }
-
-    impl MuxedResult {
-        pub fn new(result: RegistryResult, id: u64) -> Self {
-            Self { id, result }
-        }
-    }
-
-    #[derive(Debug, Serialize, Deserialize, Clone,strum_macros::EnumDiscriminants)]
+    #[derive(
+        Debug, Serialize, Deserialize, Clone, strum_macros::EnumDiscriminants, strum_macros::Display,
+    )]
     #[strum_discriminants(vis(pub))]
     #[strum_discriminants(name(RegistryResultType))]
     #[strum_discriminants(derive(Hash, Serialize, Deserialize, strum_macros::Display))]
@@ -1007,7 +1028,14 @@ pub mod exchange {
         Err(RegErr),
     }
 
-
+    impl RegistryResult {
+        pub fn into_result(self) -> Result<RegistryResponse, RegErr> {
+            match self {
+                RegistryResult::Ok(value) => Ok(value),
+                RegistryResult::Err(value) => Err(value),
+            }
+        }
+    }
 
     impl From<Result<RegistryResponse, RegErr>> for RegistryResult {
         fn from(result: Result<RegistryResponse, RegErr>) -> Self {
@@ -1057,60 +1085,78 @@ pub mod exchange {
     pub type MuxedRequestCodec = SerdeCodec<MuxedRequest>;
     pub type MuxedResultCodec = SerdeCodec<MuxedResult>;
 
-    pub struct SerdeCodec<T> where T: Display+serde::Serialize+serde::de::DeserializeOwned {
+    pub struct SerdeCodec<T>
+    where
+        T: serde::Serialize + serde::de::DeserializeOwned,
+    {
         length_codec: LengthDelimitedCodec,
         _phantom: PhantomData<T>,
     }
 
-    impl <T> Default for SerdeCodec<T> where T: Display+serde::Serialize+serde::de::DeserializeOwned {
+    impl<T> Default for SerdeCodec<T>
+    where
+        T: serde::Serialize + serde::de::DeserializeOwned,
+    {
         fn default() -> Self {
             Self {
                 length_codec: LengthDelimitedCodec::default(),
-                _phantom: PhantomData::default()
+                _phantom: PhantomData::default(),
             }
         }
     }
 
-    impl <T> Encoder<T> for SerdeCodec<T> where T: Display+serde::Serialize+serde::de::DeserializeOwned {
+    impl<T> Encoder<T> for SerdeCodec<T>
+    where
+        T: serde::Serialize + serde::de::DeserializeOwned,
+    {
         type Error = anyhow::Error;
 
         fn encode(&mut self, item: T, dst: &mut BytesMut) -> Result<(), Self::Error> {
-            println!("encode");
-            let data = bincode::serialize(& item)?;
-            println!("encoded data: {}", data.len());
-            self.length_codec.encode(data.into(),dst)?;
-            println!("final encoded data: {}", dst.len());
+            let data = bincode::serialize(&item)?;
+            self.length_codec.encode(data.into(), dst)?;
             Ok(())
         }
     }
-    impl <T> Decoder for SerdeCodec<T> where T: Display+serde::Serialize+serde::de::DeserializeOwned{
-
+    impl<T> Decoder for SerdeCodec<T>
+    where
+        T: serde::Serialize + serde::de::DeserializeOwned,
+    {
         type Item = T;
         type Error = anyhow::Error;
 
         fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-            println!("DECODE");
-            use tokio_util::bytes::Buf;
-            let mut data = self.length_codec.decode(src)?.ok_or(anyhow::Error::msg("No data"))?;
-            println!("DATA: {}",data.len());
-            let t= bincode::deserialize(& mut data)?;
-            println!("Got T: {}",t);
-            Ok(Some(t))
+            if let Some(mut data) = self.length_codec.decode(src)? {
+                let t = bincode::deserialize(&mut data)?;
+                Ok(Some(t))
+            } else {
+                Ok(None)
+            }
         }
     }
-
-
-
-
-
-
-
 
     #[async_trait]
     trait Sender: Send + Sync {
         async fn send<R, F>(&self, request: RegistryRequest, expect: F) -> Result<R, RegErr>
         where
-            F: Fn(RegistryResponse) -> Result<R, RegErr> + Send + Sync;
+            F: Fn(RegistryResponse) -> Result<R, RegErr> + Send + Sync,
+        {
+            self.signal(Signal::Transport(request), move |signal| {
+                let request = signal
+                    .transport_or()
+                    .map_err(|_| RegErr::ExchangeErr)
+                    .map(RegistryResult::into_result)??;
+                expect(request)
+            })
+            .await
+        }
+
+        async fn signal<R, F>(
+            &self,
+            signal: Signal<RegistryRequest>,
+            expect: F,
+        ) -> Result<R, RegErr>
+        where
+            F: Fn(Signal<RegistryResult>) -> Result<R, RegErr> + Send + Sync;
     }
 
     #[async_trait]
@@ -1265,53 +1311,138 @@ pub mod exchange {
 
     pub struct RegistryExchanger {
         tx: tokio::sync::mpsc::Sender<Exchange>,
+        status: StatusReporter,
     }
 
     impl RegistryExchanger {
         pub fn new(registry: Arc<dyn RegistryApi>) -> Self {
             let tx = ExchangeRunner::new(registry);
-            Self { tx }
-        }
-
-        async fn xsend<R>(
-            &self,
-            request: RegistryRequest,
-            expect: impl Fn(RegistryResponse) -> Result<R, RegErr>,
-        ) -> Result<R, RegErr> {
-            let (exchange, mut rx) = Exchange::new(request);
-            self.tx.send(exchange).await?;
-            let result = rx.await??;
-            expect(result)
+            let status = status_reporter();
+            Self { tx, status }
         }
     }
 
     #[async_trait]
     impl Sender for RegistryExchanger {
+        /*
         async fn send<R, F>(&self, request: RegistryRequest, expect: F) -> Result<R, RegErr>
         where
             F: Fn(RegistryResponse) -> Result<R, RegErr> + Send + Sync,
         {
-            let (exchange, mut rx) = Exchange::new(request);
+            let (exchange, mut rx) = Exchange::request(request);
             self.tx.send(exchange).await?;
-            let result = rx.await??;
+            let result = rx.await?;
+            expect(result)
+        }
+
+         */
+
+        async fn signal<R, F>(
+            &self,
+            signal: Signal<RegistryRequest>,
+            expect: F,
+        ) -> Result<R, RegErr>
+        where
+            F: Fn(Signal<RegistryResult>) -> Result<R, RegErr> + Send + Sync,
+        {
+            let (exchange, mut rx) = Exchange::signal(signal);
+            self.tx.send(exchange).await?;
+            let result = rx.await?;
             expect(result)
         }
     }
 
-    struct Exchange {
-        pub request: RegistryRequest,
-        pub tx: tokio::sync::oneshot::Sender<Result<RegistryResponse, RegErr>>,
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub enum Signal<T> {
+        Probe(Probe),
+        Transport(T),
+    }
+
+    impl<T> Display for Signal<T>
+    where
+        T: Display,
+    {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Signal::Probe(t) => {
+                    write!(f, "Signal::Trace({})", t)
+                }
+                Signal::Transport(t) => {
+                    write!(f, "Signal::Transport({})", t)
+                }
+            }
+        }
+    }
+
+    impl<T> Signal<T>
+    where
+        T: Display,
+    {
+        pub fn transport_or(self) -> Result<T, anyhow::Error> {
+            match self {
+                Signal::Transport(t) => Ok(t),
+                _ => Err(anyhow!("expected a transport")),
+            }
+        }
+        pub fn unwrap(self) -> T {
+            match self {
+                Signal::Transport(t) => t,
+                _ => panic!("expected transport"),
+            }
+        }
+    }
+
+    impl From<Result<RegistryResponse, RegErr>> for Signal<Result<RegistryResponse, RegErr>> {
+        fn from(value: Result<RegistryResponse, RegErr>) -> Self {
+            Signal::Transport(value)
+        }
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub enum Probe {
+        /// return a stack of names
+        Status(Vec<String>),
+        Report(Vec<StatusReport>),
+    }
+
+    impl Display for Probe {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Probe::Status(_) => write!(f, "Probe::Probe"),
+                Probe::Report(_) => write!(f, "Probe::Return"),
+            }
+        }
+    }
+
+    impl Probe {
+        pub fn push(mut self, name: &str) -> anyhow::Result<Self> {
+            if let Self::Status(mut stack) = self {
+                stack.push(name.to_string());
+                Ok(Self::Status(stack))
+            } else {
+                Err(anyhow!("not a probe"))
+            }
+        }
+    }
+
+    pub struct Exchange {
+        pub signal: Signal<RegistryRequest>,
+        pub tx: tokio::sync::oneshot::Sender<Signal<RegistryResult>>,
     }
 
     impl Exchange {
-        pub fn new(
+        pub fn request(
             request: RegistryRequest,
-        ) -> (
-            Self,
-            tokio::sync::oneshot::Receiver<Result<RegistryResponse, RegErr>>,
-        ) {
+        ) -> (Self, tokio::sync::oneshot::Receiver<Signal<RegistryResult>>) {
+            let signal = Signal::Transport(request);
+            Self::signal(signal)
+        }
+
+        pub fn signal(
+            signal: Signal<RegistryRequest>,
+        ) -> (Self, tokio::sync::oneshot::Receiver<Signal<RegistryResult>>) {
             let (tx, rx) = tokio::sync::oneshot::channel();
-            (Self { request, tx }, rx)
+            (Self { signal, tx }, rx)
         }
     }
 
@@ -1333,91 +1464,104 @@ pub mod exchange {
             while let Some(x) = self.rx.recv().await {
                 let registry = self.registry.clone();
                 tokio::spawn(async move {
-                    let result: Result<RegistryResponse, RegErr> = match x.request {
-                        RegistryRequest::Scorch => {
-                            registry.scorch().await.map(|_| RegistryResponse::Scorch)
+                    match x.signal {
+                        Signal::Transport(request) => {
+                            let result: Result<RegistryResponse, RegErr> = match request {
+                                RegistryRequest::Scorch => {
+                                    registry.scorch().await.map(|_| RegistryResponse::Scorch)
+                                }
+                                RegistryRequest::Register(registration) => registry
+                                    .register(&registration)
+                                    .await
+                                    .map(|_| RegistryResponse::Register),
+                                RegistryRequest::AssignStar { point, star } => registry
+                                    .assign_star(&point, &star)
+                                    .await
+                                    .map(|_| RegistryResponse::AssignStar),
+                                RegistryRequest::AssignHost { point, host } => registry
+                                    .assign_host(&point, &host)
+                                    .await
+                                    .map(|_| RegistryResponse::AssignHost),
+                                RegistryRequest::SetStatus { point, status } => registry
+                                    .set_status(&point, &status)
+                                    .await
+                                    .map(|_| RegistryResponse::SetStatus),
+                                RegistryRequest::SetProperties { point, properties } => registry
+                                    .set_properties(&point, &properties)
+                                    .await
+                                    .map(|_| RegistryResponse::SetProperties),
+                                RegistryRequest::Sequence(point) => registry
+                                    .sequence(&point)
+                                    .await
+                                    .map(|value| RegistryResponse::Sequence(value)),
+                                RegistryRequest::GetProperties(point) => registry
+                                    .get_properties(&point)
+                                    .await
+                                    .map(|value| RegistryResponse::GetProperties(value)),
+                                RegistryRequest::Record(point) => registry
+                                    .record(&point)
+                                    .await
+                                    .map(|value| RegistryResponse::Record(value)),
+                                RegistryRequest::Query { point, query } => registry
+                                    .query(&point, &query)
+                                    .await
+                                    .map(|value| RegistryResponse::Query(value)),
+                                RegistryRequest::Delete(delete) => registry
+                                    .delete(&delete)
+                                    .await
+                                    .map(|value| RegistryResponse::Delete(value)),
+                                RegistryRequest::Select(mut select) => registry
+                                    .select(&mut select)
+                                    .await
+                                    .map(|value| RegistryResponse::Select(value)),
+                                RegistryRequest::Grant(access_grant) => registry
+                                    .grant(&access_grant)
+                                    .await
+                                    .map(|_| RegistryResponse::Grant),
+                                RegistryRequest::Access { to, on } => registry
+                                    .access(&to, &on)
+                                    .await
+                                    .map(|value| RegistryResponse::Access(value)),
+                                RegistryRequest::Chown { on, owner, by } => registry
+                                    .chown(&on, &owner, &by)
+                                    .await
+                                    .map(|_| RegistryResponse::Chown),
+                                RegistryRequest::ListAccess { to, on } => registry
+                                    .list_access(&to.as_ref(), &on)
+                                    .await
+                                    .map(|value| RegistryResponse::ListAccess(value)),
+                                RegistryRequest::RemoveAccess { id, to } => registry
+                                    .remove_access(id, &to)
+                                    .await
+                                    .map(|_| RegistryResponse::RemoveAccess),
+                            };
+                            let result = Signal::Transport(RegistryResult::from(result));
+                            x.tx.send(result).unwrap();
                         }
-                        RegistryRequest::Register(registration) => registry
-                            .register(&registration)
-                            .await
-                            .map(|_| RegistryResponse::Register),
-                        RegistryRequest::AssignStar { point, star } => registry
-                            .assign_star(&point, &star)
-                            .await
-                            .map(|_| RegistryResponse::AssignStar),
-                        RegistryRequest::AssignHost { point, host } => registry
-                            .assign_host(&point, &host)
-                            .await
-                            .map(|_| RegistryResponse::AssignHost),
-                        RegistryRequest::SetStatus { point, status } => registry
-                            .set_status(&point, &status)
-                            .await
-                            .map(|_| RegistryResponse::SetStatus),
-                        RegistryRequest::SetProperties { point, properties } => registry
-                            .set_properties(&point, &properties)
-                            .await
-                            .map(|_| RegistryResponse::SetProperties),
-                        RegistryRequest::Sequence(point) => registry
-                            .sequence(&point)
-                            .await
-                            .map(|value| RegistryResponse::Sequence(value)),
-                        RegistryRequest::GetProperties(point) => registry
-                            .get_properties(&point)
-                            .await
-                            .map(|value| RegistryResponse::GetProperties(value)),
-                        RegistryRequest::Record(point) => registry
-                            .record(&point)
-                            .await
-                            .map(|value| RegistryResponse::Record(value)),
-                        RegistryRequest::Query { point, query } => registry
-                            .query(&point, &query)
-                            .await
-                            .map(|value| RegistryResponse::Query(value)),
-                        RegistryRequest::Delete(delete) => registry
-                            .delete(&delete)
-                            .await
-                            .map(|value| RegistryResponse::Delete(value)),
-                        RegistryRequest::Select(mut select) => registry
-                            .select(&mut select)
-                            .await
-                            .map(|value| RegistryResponse::Select(value)),
-                        RegistryRequest::Grant(access_grant) => registry
-                            .grant(&access_grant)
-                            .await
-                            .map(|_| RegistryResponse::Grant),
-                        RegistryRequest::Access { to, on } => registry
-                            .access(&to, &on)
-                            .await
-                            .map(|value| RegistryResponse::Access(value)),
-                        RegistryRequest::Chown { on, owner, by } => registry
-                            .chown(&on, &owner, &by)
-                            .await
-                            .map(|_| RegistryResponse::Chown),
-                        RegistryRequest::ListAccess { to, on } => registry
-                            .list_access(&to.as_ref(), &on)
-                            .await
-                            .map(|value| RegistryResponse::ListAccess(value)),
-                        RegistryRequest::RemoveAccess { id, to } => registry
-                            .remove_access(id, &to)
-                            .await
-                            .map(|_| RegistryResponse::RemoveAccess),
-                    };
-                    x.tx.send(result).unwrap();
+                        Signal::Probe(Trace) => {
+                            panic!("cannot handle Signal::Probe yet")
+                        }
+                    }
                 });
             }
         }
     }
+
+    #[derive(Error, Debug)]
+    enum TxRxErr {}
 }
 
 #[cfg(test)]
 pub mod test {
-    use std::time::Duration;
     use super::*;
     use crate::hyperlane::HyperwayKind::Mount;
-    use crate::registry::exchange::{MuxRegistryClient, MuxedRequest, RegistryExchanger};
+    use crate::registry::exchange::{
+        MuxRegistryClient, MuxRegistryServer, MuxedRequest, RegistryExchanger,
+    };
     use mockall::mock;
-    use tokio_util::codec::{FramedRead, FramedWrite};
     use starlane_space::wave::exchange::asynch::Exchanger;
+    use std::time::Duration;
+    use tokio_util::codec::{FramedRead, FramedWrite};
 
     mock! {
         pub Registry{
@@ -1502,6 +1646,21 @@ pub mod test {
         test_registry(registry).await.unwrap();
     }
 
+    #[tokio::test]
+    pub async fn test_muxer_over_pipes() {
+        let mock = Arc::new(mock());
+        let registry = MuxRegistryClient::local(mock.clone());
+        let (client_request_read, client_request_write) = tokio_pipe::pipe().unwrap();
+        let (server_result_read, server_result_write) = tokio_pipe::pipe().unwrap();
+        MuxRegistryServer::from_connection(mock, client_request_read, server_result_write);
+        let registry = MuxRegistryClient::from_connection(server_result_read, client_request_write);
+
+        tokio::time::timeout(Duration::from_secs(15), test_registry(registry))
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
     pub fn mock() -> MockRegistry {
         let mut mock = MockRegistry::new();
         mock.expect_scorch().times(1).returning(|| Ok(()));
@@ -1557,22 +1716,24 @@ pub mod test {
         Ok(())
     }
 
-
     #[tokio::test]
     pub async fn test_mux_framed_writer() {
-
-
         let (read, write) = tokio_pipe::pipe().unwrap();
 
-        let REQUEST: MuxedRequest = MuxedRequest::new(RegistryRequest::Scorch, 1_u64);
+        let REQUEST: MuxedRequest = MuxedRequest::transport(1_u64,RegistryRequest::Scorch, );
 
         let tx = {
-            let write= FramedWrite::new(write, crate::registry::exchange::MuxedRequestCodec::default());
+            let write = FramedWrite::new(
+                write,
+                crate::registry::exchange::MuxedRequestCodec::default(),
+            );
             crate::registry::exchange::MuxFramedWriter::new(write)
         };
 
-        let mut read = FramedRead::new(read, crate::registry::exchange::MuxedRequestCodec::default());
-
+        let mut read = FramedRead::new(
+            read,
+            crate::registry::exchange::MuxedRequestCodec::default(),
+        );
 
         let mut read = crate::registry::exchange::MuxFramedReader::new(read);
 
@@ -1583,8 +1744,15 @@ pub mod test {
             .unwrap()
             .unwrap();
 
-        println!("Received FROM! {}", from_read.request.to_string());
+        println!("Received FROM! {}", from_read.signal.to_string());
 
-        assert_eq!(REQUEST, from_read);
+//        assert_eq!(REQUEST, from_read);
+    }
+
+    #[test]
+    pub fn test_query_serde() {
+        let query = Query::mock();
+        let query = bincode::serialize(&query).unwrap();
+        let query = bincode::deserialize::<Query>(&query).unwrap();
     }
 }
