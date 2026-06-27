@@ -29,7 +29,6 @@ pub mod wit {
 pub use bindings::starlane::hyperspace::space;
 pub use bindings::starlane::hyperspace::status_api::Host as StatusHost;
 use crate::host::registry::bindings::exports::starlane::hyperspace::registry_api::RegErr;
-use crate::wit::RegistryGuest;
 
 struct RegistryState {
     pub status: Status,

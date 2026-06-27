@@ -26,6 +26,7 @@ repository.workspace = true
 skel=[]
 test=[]
 wit=[]
+signal=[]
 
 
 [dependencies]
