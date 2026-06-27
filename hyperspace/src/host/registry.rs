@@ -1,39 +1,35 @@
-use std::str::FromStr;
 use anyhow::Result;
-use wasmtime::{
-    Config,
-    Engine,
-    Store,
-};
-use wasmtime::component::{Component, HasSelf, Linker, ResourceTable};
-use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
-use starlane_space::types::specific::PackFile;
 use bindings::starlane::hyperspace::space::Status;
+use starlane_space::types::specific::PackFile;
+use std::str::FromStr;
+use wasmtime::component::{Component, HasSelf, Linker, ResourceTable};
+use wasmtime::{Config, Engine, Store};
+use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
 
 mod bindings {
     wasmtime::component::bindgen!({
-            path: "../wit",
-            world: "registry",
-        });
+        path: "../wit",
+        world: "registry",
+    });
 }
 
 pub use bindings::Registry as RegistryComponent;
 
 pub mod wit {
-    pub use super::bindings::starlane::hyperspace::space;
-    pub use super::bindings::starlane::hyperspace::status_api::Host as StatusHost;
-    pub use super::bindings::starlane::hyperspace::space::Host as SpaceHost;
     pub use super::bindings::exports::starlane::hyperspace::registry_api::Guest as RegistryGuest;
+    pub use super::bindings::starlane::hyperspace::space;
+    pub use super::bindings::starlane::hyperspace::space::Host as SpaceHost;
+    pub use super::bindings::starlane::hyperspace::status_api::Host as StatusHost;
 }
 
+use crate::host::registry::bindings::exports::starlane::hyperspace::registry_api::RegErr;
 pub use bindings::starlane::hyperspace::space;
 pub use bindings::starlane::hyperspace::status_api::Host as StatusHost;
-use crate::host::registry::bindings::exports::starlane::hyperspace::registry_api::RegErr;
 
 struct RegistryState {
     pub status: Status,
     ctx: WasiCtx,
-    table: ResourceTable
+    table: ResourceTable,
 }
 
 impl RegistryState {
@@ -62,33 +58,27 @@ impl Default for RegistryState {
     }
 }
 
-    impl wit::StatusHost for RegistryState {
-        fn update(&mut self, status: bindings::starlane::hyperspace::status_api::Status) -> () {
-            self.status = status.into();
+impl wit::StatusHost for RegistryState {
+    fn update(&mut self, status: bindings::starlane::hyperspace::status_api::Status) -> () {
+        self.status = status.into();
+    }
+}
+
+impl wit::SpaceHost for RegistryState {}
+impl WasiView for RegistryState {
+    fn ctx(&mut self) -> WasiCtxView<'_> {
+        WasiCtxView {
+            ctx: &mut self.ctx,
+            table: &mut self.table,
         }
     }
-
-
-impl wit::SpaceHost for RegistryState { }
-    impl WasiView for RegistryState {
-        fn ctx(&mut self) -> WasiCtxView<'_> {
-            WasiCtxView {
-                ctx: &mut self.ctx,
-                table: &mut self.table,
-            }
-        }
-    }
-
-
-
-
-
+}
 
 mod state {
     use starlane_space::particle::Status;
     struct HostState {
-        pub status_tx: tokio::sync::watch::Sender<Status>
-    }   
+        pub status_tx: tokio::sync::watch::Sender<Status>,
+    }
 }
 
 #[tokio::test]
@@ -105,7 +95,9 @@ async fn test_mock_registry() -> Result<()> {
     let state = RegistryState::default();
 
     let mut linker = Linker::new(&engine);
-    RegistryComponent::add_to_linker::<_,HasSelf<_>>(&mut linker, |state: &mut RegistryState| state)?;
+    RegistryComponent::add_to_linker::<_, HasSelf<_>>(&mut linker, |state: &mut RegistryState| {
+        state
+    })?;
     wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
 
     let mut store = Store::new(&engine, state);
@@ -114,38 +106,32 @@ async fn test_mock_registry() -> Result<()> {
 
     let bindings = RegistryComponent::instantiate(&mut store, &component, &linker)?;
     let guest = bindings.starlane_hyperspace_registry_api();
-     match guest.call_assign_host(& mut store, & "hello".to_string(), &"kitty".to_string()).unwrap() {
-         Ok(_) => {
-             assert!(false)
-         }
-         Err(err) => {
-             match err {
-                 RegErr::NotImplemented => {
+    match guest
+        .call_assign_host(&mut store, &"hello".to_string(), &"kitty".to_string())
+        .unwrap()
+    {
+        Ok(_) => {
+            assert!(false)
+        }
+        Err(err) => match err {
+            RegErr::NotImplemented => {}
+            _ => {
+                assert!(false)
+            }
+        },
+    }
 
-                 },
-                 _ => {
-                     assert!(false)
-                 }
-             }
-         }
-     }
-
-    match guest.call_scorch(& mut store).unwrap() {
+    match guest.call_scorch(&mut store).unwrap() {
         Ok(_) => {
             assert!(true)
         }
         Err(err) => {
             assert!(false)
-       }
+        }
     }
 
     Ok(())
 }
-
-
-
-
-    
 
 /*
 

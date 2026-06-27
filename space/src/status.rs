@@ -282,6 +282,13 @@ pub struct PendingDetail {
     conditions: Vec<String>,
 }
 
+impl PendingDetail {
+    pub fn new(condition: &str) -> Self {
+        let conditions = vec![condition.to_string()];
+        Self { conditions }
+    }
+}
+
 #[derive(Clone, Debug, EnumDiscriminants, Serialize, Deserialize)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(name(StateErr))]
